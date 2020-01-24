@@ -1,0 +1,282 @@
+[
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.CYCLES"
+	    "Compat": "TBC"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.TRANSACTION"
+	    "Compat": "TBC"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.TLB_MISS"
+	    "Compat": "TBC"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_CACHE_MISS"
+	    "Compat": "TBC"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.TRANS_TABLE_WALK_ACCESS"
+	    "Compat": "TBC"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_STRUCT_ACCESS"
+	    "Compat": "TBC"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_RQ"
+	    "Compat": "TBC"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_PASSED"
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x80",
+	    "EventName": "smmuv3_pmcg.WR_RCVD_SP",
+	    "BriefDescription": "Write command received by the SP",
+	    "PublicDescription": "Write command received by the SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x81",
+	    "EventName": "smmuv3_pmcg.RD_RCVD_SP",
+	    "BriefDescription": "Read command received by the SP",
+	    "PublicDescription": "Read command received by the SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x82",
+	    "EventName": "smmuv3_pmcg.WR_RCVD_TP",
+	    "BriefDescription": "Write command received by the TP",
+	    "PublicDescription": "Write command received by the TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x83",
+	    "EventName": "smmuv3_pmcg.RD_RCVD_TP",
+	    "BriefDescription": "Read command received by the TP",
+	    "PublicDescription": "Read command received by the TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x84",
+	    "EventName": "smmuv3_pmcg.CMD_ISSUED_SP",
+	    "BriefDescription": "Command issued by the SP",
+	    "PublicDescription": "Command issued by the SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x85",
+	    "EventName": "smmuv3_pmcg.CMD_ISSUED_TP",
+	    "BriefDescription": "Command issued by the TP",
+	    "PublicDescription": "Command issued by the TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x86",
+	    "EventName": "smmuv3_pmcg.WR_SENT_SP",
+	    "BriefDescription": "Write command sent by SP",
+	    "PublicDescription": "Write command sent by SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x87",
+	    "EventName": "smmuv3_pmcg.RD_SENT_SP",
+	    "BriefDescription": "Read command sent by SP",
+	    "PublicDescription": "Read command sent by SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x88",
+	    "EventName": "smmuv3_pmcg.WR_SENT_TP",
+	    "BriefDescription": "Write command sent by TP",
+	    "PublicDescription": "Write command sent by TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x89",
+	    "EventName": "smmuv3_pmcg.RD_SENT_TP",
+	    "BriefDescription": "Read command sent by TP",
+	    "PublicDescription": "Read command sent by TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x8a",
+	    "EventName": "smmuv3_pmcg.L1_TLB",
+	    "BriefDescription": "Command received by L1 TLB",
+	    "PublicDescription": "Command received by L1 TLB",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x8B",
+	    "EventName": "smmuv3_pmcg.L2_TLB",
+	    "BriefDescription": "Command received by L2 TLB",
+	    "PublicDescription": "Command received by L2 TLB",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x8c",
+	    "EventName": "smmuv3_pmcg.L1_TLB_HIT",
+	    "BriefDescription": "L1 TLB HIT",
+	    "PublicDescription": "L1 TLB HIT",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x8d",
+	    "EventName": "smmuv3_pmcg.L2_TLB_HIT",
+	    "BriefDescription": "L2 TLB HIT",
+	    "PublicDescription": "L2 TLB HIT",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x8f",
+	    "EventName": "smmuv3_pmcg.RETRIED_TP",
+	    "BriefDescription": "Command retried on TP interface",
+	    "PublicDescription": "Command retried on TP interface",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x90",
+	    "EventName": "smmuv3_pmcg.MATCH_CMD_ISSUED_SP",
+	    "BriefDescription": "Specific matched commands sent by SP",
+	    "PublicDescription": "Specific matched commands sent by SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x91",
+	    "EventName": "smmuv3_pmcg.DELAYED_CMD_ISSUED_SP",
+	    "BriefDescription": "Delayed commands sent by SP",
+	    "PublicDescription": "Delayed commands sent by SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x92",
+	    "EventName": "smmuv3_pmcg.MATCH_CMD_ISSUED_TP",
+	    "BriefDescription": "Specific matched commands sent by TP",
+	    "PublicDescription": "Specific matched commands sent by TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0x93",
+	    "EventName": "smmuv3_pmcg.DELAYED_CMD_ISSUED_TP",
+	    "BriefDescription": "Delayed commands sent by TP",
+	    "PublicDescription": "Delayed commands sent by TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa0",
+	    "EventName": "smmuv3_pmcg.DVM_TLBI",
+	    "BriefDescription": "DVM TLBI",
+	    "PublicDescription": "DVM TLBI",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa1",
+	    "EventName": "smmuv3_pmcg.DVM_SYNC",
+	    "BriefDescription": "DVM SYNC",
+	    "PublicDescription": "DVM SYNC",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa2",
+	    "EventName": "smmuv3_pmcg.DELAY_PAGE_TBL_READ",
+	    "BriefDescription": "Delay page table read request",
+	    "PublicDescription": "Delay page table read request",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa3",
+	    "EventName": "smmuv3_pmcg.PAGE_TBL_READ",
+	    "BriefDescription": "Page table read request",
+	    "PublicDescription": "Page table read request",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa4",
+	    "EventName": "smmuv3_pmcg.DELAY_ADDR_TRANSLATE_REQ",
+	    "BriefDescription": "Delay of address translation requests",
+	    "PublicDescription": "Delay of address translation requests",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa5",
+	    "EventName": "smmuv3_pmcg.ADDR_TRANSLATE_REQ",
+	    "BriefDescription": "Address translation request",
+	    "PublicDescription": "Address translation request",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa6",
+	    "EventName": "smmuv3_pmcg.SYNC_REQUEST_EXEC_TIME",
+	    "BriefDescription": "Sync request execution time",
+	    "PublicDescription": "Sync request execution time",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa7",
+	    "EventName": "smmuv3_pmcg.SYNC_REQUEST_SENT",
+	    "BriefDescription": "Sync request sent",
+	    "PublicDescription": "Sync request sent",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa8",
+	    "EventName": "smmuv3_pmcg.CLEAN_UNIQUE_REQUEST_SP",
+	    "BriefDescription": "Clean unique request sent by SP",
+	    "PublicDescription": "Clean unique request sent by SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xa9",
+	    "EventName": "smmuv3_pmcg.WRITEBACK_SP",
+	    "BriefDescription": "Writeback sent by SP",
+	    "PublicDescription": "Writeback sent by SP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xaa",
+	    "EventName": "smmuv3_pmcg.CLEAN_UNIQUE_REQUEST_TP",
+	    "BriefDescription": "Clean unique request sent by TP",
+	    "PublicDescription": "Clean unique request sent by TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+   {
+	    "EventCode": "0xab",
+	    "EventName": "smmuv3_pmcg.WRITEBACK_TP",
+	    "BriefDescription": "Writeback sent by TP",
+	    "PublicDescription": "Writeback sent by TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "TBC"
+   },
+]
