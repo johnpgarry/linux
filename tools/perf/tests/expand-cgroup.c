@@ -205,7 +205,7 @@ static int expand_metric_events(void)
 
 	rblist__init(&metric_events);
 	ret = metricgroup__parse_groups_test(evlist, &ev_map, metric_str,
-					     false, false, &metric_events);
+					     false, false, &metric_events, NULL);
 	if (ret < 0) {
 		pr_debug("failed to parse '%s' metric\n", metric_str);
 		goto out;

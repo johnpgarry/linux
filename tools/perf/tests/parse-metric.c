@@ -139,7 +139,8 @@ static double compute_single(struct rblist *metric_events, struct evlist *evlist
 
 static int __compute_metric(const char *name, struct value *vals,
 			    const char *name1, double *ratio1,
-			    const char *name2, double *ratio2)
+			    const char *name2, double *ratio2,
+			    struct perf_pmu *pmu)
 {
 	struct rblist metric_events = {
 		.nr_entries = 0,
@@ -169,7 +170,8 @@ static int __compute_metric(const char *name, struct value *vals,
 	/* Parse the metric into metric_events list. */
 	err = metricgroup__parse_groups_test(evlist, &map, name,
 					     false, false,
-					     &metric_events);
+					     &metric_events,
+					     pmu);
 	if (err)
 		goto out;
 
@@ -198,14 +200,14 @@ out:
 
 static int compute_metric(const char *name, struct value *vals, double *ratio)
 {
-	return __compute_metric(name, vals, name, ratio, NULL, NULL);
+	return __compute_metric(name, vals, name, ratio, NULL, NULL, NULL);
 }
 
 static int compute_metric_group(const char *name, struct value *vals,
 				const char *name1, double *ratio1,
 				const char *name2, double *ratio2)
 {
-	return __compute_metric(name, vals, name1, ratio1, name2, ratio2);
+	return __compute_metric(name, vals, name1, ratio1, name2, ratio2, NULL);
 }
 
 static int test_ipc(void)

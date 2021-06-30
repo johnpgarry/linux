@@ -975,6 +975,7 @@ static struct pmu_events_map *sys_pmu_map;
 struct event_iter_data {
 	struct pmu_event *table;
 	unsigned int event_count;
+	struct perf_pmu *fake_pmu;
 };
 
 static int
@@ -1082,6 +1083,7 @@ static int metricgroup__metric_event_iter(struct pmu_event *pe,
 					  void *data)
 {
 	struct event_iter_data *iter_data = data;
+	struct perf_pmu *fake_pmu = iter_data->fake_pmu;
 	struct pmu_event *event_table = iter_data->table;
 	int events_count = 0, found_events;
 	struct evlist *evlist;
@@ -1094,7 +1096,8 @@ static int metricgroup__metric_event_iter(struct pmu_event *pe,
 	evlist = evlist__new();
 	if (!evlist)
 		return -ENOMEM;
-	ret = parse_groups_sys(evlist, false, NULL, pe, event_table);
+	ret = parse_groups_sys(evlist, false, iter_data->fake_pmu, pe,
+			       event_table);
 	if (ret) {
 		/* Just allow the iter to continue as we could not parse */
 		ret = 0;
@@ -1140,6 +1143,9 @@ static int metricgroup__metric_event_iter(struct pmu_event *pe,
 			}
 		}
 
+		if (fake_pmu && match_to_pmu(found_event, fake_pmu, pe, evsel))
+			found_events++;
+
 test:
 		if (found_events == events_count) {
 			pr_debug2("Adding metric %s to sys event table\n", pe->metric_name);
@@ -1156,7 +1162,11 @@ out:
 	return ret;
 }
 
-static void metricgroup_init_sys_pmu_list(void)
+/*
+ * fake_pmu argument is to avoid adding a fake_pmu to the list of PMUs in
+ * pmu.c::pmus
+ */
+static void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
 {
 	struct event_iter_data event_iter_data;
 	unsigned int event_count = 0;
@@ -1175,6 +1185,7 @@ static void metricgroup_init_sys_pmu_list(void)
 	}
 	event_count++; // Add a sentinel
 	event_iter_data.event_count = 0;
+	event_iter_data.fake_pmu = fake_pmu;
 	event_iter_data.table = table = zalloc(event_count * sizeof(*table));
 	if (!table)
 		return;
@@ -1280,7 +1291,8 @@ out:
 static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 					struct strbuf *events,
 					struct list_head *metric_list,
-					struct pmu_events_map *map)
+					struct pmu_events_map *map,
+					struct perf_pmu *fake_pmu)
 {
 	char *llist, *nlist, *p;
 	int ret = -EINVAL;
@@ -1293,7 +1305,7 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 	strbuf_init(events, 100);
 	strbuf_addf(events, "%s", "");
 
-	metricgroup_init_sys_pmu_list();
+	metricgroup_init_sys_pmu_list(fake_pmu);
 
 	while ((p = strsep(&llist, ",")) != NULL) {
 		ret = metricgroup__add_metric(p, metric_no_group, events,
@@ -1347,7 +1359,7 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 			return;
 	}
 
-	metricgroup_init_sys_pmu_list();
+	metricgroup_init_sys_pmu_list(NULL);
 
 	for (i = 0; sys_pmu_map; i++) {
 		pe = &sys_pmu_map->table[i];
@@ -1397,7 +1409,7 @@ static int parse_groups(struct evlist *perf_evlist, const char *str,
 	if (metric_events->nr_entries == 0)
 		metricgroup__rblist_init(metric_events);
 	ret = metricgroup__add_metric_list(str, metric_no_group,
-					   &extra_events, &metric_list, map);
+					   &extra_events, &metric_list, map, fake_pmu);
 	if (ret)
 		goto out;
 	pr_debug("adding %s\n", extra_events.buf);
@@ -1433,10 +1445,13 @@ int metricgroup__parse_groups_test(struct evlist *evlist,
 				   const char *str,
 				   bool metric_no_group,
 				   bool metric_no_merge,
-				   struct rblist *metric_events)
+				   struct rblist *metric_events,
+				   struct perf_pmu *pmu)
 {
+	if (!pmu)
+		pmu = &perf_pmu__fake;
 	return parse_groups(evlist, str, metric_no_group,
-			    metric_no_merge, &perf_pmu__fake, metric_events, map);
+			    metric_no_merge, pmu, metric_events, map);
 }
 
 bool metricgroup__has_metric(const char *metric)
