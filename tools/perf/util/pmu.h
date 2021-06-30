@@ -113,6 +113,7 @@ bool pmu_have_event(const char *pname, const char *name);
 int perf_pmu__scan_file(struct perf_pmu *pmu, const char *name, const char *fmt, ...) __scanf(3, 4);
 
 int perf_pmu__test(void);
+void pmu_add_sys_aliases(struct list_head *head, struct perf_pmu *pmu);
 
 struct perf_event_attr *perf_pmu__get_default_config(struct perf_pmu *pmu);
 void pmu_add_cpu_aliases_map(struct list_head *head, struct perf_pmu *pmu,
