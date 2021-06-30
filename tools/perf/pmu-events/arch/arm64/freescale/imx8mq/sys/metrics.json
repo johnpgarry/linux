@@ -5,7 +5,6 @@
 	    "MetricExpr": "imx8mq_ddr.read_cycles * 4 * 4",
 	    "ScaleUnit": "9.765625e-4KB",
 	    "Unit": "imx8_ddr",
-	    "Compat": "i.MX8MQ"
    },
    {
 	    "BriefDescription": "bytes all masters write to ddr based on write-cycles event",
@@ -13,6 +12,5 @@
 	    "MetricExpr": "imx8mq_ddr.write_cycles * 4 * 4",
 	    "ScaleUnit": "9.765625e-4KB",
 	    "Unit": "imx8_ddr",
-	    "Compat": "i.MX8MQ"
     }
 ]
