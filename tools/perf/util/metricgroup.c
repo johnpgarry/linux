@@ -617,77 +617,6 @@ static int metricgroup__print_sys_event_iter(struct pmu_event *pe, void *data)
 				     d->details, d->groups, d->metriclist);
 }
 
-void metricgroup__print(bool metrics, bool metricgroups, char *filter,
-			bool raw, bool details)
-{
-	struct pmu_events_map *map = pmu_events_map__find();
-	struct pmu_event *pe;
-	int i;
-	struct rblist groups;
-	struct rb_node *node, *next;
-	struct strlist *metriclist = NULL;
-
-	if (!metricgroups) {
-		metriclist = strlist__new(NULL, NULL);
-		if (!metriclist)
-			return;
-	}
-
-	rblist__init(&groups);
-	groups.node_new = mep_new;
-	groups.node_cmp = mep_cmp;
-	groups.node_delete = mep_delete;
-	for (i = 0; map; i++) {
-		pe = &map->table[i];
-
-		if (!pe->name && !pe->metric_group && !pe->metric_name)
-			break;
-		if (!pe->metric_expr)
-			continue;
-		if (metricgroup__print_pmu_event(pe, metricgroups, filter,
-						 raw, details, &groups,
-						 metriclist) < 0)
-			return;
-	}
-
-	{
-		struct metricgroup_iter_data data = {
-			.fn = metricgroup__print_sys_event_iter,
-			.data = (void *) &(struct metricgroup_print_sys_idata){
-				.metriclist = metriclist,
-				.metricgroups = metricgroups,
-				.filter = filter,
-				.raw = raw,
-				.details = details,
-				.groups = &groups,
-			},
-		};
-
-		pmu_for_each_sys_event(metricgroup__sys_event_iter, &data);
-	}
-
-	if (!filter || !rblist__empty(&groups)) {
-		if (metricgroups && !raw)
-			printf("\nMetric Groups:\n\n");
-		else if (metrics && !raw)
-			printf("\nMetrics:\n\n");
-	}
-
-	for (node = rb_first_cached(&groups.entries); node; node = next) {
-		struct mep *me = container_of(node, struct mep, nd);
-
-		if (metricgroups)
-			printf("%s%s%s", me->name, metrics && !raw ? ":" : "", raw ? " " : "\n");
-		if (metrics)
-			metricgroup__print_strlist(me->metrics, raw);
-		next = rb_next(node);
-		rblist__remove_node(&groups, node);
-	}
-	if (!metricgroups)
-		metricgroup__print_strlist(metriclist, raw);
-	strlist__delete(metriclist);
-}
-
 static void metricgroup__add_metric_weak_group(struct strbuf *events,
 					       struct expr_parse_ctx *ctx)
 {
@@ -963,9 +892,33 @@ static int recursion_check(struct metric *m, const char *id, struct expr_id **pa
 static int add_metric(struct list_head *metric_list,
 		      struct pmu_event *pe,
 		      bool metric_no_group,
-		      struct metric **mp,
+		      struct metric **m,
 		      struct expr_id *parent,
-		      struct expr_ids *ids);
+		      struct expr_ids *ids)
+{
+	struct metric *orig = *m;
+	int ret = 0;
+
+	pr_debug("metric expr %s for %s\n", pe->metric_expr, pe->metric_name);
+
+	if (!strstr(pe->metric_expr, "?")) {
+		ret = __add_metric(metric_list, pe, metric_no_group, 1, m, parent, ids);
+	} else {
+		int j, count;
+
+		count = arch_get_runtimeparam(pe);
+
+		/* This loop is added to create multiple
+		 * events depend on count value and add
+		 * those events to metric_list.
+		 */
+
+		for (j = 0; j < count && !ret; j++, *m = orig)
+			ret = __add_metric(metric_list, pe, metric_no_group, j, m, parent, ids);
+	}
+
+	return ret;
+}
 
 static int __resolve_metric(struct metric *m,
 			    bool metric_no_group,
@@ -1032,35 +985,26 @@ static int resolve_metric(bool metric_no_group,
 	return 0;
 }
 
-static int add_metric(struct list_head *metric_list,
-		      struct pmu_event *pe,
-		      bool metric_no_group,
-		      struct metric **m,
-		      struct expr_id *parent,
-		      struct expr_ids *ids)
+static void metric__free_refs(struct metric *metric)
 {
-	struct metric *orig = *m;
-	int ret = 0;
+	struct metric_ref_node *ref, *tmp;
 
-	pr_debug("metric expr %s for %s\n", pe->metric_expr, pe->metric_name);
-
-	if (!strstr(pe->metric_expr, "?")) {
-		ret = __add_metric(metric_list, pe, metric_no_group, 1, m, parent, ids);
-	} else {
-		int j, count;
-
-		count = arch_get_runtimeparam(pe);
-
-		/* This loop is added to create multiple
-		 * events depend on count value and add
-		 * those events to metric_list.
-		 */
-
-		for (j = 0; j < count && !ret; j++, *m = orig)
-			ret = __add_metric(metric_list, pe, metric_no_group, j, m, parent, ids);
+	list_for_each_entry_safe(ref, tmp, &metric->metric_refs, list) {
+		list_del(&ref->list);
+		free(ref);
 	}
+}
 
-	return ret;
+static void metricgroup__free_metrics(struct list_head *metric_list)
+{
+	struct metric *m, *tmp;
+
+	list_for_each_entry_safe (m, tmp, metric_list, nd) {
+		metric__free_refs(m);
+		expr__ctx_clear(&m->pctx);
+		list_del_init(&m->nd);
+		free(m);
+	}
 }
 
 static int metricgroup__add_metric_sys_event_iter(struct pmu_event *pe,
@@ -1196,26 +1140,75 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 	return ret;
 }
 
-static void metric__free_refs(struct metric *metric)
+void metricgroup__print(bool metrics, bool metricgroups, char *filter,
+			bool raw, bool details)
 {
-	struct metric_ref_node *ref, *tmp;
+	struct pmu_events_map *map = pmu_events_map__find();
+	struct pmu_event *pe;
+	int i;
+	struct rblist groups;
+	struct rb_node *node, *next;
+	struct strlist *metriclist = NULL;
 
-	list_for_each_entry_safe(ref, tmp, &metric->metric_refs, list) {
-		list_del(&ref->list);
-		free(ref);
+	if (!metricgroups) {
+		metriclist = strlist__new(NULL, NULL);
+		if (!metriclist)
+			return;
 	}
-}
 
-static void metricgroup__free_metrics(struct list_head *metric_list)
-{
-	struct metric *m, *tmp;
+	rblist__init(&groups);
+	groups.node_new = mep_new;
+	groups.node_cmp = mep_cmp;
+	groups.node_delete = mep_delete;
+	for (i = 0; map; i++) {
+		pe = &map->table[i];
 
-	list_for_each_entry_safe (m, tmp, metric_list, nd) {
-		metric__free_refs(m);
-		expr__ctx_clear(&m->pctx);
-		list_del_init(&m->nd);
-		free(m);
+		if (!pe->name && !pe->metric_group && !pe->metric_name)
+			break;
+		if (!pe->metric_expr)
+			continue;
+		if (metricgroup__print_pmu_event(pe, metricgroups, filter,
+						 raw, details, &groups,
+						 metriclist) < 0)
+			return;
 	}
+
+	{
+		struct metricgroup_iter_data data = {
+			.fn = metricgroup__print_sys_event_iter,
+			.data = (void *) &(struct metricgroup_print_sys_idata){
+				.metriclist = metriclist,
+				.metricgroups = metricgroups,
+				.filter = filter,
+				.raw = raw,
+				.details = details,
+				.groups = &groups,
+			},
+		};
+
+		pmu_for_each_sys_event(metricgroup__sys_event_iter, &data);
+	}
+
+	if (!filter || !rblist__empty(&groups)) {
+		if (metricgroups && !raw)
+			printf("\nMetric Groups:\n\n");
+		else if (metrics && !raw)
+			printf("\nMetrics:\n\n");
+	}
+
+	for (node = rb_first_cached(&groups.entries); node; node = next) {
+		struct mep *me = container_of(node, struct mep, nd);
+
+		if (metricgroups)
+			printf("%s%s%s", me->name, metrics && !raw ? ":" : "", raw ? " " : "\n");
+		if (metrics)
+			metricgroup__print_strlist(me->metrics, raw);
+		next = rb_next(node);
+		rblist__remove_node(&groups, node);
+	}
+	if (!metricgroups)
+		metricgroup__print_strlist(metriclist, raw);
+	strlist__delete(metriclist);
 }
 
 static int parse_groups(struct evlist *perf_evlist, const char *str,
