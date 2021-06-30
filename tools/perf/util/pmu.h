@@ -123,7 +123,8 @@ struct pmu_events_map *pmu_events_map__find(void);
 bool pmu_uncore_alias_match(const char *pmu_name, const char *name);
 void perf_pmu_free_alias(struct perf_pmu_alias *alias);
 
-typedef int (*pmu_sys_event_iter_fn)(struct pmu_event *pe, void *data);
+typedef int (*pmu_sys_event_iter_fn)(struct pmu_event *pe,
+				     struct pmu_sys_events *table, void *data);
 void pmu_for_each_sys_event(pmu_sys_event_iter_fn fn, void *data);
 int perf_pmu__convert_scale(const char *scale, char **end, double *sval);
 

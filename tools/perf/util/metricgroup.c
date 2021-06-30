@@ -588,7 +588,9 @@ struct metricgroup_iter_data {
 	void *data;
 };
 
-static int metricgroup__sys_event_iter(struct pmu_event *pe, void *data)
+static int metricgroup__sys_event_iter(struct pmu_event *pe,
+				       __maybe_unused struct pmu_sys_events *table,
+				       void *data)
 {
 	struct metricgroup_iter_data *d = data;
 	struct perf_pmu *pmu = NULL;
