@@ -1050,6 +1050,61 @@ out:
 	return ret;
 }
 
+static struct pmu_events_map *sys_pmu_map;
+
+struct event_iter_data {
+	struct pmu_event *table;
+	unsigned int event_count;
+};
+
+static int
+metricgroup__metric_sys_event_count(__maybe_unused struct pmu_event *pe,
+				    __maybe_unused struct pmu_sys_events *t,
+				    void *data)
+{
+	unsigned int *count = data;
+	(*count)++;
+	return 0;
+}
+
+static void metricgroup_init_sys_pmu_list(void)
+{
+	unsigned int event_count = 0;
+	struct pmu_event *table;
+	static int done;
+
+	if (sys_pmu_map || done)
+		return;
+
+	pmu_for_each_sys_event(metricgroup__metric_sys_event_count,
+			       &event_count);
+
+	if (event_count == 0) {
+		done = 1;
+		return;
+	}
+	table = zalloc(event_count * sizeof(*table));
+	if (!table)
+		return;
+
+	sys_pmu_map = malloc(sizeof(*sys_pmu_map));
+	if (!sys_pmu_map) {
+		free(table);
+		return;
+	}
+	sys_pmu_map->table = table;
+}
+
+static void metricgroup_cleanup_sys_pmu_list(void)
+{
+	/* Test for sys events found */
+	if (sys_pmu_map) {
+		free(sys_pmu_map->table);
+		free(sys_pmu_map);
+	}
+	sys_pmu_map = NULL;
+}
+
 static int metricgroup__add_metric(const char *metric, bool metric_no_group,
 				   struct strbuf *events,
 				   struct list_head *metric_list,
@@ -1095,6 +1150,7 @@ static int metricgroup__add_metric(const char *metric, bool metric_no_group,
 
 		pmu_for_each_sys_event(metricgroup__sys_event_iter, &data);
 	}
+
 	/* End of pmu events. */
 	if (!has_match) {
 		ret = -EINVAL;
@@ -1140,6 +1196,8 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 	strbuf_init(events, 100);
 	strbuf_addf(events, "%s", "");
 
+	metricgroup_init_sys_pmu_list();
+
 	while ((p = strsep(&llist, ",")) != NULL) {
 		ret = metricgroup__add_metric(p, metric_no_group, events,
 					      metric_list, map);
@@ -1150,6 +1208,8 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 		}
 	}
 	free(nlist);
+
+	metricgroup_cleanup_sys_pmu_list();
 
 	if (!ret)
 		metricgroup___watchdog_constraint_hint(NULL, true);
@@ -1190,6 +1250,8 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 			return;
 	}
 
+	metricgroup_init_sys_pmu_list();
+
 	{
 		struct metricgroup_iter_data data = {
 			.fn = metricgroup__print_sys_event_iter,
@@ -1205,6 +1267,8 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 
 		pmu_for_each_sys_event(metricgroup__sys_event_iter, &data);
 	}
+
+	metricgroup_cleanup_sys_pmu_list();
 
 	if (!filter || !rblist__empty(&groups)) {
 		if (metricgroups && !raw)
