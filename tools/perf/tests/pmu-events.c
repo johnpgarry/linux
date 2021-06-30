@@ -450,6 +450,19 @@ static int check_parse_cpu(const char *id, bool same_cpu, struct pmu_event *pe)
 	return ret;
 }
 
+static void check_parse_sys(const char *id, struct pmu_event *pe)
+{
+	struct parse_events_error error = { .idx = 0, };
+	int ret = check_parse_id(id, &error, NULL);
+	if (ret)
+		pr_debug2("Parse system event failed, but for an event that may not be supported by this system.\nid '%s' metric '%s' expr '%s'\n",
+			  id, pe->metric_name, pe->metric_expr);
+	free(error.str);
+	free(error.help);
+	free(error.first_str);
+	free(error.first_help);
+}
+
 static int check_parse_fake(const char *id)
 {
 	struct parse_events_error error = { .idx = 0, };
@@ -468,6 +481,15 @@ static void expr_failure(const char *msg,
 {
 	pr_debug("%s for map %s %s %s\n",
 		msg, map->cpuid, map->version, map->type);
+	pr_debug("On metric %s\n", pe->metric_name);
+	pr_debug("On expression %s\n", pe->metric_expr);
+}
+
+static void expr_failure_sys(const char *msg,
+			 const struct pmu_sys_events *map,
+			 const struct pmu_event *pe)
+{
+	pr_debug("%s for map %s\n", msg, map->name);
 	pr_debug("On metric %s\n", pe->metric_name);
 	pr_debug("On expression %s\n", pe->metric_expr);
 }
@@ -611,6 +633,74 @@ exit:
 	return ret == 0 ? TEST_OK : TEST_SKIP;
 }
 
+static int test_sys_parsing(void)
+{
+	struct pmu_sys_events *map;
+	struct pmu_event *pe;
+	int i, j, k;
+	int ret = 0;
+	struct expr_parse_ctx ctx;
+	double result;
+
+	i = 0;
+	for (;;) {
+		map = &pmu_sys_event_tables[i++];
+		if (!map->table)
+			break;
+		j = 0;
+		for (;;) {
+			struct metric *metric, *tmp;
+			struct hashmap_entry *cur;
+			LIST_HEAD(compound_list);
+			size_t bkt;
+
+			pe = &map->table[j++];
+			if (!pe->name && !pe->metric_group && !pe->metric_name)
+				break;
+			if (!pe->metric_expr)
+				continue;
+
+			pr_debug("parsing '%s' in %s\n", pe->metric_name, map->name);
+
+			expr__ctx_init(&ctx);
+			if (expr__find_other(pe->metric_expr, NULL, &ctx, 0)
+				  < 0) {
+				expr_failure_sys("Parse other failed", map, pe);
+				ret++;
+				continue;
+			}
+
+			/* TODO: Add support for resolving metrics */
+
+			/*
+			 * Add all ids with a made up value. The value may
+			 * trigger divide by zero when subtracted and so try to
+			 * make them unique.
+			 */
+			k = 1;
+			hashmap__for_each_entry((&ctx.ids), cur, bkt)
+				expr__add_id_val(&ctx, strdup(cur->key), k++);
+
+			hashmap__for_each_entry((&ctx.ids), cur, bkt) {
+				check_parse_sys(cur->key, pe);
+			}
+
+			list_for_each_entry_safe(metric, tmp, &compound_list, list) {
+				expr__add_ref(&ctx, &metric->metric_ref);
+				free(metric);
+			}
+
+			if (expr__parse(&result, &ctx, pe->metric_expr, 0)) {
+				expr_failure_sys("Parse failed", map, pe);
+				ret++;
+			}
+			expr__ctx_clear(&ctx);
+		}
+	}
+	/* TODO: fail when not ok */
+	return ret == 0 ? TEST_OK : TEST_SKIP;
+}
+
 struct test_metric {
 	const char *str;
 };
@@ -705,6 +795,38 @@ static int test_parsing_fake(void)
 	return 0;
 }
 
+/*
+ * Parse all the sys metrics for current architecture via the 'fake_pmu'
+ * in parse_events.
+ */
+static __maybe_unused int test_sys_parsing_fake(void)
+{
+	struct pmu_sys_events *map;
+	struct pmu_event *pe;
+	unsigned int i, j;
+	int err = 0;
+
+	i = 0;
+	for (;;) {
+		map = &pmu_sys_event_tables[i++];
+		if (!map->table)
+			break;
+		j = 0;
+		for (;;) {
+			pe = &map->table[j++];
+			if (!pe->name && !pe->metric_group && !pe->metric_name)
+				break;
+			if (!pe->metric_expr)
+				continue;
+			err = metric_parse_fake(pe->metric_expr);
+			if (err)
+				return err;
+		}
+	}
+
+	return 0;
+}
+
 static const struct {
 	int (*func)(void);
 	const char *desc;
@@ -724,6 +846,14 @@ static const struct {
 	{
 		.func = test_parsing_fake,
 		.desc = "Parsing of PMU event table metrics with fake PMUs",
+	},
+	{
+		.func = test_sys_parsing,
+		.desc = "Parsing of System PMU event table metrics",
+	},
+	{
+		.func = test_sys_parsing_fake,
+		.desc = "Parsing of system PMU event table metrics with fake PMUs",
 	},
 };
 
