@@ -1,0 +1,37 @@
+[
+   {
+           "BriefDescription": "ddr cycles event",
+           "EventCode": "0x00",
+           "EventName": "test_ddr.cycles",
+           "Unit": "fake_ddr_pmu"
+           "Compat": "v1"
+   },
+   {
+           "BriefDescription": "ddr read-cycles event",
+           "EventCode": "0x2a",
+           "EventName": "test_ddr.read_cycles",
+           "Unit": "fake_ddr_pmu"
+           "Compat": "v1"
+   },
+   {
+           "BriefDescription": "ddr write-cycles event",
+           "EventCode": "0x2b",
+           "EventName": "test_ddr.write_cycles",
+           "Unit": "fake_ddr_pmu"
+           "Compat": "v1"
+   },
+   {
+           "BriefDescription": "ddr read event",
+           "EventCode": "0x35",
+           "EventName": "test_ddr.read",
+           "Unit": "fake_ddr_pmu"
+           "Compat": "v1"
+   },
+   {
+           "BriefDescription": "ddr write event",
+           "EventCode": "0x38",
+           "EventName": "test_ddr.write",
+           "Unit": "fake_ddr_pmu"
+           "Compat": "v1"
+   }
+]

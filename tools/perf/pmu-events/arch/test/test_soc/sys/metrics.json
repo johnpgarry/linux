@@ -1,0 +1,28 @@
+[
+   {
+	    "BriefDescription": "bytes all masters read from ddr based on read-cycles event",
+	    "MetricName": "test_ddr_read.all",
+	    "MetricExpr": "test_ddr.read_cycles * 4 * 4",
+   },
+   {
+	    "BriefDescription": "bytes all masters write to ddr based on write-cycles event",
+	    "MetricName": "test_ddr_write.all",
+	    "MetricExpr": "test_ddr.write_cycles * 4 * 4",
+    },
+    {
+	    "BriefDescription": "write-cycles vs read-cycles ratio",
+	    "MetricName": "test_ddr_rw_ratio.all",
+	    "MetricExpr": "test_ddr_read.all / test_ddr_write.all",
+    },
+    {
+	    "BriefDescription": "bandwidth on read-cycles event",
+	    "MetricName": "test_ddr_read.bandwidth",
+	    "MetricExpr": "test_ddr_read.all / duration_time",
+    },
+    {
+	    "BriefDescription": "Metric without aliases",
+	    "MetricName": "test_ddr.noalias",
+	    "MetricExpr": "uncore_fake_ddr_pmu0@event\\=0x4\\,subevent\\=0x2@ / uncore_fake_ddr_pmu0@event\\=0x1\\,subevent\\=0x0@",
+	    "Compat": "v1"
+    }
+]

@@ -203,6 +203,12 @@ static int compute_metric(const char *name, struct value *vals, double *ratio)
 	return __compute_metric(name, vals, name, ratio, NULL, NULL, NULL);
 }
 
+static int compute_sys_metric(const char *name, struct value *vals,
+			      double *ratio, struct perf_pmu *pmu)
+{
+	return __compute_metric(name, vals, name, ratio, NULL, NULL, pmu);
+}
+
 static int compute_metric_group(const char *name, struct value *vals,
 				const char *name1, double *ratio1,
 				const char *name2, double *ratio2)
@@ -371,6 +377,59 @@ static int test_metric_group(void)
 	return 0;
 }
 
+static int test_system_event(void)
+{
+	double value;
+	struct perf_pmu_alias *alias, *tmp;
+	/* metrics are in pmu-events/arch/test/ */
+	struct value vals[] = {
+		{ .event = "test_ddr.write_cycles", .val = 4000000 },
+		{ .event = "test_ddr.read_cycles", .val = 3000000 },
+		{ .event = "duration_time",  .val = 200000000 },
+		{ .event = "uncore_fake_ddr_pmu0/event=0x4,subevent=0x2/", .val = 700000000 },
+		{ .event = "uncore_fake_ddr_pmu0/event=0x1,subevent=0x0/", .val = 100000000 },
+		{ .event = NULL, },
+	};
+	LIST_HEAD(aliases);
+	struct perf_pmu pmu = {
+		.name = (char *)"uncore_fake_ddr_pmu0",
+		.id = (char *)"v1",
+	};
+
+	pmu_add_sys_aliases(&aliases, &pmu);
+	INIT_LIST_HEAD(&pmu.aliases);
+	list_splice(&aliases, &pmu.aliases);
+
+	TEST_ASSERT_VAL("failed to compute metric",
+			compute_sys_metric("test_ddr_read.all", vals, &value, &pmu) == 0);
+	TEST_ASSERT_VAL("test_ddr_read.all, wrong value",
+			48000000 == value);
+
+	TEST_ASSERT_VAL("failed to compute metric",
+			compute_sys_metric("test_ddr_write.all", vals, &value, &pmu) == 0);
+	TEST_ASSERT_VAL("test_ddr_write.all, wrong value",
+			64000000 == value);
+
+	TEST_ASSERT_VAL("failed to compute metric",
+			compute_sys_metric("test_ddr_rw_ratio.all", vals, &value, &pmu) == 0);
+	TEST_ASSERT_VAL("test_ddr_rw_ratio.all, wrong ratio",
+			0.75 == value);
+
+	TEST_ASSERT_VAL("failed to compute metric",
+			compute_sys_metric("test_ddr_read.bandwidth", vals, &value, &pmu) == 0);
+	TEST_ASSERT_VAL("test_ddr_read.bandwidth, wrong value",
+			240000000 == value);
+	TEST_ASSERT_VAL("failed to compute metric",
+			compute_sys_metric("test_ddr.noalias", vals, &value, &pmu) == 0);
+	TEST_ASSERT_VAL("test_ddr.noalias, wrong value",
+			7 == value);
+
+	list_for_each_entry_safe(alias, tmp, &pmu.aliases, list)
+		free(alias);
+
+	return 0;
+}
+
 int test__parse_metric(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
 	TEST_ASSERT_VAL("IPC failed", test_ipc() == 0);
@@ -378,6 +437,7 @@ int test__parse_metric(struct test *test __maybe_unused, int subtest __maybe_unu
 	TEST_ASSERT_VAL("DCache_L2 failed", test_dcache_l2() == 0);
 	TEST_ASSERT_VAL("recursion fail failed", test_recursion_fail() == 0);
 	TEST_ASSERT_VAL("Memory bandwidth", test_memory_bandwidth() == 0);
+	TEST_ASSERT_VAL("System", test_system_event() == 0);
 
 	if (!perf_pmu__has_hybrid()) {
 		TEST_ASSERT_VAL("cache_miss_cycles failed", test_cache_miss_cycles() == 0);
