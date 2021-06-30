@@ -617,15 +617,16 @@ static int metricgroup__print_sys_event_iter(struct pmu_event *pe, void *data)
 				     d->details, d->groups, d->metriclist);
 }
 
-static void metricgroup__add_metric_weak_group(struct strbuf *events,
-					       struct expr_parse_ctx *ctx)
+static void __add_metric_weak_group(struct strbuf *events,
+				    struct expr_parse_ctx *ctx, bool debug)
 {
 	struct hashmap_entry *cur;
 	size_t bkt;
 	bool no_group = true, has_duration = false;
 
 	hashmap__for_each_entry((&ctx->ids), cur, bkt) {
-		pr_debug("found event %s\n", (const char *)cur->key);
+		if (debug)
+			pr_debug("found event %s\n", (const char *)cur->key);
 		/*
 		 * Duration time maps to a software event and can make
 		 * groups not count. Always use it outside a
@@ -646,6 +647,12 @@ static void metricgroup__add_metric_weak_group(struct strbuf *events,
 			strbuf_addf(events, ",duration_time");
 	} else if (has_duration)
 		strbuf_addf(events, "duration_time");
+}
+
+static void metricgroup__add_metric_weak_group(struct strbuf *events,
+					       struct expr_parse_ctx *ctx)
+{
+	__add_metric_weak_group(events, ctx, true);
 }
 
 static void metricgroup__add_metric_non_group(struct strbuf *events,
@@ -889,17 +896,15 @@ static int recursion_check(struct metric *m, const char *id, struct expr_id **pa
 	return p->id ? 0 : -ENOMEM;
 }
 
-static int add_metric(struct list_head *metric_list,
-		      struct pmu_event *pe,
-		      bool metric_no_group,
-		      struct metric **m,
-		      struct expr_id *parent,
-		      struct expr_ids *ids)
+static int _add_metric(struct list_head *metric_list,
+		       struct pmu_event *pe,
+		       bool metric_no_group,
+		       struct metric **m,
+		       struct expr_id *parent,
+		       struct expr_ids *ids)
 {
 	struct metric *orig = *m;
 	int ret = 0;
-
-	pr_debug("metric expr %s for %s\n", pe->metric_expr, pe->metric_name);
 
 	if (!strstr(pe->metric_expr, "?")) {
 		ret = __add_metric(metric_list, pe, metric_no_group, 1, m, parent, ids);
@@ -918,6 +923,18 @@ static int add_metric(struct list_head *metric_list,
 	}
 
 	return ret;
+}
+
+static int add_metric(struct list_head *metric_list,
+		      struct pmu_event *pe,
+		      bool metric_no_group,
+		      struct metric **m,
+		      struct expr_id *parent,
+		      struct expr_ids *ids)
+{
+	pr_debug("metric expr %s for %s\n", pe->metric_expr, pe->metric_name);
+
+	return _add_metric(metric_list, pe, metric_no_group, m, parent, ids);
 }
 
 static int __resolve_metric(struct metric *m,
