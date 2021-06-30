@@ -46,6 +46,7 @@ struct pmu_events_map {
 
 struct pmu_sys_events {
 	struct pmu_event *table;
+	const char *name;
 };
 
 /*
