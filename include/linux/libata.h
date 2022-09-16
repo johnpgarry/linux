@@ -981,6 +981,8 @@ struct ata_port_operations {
 	ssize_t (*transmit_led_message)(struct ata_port *ap, u32 state,
 					ssize_t size);
 
+	int (*setup_scsi_device)(struct ata_device *dev);
+
 	/*
 	 * ->inherits must be the last field and all the preceding
 	 * fields must be pointers.
