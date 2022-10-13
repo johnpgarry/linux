@@ -138,6 +138,7 @@ static const struct scsi_host_template pm8001_sht = {
 	.cmd_per_lun		= 32,
 	.map_queues		= pm8001_map_queues,
 	.reserved_queuecommand = sas_queuecommand_internal,
+	.reserved_timedout = sas_internal_timeout,
 };
 
 /*
