@@ -62,6 +62,7 @@ static struct scsi_host_template aic94xx_sht = {
 	.track_queue_depth	= 1,
 	.reserved_queuecommand = sas_queuecommand_internal,
 	.reserved_timedout = sas_internal_timeout,
+	.nr_reserved_cmds = 2,
 };
 
 static int asd_map_memio(struct asd_ha_struct *asd_ha)
@@ -787,7 +788,7 @@ static int asd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		   asd_ha->hw_prof.bios.present ? "build " : "not present",
 		   asd_ha->hw_prof.bios.bld);
 
-	shost->can_queue = asd_ha->seq.can_queue;
+	shost->can_queue = asd_ha->seq.can_queue - shost->nr_reserved_cmds;
 
 	if (use_msi)
 		pci_enable_msi(asd_ha->pcidev);

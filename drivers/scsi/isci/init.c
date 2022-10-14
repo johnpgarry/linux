@@ -162,7 +162,8 @@ static struct scsi_host_template isci_sht = {
 	.scan_start			= isci_host_start,
 	.change_queue_depth		= sas_change_queue_depth,
 	.bios_param			= sas_bios_param,
-	.can_queue			= ISCI_CAN_QUEUE_VAL,
+	.can_queue			= ISCI_CAN_QUEUE_VAL -
+						ISCI_CAN_RESERVED_TAGS,
 	.this_id			= -1,
 	.sg_tablesize			= SG_ALL,
 	.max_sectors			= SCSI_DEFAULT_MAX_SECTORS,
@@ -179,6 +180,7 @@ static struct scsi_host_template isci_sht = {
 	.track_queue_depth		= 1,
 	.reserved_queuecommand = sas_queuecommand_internal,
 	.reserved_timedout = sas_internal_timeout,
+	.nr_reserved_cmds	= ISCI_CAN_RESERVED_TAGS,
 };
 
 static struct sas_domain_function_template isci_transport_ops  = {
