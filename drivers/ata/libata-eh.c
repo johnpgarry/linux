@@ -1949,7 +1949,7 @@ static void ata_eh_link_autopsy(struct ata_link *link)
 	all_err_mask |= ehc->i.err_mask;
 
 	ata_qc_for_each_raw(ap, qc, tag) {
-		if (!qc || (qc->flags & ATA_QCFLAG_FAILED) ||
+		if (!qc || !(qc->flags & ATA_QCFLAG_FAILED) ||
 		    ata_dev_phys_link(qc->dev) != link)
 			continue;
 
