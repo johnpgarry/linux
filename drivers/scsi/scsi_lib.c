@@ -1751,7 +1751,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 			clear_bit(SCMD_STATE_COMPLETE, &cmd->state);
 		}
 		blk_mq_start_request(req);
-
+		__set_bit(SCMD_STATE_INFLIGHT, &cmd->state);
 		return shost->hostt->reserved_queuecommand(shost, cmd);
 	}
 
