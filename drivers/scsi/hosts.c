@@ -703,6 +703,9 @@ static bool complete_all_cmds_iter(struct request *rq, void *data)
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(rq);
 	enum scsi_host_status status = *(enum scsi_host_status *)data;
 
+	if (blk_mq_is_reserved_rq(rq))
+		return true;
+
 	scsi_dma_unmap(scmd);
 	scmd->result = 0;
 	set_host_byte(scmd, status);
