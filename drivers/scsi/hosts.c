@@ -602,6 +602,11 @@ static bool scsi_host_check_in_flight(struct request *rq, void *data)
 {
 	int *count = data;
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
+	bool reserved = blk_mq_is_reserved_rq(rq);
+
+	if (reserved) {
+		return true;
+	}
 
 	if (test_bit(SCMD_STATE_INFLIGHT, &cmd->state))
 		(*count)++;
