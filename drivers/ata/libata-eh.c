@@ -659,6 +659,9 @@ EXPORT_SYMBOL(ata_scsi_cmd_error_handler);
 void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 {
 	unsigned long flags;
+	struct Scsi_Host *shost = ap->scsi_host;
+
+       pr_err("%s ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 
 	/* invoke error handler */
 	if (ap->ops->error_handler) {
@@ -693,6 +696,7 @@ void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 			}
 		}
 
+       pr_err("%s2 ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 		ap->pflags |= ATA_PFLAG_EH_IN_PROGRESS;
 		ap->pflags &= ~ATA_PFLAG_EH_PENDING;
 		ap->excl_link = NULL;	/* don't maintain exclusion over EH */
@@ -710,6 +714,7 @@ void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 			ata_eh_finish(ap);
 		}
 
+       pr_err("%s3 ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 		/* process port suspend request */
 		ata_eh_handle_port_suspend(ap);
 
@@ -739,17 +744,22 @@ void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 		 * point but before EH completion, SCSI midlayer will
 		 * re-initiate EH.
 		 */
+       pr_err("%s4 ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 		ap->ops->end_eh(ap);
 
+       pr_err("%s5 ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 		spin_unlock_irqrestore(ap->lock, flags);
 		ata_eh_release(ap);
+       pr_err("%s5.1 ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	} else {
 		WARN_ON(ata_qc_from_tag(ap, ap->link.active_tag) == NULL);
 		ap->ops->eng_timeout(ap);
 	}
 
+       pr_err("%s5.2 ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	scsi_eh_flush_done_q(&ap->eh_done_q);
 
+       pr_err("%s6 ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	/* clean up */
 	spin_lock_irqsave(ap->lock, flags);
 
@@ -760,7 +770,7 @@ void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 		schedule_delayed_work(&ap->hotplug_task, 0);
 
 	if (ap->pflags & ATA_PFLAG_RECOVERED)
-		ata_port_info(ap, "EH complete\n");
+		ata_port_info(ap, "EH2 complete busy=%d\n", scsi_host_busy(shost));
 
 	ap->pflags &= ~(ATA_PFLAG_SCSI_HOTPLUG | ATA_PFLAG_RECOVERED);
 
@@ -979,6 +989,9 @@ EXPORT_SYMBOL(ata_std_end_eh);
  */
 void ata_port_schedule_eh(struct ata_port *ap)
 {
+	struct Scsi_Host *shost = ap->scsi_host;
+
+	pr_err("%s ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	/* see: ata_std_sched_eh, unless you know better */
 	ap->ops->sched_eh(ap);
 }
@@ -988,7 +1001,9 @@ static int ata_do_link_abort(struct ata_port *ap, struct ata_link *link)
 {
 	struct ata_queued_cmd *qc;
 	int tag, nr_aborted = 0;
+	struct Scsi_Host *shost = ap->scsi_host;
 
+	pr_err("%s ap=%pS link=%pS busy=%d\n", __func__, ap, link, scsi_host_busy(shost));
 	WARN_ON(!ap->ops->error_handler);
 
 	/* we're gonna abort all commands, no need for fast drain */
@@ -996,13 +1011,20 @@ static int ata_do_link_abort(struct ata_port *ap, struct ata_link *link)
 
 	/* include internal tag in iteration */
 	ata_qc_for_each_with_internal(ap, qc, tag) {
+	//	if (qc)
+	//		pr_err("%s1 qc=%pS link=%pS qc->dev->link == link=%d tag=%d\n", __func__, qc, link, qc->dev->link == link, tag);
+	//	else
+	//		pr_err("%s1 qc=%pS tag=%d\n", __func__, qc, tag);
+
 		if (qc && (!link || qc->dev->link == link)) {
+	//		pr_err("%s1.1 qc=%pS tag=%d\n", __func__, qc, tag);
 			qc->flags |= ATA_QCFLAG_FAILED;
 			ata_qc_complete(qc);
 			nr_aborted++;
 		}
 	}
 
+	pr_err("%s2 nr_aborted=%d\n", __func__, nr_aborted);
 	if (!nr_aborted)
 		ata_port_schedule_eh(ap);
 
@@ -1924,6 +1946,10 @@ static void ata_eh_link_autopsy(struct ata_link *link)
 	u32 serror;
 	int rc;
 
+
+	struct Scsi_Host *shost = ap->scsi_host;
+
+	pr_err("%s ap=%pS link=%pS busy=%d\n", __func__, ap, link, scsi_host_busy(shost));
 	if (ehc->i.flags & ATA_EHI_NO_AUTOPSY)
 		return;
 
@@ -1949,10 +1975,23 @@ static void ata_eh_link_autopsy(struct ata_link *link)
 	all_err_mask |= ehc->i.err_mask;
 
 	ata_qc_for_each_raw(ap, qc, tag) {
+		if (qc) {
+			struct ata_device *dev = qc->dev;
+			if (dev)
+				pr_err("%s1 qc=%pS failed=%d tag=%d ata_dev_phys_link(qc->dev)=%pS link=%pS different=%d\n", 
+					__func__, qc, qc ? !!(qc->flags & ATA_QCFLAG_FAILED) : -1, tag, ata_dev_phys_link(qc->dev), link, ata_dev_phys_link(qc->dev) != link);
+			else 
+				pr_err("%s1 qc=%pS failed=%d tag=%d dev==%pS \n", 
+					__func__, qc, qc ? !!(qc->flags & ATA_QCFLAG_FAILED) : -1, tag, dev);
+		}
+		else
+			pr_err("%s1 qc=%pS\n", __func__, qc);
+
 		if (!qc || !(qc->flags & ATA_QCFLAG_FAILED) ||
 		    ata_dev_phys_link(qc->dev) != link)
 			continue;
 
+		pr_err("%s1.1 qc=%pS\n", __func__, qc);
 		/* inherit upper level err_mask */
 		qc->err_mask |= ehc->i.err_mask;
 
@@ -1994,6 +2033,8 @@ static void ata_eh_link_autopsy(struct ata_link *link)
 	}
 
 	/* If all failed commands requested silence, then be quiet */
+
+	pr_err("%s2 ap=%pS nr_quiet=%d busy=%d\n", __func__, ap, nr_quiet, nr_failed);
 	if (nr_quiet == nr_failed)
 		ehc->i.flags |= ATA_EHI_QUIET;
 
@@ -2046,6 +2087,10 @@ void ata_eh_autopsy(struct ata_port *ap)
 {
 	struct ata_link *link;
 
+
+	struct Scsi_Host *shost = ap->scsi_host;
+
+	pr_err("%s ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	ata_for_each_link(link, ap, EDGE)
 		ata_eh_link_autopsy(link);
 
@@ -2218,6 +2263,8 @@ static void ata_eh_link_report(struct ata_link *link)
 	char tries_buf[6] = "";
 	int tag, nr_failed = 0;
 
+
+	pr_err("%s ap=%pS ATA_EHI_QUIET=%d\n", __func__, ap, !!(ehc->i.flags & ATA_EHI_QUIET));
 	if (ehc->i.flags & ATA_EHI_QUIET)
 		return;
 
@@ -2225,18 +2272,23 @@ static void ata_eh_link_report(struct ata_link *link)
 	if (ehc->i.desc[0] != '\0')
 		desc = ehc->i.desc;
 
+	pr_err("%s1 ap=%pS\n", __func__, ap);
 	ata_qc_for_each_raw(ap, qc, tag) {
+		pr_err("%s2 ap=%pS qc=%pS tag=%d\n", __func__, ap, qc, tag);
 		if (!qc || !(qc->flags & ATA_QCFLAG_FAILED) ||
 		    ata_dev_phys_link(qc->dev) != link ||
 		    ((qc->flags & ATA_QCFLAG_QUIET) &&
 		     qc->err_mask == AC_ERR_DEV))
 			continue;
+		pr_err("%s3 ap=%pS qc=%pS tag=%d\n", __func__, ap, qc, tag);
 		if (qc->flags & ATA_QCFLAG_SENSE_VALID && !qc->err_mask)
 			continue;
 
+		pr_err("%s3.1 ap=%pS qc=%pS tag=%d\n", __func__, ap, qc, tag);
 		nr_failed++;
 	}
 
+	pr_err("%s4 ap=%pS nr_failed=%d ehc->i.err_mask=%d\n", __func__, ap, nr_failed, ehc->i.err_mask);
 	if (!nr_failed && !ehc->i.err_mask)
 		return;
 
@@ -2408,6 +2460,10 @@ void ata_eh_report(struct ata_port *ap)
 {
 	struct ata_link *link;
 
+
+	struct Scsi_Host *shost = ap->scsi_host;
+
+	pr_err("%s ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	ata_for_each_link(link, ap, HOST_FIRST)
 		ata_eh_link_report(link);
 }
@@ -2456,6 +2512,9 @@ int ata_eh_reset(struct ata_link *link, int classify,
 	u32 sstatus;
 	int nr_unknown, rc;
 
+	struct Scsi_Host *shost = ap->scsi_host;
+
+	pr_err("%s ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	/*
 	 * Prepare to reset
 	 */
@@ -3571,6 +3630,13 @@ int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 	int rc, nr_fails;
 	unsigned long flags, deadline;
 
+	struct Scsi_Host *shost = ap->scsi_host;
+ 	static int count;
+
+	BUG_ON(count > 27);
+
+	pr_err("%s ap=%pS busy=%d count=%d\n", __func__, ap, scsi_host_busy(shost), count);
+	count++;
 	/* prep for recovery */
 	ata_for_each_link(link, ap, EDGE) {
 		struct ata_eh_context *ehc = &link->eh_context;
@@ -3847,6 +3913,10 @@ void ata_do_eh(struct ata_port *ap, ata_prereset_fn_t prereset,
 	struct ata_device *dev;
 	int rc;
 
+
+	struct Scsi_Host *shost = ap->scsi_host;
+
+	pr_err("%s ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	ata_eh_autopsy(ap);
 	ata_eh_report(ap);
 
@@ -3873,6 +3943,8 @@ void ata_std_error_handler(struct ata_port *ap)
 {
 	struct ata_port_operations *ops = ap->ops;
 	ata_reset_fn_t hardreset = ops->hardreset;
+
+	pr_err("%s ap=%pS\n", __func__, ap);
 
 	/* ignore built-in hardreset if SCR access is not available */
 	if (hardreset == sata_std_hardreset && !sata_scr_valid(&ap->link))

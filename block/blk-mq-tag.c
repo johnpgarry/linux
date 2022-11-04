@@ -339,6 +339,9 @@ static bool bt_tags_iter(struct sbitmap *bitmap, unsigned int bitnr, void *data)
 	if (!(iter_data->flags & BT_TAG_ITER_RESERVED))
 		bitnr += tags->nr_reserved_tags;
 
+	if (iter_data->flags & BT_TAG_ITER_RESERVED)
+		pr_err("%s bitnr=%d checking reserved\n", __func__, bitnr);
+
 	/*
 	 * We can hit rq == NULL here, because the tagging functions
 	 * test and set the bit before assigning ->rqs[].
@@ -350,9 +353,19 @@ static bool bt_tags_iter(struct sbitmap *bitmap, unsigned int bitnr, void *data)
 	if (!rq)
 		return true;
 
+	if (iter_data->flags & BT_TAG_ITER_RESERVED)
+		pr_err("%s2 bitnr=%d found reserved rq=%pS\n", __func__, bitnr, rq);
+
 	if (!(iter_data->flags & BT_TAG_ITER_STARTED) ||
-	    blk_mq_request_started(rq))
+	    blk_mq_request_started(rq)) {
+
+		if (iter_data->flags & BT_TAG_ITER_RESERVED)
+			pr_err("%s3 bitnr=%d found reserved rq=%pS calling %pS\n", __func__, bitnr, rq, iter_data->fn);
 		ret = iter_data->fn(rq, iter_data->data);
+	} else {
+		if (iter_data->flags & BT_TAG_ITER_RESERVED)
+			pr_err("%s4 bitnr=%d found reserved rq=%pS not started\n", __func__, bitnr, rq);
+	}
 	if (!iter_static_rqs)
 		blk_mq_put_rq_ref(rq);
 	return ret;

@@ -1442,7 +1442,11 @@ static void ata_qc_complete_internal(struct ata_queued_cmd *qc)
 {
 	struct scsi_cmnd *scmd = qc->scsicmd;
 
+//	pr_err("%s qc=%pS going to mdelay 100  and then call scsi_done SCMD_STATE_INFLIGHT=%d\n", __func__, qc, test_bit(SCMD_STATE_INFLIGHT, &scmd->state));
+//	mdelay(200);
+//	pr_err("%s2 qc=%pS calling scsi_done SCMD_STATE_INFLIGHT=%d\n", __func__, qc, test_bit(SCMD_STATE_INFLIGHT, &scmd->state));
 	scsi_done(scmd);
+//	BUG();
 }
 
 static enum rq_end_io_ret ata_internal_end_rq(struct request *rq,
@@ -1451,7 +1455,8 @@ static enum rq_end_io_ret ata_internal_end_rq(struct request *rq,
 	struct completion *waiting = rq->end_io_data;
 
 	rq->end_io_data = (void *)(uintptr_t)error;
-
+//	pr_err("%s rq=%pS going to mdelay 100 and then calling complete\n", __func__, rq);
+//	mdelay(200);
 	complete(waiting);
 
 	return RQ_END_IO_NONE;
@@ -1495,10 +1500,11 @@ static unsigned ata_exec_internal_sg(struct ata_device *dev,
 	unsigned int err_mask;
 	struct scsi_cmnd *scmd;
 	struct request *rq;
+	__maybe_unused struct Scsi_Host *shost = ap->scsi_host;
 
 	if (!sdev)
 		return AC_ERR_OTHER;
-
+	//pr_err("%s ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	rq = scsi_alloc_request(sdev->request_queue,
 			dma_dir == DMA_TO_DEVICE ?
 			REQ_OP_DRV_OUT : REQ_OP_DRV_IN,
@@ -1506,6 +1512,7 @@ static unsigned ata_exec_internal_sg(struct ata_device *dev,
 	if (IS_ERR(rq))
 		return AC_ERR_OTHER;
 
+	//pr_err("%s1 after req alloc ap=%pS busy=%d rq=%pS\n", __func__, ap, scsi_host_busy(shost), rq);
 
 	if (!timeout) {
 		if (ata_probe_timeout)
@@ -1561,6 +1568,9 @@ static unsigned ata_exec_internal_sg(struct ata_device *dev,
 
 	blk_execute_rq_nowait(rq, true);
 
+	//pr_err("%s2 after sending ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
+	//mdelay(10);
+	//pr_err("%s2 after sending and a delay ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	if (ap->ops->error_handler)
 		ata_eh_release(ap);
 
@@ -1626,7 +1636,9 @@ static unsigned ata_exec_internal_sg(struct ata_device *dev,
 
 	spin_unlock_irqrestore(ap->lock, flags);
 
+	//pr_err("%s4 before free ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 	blk_mq_free_request(rq);
+	//pr_err("%s5 after free ap=%pS busy=%d\n", __func__, ap, scsi_host_busy(shost));
 
 	if ((err_mask & AC_ERR_TIMEOUT) && auto_timeout)
 		ata_internal_cmd_timed_out(dev, command);

@@ -1422,6 +1422,9 @@ void ata_eh_analyze_ncq_error(struct ata_link *link)
 	struct ata_taskfile tf;
 	int tag, rc;
 
+	struct Scsi_Host *shost = ap->scsi_host;
+
+	pr_err("%s ap=%pS link=%pS busy=%d ATA_PFLAG_FROZEN=%d\n", __func__, ap, link, scsi_host_busy(shost), !!(ap->pflags & ATA_PFLAG_FROZEN));
 	/* if frozen, we can't do much */
 	if (ap->pflags & ATA_PFLAG_FROZEN)
 		return;
@@ -1435,10 +1438,13 @@ void ata_eh_analyze_ncq_error(struct ata_link *link)
 		if (!qc || !(qc->flags & ATA_QCFLAG_FAILED))
 			continue;
 
-		if (qc->err_mask)
+		if (qc->err_mask) {
+			pr_err("%s1 ap=%pS qc=%pS tag=%d err_mask=%d\n", __func__, ap, qc, tag, qc->err_mask);
 			return;
+		}
 	}
 
+	pr_err("%s2 ap=%pS link=%pS\n", __func__, ap, link);
 	/* okay, this error is ours */
 	memset(&tf, 0, sizeof(tf));
 	rc = ata_eh_read_log_10h(dev, &tag, &tf);
@@ -1456,6 +1462,7 @@ void ata_eh_analyze_ncq_error(struct ata_link *link)
 
 	/* we've got the perpetrator, condemn it */
 	qc = __ata_qc_from_tag(ap, tag);
+	pr_err("%s3 ap=%pS qc=%pS tag=%d\n", __func__, ap, qc, tag);
 	memcpy(&qc->result_tf, &tf, sizeof(tf));
 	qc->result_tf.flags = ATA_TFLAG_ISADDR | ATA_TFLAG_LBA | ATA_TFLAG_LBA48;
 	qc->err_mask |= AC_ERR_DEV | AC_ERR_NCQ;

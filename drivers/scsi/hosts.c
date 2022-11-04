@@ -605,6 +605,7 @@ static bool scsi_host_check_in_flight(struct request *rq, void *data)
 	bool reserved = blk_mq_is_reserved_rq(rq);
 
 	if (reserved) {
+		pr_err("%s rq=%pS SCMD_STATE_INFLIGHT=%d reserved\n", __func__, rq, test_bit(SCMD_STATE_INFLIGHT, &cmd->state));
 		return true;
 	}
 

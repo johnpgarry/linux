@@ -276,8 +276,13 @@ EXPORT_SYMBOL(__scsi_execute);
 static void scsi_dec_host_busy(struct Scsi_Host *shost, struct scsi_cmnd *cmd)
 {
 	unsigned long flags;
+	struct request *rq = scsi_cmd_to_rq(cmd);
 
 	rcu_read_lock();
+	if (blk_mq_is_reserved_rq(rq))
+		pr_err_once("%s rq=%pS clearing SCMD_STATE_INFLIGHT (was %d)\n", __func__, rq, test_bit(SCMD_STATE_INFLIGHT, &cmd->state));
+	if (blk_mq_is_reserved_rq(rq) && test_bit(SCMD_STATE_INFLIGHT, &cmd->state))
+		pr_err_once("%s2 rq=%pS clearing SCMD_STATE_INFLIGHT (was %d)\n", __func__, rq, test_bit(SCMD_STATE_INFLIGHT, &cmd->state));
 	__clear_bit(SCMD_STATE_INFLIGHT, &cmd->state);
 	if (unlikely(scsi_host_in_recovery(shost))) {
 		spin_lock_irqsave(shost->host_lock, flags);
@@ -1752,6 +1757,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 		}
 		blk_mq_start_request(req);
 		__set_bit(SCMD_STATE_INFLIGHT, &cmd->state);
+		pr_err("%s setting SCMD_STATE_INFLIGHT for rq=%pS reserved_queuecommand=%pS\nn", __func__, req, shost->hostt->reserved_queuecommand);
 		return shost->hostt->reserved_queuecommand(shost, cmd);
 	}
 

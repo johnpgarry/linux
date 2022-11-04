@@ -1128,7 +1128,7 @@ int ata_internal_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmd)
 {
 	struct ata_port *ap;
 	int res;
-
+	pr_err("%s scmd=%pS SCMD_STATE_INFLIGHT=%d\n", __func__, scmd, test_bit(SCMD_STATE_INFLIGHT, &scmd->state));
 	ap = ata_shost_to_port(shost);
 	spin_lock_irq(ap->lock);
 	res = ata_sas_queuecmd(scmd, ap);
@@ -4002,6 +4002,7 @@ unsigned int ata_scsi_queue_internal(struct scsi_cmnd *scmd,
 	struct ata_port *ap = link->ap;
 	struct ata_queued_cmd *qc;
 
+	pr_err("%s scmd=%pS SCMD_STATE_INFLIGHT=%d\n", __func__, scmd, test_bit(SCMD_STATE_INFLIGHT, &scmd->state));
 	/* no internal command while frozen */
 	if (ap->pflags & ATA_PFLAG_FROZEN)
 		goto did_err;
