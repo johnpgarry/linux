@@ -2481,6 +2481,7 @@ static int __init vhost_scsi_init(void)
 {
 	int ret = -ENOMEM;
 
+	pr_err("%s snake 28 nov 2022 1157\n", __func__);
 	pr_debug("TCM_VHOST fabric module %s on %s/%s"
 		" on "UTS_RELEASE"\n", VHOST_SCSI_VERSION, utsname()->sysname,
 		utsname()->machine);

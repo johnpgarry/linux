@@ -2639,6 +2639,7 @@ EXPORT_SYMBOL_GPL(vhost_set_backend_features);
 
 static int __init vhost_init(void)
 {
+	pr_err("%s snake 28 nov 2022 1156\n", __func__);
 	return 0;
 }
 
