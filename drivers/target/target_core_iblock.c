@@ -375,14 +375,24 @@ static void iblock_submit_bios(struct bio_list *list)
 {
 	struct blk_plug plug;
 	struct bio *bio;
-	pr_err("%s list=%pS\n", __func__, list);
+
+	WARN_ON_ONCE(1);
 	/*
 	 * The block layer handles nested plugs, so just plug/unplug to handle
 	 * fabric drivers that didn't support batching and multi bio cmds.
 	 */
 	blk_start_plug(&plug);
-	while ((bio = bio_list_pop(list)))
+	while ((bio = bio_list_pop(list))) {
+		struct block_device *bdev = bio->bi_bdev;
+		struct request_queue *bd_queue;
+		if (bdev)
+			bd_queue = bdev->bd_queue;
+		else
+			bd_queue = NULL;
+		pr_err_ratelimited("%s list=%pS bdev=%pS bd_queue=%pS\n", __func__, list, bdev, bd_queue);
+
 		submit_bio(bio);
+	}
 	blk_finish_plug(&plug);
 }
 
@@ -737,8 +747,8 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	int i, rc;
 	struct sg_mapping_iter prot_miter;
 	unsigned int miter_dir;
-
-	pr_err("%s dev=%pS cmd=%pS\n", __func__, dev, cmd);
+	WARN_ON_ONCE(1);
+	pr_err_ratelimited("%s dev=%pS cmd=%pS\n", __func__, dev, cmd);
 	if (data_direction == DMA_TO_DEVICE) {
 		struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
 		/*
@@ -841,7 +851,8 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 	struct block_device *bd = ib_dev->ibd_bd;
 	struct request_queue *q = bdev_get_queue(bd);
 
-	pr_err("%s dev=%pS\n", __func__, dev);
+	pr_err_ratelimited("%s dev=%pS\n", __func__, dev);
+	WARN_ON_ONCE(1);
 	return iblock_emulate_read_cap_with_block_size(dev, bd, q);
 }
 

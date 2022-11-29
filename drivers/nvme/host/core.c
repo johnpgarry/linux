@@ -1604,6 +1604,7 @@ static void nvme_ns_release(struct nvme_ns *ns)
 
 static int nvme_open(struct block_device *bdev, fmode_t mode)
 {
+	pr_err("%s bdev=%pS bd_queue=%pS\n", __func__, bdev, bdev->bd_queue);
 	return nvme_ns_open(bdev->bd_disk->private_data);
 }
 
@@ -4231,6 +4232,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 			ns->head->instance);
 	}
 
+	pr_err("%s ctrl=%pS disk=%pS queue=%pS disk_name=%s\n", __func__, ctrl, disk, ns->queue, disk->disk_name);
 	if (nvme_update_ns_info(ns, info))
 		goto out_unlink_ns;
 
