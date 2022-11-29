@@ -111,6 +111,7 @@ core_alloc_hba(const char *plugin_name, u32 plugin_dep_id, u32 hba_flags)
 	struct se_hba *hba;
 	int ret = 0;
 
+	pr_err("%s plugin_name=%s\n", __func__, plugin_name);
 	hba = kzalloc(sizeof(*hba), GFP_KERNEL);
 	if (!hba) {
 		pr_err("Unable to allocate struct se_hba\n");

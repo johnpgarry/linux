@@ -46,6 +46,7 @@ static int target_xcopy_locate_se_dev_e4_iter(struct se_device *se_dev,
 	unsigned char tmp_dev_wwn[XCOPY_NAA_IEEE_REGEX_LEN];
 	int rc;
 
+	pr_err("%s se_dev=%pS dev_wwn=%pS\n", __func__, se_dev, dev_wwn);
 	if (!se_dev->dev_attrib.emulate_3pc) {
 		pr_debug("XCOPY: emulate_3pc disabled on se_dev %p\n", se_dev);
 		return 0;
@@ -75,6 +76,7 @@ static int target_xcopy_locate_se_dev_e4(struct se_session *sess,
 	struct se_lun *this_lun = NULL;
 	struct se_device *found_dev = NULL;
 
+	pr_err("%s sess=%pS dev_wwn=%pS\n", __func__, sess, dev_wwn);
 	/* cmd with NULL sess indicates no associated $FABRIC_MOD */
 	if (!sess)
 		goto err_out;
@@ -794,6 +796,7 @@ static sense_reason_t target_parse_xcopy_cmd(struct xcopy_op *xop)
 	int rc;
 	unsigned short tdll;
 
+	pr_err("%s xop=%pS\n", __func__, xop);
 	p = transport_kmap_data_sg(se_cmd);
 	if (!p) {
 		pr_err("transport_kmap_data_sg() failed in target_do_xcopy\n");
@@ -878,6 +881,7 @@ sense_reason_t target_do_xcopy(struct se_cmd *se_cmd)
 	struct xcopy_op *xop;
 	unsigned int sa;
 
+	pr_err("%s se_cmd=%pS\n", __func__, se_cmd);
 	if (!dev->dev_attrib.emulate_3pc) {
 		pr_err("EXTENDED_COPY operation explicitly disabled\n");
 		return TCM_UNSUPPORTED_SCSI_OPCODE;

@@ -37,7 +37,7 @@ static inline struct fd_dev *FD_DEV(struct se_device *dev)
 static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	struct fd_host *fd_host;
-
+	pr_err("%s hba=%pS\n", __func__, hba);
 	fd_host = kzalloc(sizeof(struct fd_host), GFP_KERNEL);
 	if (!fd_host) {
 		pr_err("Unable to allocate memory for struct fd_host\n");
@@ -73,6 +73,7 @@ static struct se_device *fd_alloc_device(struct se_hba *hba, const char *name)
 	struct fd_dev *fd_dev;
 	struct fd_host *fd_host = hba->hba_ptr;
 
+	pr_err("%s hba=%pS name=%s\n", __func__, hba, name);
 	fd_dev = kzalloc(sizeof(struct fd_dev), GFP_KERNEL);
 	if (!fd_dev) {
 		pr_err("Unable to allocate memory for struct fd_dev\n");
@@ -277,6 +278,7 @@ fd_execute_rw_aio(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	ssize_t len = 0;
 	int ret = 0, i;
 
+	pr_err("%s cmd=%pS\n", __func__, cmd);
 	aio_cmd = kmalloc(struct_size(aio_cmd, bvecs, sgl_nents), GFP_KERNEL);
 	if (!aio_cmd)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -323,6 +325,7 @@ static int fd_do_rw(struct se_cmd *cmd, struct file *fd,
 	loff_t pos = (cmd->t_task_lba * block_size);
 	int ret = 0, i;
 
+	pr_err("%s cmd=%pS\n", __func__, cmd);
 	bvec = kcalloc(sgl_nents, sizeof(struct bio_vec), GFP_KERNEL);
 	if (!bvec) {
 		pr_err("Unable to allocate fd_do_readv iov[]\n");

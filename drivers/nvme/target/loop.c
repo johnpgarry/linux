@@ -94,6 +94,7 @@ static void nvme_loop_queue_response(struct nvmet_req *req)
 		container_of(req->sq, struct nvme_loop_queue, nvme_sq);
 	struct nvme_completion *cqe = req->cqe;
 
+	pr_err("%s req=%pS\n", __func__, req);
 	/*
 	 * AEN requests are special as they don't time out and can
 	 * survive any kind of queue freeze and often don't respond to
@@ -207,6 +208,7 @@ static int nvme_loop_init_request(struct blk_mq_tag_set *set,
 	struct nvme_loop_ctrl *ctrl = set->driver_data;
 	struct nvme_loop_iod *iod = blk_mq_rq_to_pdu(req);
 
+	pr_err("%s req=%pS\n", __func__, req);
 	nvme_req(req)->ctrl = &ctrl->ctrl;
 	nvme_req(req)->cmd = &iod->cmd;
 	return nvme_loop_init_iod(ctrl, blk_mq_rq_to_pdu(req),

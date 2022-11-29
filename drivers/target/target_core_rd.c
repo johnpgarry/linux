@@ -34,6 +34,7 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	struct rd_host *rd_host;
 
+	pr_err("%s hba=%pS \n", __func__, hba);
 	rd_host = kzalloc(sizeof(*rd_host), GFP_KERNEL);
 	if (!rd_host)
 		return -ENOMEM;
@@ -272,6 +273,7 @@ static struct se_device *rd_alloc_device(struct se_hba *hba, const char *name)
 	struct rd_dev *rd_dev;
 	struct rd_host *rd_host = hba->hba_ptr;
 
+	pr_err("%s hba=%pS name=%s\n", __func__, hba, name);
 	rd_dev = kzalloc(sizeof(*rd_dev), GFP_KERNEL);
 	if (!rd_dev)
 		return NULL;
@@ -342,6 +344,7 @@ static struct rd_dev_sg_table *rd_get_sg_table(struct rd_dev *rd_dev, u32 page)
 	u32 i, sg_per_table = (RD_MAX_ALLOCATION_SIZE /
 				sizeof(struct scatterlist));
 
+	pr_err("%s rd_dev=%pS\n", __func__, rd_dev);
 	i = page / sg_per_table;
 	if (i < rd_dev->sg_table_count) {
 		sg_table = &rd_dev->sg_table_array[i];
@@ -429,6 +432,7 @@ rd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	u64 tmp;
 	sense_reason_t rc;
 
+	pr_err("%s cmd=%pS\n", __func__, cmd);
 	if (dev->rd_flags & RDF_NULLIO) {
 		target_complete_cmd(cmd, SAM_STAT_GOOD);
 		return 0;

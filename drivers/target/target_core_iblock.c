@@ -93,7 +93,7 @@ static int iblock_configure_device(struct se_device *dev)
 	fmode_t mode;
 	unsigned int max_write_zeroes_sectors;
 	int ret;
-
+	pr_err("%s dev=%pS\n", __func__, dev);
 	if (!(ib_dev->ibd_flags & IBDF_HAS_UDEV_PATH)) {
 		pr_err("Missing udev_path= parameters for IBLOCK\n");
 		return -EINVAL;
@@ -239,6 +239,7 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	unsigned long long blocks_long =
 		div_u64(bdev_nr_bytes(bd), block_size) - 1;
 
+	pr_err("%s dev=%pS\n", __func__, dev);
 	if (block_size == dev->dev_attrib.block_size)
 		return blocks_long;
 
@@ -374,6 +375,7 @@ static void iblock_submit_bios(struct bio_list *list)
 {
 	struct blk_plug plug;
 	struct bio *bio;
+	pr_err("%s list=%pS\n", __func__, list);
 	/*
 	 * The block layer handles nested plugs, so just plug/unplug to handle
 	 * fabric drivers that didn't support batching and multi bio cmds.
@@ -455,6 +457,7 @@ iblock_execute_zero_out(struct block_device *bdev, struct se_cmd *cmd)
 	unsigned char *buf, *not_zero;
 	int ret;
 
+	pr_err("%s bdev=%pS cmd=%pS\n", __func__, bdev, cmd);
 	buf = kmap(sg_page(sg)) + sg->offset;
 	if (!buf)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -493,6 +496,7 @@ iblock_execute_write_same(struct se_cmd *cmd)
 	sector_t sectors = target_to_linux_sector(dev,
 					sbc_get_write_same_sectors(cmd));
 
+	pr_err("%s bdev=%pS cmd=%pS\n", __func__, bdev, cmd);
 	if (cmd->prot_op) {
 		pr_err("WRITE_SAME: Protection information with IBLOCK"
 		       " backends not supported\n");
@@ -672,6 +676,7 @@ iblock_alloc_bip(struct se_cmd *cmd, struct bio *bio,
 	int rc;
 	size_t resid, len;
 
+	pr_err("%s dev=%pS cmd=%pS\n", __func__, dev, cmd);
 	bi = bdev_get_integrity(ib_dev->ibd_bd);
 	if (!bi) {
 		pr_err("Unable to locate bio_integrity\n");
@@ -733,6 +738,7 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	struct sg_mapping_iter prot_miter;
 	unsigned int miter_dir;
 
+	pr_err("%s dev=%pS cmd=%pS\n", __func__, dev, cmd);
 	if (data_direction == DMA_TO_DEVICE) {
 		struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
 		/*
@@ -835,6 +841,7 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 	struct block_device *bd = ib_dev->ibd_bd;
 	struct request_queue *q = bdev_get_queue(bd);
 
+	pr_err("%s dev=%pS\n", __func__, dev);
 	return iblock_emulate_read_cap_with_block_size(dev, bd, q);
 }
 

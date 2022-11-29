@@ -539,6 +539,7 @@ int core_dev_add_lun(
 {
 	int rc;
 
+	pr_err("%s tpg=%pS dev=%pS\n", __func__, tpg, dev);
 	rc = core_tpg_add_lun(tpg, lun, false, dev);
 	if (rc < 0)
 		return rc;
@@ -592,6 +593,7 @@ struct se_lun_acl *core_dev_init_initiator_node_lun_acl(
 {
 	struct se_lun_acl *lacl;
 
+	pr_err("%s tpg=%pS nacl=%pS\n", __func__, tpg, nacl);
 	if (strlen(nacl->initiatorname) >= TRANSPORT_IQN_LEN) {
 		pr_err("%s InitiatorName exceeds maximum size.\n",
 			tpg->se_tpg_tfo->fabric_name);
@@ -827,6 +829,7 @@ bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 {
 	int block_size = bdev_logical_block_size(bdev);
 
+	pr_err("%s attrib=%pS bdev=%pS\n", __func__, attrib, bdev);
 	if (!bdev_max_discard_sectors(bdev))
 		return false;
 

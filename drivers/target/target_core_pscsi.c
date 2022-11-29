@@ -50,6 +50,7 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	struct pscsi_hba_virt *phv;
 
+	pr_err("%s hba=%pS\n", __func__, hba);
 	phv = kzalloc(sizeof(struct pscsi_hba_virt), GFP_KERNEL);
 	if (!phv) {
 		pr_err("Unable to allocate struct pscsi_hba_virt\n");
@@ -136,6 +137,8 @@ static void pscsi_tape_read_blocksize(struct se_device *dev,
 	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
 	int ret;
 
+
+	pr_err("%s sdev=%pS dev=%pS\n", __func__, sdev, dev);
 	buf = kzalloc(12, GFP_KERNEL);
 	if (!buf)
 		goto out_free;
@@ -220,6 +223,7 @@ pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
 	int ident_len, page_len, off = 4, ret;
 	struct t10_vpd *vpd;
 
+	pr_err("%s sdev=%pS wwn=%pS\n", __func__, sdev, wwn);
 	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
 	if (!buf)
 		return;
@@ -357,6 +361,7 @@ static int pscsi_create_type_disk(struct se_device *dev, struct scsi_device *sd)
 	struct block_device *bd;
 	int ret;
 
+	pr_err("%s dev=%pS sd=%pS\n", __func__, dev, sd);
 	if (scsi_device_get(sd)) {
 		pr_err("scsi_device_get() failed for %d:%d:%d:%llu\n",
 			sh->host_no, sd->channel, sd->id, sd->lun);
@@ -430,6 +435,7 @@ static int pscsi_configure_device(struct se_device *dev)
 	int legacy_mode_enable = 0;
 	int ret;
 
+	pr_err("%s hba=%pS dev=%pS\n", __func__, hba, dev);
 	if (!(pdv->pdv_flags & PDF_HAS_CHANNEL_ID) ||
 	    !(pdv->pdv_flags & PDF_HAS_TARGET_ID) ||
 	    !(pdv->pdv_flags & PDF_HAS_LUN_ID)) {
@@ -594,6 +600,7 @@ static void pscsi_complete_cmd(struct se_cmd *cmd, u8 scsi_status,
 	struct scsi_device *sd = pdv->pdv_sd;
 	unsigned char *cdb = cmd->priv;
 
+	pr_err("%s cmd=%pS req_sense=%pS\n", __func__, cmd, req_sense);
 	/*
 	 * Special case for REPORT_LUNs which is emulated and not passed on.
 	 */
@@ -795,6 +802,7 @@ static ssize_t pscsi_show_configfs_dev_params(struct se_device *dev, char *b)
 	unsigned char host_id[16];
 	ssize_t bl;
 
+	pr_err("%s dev=%pS b=%s\n", __func__, dev, b);
 	if (phv->phv_mode == PHV_VIRTUAL_HOST_ID)
 		snprintf(host_id, 16, "%d", pdv->pdv_host_id);
 	else
@@ -940,6 +948,7 @@ pscsi_execute_cmd(struct se_cmd *cmd)
 	struct request *req;
 	sense_reason_t ret;
 
+	pr_err("%s cmd=%pS\n", __func__, cmd);
 	req = scsi_alloc_request(pdv->pdv_sd->request_queue,
 			cmd->data_direction == DMA_TO_DEVICE ?
 			REQ_OP_DRV_OUT : REQ_OP_DRV_IN, 0);
@@ -1010,6 +1019,7 @@ static void pscsi_req_done(struct request *req, blk_status_t status)
 	int valid_data = cmd->data_length - scmd->resid_len;
 	u8 *cdb = cmd->priv;
 
+	pr_err("%s req=%pS\n", __func__, req);
 	if (scsi_status != SAM_STAT_GOOD) {
 		pr_debug("PSCSI Status Byte exception at cmd: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", cmd, cdb[0], scmd->result);

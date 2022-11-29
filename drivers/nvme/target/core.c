@@ -256,6 +256,7 @@ void nvmet_send_ana_event(struct nvmet_subsys *subsys,
 {
 	struct nvmet_ctrl *ctrl;
 
+	pr_err("%s subsys=%pS port=%pS\n", __func__, subsys, port);
 	mutex_lock(&subsys->lock);
 	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry) {
 		if (port && ctrl->port != port)
@@ -737,6 +738,7 @@ static void __nvmet_req_complete(struct nvmet_req *req, u16 status)
 {
 	struct nvmet_ns *ns = req->ns;
 
+	pr_err("%s req=%pS\n", __func__, req);
 	if (!req->sq->sqhd_disabled)
 		nvmet_update_sq_head(req);
 	req->cqe->sq_id = cpu_to_le16(req->sq->qid);
@@ -919,6 +921,7 @@ bool nvmet_req_init(struct nvmet_req *req, struct nvmet_cq *cq,
 	u8 flags = req->cmd->common.flags;
 	u16 status;
 
+	pr_err("%s req=%pS cq=%pS\n", __func__, req, cq);
 	req->cq = cq;
 	req->sq = sq;
 	req->ops = ops;
@@ -1358,6 +1361,7 @@ u16 nvmet_alloc_ctrl(const char *subsysnqn, const char *hostnqn,
 	int ret;
 	u16 status;
 
+	pr_err("%s subsysnqn=%s hostnqn=%s\n", __func__, subsysnqn, hostnqn);
 	status = NVME_SC_CONNECT_INVALID_PARAM | NVME_SC_DNR;
 	subsys = nvmet_find_get_subsys(req->port, subsysnqn);
 	if (!subsys) {
@@ -1545,6 +1549,7 @@ struct nvmet_subsys *nvmet_subsys_alloc(const char *subsysnqn,
 	char serial[NVMET_SN_MAX_SIZE / 2];
 	int ret;
 
+	pr_err("%s subsysnqn=%s\n", __func__, subsysnqn);
 	subsys = kzalloc(sizeof(*subsys), GFP_KERNEL);
 	if (!subsys)
 		return ERR_PTR(-ENOMEM);
@@ -1633,7 +1638,7 @@ static int __init nvmet_init(void)
 	int error;
 
 	nvmet_ana_group_enabled[NVMET_DEFAULT_ANA_GRPID] = 1;
-
+	pr_err("%s snake\n", __func__);
 	zbd_wq = alloc_workqueue("nvmet-zbd-wq", WQ_MEM_RECLAIM, 0);
 	if (!zbd_wq)
 		return -ENOMEM;

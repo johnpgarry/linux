@@ -511,6 +511,7 @@ static inline int tcmu_get_empty_block(struct tcmu_dev *udev,
 	int i, cnt, dbi, dpi;
 	int page_cnt = DIV_ROUND_UP(length, PAGE_SIZE);
 
+	pr_err("%s udev=%pS tcmu_cmd=%pS\n", __func__, udev, tcmu_cmd);
 	dbi = find_first_zero_bit(udev->data_bitmap, udev->dbi_thresh);
 	if (dbi == udev->dbi_thresh)
 		return -1;
@@ -1025,6 +1026,7 @@ static int queue_cmd_ring(struct tcmu_cmd *tcmu_cmd, sense_reason_t *scsi_err)
 
 	*scsi_err = TCM_NO_SENSE;
 
+	pr_err("%s scsi_err=%pS tcmu_cmd=%pS\n", __func__, scsi_err, tcmu_cmd);
 	if (test_bit(TCMU_DEV_BIT_BLOCKED, &udev->flags)) {
 		*scsi_err = TCM_LUN_BUSY;
 		return -1;
@@ -1863,6 +1865,7 @@ static void tcmu_vma_open(struct vm_area_struct *vma)
 {
 	struct tcmu_dev *udev = vma->vm_private_data;
 
+	pr_err("%s vma=%pS \n", __func__, vma);
 	pr_debug("vma_open\n");
 
 	kref_get(&udev->kref);
@@ -2578,6 +2581,7 @@ static ssize_t tcmu_set_configfs_dev_params(struct se_device *dev,
 	substring_t args[MAX_OPT_ARGS];
 	int ret = 0, token;
 
+	pr_err("%s dev=%pS \n", __func__, dev);
 	opts = kstrdup(page, GFP_KERNEL);
 	if (!opts)
 		return -ENOMEM;
