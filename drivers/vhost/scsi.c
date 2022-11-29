@@ -774,7 +774,7 @@ static void vhost_scsi_target_queue_cmd(struct vhost_scsi_cmd *cmd)
 	struct se_cmd *se_cmd = &cmd->tvc_se_cmd;
 	struct vhost_scsi_nexus *tv_nexus;
 	struct scatterlist *sg_ptr, *sg_prot_ptr = NULL;
-
+	pr_err_ratelimited("%s cmd=%pS\n", __func__, cmd);
 	/* FIXME: BIDI operation */
 	if (cmd->tvc_sgl_count) {
 		sg_ptr = cmd->tvc_sgl;
