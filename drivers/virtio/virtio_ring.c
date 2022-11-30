@@ -2082,7 +2082,11 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 				gfp_t gfp)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
-	pr_err_ratelimited("%s _vq=%pS sgs=%pS packed_ring=%d\n", __func__, _vq, sgs, vq->packed_ring);
+	static int countf;
+
+	if ((countf % 200) == 0)
+		pr_err("%s _vq=%pS sgs=%pS packed_ring=%d\n", __func__, _vq, sgs, vq->packed_ring);
+	countf++;
 	return vq->packed_ring ? virtqueue_add_packed(_vq, sgs, total_sg,
 					out_sgs, in_sgs, data, ctx, gfp) :
 				 virtqueue_add_split(_vq, sgs, total_sg,

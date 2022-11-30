@@ -239,7 +239,7 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	unsigned long long blocks_long =
 		div_u64(bdev_nr_bytes(bd), block_size) - 1;
 
-	pr_err("%s dev=%pS\n", __func__, dev);
+	pr_err_ratelimited("%s dev=%pS\n", __func__, dev);
 	if (block_size == dev->dev_attrib.block_size)
 		return blocks_long;
 
