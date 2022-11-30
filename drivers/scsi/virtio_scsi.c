@@ -560,7 +560,10 @@ static int virtscsi_queuecommand(struct Scsi_Host *shost,
 	unsigned long flags;
 	int req_size;
 	int ret;
-	pr_err_ratelimited("%s cmd=%pS\n", __func__, cmd);
+	static int counttt;
+	if ((counttt % 1000) == 0)
+		pr_err("%s cmd=%pS\n", __func__, cmd);
+	counttt++;
 	BUG_ON(scsi_sg_count(sc) > shost->sg_tablesize);
 
 	/* TODO: check feature bit and fail if unsupported?  */

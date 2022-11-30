@@ -910,6 +910,7 @@ show_vpd_##_page(struct file *filp, struct kobject *kobj,	\
 									\
 	rcu_read_lock();						\
 	vpd_page = rcu_dereference(sdev->vpd_##_page);			\
+	pr_err("%s vpd_page=%pS len=%d sdev=%pS\n", __func__, vpd_page, vpd_page ? vpd_page->len : -1, sdev);\
 	if (vpd_page)							\
 		ret = memory_read_from_buffer(buf, count, &off,		\
 				vpd_page->data, vpd_page->len);		\
@@ -1252,7 +1253,7 @@ static umode_t scsi_sdev_bin_attr_is_visible(struct kobject *kobj,
 	struct device *dev = kobj_to_dev(kobj);
 	struct scsi_device *sdev = to_scsi_device(dev);
 
-
+	dev_err(dev, "%s attr=%pS\n", __func__, attr);
 	if (attr == &dev_attr_vpd_pg0 && !sdev->vpd_pg0)
 		return 0;
 
@@ -1265,6 +1266,8 @@ static umode_t scsi_sdev_bin_attr_is_visible(struct kobject *kobj,
 	if (attr == &dev_attr_vpd_pg89 && !sdev->vpd_pg89)
 		return 0;
 
+	if (attr == &dev_attr_vpd_pgb0)
+		dev_err(dev, "%s2 sdev->vpd_pgb0=%pS\n", __func__, sdev->vpd_pgb0);
 	if (attr == &dev_attr_vpd_pgb0 && !sdev->vpd_pgb0)
 		return 0;
 

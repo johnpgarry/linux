@@ -2860,6 +2860,8 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 	sdkp->min_xfer_blocks = get_unaligned_be16(&vpd->data[6]);
 	sdkp->max_xfer_blocks = get_unaligned_be32(&vpd->data[8]);
 	sdkp->opt_xfer_blocks = get_unaligned_be32(&vpd->data[12]);
+	pr_err("%s sdkp=%pS sdev=%pS min_xfer_blocks=%d max_xfer_blocks=%d opt_xfer_blocks=%d\n", 
+		__func__, sdkp, sdkp->device, sdkp->min_xfer_blocks, sdkp->max_xfer_blocks, sdkp->opt_xfer_blocks);
 
 	if (vpd->len >= 64) {
 		unsigned int lba_count, desc_count;
@@ -3152,12 +3154,15 @@ static bool sd_validate_opt_xfer_size(struct scsi_disk *sdkp,
 	unsigned int min_xfer_bytes =
 		logical_to_bytes(sdp, sdkp->min_xfer_blocks);
 
+	pr_err("%s sdkp=%pS sdev=%pS sdkp->opt_xfer_blocks=%d opt_xfer_bytes=%d\n",
+	 __func__, sdkp, sdkp->device, sdkp->opt_xfer_blocks, opt_xfer_bytes);
+
 	if (sdkp->opt_xfer_blocks == 0)
 		return false;
 
 	if (sdkp->opt_xfer_blocks > dev_max) {
 		sd_first_printk(KERN_WARNING, sdkp,
-				"Optimal transfer size %u logical blocks " \
+				"Optimal1 transfer size %u logical blocks " \
 				"> dev_max (%u logical blocks)\n",
 				sdkp->opt_xfer_blocks, dev_max);
 		return false;
@@ -3165,7 +3170,7 @@ static bool sd_validate_opt_xfer_size(struct scsi_disk *sdkp,
 
 	if (sdkp->opt_xfer_blocks > SD_DEF_XFER_BLOCKS) {
 		sd_first_printk(KERN_WARNING, sdkp,
-				"Optimal transfer size %u logical blocks " \
+				"Optimal2 transfer size %u logical blocks " \
 				"> sd driver limit (%u logical blocks)\n",
 				sdkp->opt_xfer_blocks, SD_DEF_XFER_BLOCKS);
 		return false;
@@ -3173,7 +3178,7 @@ static bool sd_validate_opt_xfer_size(struct scsi_disk *sdkp,
 
 	if (opt_xfer_bytes < PAGE_SIZE) {
 		sd_first_printk(KERN_WARNING, sdkp,
-				"Optimal transfer size %u bytes < " \
+				"Optimal3 transfer size %u bytes < " \
 				"PAGE_SIZE (%u bytes)\n",
 				opt_xfer_bytes, (unsigned int)PAGE_SIZE);
 		return false;
@@ -3181,7 +3186,7 @@ static bool sd_validate_opt_xfer_size(struct scsi_disk *sdkp,
 
 	if (min_xfer_bytes && opt_xfer_bytes % min_xfer_bytes) {
 		sd_first_printk(KERN_WARNING, sdkp,
-				"Optimal transfer size %u bytes not a " \
+				"Optimal4 transfer size %u bytes not a " \
 				"multiple of preferred minimum block " \
 				"size (%u bytes)\n",
 				opt_xfer_bytes, min_xfer_bytes);
@@ -3190,13 +3195,13 @@ static bool sd_validate_opt_xfer_size(struct scsi_disk *sdkp,
 
 	if (opt_xfer_bytes & (sdkp->physical_block_size - 1)) {
 		sd_first_printk(KERN_WARNING, sdkp,
-				"Optimal transfer size %u bytes not a " \
+				"Optimal5 transfer size %u bytes not a " \
 				"multiple of physical block size (%u bytes)\n",
 				opt_xfer_bytes, sdkp->physical_block_size);
 		return false;
 	}
 
-	sd_first_printk(KERN_INFO, sdkp, "Optimal transfer size %u bytes\n",
+	sd_first_printk(KERN_INFO, sdkp, "Optimal6 transfer size %u bytes\n",
 			opt_xfer_bytes);
 	return true;
 }

@@ -748,7 +748,6 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	struct sg_mapping_iter prot_miter;
 	unsigned int miter_dir;
 	WARN_ON_ONCE(1);
-	pr_err_ratelimited("%s dev=%pS cmd=%pS\n", __func__, dev, cmd);
 	if (data_direction == DMA_TO_DEVICE) {
 		struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
 		/*
@@ -780,6 +779,7 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	}
 
 	bio = iblock_get_bio(cmd, block_lba, sgl_nents, opf);
+	pr_err_ratelimited("%s dev=%pS cmd=%pS bio=%pS\n", __func__, dev, cmd, bio);
 	if (!bio)
 		goto fail_free_ibr;
 
