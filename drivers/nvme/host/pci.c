@@ -970,7 +970,11 @@ static void nvme_submit_cmds(struct nvme_queue *nvmeq, struct request **rqlist)
 	while (!rq_list_empty(*rqlist)) {
 		struct request *req = rq_list_pop(rqlist);
 		struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
-
+		struct bio *bio = req->bio;
+		if (bio)
+			pr_err_ratelimited("%s req=%pS q=%pS bio=%pS bio_op=%d\n", __func__, req, req->q, bio, bio_op(bio));
+		else
+			pr_err_ratelimited("%s req=%pS q=%pS bio=NULL\n", __func__, req, req->q);
 		nvme_sq_copy_cmd(nvmeq, &iod->cmd);
 	}
 	nvme_write_sq_db(nvmeq, true);
