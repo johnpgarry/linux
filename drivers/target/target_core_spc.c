@@ -513,7 +513,7 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	struct se_device *dev = cmd->se_dev;
 	u32 mtl = 0;
 	int have_tp = 0, opt, min;
-
+	pr_err("%s cmd=%pS buf=%pS\n", __func__, cmd, buf);
 	/*
 	 * Following spc3r22 section 6.5.3 Block Limits VPD page, when
 	 * emulate_tpu=1 or emulate_tpws=1 we will be expect a
@@ -556,10 +556,13 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	/*
 	 * Set OPTIMAL TRANSFER LENGTH
 	 */
-	if (dev->transport->get_io_opt && (opt = dev->transport->get_io_opt(dev)))
+	if (dev->transport->get_io_opt && (opt = dev->transport->get_io_opt(dev))) {
 		put_unaligned_be32(opt / dev->dev_attrib.block_size, &buf[12]);
-	else
+		pr_err("%s1 cmd=%pS buf=%pS opt=%d\n", __func__, cmd, buf, opt);
+	} else {
 		put_unaligned_be32(dev->dev_attrib.optimal_sectors, &buf[12]);
+		pr_err("%s2 cmd=%pS buf=%pS optimal_sectors=%d\n", __func__, cmd, buf, dev->dev_attrib.optimal_sectors);
+	}
 
 	/*
 	 * Exit now if we don't support TP.

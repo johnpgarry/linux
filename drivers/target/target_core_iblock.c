@@ -125,6 +125,7 @@ static int iblock_configure_device(struct se_device *dev)
 
 	dev->dev_attrib.hw_block_size = bdev_logical_block_size(bd);
 	dev->dev_attrib.hw_max_sectors = queue_max_hw_sectors(q);
+	pr_err("%s dev->dev_attrib.hw_max_sectors=%d q=%pS\n", __func__, dev->dev_attrib.hw_max_sectors, q);
 	dev->dev_attrib.hw_queue_depth = q->nr_requests;
 
 	/*

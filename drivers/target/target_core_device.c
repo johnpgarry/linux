@@ -972,6 +972,8 @@ int target_configure_device(struct se_device *dev)
 		se_dev_align_max_sectors(dev->dev_attrib.hw_max_sectors,
 					 dev->dev_attrib.hw_block_size);
 	dev->dev_attrib.optimal_sectors = dev->dev_attrib.hw_max_sectors;
+	pr_err("%s dev=%pS dev->dev_attrib.optimal_sectors=%d dev->dev_attrib.hw_block_size=%d\n", 
+		__func__, dev, dev->dev_attrib.optimal_sectors, dev->dev_attrib.hw_block_size);
 
 	dev->creation_time = get_jiffies_64();
 
