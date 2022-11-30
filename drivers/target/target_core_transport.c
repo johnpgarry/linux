@@ -2832,6 +2832,7 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	cmd->transport_state &= ~CMD_T_ACTIVE;
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 
+	pr_err_ratelimited("%s cmd=%pS se_tfo=%pS write_pending=%pS\n", __func__, cmd, cmd->se_tfo, cmd->se_tfo->write_pending);
 	ret = cmd->se_tfo->write_pending(cmd);
 	if (ret)
 		goto queue_full;

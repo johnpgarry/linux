@@ -769,6 +769,7 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 	unsigned int size;
 	u32 sectors = 0;
 	sense_reason_t ret;
+	unsigned int cdb0 = cdb[0];
 
 	cmd->protocol_data = ops;
 
@@ -1061,6 +1062,7 @@ check_lba:
 			size = sbc_get_size(cmd, sectors);
 	}
 
+	pr_err_ratelimited("%s cmd=%pS cmd->execute_cmd=%pS cdb[0]=0x%x\n", __func__, cmd, cmd->execute_cmd, cdb0);
 	return target_cmd_size_check(cmd, size);
 }
 EXPORT_SYMBOL(sbc_parse_cdb);
