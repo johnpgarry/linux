@@ -938,6 +938,7 @@ static blk_status_t nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct request *req = bd->rq;
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
+	pr_err_ratelimited("%s req=%pS q=%pS\n", __func__, req, req->q);
 
 	/*
 	 * We should not need to do this, but we're still using this to

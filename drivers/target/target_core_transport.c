@@ -1878,6 +1878,8 @@ void target_queued_submit_work(struct work_struct *work)
 	struct se_device *se_dev = NULL;
 	struct llist_node *cmd_list;
 
+	WARN_ON_ONCE(1);
+	pr_err_ratelimited("%s sq=%pS\n", __func__, sq);
 	cmd_list = llist_del_all(&sq->cmd_list);
 	if (!cmd_list)
 		/* Previous call took what we were queued to submit */
@@ -1906,7 +1908,8 @@ void target_queue_submission(struct se_cmd *se_cmd)
 	struct se_device *se_dev = se_cmd->se_dev;
 	int cpu = se_cmd->cpuid;
 	struct se_cmd_queue *sq;
-
+	WARN_ON_ONCE(1);
+	pr_err_ratelimited("%s se_cmd=%pS se_dev=%pS\n", __func__, se_cmd, se_dev);
 	sq = &se_dev->queues[cpu].sq;
 	llist_add(&se_cmd->se_cmd_list, &sq->cmd_list);
 	queue_work_on(cpu, target_submission_wq, &sq->work);
