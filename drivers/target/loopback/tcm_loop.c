@@ -45,7 +45,7 @@ static int tcm_loop_hba_no_cnt;
 
 static int tcm_loop_queue_status(struct se_cmd *se_cmd);
 
-static unsigned int tcm_loop_nr_hw_queues = 1;
+static unsigned int tcm_loop_nr_hw_queues = 10;
 module_param_named(nr_hw_queues, tcm_loop_nr_hw_queues, uint, 0644);
 
 static unsigned int tcm_loop_can_queue = 1024;
