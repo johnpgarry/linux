@@ -324,8 +324,23 @@ static int fd_do_rw(struct se_cmd *cmd, struct file *fd,
 	ssize_t len = 0;
 	loff_t pos = (cmd->t_task_lba * block_size);
 	int ret = 0, i;
+	static int counttt;
+	unsigned char *d_iname = NULL;
+	const struct file_operations *f_op = NULL;
 
-	pr_err("%s cmd=%pS\n", __func__, cmd);
+	if (fd) {
+		struct dentry *dentry;
+
+		f_op = fd->f_op;
+		dentry = fd->f_path.dentry;
+		if (dentry)
+			d_iname = &dentry->d_iname[0];
+	}
+
+	if ((counttt % 100) == 0)
+		pr_err("%s cmd=%pS data_length=%d is_write=%d f_op=%pS d_iname=%s\n", __func__, cmd, data_length, is_write, f_op, d_iname);
+	WARN_ON_ONCE(1);
+
 	bvec = kcalloc(sgl_nents, sizeof(struct bio_vec), GFP_KERNEL);
 	if (!bvec) {
 		pr_err("Unable to allocate fd_do_readv iov[]\n");
