@@ -2104,6 +2104,7 @@ EXPORT_SYMBOL(transport_generic_request_failure);
 void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
 {
 	sense_reason_t ret;
+	static  int countty;
 
 	if (!cmd->execute_cmd) {
 		ret = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -2131,7 +2132,10 @@ void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
 		}
 	}
 
+	if ((countty % 100) == 0)
+		pr_err("%s cmd=%pS execute_cmd=%pS\n", __func__, cmd, cmd->execute_cmd);
 	ret = cmd->execute_cmd(cmd);
+	countty++;
 	if (!ret)
 		return;
 err:

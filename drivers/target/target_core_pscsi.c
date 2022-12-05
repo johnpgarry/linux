@@ -947,8 +947,8 @@ pscsi_execute_cmd(struct se_cmd *cmd)
 	struct scsi_cmnd *scmd;
 	struct request *req;
 	sense_reason_t ret;
+	static int countttt;
 
-	pr_err("%s cmd=%pS\n", __func__, cmd);
 	req = scsi_alloc_request(pdv->pdv_sd->request_queue,
 			cmd->data_direction == DMA_TO_DEVICE ?
 			REQ_OP_DRV_OUT : REQ_OP_DRV_IN, 0);
@@ -971,6 +971,10 @@ pscsi_execute_cmd(struct se_cmd *cmd)
 		goto fail_put_request;
 	}
 	memcpy(scmd->cmnd, cmd->t_task_cdb, scmd->cmd_len);
+
+	if ((countttt % 100) == 0)
+		pr_err("%s cmd=%pS scmd->cmnd[0]=0x%x\n", __func__, cmd, scmd->cmnd[0]);
+	countttt++;
 
 	if (pdv->pdv_sd->type == TYPE_DISK ||
 	    pdv->pdv_sd->type == TYPE_ZBC)
