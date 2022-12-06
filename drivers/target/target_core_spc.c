@@ -584,7 +584,7 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	/*
 	 * Set OPTIMAL UNMAP GRANULARITY
 	 */
-	pr_err("%s3 cmd=%pS unmap_granularity=%d\n", __func__, cmd, dev->dev_attrib.unmap_granularity);
+	pr_err("%s3 cmd=%pS unmap_granularity=%d dev->dev_attrib=%pS\n", __func__, cmd, dev->dev_attrib.unmap_granularity, &dev->dev_attrib);
 	put_unaligned_be32(dev->dev_attrib.unmap_granularity, &buf[28]);
 
 	/*

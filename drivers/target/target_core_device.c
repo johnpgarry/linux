@@ -829,7 +829,7 @@ bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 {
 	int block_size = bdev_logical_block_size(bdev);
 
-	pr_err("%s attrib=%pS bdev=%pS\n", __func__, attrib, bdev);
+	pr_err("%s attrib=%pS bdev=%pS attrib=%pS bdev_max_discard_sectors=%d\n", __func__, attrib, bdev, attrib, bdev_max_discard_sectors(bdev));
 	if (!bdev_max_discard_sectors(bdev))
 		return false;
 

@@ -792,7 +792,7 @@ static void sd_config_discard(struct scsi_disk *sdkp, unsigned int mode)
 		    sdkp->unmap_granularity * logical_block_size);
 	sdkp->provisioning_mode = mode;
 
-	pr_err("%s sdkp=%pS sdkp->unmap_alignment=%d q->limits.discard_alignment=%d mode=%d\n", __func__, sdkp, sdkp->unmap_alignment, q->limits.discard_alignment, mode);
+	pr_err("%s sdkp=%pS sdkp->unmap_alignment=%d q->limits.discard_alignment=%d mode=%d logical_block_size=%d\n", __func__, sdkp, sdkp->unmap_alignment, q->limits.discard_alignment, mode, logical_block_size);
 	pr_err("%s2 sdkp=%pS sdkp->unmap_granularity=%d q->limits.discard_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity, q->limits.discard_granularity);
 
 	switch (mode) {
@@ -2883,6 +2883,7 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 			sdkp->max_unmap_blocks = lba_count;
 
 		sdkp->unmap_granularity = get_unaligned_be32(&vpd->data[28]);
+		pr_err("%s0.2 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 
 		if (vpd->data[32] & 0x80)
 			sdkp->unmap_alignment =
@@ -2890,20 +2891,28 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 
 		if (!sdkp->lbpvpd) { /* LBP VPD page not provided */
 
-			if (sdkp->max_unmap_blocks)
+			if (sdkp->max_unmap_blocks) {
+				pr_err("%s0.3 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_UNMAP);
-			else
+			} else {
+				pr_err("%s0.4 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_WS16);
+			}
 
 		} else {	/* LBP VPD page tells us what to use */
-			if (sdkp->lbpu && sdkp->max_unmap_blocks)
+			if (sdkp->lbpu && sdkp->max_unmap_blocks) {
+				pr_err("%s0.5 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_UNMAP);
-			else if (sdkp->lbpws)
+			} else if (sdkp->lbpws) {
+				pr_err("%s0.6 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_WS16);
-			else if (sdkp->lbpws10)
+			} else if (sdkp->lbpws10) {
+				pr_err("%s0.7 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_WS10);
-			else
+			} else {
+				pr_err("%s0.8 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_DISABLE);
+			}
 		}
 	}
 
