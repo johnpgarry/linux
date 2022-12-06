@@ -311,6 +311,11 @@ struct queue_limits {
 	unsigned char		discard_misaligned;
 	unsigned char		raid_partial_stripes_expensive;
 	enum blk_zoned_model	zoned;
+
+	unsigned int		queue_write_atomic_max_bytes;
+	unsigned int		queue_write_atomic_granularity;
+	unsigned int		queue_write_atomic_alignment;
+	unsigned int		queue_write_atomic_offset;
 };
 
 typedef int (*report_zones_cb)(struct blk_zone *zone, unsigned int idx,
@@ -872,6 +877,12 @@ extern int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags);
 extern void blk_queue_exit(struct request_queue *q);
 extern void blk_sync_queue(struct request_queue *q);
 
+
+extern void blk_queue_write_atomic_max_bytes(struct request_queue *q, unsigned int max_bytes);
+extern void blk_queue_write_atomic_granularity(struct request_queue *q, unsigned int size);
+extern void blk_queue_write_atomic_alignment(struct request_queue *q, unsigned int alignment);
+extern void blk_queue_write_atomic_offset(struct request_queue *q, unsigned int offset);
+
 /* Helper to convert REQ_OP_XXX to its string format XXX */
 extern const char *blk_op_str(enum req_op op);
 
@@ -1147,6 +1158,26 @@ static inline unsigned short queue_max_segments(const struct request_queue *q)
 static inline unsigned short queue_max_discard_segments(const struct request_queue *q)
 {
 	return q->limits.max_discard_segments;
+}
+
+static inline unsigned short queue_write_atomic_max_bytes(const struct request_queue *q)
+{
+	return q->limits.queue_write_atomic_max_bytes;
+}
+
+static inline unsigned short queue_write_atomic_granularity(const struct request_queue *q)
+{
+	return q->limits.queue_write_atomic_granularity;
+}
+
+static inline unsigned short queue_write_atomic_alignment(const struct request_queue *q)
+{
+	return q->limits.queue_write_atomic_alignment;
+}
+
+static inline unsigned short queue_write_atomic_offset(const struct request_queue *q)
+{
+	return q->limits.queue_write_atomic_offset;
 }
 
 static inline unsigned int queue_max_segment_size(const struct request_queue *q)
