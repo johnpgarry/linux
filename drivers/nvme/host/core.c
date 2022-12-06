@@ -1841,6 +1841,11 @@ static void nvme_set_queue_limits(struct nvme_ctrl *ctrl,
 	blk_queue_virt_boundary(q, NVME_CTRL_PAGE_SIZE - 1);
 	blk_queue_dma_alignment(q, 3);
 	blk_queue_write_cache(q, vwc, vwc);
+
+	blk_queue_write_atomic_max_bytes(q, 1073725440);
+	blk_queue_write_atomic_granularity(q, 256);
+	blk_queue_write_atomic_alignment(q, 5);
+	blk_queue_write_atomic_offset(q, 0);
 }
 
 static void nvme_update_disk_info(struct gendisk *disk,
