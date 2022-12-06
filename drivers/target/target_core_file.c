@@ -337,7 +337,7 @@ static int fd_do_rw(struct se_cmd *cmd, struct file *fd,
 			d_iname = &dentry->d_iname[0];
 	}
 
-	if ((counttt % 3000) == 0)
+	if ((counttt % 30000) == 0)
 		pr_err("%s cmd=%pS data_length=%d is_write=%d f_op=%pS d_iname=%s\n", __func__, cmd, data_length, is_write, f_op, d_iname);
 	WARN_ON_ONCE(1);
 

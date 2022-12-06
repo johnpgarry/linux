@@ -2864,8 +2864,9 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 	sdkp->min_xfer_blocks = get_unaligned_be16(&vpd->data[6]);
 	sdkp->max_xfer_blocks = get_unaligned_be32(&vpd->data[8]);
 	sdkp->opt_xfer_blocks = get_unaligned_be32(&vpd->data[12]);
-	pr_err("%s sdkp=%pS sdev=%pS min_xfer_blocks=%d max_xfer_blocks=%d opt_xfer_blocks=%d lbpvpd=%d vpd->len=%d\n", 
-		__func__, sdkp, sdkp->device, sdkp->min_xfer_blocks, sdkp->max_xfer_blocks, sdkp->opt_xfer_blocks, sdkp->lbpvpd, vpd->len);
+	pr_err("%s sdkp=%pS sdev=%pS min_xfer_blocks=%d max_xfer_blocks=%d opt_xfer_blocks=%d\n", 
+		__func__, sdkp, sdkp->device, sdkp->min_xfer_blocks, sdkp->max_xfer_blocks, sdkp->opt_xfer_blocks);
+	pr_err("%s0.1 sdkp=%pS lbpvpd=%d vpd->len=%d\n", __func__, sdkp,  sdkp->lbpvpd, vpd->len);
 
 	if (vpd->len >= 64) {
 		unsigned int lba_count, desc_count;
