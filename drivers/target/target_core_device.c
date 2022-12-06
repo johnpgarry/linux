@@ -835,6 +835,7 @@ bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 
 	attrib->max_unmap_lba_count =
 		bdev_max_discard_sectors(bdev) >> (ilog2(block_size) - 9);
+	pr_err("%s2 bdev=%pS max_unmap_lba_count=%u\n", __func__, bdev, attrib->max_unmap_lba_count);
 	/*
 	 * Currently hardcoded to 1 in Linux/SCSI code..
 	 */
@@ -842,6 +843,9 @@ bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 	attrib->unmap_granularity = bdev_discard_granularity(bdev) / block_size;
 	attrib->unmap_granularity_alignment =
 		bdev_discard_alignment(bdev) / block_size;
+	pr_err("%s3 bdev=%pS max_unmap_block_desc_count=%d unmap_granularity=%d unmap_granularity_alignment=%d\n", __func__, bdev, attrib->max_unmap_block_desc_count,
+		attrib->unmap_granularity,
+		attrib->unmap_granularity_alignment);
 	return true;
 }
 EXPORT_SYMBOL(target_configure_unmap_from_queue);

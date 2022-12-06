@@ -792,6 +792,9 @@ static void sd_config_discard(struct scsi_disk *sdkp, unsigned int mode)
 		    sdkp->unmap_granularity * logical_block_size);
 	sdkp->provisioning_mode = mode;
 
+	pr_err("%s sdkp=%pS sdkp->unmap_alignment=%d q->limits.discard_alignment=%d\n", __func__, sdkp, sdkp->unmap_alignment, q->limits.discard_alignment);
+	pr_err("%s2 sdkp=%pS sdkp->unmap_granularity=%d q->limits.discard_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity, q->limits.discard_granularity);
+	
 	switch (mode) {
 
 	case SD_LBP_FULL:

@@ -79,7 +79,7 @@ free_dev:
 static bool iblock_configure_unmap(struct se_device *dev)
 {
 	struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
-
+	pr_err("%s dev=%pS\n", __func__, dev);
 	return target_configure_unmap_from_queue(&dev->dev_attrib,
 						 ib_dev->ibd_bd);
 }
