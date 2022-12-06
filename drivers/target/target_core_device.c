@@ -849,6 +849,45 @@ bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 	return true;
 }
 EXPORT_SYMBOL(target_configure_unmap_from_queue);
+/*
+	u32		max_atomic;
+	u32		atomic_alignment;
+	u32		atomic_granularity;
+	u32		max_atomic_with_boundary;
+	u32		max_atomic_boundary
+
+
+struct queue_limits {
+
+
+	unsigned int		queue_write_atomic_max_bytes;
+	unsigned int		queue_write_atomic_granularity;
+	unsigned int		queue_write_atomic_alignment;
+	unsigned int		queue_write_atomic_offset;
+*/
+bool target_configure_atomic_from_queue(struct se_dev_attrib *attrib,
+				       struct block_device *bdev)
+{
+	int block_size = bdev_logical_block_size(bdev);
+	struct request_queue *q = bdev_get_queue(bdev);
+
+	pr_err("%s attrib=%pS bdev=%pS block_size=%d\n", __func__, attrib, bdev, block_size);
+
+	attrib->max_atomic = q->limits.queue_write_atomic_max_bytes;
+	attrib->atomic_alignment =  q->limits.queue_write_atomic_alignment;
+	attrib->atomic_granularity =  q->limits.queue_write_atomic_granularity;
+	attrib->max_atomic_with_boundary =  33;
+	attrib->max_atomic_boundary =  44;
+
+	pr_err("%s3 bdev=%pS max_atomic=%d atomic_alignment=%d atomic_granularity=%d with_boundary=%d boundary=%d\n", __func__, bdev, 
+		attrib->max_atomic,
+		attrib->atomic_alignment,
+		attrib->atomic_granularity,
+		attrib->max_atomic_with_boundary,
+		attrib->max_atomic_boundary);
+	return true;
+}
+EXPORT_SYMBOL(target_configure_atomic_from_queue);
 
 bool target_configure_atomic_from_queue(struct se_dev_attrib *attrib,
 				       struct block_device *bdev)
