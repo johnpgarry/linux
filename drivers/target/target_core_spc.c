@@ -513,7 +513,6 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	struct se_device *dev = cmd->se_dev;
 	u32 mtl = 0;
 	int have_tp = 0, opt, min;
-	pr_err("%s cmd=%pS buf=%pS\n", __func__, cmd, buf);
 	/*
 	 * Following spc3r22 section 6.5.3 Block Limits VPD page, when
 	 * emulate_tpu=1 or emulate_tpws=1 we will be expect a
@@ -521,6 +520,7 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	 */
 	if (dev->dev_attrib.emulate_tpu || dev->dev_attrib.emulate_tpws)
 		have_tp = 1;
+	pr_err("%s cmd=%pS buf=%pS transport=%pS get_io_min=%pS have_tp=%d\n", __func__, cmd, buf, dev->transport, dev->transport->get_io_min, have_tp);
 
 	buf[0] = dev->transport->get_device_type(dev);
 	buf[3] = have_tp ? 0x3c : 0x10;
