@@ -84,6 +84,14 @@ static bool iblock_configure_unmap(struct se_device *dev)
 						 ib_dev->ibd_bd);
 }
 
+static bool iblock_configure_atomic(struct se_device *dev)
+{
+	struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
+	pr_err("%s dev=%pS\n", __func__, dev);
+	return target_configure_atomic_from_queue(&dev->dev_attrib,
+						 ib_dev->ibd_bd);
+}
+
 static int iblock_configure_device(struct se_device *dev)
 {
 	struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
@@ -927,6 +935,7 @@ static const struct target_backend_ops iblock_ops = {
 	.destroy_device		= iblock_destroy_device,
 	.free_device		= iblock_free_device,
 	.configure_unmap	= iblock_configure_unmap,
+	.configure_atomic	= iblock_configure_atomic,
 	.plug_device		= iblock_plug_device,
 	.unplug_device		= iblock_unplug_device,
 	.parse_cdb		= iblock_parse_cdb,

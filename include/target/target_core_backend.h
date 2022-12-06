@@ -38,6 +38,7 @@ struct target_backend_ops {
 	void (*unplug_device)(struct se_dev_plug *se_plug);
 
 	bool (*configure_unmap)(struct se_device *se_dev);
+	bool (*configure_atomic)(struct se_device *se_dev);
 	ssize_t (*set_configfs_dev_params)(struct se_device *,
 					   const char *, ssize_t);
 	ssize_t (*show_configfs_dev_params)(struct se_device *, char *);
@@ -119,7 +120,8 @@ bool target_sense_desc_format(struct se_device *dev);
 sector_t target_to_linux_sector(struct se_device *dev, sector_t lb);
 bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 				       struct block_device *bdev);
-
+bool target_configure_atomic_from_queue(struct se_dev_attrib *attrib,
+				       struct block_device *bdev);
 static inline bool target_dev_configured(struct se_device *se_dev)
 {
 	return !!(se_dev->dev_flags & DF_CONFIGURED);

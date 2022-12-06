@@ -520,7 +520,7 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	 */
 	if (dev->dev_attrib.emulate_tpu || dev->dev_attrib.emulate_tpws)
 		have_tp = 1;
-	pr_err("%s cmd=%pS buf=%pS transport=%pS get_io_min=%pS have_tp=%d\n", __func__, cmd, buf, dev->transport, dev->transport->get_io_min, have_tp);
+	pr_err("%s cmd=%pS buf=%pS transport=%pS get_io_min=%pS have_tp=%d max_unmap_lba_count=%d\n", __func__, cmd, buf, dev->transport, dev->transport->get_io_min, have_tp, dev->dev_attrib.max_unmap_lba_count);
 
 	buf[0] = dev->transport->get_device_type(dev);
 	buf[3] = have_tp ? 0x3c : 0x10;
@@ -601,6 +601,15 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	 */
 max_write_same:
 	put_unaligned_be64(dev->dev_attrib.max_write_same_len, &buf[36]);
+
+	if (!dev->dev_attrib.emulate_atomic)
+		return 0;
+
+	put_unaligned_be32(dev->dev_attrib.max_atomic, &buf[44]);
+	put_unaligned_be32(dev->dev_attrib.atomic_alignment, &buf[48]);
+	put_unaligned_be32(dev->dev_attrib.atomic_granularity, &buf[52]);
+	put_unaligned_be32(dev->dev_attrib.max_atomic_with_boundary, &buf[56]);
+	put_unaligned_be32(dev->dev_attrib.max_atomic_boundary, &buf[60]);
 
 	return 0;
 }

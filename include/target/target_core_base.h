@@ -687,6 +687,7 @@ struct se_dev_attrib {
 	bool		emulate_tas;
 	bool		emulate_tpu;
 	bool		emulate_tpws;
+	bool		emulate_atomic;
 	bool		emulate_caw;
 	bool		emulate_3pc;
 	bool		emulate_pr;
@@ -710,6 +711,12 @@ struct se_dev_attrib {
 	u32		unmap_granularity_alignment;
 	u32		max_write_same_len;
 	u32		max_bytes_per_io;
+	u32		max_atomic;
+	u32		atomic_alignment;
+	u32		atomic_granularity;
+	u32		max_atomic_with_boundary;
+	u32		max_atomic_boundary;
+
 	struct se_device *da_dev;
 	struct config_group da_group;
 };

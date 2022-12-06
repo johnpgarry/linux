@@ -525,6 +525,7 @@ DEF_CONFIGFS_ATTRIB_SHOW(emulate_ua_intlck_ctrl);
 DEF_CONFIGFS_ATTRIB_SHOW(emulate_tas);
 DEF_CONFIGFS_ATTRIB_SHOW(emulate_tpu);
 DEF_CONFIGFS_ATTRIB_SHOW(emulate_tpws);
+DEF_CONFIGFS_ATTRIB_SHOW(emulate_atomic);
 DEF_CONFIGFS_ATTRIB_SHOW(emulate_caw);
 DEF_CONFIGFS_ATTRIB_SHOW(emulate_3pc);
 DEF_CONFIGFS_ATTRIB_SHOW(emulate_pr);
@@ -754,6 +755,29 @@ static ssize_t emulate_tpu_store(struct config_item *item,
 
 	da->emulate_tpu = flag;
 	pr_debug("dev[%p]: SE Device Thin Provisioning UNMAP bit: %d\n",
+		da->da_dev, flag);
+	return count;
+}
+
+static ssize_t emulate_atomic_store(struct config_item *item,
+		const char *page, size_t count)
+{
+	struct se_dev_attrib *da = to_attrib(item);
+	struct se_device *dev = da->da_dev;
+	bool flag;
+	int ret;
+
+	ret = strtobool(page, &flag);
+	pr_err("%s flag=%d ret=%d da=%pS dev=%pS\n", __func__, flag, ret, da, dev);
+	if (ret < 0)
+		return ret;
+
+	#ifdef dddsdsds
+	check emulate_tpu_store
+	#endif
+
+	da->emulate_atomic = flag;
+	pr_debug("dev[%p]: SE Device atomic bit: %d\n",
 		da->da_dev, flag);
 	return count;
 }
@@ -1195,6 +1219,7 @@ CONFIGFS_ATTR(, emulate_ua_intlck_ctrl);
 CONFIGFS_ATTR(, emulate_tas);
 CONFIGFS_ATTR(, emulate_tpu);
 CONFIGFS_ATTR(, emulate_tpws);
+CONFIGFS_ATTR(, emulate_atomic);
 CONFIGFS_ATTR(, emulate_caw);
 CONFIGFS_ATTR(, emulate_3pc);
 CONFIGFS_ATTR(, emulate_pr);
@@ -1236,6 +1261,7 @@ struct configfs_attribute *sbc_attrib_attrs[] = {
 	&attr_emulate_tas,
 	&attr_emulate_tpu,
 	&attr_emulate_tpws,
+	&attr_emulate_atomic,
 	&attr_emulate_caw,
 	&attr_emulate_3pc,
 	&attr_emulate_pr,
