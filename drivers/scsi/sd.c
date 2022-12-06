@@ -792,9 +792,9 @@ static void sd_config_discard(struct scsi_disk *sdkp, unsigned int mode)
 		    sdkp->unmap_granularity * logical_block_size);
 	sdkp->provisioning_mode = mode;
 
-	pr_err("%s sdkp=%pS sdkp->unmap_alignment=%d q->limits.discard_alignment=%d\n", __func__, sdkp, sdkp->unmap_alignment, q->limits.discard_alignment);
+	pr_err("%s sdkp=%pS sdkp->unmap_alignment=%d q->limits.discard_alignment=%d mode=%d\n", __func__, sdkp, sdkp->unmap_alignment, q->limits.discard_alignment, mode);
 	pr_err("%s2 sdkp=%pS sdkp->unmap_granularity=%d q->limits.discard_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity, q->limits.discard_granularity);
-	
+
 	switch (mode) {
 
 	case SD_LBP_FULL:
@@ -2331,6 +2331,7 @@ static int read_capacity_16(struct scsi_disk *sdkp, struct scsi_device *sdp,
 		sd_printk(KERN_NOTICE, sdkp,
 			  "physical block alignment offset: %u\n", alignment);
 
+	pr_err("%s sdkp=%pS LBPME=%d\n", __func__, sdkp, !!(buffer[14] & 0x80));
 	if (buffer[14] & 0x80) { /* LBPME */
 		sdkp->lbpme = 1;
 
@@ -2863,8 +2864,8 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 	sdkp->min_xfer_blocks = get_unaligned_be16(&vpd->data[6]);
 	sdkp->max_xfer_blocks = get_unaligned_be32(&vpd->data[8]);
 	sdkp->opt_xfer_blocks = get_unaligned_be32(&vpd->data[12]);
-	pr_err("%s sdkp=%pS sdev=%pS min_xfer_blocks=%d max_xfer_blocks=%d opt_xfer_blocks=%d\n", 
-		__func__, sdkp, sdkp->device, sdkp->min_xfer_blocks, sdkp->max_xfer_blocks, sdkp->opt_xfer_blocks);
+	pr_err("%s sdkp=%pS sdev=%pS min_xfer_blocks=%d max_xfer_blocks=%d opt_xfer_blocks=%d lbpvpd=%d vpd->len=%d\n", 
+		__func__, sdkp, sdkp->device, sdkp->min_xfer_blocks, sdkp->max_xfer_blocks, sdkp->opt_xfer_blocks, sdkp->lbpvpd, vpd->len);
 
 	if (vpd->len >= 64) {
 		unsigned int lba_count, desc_count;
