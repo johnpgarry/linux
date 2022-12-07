@@ -889,32 +889,6 @@ bool target_configure_atomic_from_queue(struct se_dev_attrib *attrib,
 }
 EXPORT_SYMBOL(target_configure_atomic_from_queue);
 
-bool target_configure_atomic_from_queue(struct se_dev_attrib *attrib,
-				       struct block_device *bdev)
-{
-	int block_size = bdev_logical_block_size(bdev);
-
-	pr_err("%s attrib=%pS bdev=%pS attrib=%pS bdev_max_discard_sectors=%d\n", __func__, attrib, bdev, attrib, bdev_max_discard_sectors(bdev));
-	if (!bdev_max_discard_sectors(bdev))
-		return false;
-
-	attrib->max_unmap_lba_count =
-		bdev_max_discard_sectors(bdev) >> (ilog2(block_size) - 9);
-	pr_err("%s2 bdev=%pS max_unmap_lba_count=%u\n", __func__, bdev, attrib->max_unmap_lba_count);
-	/*
-	 * Currently hardcoded to 1 in Linux/SCSI code..
-	 */
-	attrib->max_unmap_block_desc_count = 1;
-	attrib->unmap_granularity = bdev_discard_granularity(bdev) / block_size;
-	attrib->unmap_granularity_alignment =
-		bdev_discard_alignment(bdev) / block_size;
-	pr_err("%s3 bdev=%pS max_unmap_block_desc_count=%d unmap_granularity=%d unmap_granularity_alignment=%d\n", __func__, bdev, attrib->max_unmap_block_desc_count,
-		attrib->unmap_granularity,
-		attrib->unmap_granularity_alignment);
-	return true;
-}
-EXPORT_SYMBOL(target_configure_atomic_from_queue);
-
 /*
  * Convert from blocksize advertised to the initiator to the 512 byte
  * units unconditionally used by the Linux block layer.
