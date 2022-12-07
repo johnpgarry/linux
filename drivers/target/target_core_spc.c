@@ -602,9 +602,14 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 max_write_same:
 	put_unaligned_be64(dev->dev_attrib.max_write_same_len, &buf[36]);
 
+	pr_err("%s5 cmd=%pS dev=%pS emulate_atomic=%d\n", __func__, cmd, dev, dev->dev_attrib.emulate_atomic);
 	if (!dev->dev_attrib.emulate_atomic)
 		return 0;
 
+	pr_err("%s6 cmd=%pS dev=%pS putting max_atomic=%d alignment=%d granularity=%d max_with_b=%d b=%d\n", __func__, cmd, dev, 
+		dev->dev_attrib.max_atomic, dev->dev_attrib.atomic_alignment,
+		dev->dev_attrib.atomic_granularity, dev->dev_attrib.max_atomic_with_boundary,
+		dev->dev_attrib.max_atomic_boundary);
 	put_unaligned_be32(dev->dev_attrib.max_atomic, &buf[44]);
 	put_unaligned_be32(dev->dev_attrib.atomic_alignment, &buf[48]);
 	put_unaligned_be32(dev->dev_attrib.atomic_granularity, &buf[52]);

@@ -785,6 +785,8 @@ struct se_device *target_alloc_device(struct se_hba *hba, const char *name)
 	dev->dev_attrib.emulate_tpu = DA_EMULATE_TPU;
 	dev->dev_attrib.emulate_tpws = DA_EMULATE_TPWS;
 	dev->dev_attrib.emulate_caw = DA_EMULATE_CAW;
+	dev->dev_attrib.emulate_atomic = 0;
+	pr_err("%s dev=%pS emulate_atomic defaults to 0\n", __func__, dev);
 	dev->dev_attrib.emulate_3pc = DA_EMULATE_3PC;
 	dev->dev_attrib.emulate_pr = DA_EMULATE_PR;
 	dev->dev_attrib.pi_prot_type = TARGET_DIF_TYPE0_PROT;
