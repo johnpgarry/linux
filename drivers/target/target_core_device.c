@@ -995,7 +995,7 @@ int target_configure_device(struct se_device *dev)
 {
 	struct se_hba *hba = dev->se_hba;
 	int ret, id;
-
+	WARN_ON(1);
 	if (target_dev_configured(dev)) {
 		pr_err("se_dev->se_dev_ptr already set for storage"
 				" object\n");
@@ -1028,7 +1028,7 @@ int target_configure_device(struct se_device *dev)
 		pr_debug("Discard support available, but disabled by default.\n");
 	}
 
-	pr_err("%s dev=%pS configure_atomic=%pS\n", __func__, dev, dev->transport->configure_atomic);
+	pr_err("%s dev=%pS transport=%pS configure_atomic=%pS\n", __func__, dev, dev->transport, dev->transport->configure_atomic);
 	if (dev->transport->configure_atomic &&
 	    dev->transport->configure_atomic(dev)) {
 		pr_debug("atomic support available, but disabled by default.\n");
