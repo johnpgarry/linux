@@ -965,6 +965,7 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 		cmd->execute_cmd = sbc_emulate_noop;
 		break;
 	case UNMAP:
+		pr_err("%s cmd=%pS execute_unmap=%pS\n", __func__, cmd, ops->execute_unmap);
 		if (!ops->execute_unmap)
 			return TCM_UNSUPPORTED_SCSI_OPCODE;
 
@@ -1084,7 +1085,8 @@ sbc_execute_unmap(struct se_cmd *cmd)
 	u32 range;
 	sense_reason_t ret = 0;
 	int dl, bd_dl;
-
+	pr_err("%s cmd=%pS\n", __func__, cmd);
+	WARN_ON_ONCE(1);
 	/* We never set ANC_SUP */
 	if (cmd->t_task_cdb[1])
 		return TCM_INVALID_CDB_FIELD;
