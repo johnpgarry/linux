@@ -869,6 +869,16 @@ static blk_status_t sd_setup_unmap_cmnd(struct scsi_cmnd *cmd)
 	return scsi_alloc_sgtables(cmd);
 }
 
+static void sd_config_atomic(struct scsi_disk *sdkp)
+{
+	struct request_queue *q = sdkp->disk->queue;
+
+	blk_queue_write_atomic_max_bytes(q, sdkp->max_atomic);
+	blk_queue_write_atomic_granularity(q, sdkp->atomic_granularity);
+	blk_queue_write_atomic_alignment(q, sdkp->atomic_alignment);
+	blk_queue_write_atomic_offset(q, 0);
+}
+
 static blk_status_t sd_setup_write_same16_cmnd(struct scsi_cmnd *cmd,
 		bool unmap)
 {
@@ -2914,6 +2924,18 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 				sd_config_discard(sdkp, SD_LBP_DISABLE);
 			}
 		}
+
+		sdkp->max_atomic = get_unaligned_be32(&vpd->data[44]);
+		sdkp->atomic_alignment  = get_unaligned_be32(&vpd->data[48]);
+		sdkp->atomic_granularity  = get_unaligned_be32(&vpd->data[52]);
+		sdkp->max_atomic_with_boundary  = get_unaligned_be32(&vpd->data[56]);
+		sdkp->max_atomic_boundary = get_unaligned_be32(&vpd->data[60]);
+
+		pr_err("%s1.0 sdkp=%pS max_atomic=%d alignment=%d granularity=%d max_with_b=%d max_b=%d\n",
+			__func__, sdkp, sdkp->max_atomic, sdkp->atomic_alignment, sdkp->atomic_granularity,
+			sdkp->max_atomic_with_boundary, sdkp->max_atomic_boundary);
+
+		sd_config_atomic(sdkp);
 	}
 
  out:
