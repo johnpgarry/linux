@@ -469,6 +469,15 @@ iblock_execute_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 }
 
 static sense_reason_t
+iblock_execute_atomic(struct se_cmd *cmd, sector_t lba, sector_t nolb)
+{
+	struct block_device *bdev = IBLOCK_DEV(cmd->se_dev)->ibd_bd;
+	struct se_device *dev = cmd->se_dev;
+	pr_err("%s blkdev_issue_atomic() does not exist yet:bdev=%pS dev=%pS lba=%lld\n", __func__, bdev, dev, lba);
+	return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+}
+
+static sense_reason_t
 iblock_execute_zero_out(struct block_device *bdev, struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
@@ -910,6 +919,7 @@ static struct sbc_ops iblock_sbc_ops = {
 	.execute_sync_cache	= iblock_execute_sync_cache,
 	.execute_write_same	= iblock_execute_write_same,
 	.execute_unmap		= iblock_execute_unmap,
+	.execute_atomic		= iblock_execute_atomic,
 };
 
 static sense_reason_t

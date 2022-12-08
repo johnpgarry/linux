@@ -761,6 +761,9 @@ sbc_check_dpofua(struct se_device *dev, struct se_cmd *cmd, unsigned char *cdb)
 	return 0;
 }
 
+static sense_reason_t
+sbc_execute_atomic(struct se_cmd *cmd);
+
 sense_reason_t
 sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 {
@@ -769,7 +772,7 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 	unsigned int size;
 	u32 sectors = 0;
 	sense_reason_t ret;
-	unsigned int cdb0 = cdb[0];
+	//unsigned int cdb0 = cdb[0];
 
 	cmd->protocol_data = ops;
 
@@ -977,6 +980,19 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 		size = get_unaligned_be16(&cdb[7]);
 		cmd->execute_cmd = sbc_execute_unmap;
 		break;
+	case WRITE_ATOMIC_16:
+		pr_err("%s cmd=%pS execute_atomic=%pS\n", __func__, cmd, ops->execute_atomic);
+		if (!ops->execute_atomic)
+			return TCM_UNSUPPORTED_SCSI_OPCODE;
+
+		if (!dev->dev_attrib.emulate_atomic) {
+			pr_err("Got ATOMIC WRITE, but backend device has"
+			       " emulate_atomnic disabled\n");
+			return TCM_UNSUPPORTED_SCSI_OPCODE;
+		}
+		size = 8;
+		cmd->execute_cmd = sbc_execute_atomic;
+		break;
 	case WRITE_SAME_16:
 		sectors = transport_get_sectors_16(cdb);
 		if (!sectors) {
@@ -1063,7 +1079,7 @@ check_lba:
 			size = sbc_get_size(cmd, sectors);
 	}
 
-	pr_err_ratelimited("%s cmd=%pS cmd->execute_cmd=%pS cdb[0]=0x%x\n", __func__, cmd, cmd->execute_cmd, cdb0);
+	//pr_err_ratelimited("%s cmd=%pS cmd->execute_cmd=%pS cdb[0]=0x%x\n", __func__, cmd, cmd->execute_cmd, cdb0);
 	return target_cmd_size_check(cmd, size);
 }
 EXPORT_SYMBOL(sbc_parse_cdb);
@@ -1157,6 +1173,17 @@ err:
 	if (!ret)
 		target_complete_cmd(cmd, SAM_STAT_GOOD);
 	return ret;
+}
+
+static sense_reason_t
+sbc_execute_atomic(struct se_cmd *cmd)
+{
+	struct sbc_ops *ops = cmd->protocol_data;
+	struct se_device *dev = cmd->se_dev;
+	pr_err("%s cmd=%pS ops=%pS dev=%pS ops->execute_unmap=%pS\n", __func__, cmd, ops, dev, ops->execute_unmap);
+	WARN_ON_ONCE(1);
+
+	return TCM_INVALID_CDB_FIELD;
 }
 
 void

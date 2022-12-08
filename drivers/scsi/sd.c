@@ -1243,7 +1243,7 @@ static blk_status_t sd_init_command(struct scsi_cmnd *cmd)
 
 	switch (req_op(rq)) {
 	case REQ_OP_DISCARD:
-		pr_err("%s cmd=%pS REQ_OP_DISCARD\n", __func__, cmd);
+	//	pr_err("%s cmd=%pS REQ_OP_DISCARD\n", __func__, cmd);
 		switch (scsi_disk(rq->q->disk)->provisioning_mode) {
 		case SD_LBP_UNMAP:
 			return sd_setup_unmap_cmnd(cmd);
@@ -1948,8 +1948,8 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 
 	switch (req_op(req)) {
 	case REQ_OP_DISCARD:
-		pr_err("%s SCpnt=%pS REQ_OP_DISCARD\n", __func__, SCpnt);
-		fallthrough;
+		//pr_err("%s SCpnt=%pS REQ_OP_DISCARD\n", __func__, SCpnt);
+		//fallthrough;
 	case REQ_OP_WRITE_ZEROES:
 	case REQ_OP_ZONE_RESET:
 	case REQ_OP_ZONE_RESET_ALL:
