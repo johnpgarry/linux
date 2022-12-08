@@ -247,8 +247,11 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	u32 block_size = bdev_logical_block_size(bd);
 	unsigned long long blocks_long =
 		div_u64(bdev_nr_bytes(bd), block_size) - 1;
+	static int counttt;
 
-	pr_err_ratelimited("%s dev=%pS\n", __func__, dev);
+	if ((counttt % 10000) == 0)
+		pr_err("%s dev=%pS\n", __func__, dev);
+	counttt++;
 	if (block_size == dev->dev_attrib.block_size)
 		return blocks_long;
 
@@ -394,11 +397,15 @@ static void iblock_submit_bios(struct bio_list *list)
 	while ((bio = bio_list_pop(list))) {
 		struct block_device *bdev = bio->bi_bdev;
 		struct request_queue *bd_queue;
+		static int counttt;
 		if (bdev)
 			bd_queue = bdev->bd_queue;
 		else
 			bd_queue = NULL;
-		pr_err_ratelimited("%s list=%pS bdev=%pS bd_queue=%pS\n", __func__, list, bdev, bd_queue);
+
+		if ((counttt % 10000) == 0)
+			pr_err("%s dev=%pS\n", __func__, dev);
+		counttt++;
 
 		submit_bio(bio);
 	}
@@ -766,6 +773,8 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	struct sg_mapping_iter prot_miter;
 	unsigned int miter_dir;
 	WARN_ON_ONCE(1);
+	static int counttt;
+
 	if (data_direction == DMA_TO_DEVICE) {
 		struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
 		/*
@@ -797,7 +806,9 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	}
 
 	bio = iblock_get_bio(cmd, block_lba, sgl_nents, opf);
-	pr_err_ratelimited("%s dev=%pS cmd=%pS bio=%pS\n", __func__, dev, cmd, bio);
+	if ((counttt % 10000) == 0)
+		pr_err("%s dev=%pS\n", __func__, dev);
+	counttt++;
 	if (!bio)
 		goto fail_free_ibr;
 
@@ -868,8 +879,11 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 	struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
 	struct block_device *bd = ib_dev->ibd_bd;
 	struct request_queue *q = bdev_get_queue(bd);
+	static int counttt;
 
-	pr_err_ratelimited("%s dev=%pS\n", __func__, dev);
+	if ((counttt % 10000) == 0)
+		pr_err("%s dev=%pS\n", __func__, dev);
+	counttt++;
 	WARN_ON_ONCE(1);
 	return iblock_emulate_read_cap_with_block_size(dev, bd, q);
 }
