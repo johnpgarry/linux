@@ -1526,11 +1526,22 @@ target_cmd_parse_cdb(struct se_cmd *cmd)
 	sense_reason_t ret;
 
 	ret = dev->transport->parse_cdb(cmd);
-	if (ret == TCM_UNSUPPORTED_SCSI_OPCODE)
-		pr_debug_ratelimited("%s/%s: Unsupported SCSI Opcode 0x%02x, sending CHECK_CONDITION.\n",
-				     cmd->se_tfo->fabric_name,
-				     cmd->se_sess->se_node_acl->initiatorname,
-				     cmd->t_task_cdb[0]);
+	if (ret == TCM_UNSUPPORTED_SCSI_OPCODE) {
+		static int ucount;
+
+		if (ucount < 1000) {
+			pr_err("%s/%s: Unsupported SCSI Opcode 0x%02x, sending CHECK_CONDITION.\n",
+					     cmd->se_tfo->fabric_name,
+					     cmd->se_sess->se_node_acl->initiatorname,
+					     cmd->t_task_cdb[0]);
+			pr_err("%s/%s 2: Unsupported SCSI Opcode 0x%02x dev=%pS dev->transport=%pS dev->transport->parse_cdb=%pS\n",
+					     cmd->se_tfo->fabric_name,
+					     cmd->se_sess->se_node_acl->initiatorname,
+					     cmd->t_task_cdb[0],
+					     dev, dev->transport, dev->transport->parse_cdb);
+		}
+		ucount++;
+	}
 	if (ret)
 		return ret;
 
@@ -1877,9 +1888,12 @@ void target_queued_submit_work(struct work_struct *work)
 	struct se_dev_plug *se_plug = NULL;
 	struct se_device *se_dev = NULL;
 	struct llist_node *cmd_list;
+	static int countyhh;
 
 	WARN_ON_ONCE(1);
-	pr_err_ratelimited("%s sq=%pS\n", __func__, sq);
+	if ((countyhh % 1000) == 0)
+		pr_err("%s sq=%pS\n", __func__, sq);
+	countyhh++;
 	cmd_list = llist_del_all(&sq->cmd_list);
 	if (!cmd_list)
 		/* Previous call took what we were queued to submit */
@@ -1908,8 +1922,11 @@ void target_queue_submission(struct se_cmd *se_cmd)
 	struct se_device *se_dev = se_cmd->se_dev;
 	int cpu = se_cmd->cpuid;
 	struct se_cmd_queue *sq;
+	static int countiij;
 	WARN_ON_ONCE(1);
-	pr_err_ratelimited("%s se_cmd=%pS se_dev=%pS\n", __func__, se_cmd, se_dev);
+	if ((countiij % 1000) == 0)
+		pr_err("%s se_cmd=%pS se_dev=%pS\n", __func__, se_cmd, se_dev);
+	countiij++;
 	sq = &se_dev->queues[cpu].sq;
 	llist_add(&se_cmd->se_cmd_list, &sq->cmd_list);
 	queue_work_on(cpu, target_submission_wq, &sq->work);
@@ -2753,6 +2770,7 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	unsigned long flags;
 	int ret = 0;
 	bool zero_flag = !(cmd->se_cmd_flags & SCF_SCSI_DATA_CDB);
+	static int countyg;
 
 	if (cmd->prot_op != TARGET_PROT_NORMAL &&
 	    !(cmd->se_cmd_flags & SCF_PASSTHROUGH_PROT_SG_TO_MEM_NOALLOC)) {
@@ -2835,8 +2853,9 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	}
 	cmd->transport_state &= ~CMD_T_ACTIVE;
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
-
-	pr_err_ratelimited("%s cmd=%pS se_tfo=%pS write_pending=%pS\n", __func__, cmd, cmd->se_tfo, cmd->se_tfo->write_pending);
+	if ((countyg % 1000) == 0)
+		pr_err("%s cmd=%pS se_tfo=%pS write_pending=%pS\n", __func__, cmd, cmd->se_tfo, cmd->se_tfo->write_pending);
+	countyg++;
 	ret = cmd->se_tfo->write_pending(cmd);
 	if (ret)
 		goto queue_full;

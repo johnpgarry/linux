@@ -788,7 +788,7 @@ spc_emulate_inquiry(struct se_cmd *cmd)
 		}
 	}
 
-	pr_debug("Unknown VPD Code: 0x%02x\n", cdb[2]);
+	pr_err("Unknown VPD Code: [2]0x%02x [0]0x%02x\n", cdb[2], cdb[0]);
 	ret = TCM_INVALID_CDB_FIELD;
 
 out:
