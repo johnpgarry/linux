@@ -81,9 +81,12 @@ static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 
 	ret = 0;
 	if (hdr->dout_xfer_len) {
+		pr_err("%s rq=%pS dout_xfer_len=%d\n", __func__, rq, hdr->dout_xfer_len);
 		ret = blk_rq_map_user(rq->q, rq, NULL, uptr64(hdr->dout_xferp),
 				hdr->dout_xfer_len, GFP_KERNEL);
 	} else if (hdr->din_xfer_len) {
+
+		pr_err("%s2 rq=%pS din_xferp=%d\n", __func__, rq, hdr->din_xfer_len);
 		ret = blk_rq_map_user(rq->q, rq, NULL, uptr64(hdr->din_xferp),
 				hdr->din_xfer_len, GFP_KERNEL);
 	}

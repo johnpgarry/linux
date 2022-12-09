@@ -474,9 +474,13 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 
 		ret = blk_rq_map_user_iov(rq->q, rq, NULL, &i, GFP_KERNEL);
 		kfree(iov);
-	} else if (hdr->dxfer_len)
+	} else if (hdr->dxfer_len) {
+		pr_err("%s3 hdr=%pS hdr->dxferp=%pS hdr->dxfer_len=%d\n", __func__, hdr, hdr->dxferp, hdr->dxfer_len);
 		ret = blk_rq_map_user(rq->q, rq, NULL, hdr->dxferp,
 				      hdr->dxfer_len, GFP_KERNEL);
+		//print_hex_dump(KERN_ERR, "data: ", DUMP_PREFIX_NONE, 32, 1,
+		//	hdr->dxferp, hdr->dxfer_len, 1);
+	}
 
 	if (ret)
 		goto out_put_request;

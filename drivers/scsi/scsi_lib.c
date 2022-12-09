@@ -1599,10 +1599,12 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 			(struct scatterlist *)(cmd->prot_sdb + 1);
 	}
 
-	/*
+	/*if
 	 * Special handling for passthrough commands, which don't go to the ULP
 	 * at all:
 	 */
+	if (cmd->cmnd[0] == 0x9c)
+		pr_err("%s atomic write 9c cmd=%pS rq=%pS pt=%d\n", __func__, cmd, req, blk_rq_is_passthrough(req));
 	if (blk_rq_is_passthrough(req))
 		return scsi_setup_scsi_cmnd(sdev, req);
 

@@ -1241,6 +1241,9 @@ static blk_status_t sd_init_command(struct scsi_cmnd *cmd)
 {
 	struct request *rq = scsi_cmd_to_rq(cmd);
 
+	if (cmd->cmnd[0] == 0x9c)
+		pr_err("%s write atomic 0x9c req_op(rq)=%d cmd=%pS rq=%pS\n", __func__, req_op(rq), cmd, rq);
+
 	switch (req_op(rq)) {
 	case REQ_OP_DISCARD:
 	//	pr_err("%s cmd=%pS REQ_OP_DISCARD\n", __func__, cmd);
