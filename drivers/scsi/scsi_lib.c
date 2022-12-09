@@ -1027,6 +1027,10 @@ blk_status_t scsi_alloc_sgtables(struct scsi_cmnd *cmd)
 	blk_status_t ret;
 	bool need_drain = scsi_cmd_needs_dma_drain(sdev, rq);
 	int count;
+	bool atomic = cmd->cmnd[0] == 0x9c;
+
+	if (atomic)
+		pr_err("%s rq=%pS cmd[0]=0x9c nr_segs=%d", __func__, rq, nr_segs);
 
 	if (WARN_ON_ONCE(!nr_segs))
 		return BLK_STS_IOERR;
@@ -1051,6 +1055,8 @@ blk_status_t scsi_alloc_sgtables(struct scsi_cmnd *cmd)
 	 */
 	count = __blk_rq_map_sg(rq->q, rq, cmd->sdb.table.sgl, &last_sg);
 
+	if (atomic)
+		pr_err("%s2 rq=%pS cmd[0]=0x9c nr_segs=%d count=%d", __func__, rq, nr_segs, count);
 	if (blk_rq_bytes(rq) & rq->q->dma_pad_mask) {
 		unsigned int pad_len =
 			(rq->q->dma_pad_mask & ~blk_rq_bytes(rq)) + 1;
