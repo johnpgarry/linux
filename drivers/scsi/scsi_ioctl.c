@@ -351,8 +351,13 @@ static int scsi_fill_sghdr_rq(struct scsi_device *sdev, struct request *rq,
 		return -EMSGSIZE;
 	if (copy_from_user(scmd->cmnd, hdr->cmdp, hdr->cmd_len))
 		return -EFAULT;
-	if (!scsi_cmd_allowed(scmd->cmnd, mode))
+
+	pr_err("%s scmd->cmnd[0]=0x%x\n", __func__, scmd->cmnd[0]);
+//	WARN_ON_ONCE(scmd->cmnd[0] == 0x9c);
+	if (!scsi_cmd_allowed(scmd->cmnd, mode)) {
+		pr_err("%s2 no allowed scmd->cmnd[0]=0x%x\n", __func__, scmd->cmnd[0]);
 		return -EPERM;
+	}
 	scmd->cmd_len = hdr->cmd_len;
 
 	rq->timeout = msecs_to_jiffies(hdr->timeout);
@@ -450,6 +455,7 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 		goto out_put_request;
 
 	ret = 0;
+	pr_err("%s iovec_count=%d dxfer_len=0x%x\n", __func__, hdr->iovec_count, hdr->dxfer_len);
 	if (hdr->iovec_count && hdr->dxfer_len) {
 		struct iov_iter i;
 		struct iovec *iov = NULL;

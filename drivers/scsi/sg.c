@@ -1755,6 +1755,7 @@ sg_start_req(Sg_request *srp, unsigned char *cmd)
 	}
 
 	memcpy(scmd->cmnd, cmd, hp->cmd_len);
+	pr_err("%s scmd->cmnd[0]=0x%x\n", __func__, scmd->cmnd[0]);
 	scmd->cmd_len = hp->cmd_len;
 
 	srp->rq = rq;

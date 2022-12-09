@@ -214,6 +214,14 @@ int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	struct scsi_cmnd *scmd;
 	int ret;
 
+	if (cmd[0] == 0x9c) {
+		pr_err("%s WRITE 16 ATOMIC \n", __func__);
+		WARN_ON_ONCE(1);
+	//	return -1;
+	} else {
+	//	pr_err("%s cmd[0]=0x%x\n", __func__, cmd[0]);
+	}
+
 	req = scsi_alloc_request(sdev->request_queue,
 			data_direction == DMA_TO_DEVICE ?
 			REQ_OP_DRV_OUT : REQ_OP_DRV_IN,
