@@ -777,7 +777,7 @@ static void vhost_scsi_target_queue_cmd(struct vhost_scsi_cmd *cmd)
 	static int counttt;
 
 	if ((counttt % 10000) == 0)
-		pr_err("%s dev=%pS\n", __func__, dev);
+		pr_err("%s dev=%pS\n", __func__, se_cmd);
 	counttt++;
 	/* FIXME: BIDI operation */
 	if (cmd->tvc_sgl_count) {

@@ -404,7 +404,7 @@ static void iblock_submit_bios(struct bio_list *list)
 			bd_queue = NULL;
 
 		if ((counttt % 10000) == 0)
-			pr_err("%s dev=%pS\n", __func__, dev);
+			pr_err("%s bdev=%pS\n", __func__, bdev);
 		counttt++;
 
 		submit_bio(bio);
@@ -772,8 +772,8 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	int i, rc;
 	struct sg_mapping_iter prot_miter;
 	unsigned int miter_dir;
-	WARN_ON_ONCE(1);
 	static int counttt;
+	WARN_ON_ONCE(1);
 
 	if (data_direction == DMA_TO_DEVICE) {
 		struct iblock_dev *ib_dev = IBLOCK_DEV(dev);
