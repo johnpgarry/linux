@@ -352,10 +352,10 @@ static int scsi_fill_sghdr_rq(struct scsi_device *sdev, struct request *rq,
 	if (copy_from_user(scmd->cmnd, hdr->cmdp, hdr->cmd_len))
 		return -EFAULT;
 
-	pr_err("%s scmd->cmnd[0]=0x%x\n", __func__, scmd->cmnd[0]);
+	pr_err("%s scmd->cmnd[0]=0x%x hdr=%pS rq=%pS\n", __func__, scmd->cmnd[0], hdr, rq);
 //	WARN_ON_ONCE(scmd->cmnd[0] == 0x9c);
 	if (!scsi_cmd_allowed(scmd->cmnd, mode)) {
-		pr_err("%s2 no allowed scmd->cmnd[0]=0x%x\n", __func__, scmd->cmnd[0]);
+		pr_err("%s2 no allowed scmd->cmnd[0]=0x%x hdr=%pS\n", __func__, scmd->cmnd[0], hdr);
 		return -EPERM;
 	}
 	scmd->cmd_len = hdr->cmd_len;
@@ -455,7 +455,7 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 		goto out_put_request;
 
 	ret = 0;
-	pr_err("%s iovec_count=%d dxfer_len=0x%x\n", __func__, hdr->iovec_count, hdr->dxfer_len);
+	pr_err("%s iovec_count=%d dxfer_len=0x%x hdr=%pS rq=%pS scmd->cmnd[0]=0x%x\n", __func__, hdr->iovec_count, hdr->dxfer_len, hdr, rq, scmd->cmnd[0]);
 	if (hdr->iovec_count && hdr->dxfer_len) {
 		struct iov_iter i;
 		struct iovec *iov = NULL;
@@ -464,6 +464,10 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 				   hdr->iovec_count, 0, &iov, &i);
 		if (ret < 0)
 			goto out_put_request;
+		if (iov)
+			pr_err("%s2 iovec_count=%d dxfer_len=0x%x hdr=%pS iov.base=%pS iov_len=0x%lx\n", __func__, hdr->iovec_count, hdr->dxfer_len, hdr, iov->iov_base, iov->iov_len);
+		else
+			pr_err("%s2 iovec_count=%d dxfer_len=0x%x hdr=%pS iov=NULL\n", __func__, hdr->iovec_count, hdr->dxfer_len, hdr);
 
 		/* SG_IO howto says that the shorter of the two wins */
 		iov_iter_truncate(&i, hdr->dxfer_len);

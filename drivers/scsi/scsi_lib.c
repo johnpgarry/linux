@@ -1175,7 +1175,8 @@ static blk_status_t scsi_setup_scsi_cmnd(struct scsi_device *sdev,
 		struct request *req)
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
-
+	if (cmd->cmnd[0] == 0x9c)
+		pr_err("%s cmd=%pS req=%pS bio=%pS\n", __func__, cmd, req, req->bio);
 	/*
 	 * Passthrough requests may transfer data, in which case they must
 	 * a bio attached to them.  Or they might contain a SCSI command
