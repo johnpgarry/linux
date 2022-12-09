@@ -772,6 +772,7 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 	unsigned int size;
 	u32 sectors = 0;
 	sense_reason_t ret;
+	sense_reason_t value_to_ret;
 	//unsigned int cdb0 = cdb[0];
 
 	cmd->protocol_data = ops;
@@ -981,7 +982,8 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 		cmd->execute_cmd = sbc_execute_unmap;
 		break;
 	case WRITE_ATOMIC_16:
-		pr_err("%s cmd=%pS execute_atomic=%pS\n", __func__, cmd, ops->execute_atomic);
+		pr_err("%s WRITE_ATOMIC_16 cmd=%pS execute_atomic=%pS emulate_atomic=%d lba64=0x%llx lba32=0x%x\n", 
+			__func__, cmd, ops->execute_atomic, dev->dev_attrib.emulate_atomic, transport_lba_64(cdb), transport_lba_32(cdb));
 		if (!ops->execute_atomic)
 			return TCM_UNSUPPORTED_SCSI_OPCODE;
 
@@ -992,6 +994,7 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 		}
 		size = 8;
 		cmd->execute_cmd = sbc_execute_atomic;
+		pr_err("%s2 WRITE_ATOMIC_16 cmd=%pS execute_cmd=%pS size=%d unknown_data_length=%d\n", __func__, cmd, cmd->execute_cmd, size, cmd->unknown_data_length);
 		break;
 	case WRITE_SAME_16:
 		sectors = transport_get_sectors_16(cdb);
@@ -1060,8 +1063,10 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 	}
 
 	/* reject any command that we don't have a handler for */
-	if (!cmd->execute_cmd)
+	if (!cmd->execute_cmd) {
+		pr_err("%s3 cmd=%pS cdb[0]=0x%x return TCM_UNSUPPORTED_SCSI_OPCODE\n", __func__, cmd, cdb[0]);
 		return TCM_UNSUPPORTED_SCSI_OPCODE;
+	}
 
 	if (cmd->se_cmd_flags & SCF_SCSI_DATA_CDB) {
 		unsigned long long end_lba;
@@ -1080,7 +1085,11 @@ check_lba:
 	}
 
 	//pr_err_ratelimited("%s cmd=%pS cmd->execute_cmd=%pS cdb[0]=0x%x\n", __func__, cmd, cmd->execute_cmd, cdb0);
-	return target_cmd_size_check(cmd, size);
+	value_to_ret = target_cmd_size_check(cmd, size);
+
+	if (cdb[0] == WRITE_ATOMIC_16)
+		pr_err("%s4 WRITE_ATOMIC_16 cmd=%pS execute_cmd=%pS size=%d value_to_ret=%d\n", __func__, cmd, cmd->execute_cmd, size, value_to_ret);
+	return value_to_ret;
 }
 EXPORT_SYMBOL(sbc_parse_cdb);
 
@@ -1181,7 +1190,7 @@ sbc_execute_atomic(struct se_cmd *cmd)
 	struct sbc_ops *ops = cmd->protocol_data;
 	struct se_device *dev = cmd->se_dev;
 	pr_err("%s cmd=%pS ops=%pS dev=%pS ops->execute_unmap=%pS\n", __func__, cmd, ops, dev, ops->execute_unmap);
-	WARN_ON_ONCE(1);
+	//WARN_ON_ONCE(1);
 
 	return TCM_INVALID_CDB_FIELD;
 }
