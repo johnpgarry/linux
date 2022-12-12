@@ -476,11 +476,11 @@ iblock_execute_unmap(struct se_cmd *cmd, sector_t lba, sector_t nolb)
 }
 
 static sense_reason_t
-iblock_execute_atomic(struct se_cmd *cmd, sector_t lba, sector_t nolb)
+iblock_execute_atomic(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents)
 {
 	struct block_device *bdev = IBLOCK_DEV(cmd->se_dev)->ibd_bd;
 	struct se_device *dev = cmd->se_dev;
-	pr_err("%s blkdev_issue_atomic() does not exist yet:bdev=%pS dev=%pS lba=%lld\n", __func__, bdev, dev, lba);
+	pr_err("%s blkdev_issue_atomic() does not exist yet:bdev=%pS dev=%pS sgl=%pS sgl_nents=%d\n", __func__, bdev, dev, sgl, sgl_nents);
 	return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 }
 

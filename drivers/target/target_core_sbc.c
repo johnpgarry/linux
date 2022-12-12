@@ -778,6 +778,21 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 	cmd->protocol_data = ops;
 
 	switch (cdb[0]) {
+	case WRITE_ATOMIC_16:
+		pr_err("%s WRITE_ATOMIC_16 cmd=%pS execute_atomic=%pS emulate_atomic=%d lba64=0x%llx lba32=0x%x\n", 
+			__func__, cmd, ops->execute_atomic, dev->dev_attrib.emulate_atomic, transport_lba_64(cdb), transport_lba_32(cdb));
+		if (!ops->execute_atomic)
+			return TCM_UNSUPPORTED_SCSI_OPCODE;
+
+		if (!dev->dev_attrib.emulate_atomic) {
+			pr_err("Got ATOMIC WRITE, but backend device has"
+			       " emulate_atomnic disabled\n");
+			return TCM_UNSUPPORTED_SCSI_OPCODE;
+		}
+		size = 8;
+		cmd->execute_cmd = sbc_execute_atomic;
+		pr_err("%s2 WRITE_ATOMIC_16 cmd=%pS execute_cmd=%pS size=%d unknown_data_length=%d\n", __func__, cmd, cmd->execute_cmd, size, cmd->unknown_data_length);
+		break;
 	case READ_6:
 		sectors = transport_get_sectors_6(cdb);
 		cmd->t_task_lba = transport_lba_21(cdb);
@@ -981,21 +996,6 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 		size = get_unaligned_be16(&cdb[7]);
 		cmd->execute_cmd = sbc_execute_unmap;
 		break;
-	case WRITE_ATOMIC_16:
-		pr_err("%s WRITE_ATOMIC_16 cmd=%pS execute_atomic=%pS emulate_atomic=%d lba64=0x%llx lba32=0x%x\n", 
-			__func__, cmd, ops->execute_atomic, dev->dev_attrib.emulate_atomic, transport_lba_64(cdb), transport_lba_32(cdb));
-		if (!ops->execute_atomic)
-			return TCM_UNSUPPORTED_SCSI_OPCODE;
-
-		if (!dev->dev_attrib.emulate_atomic) {
-			pr_err("Got ATOMIC WRITE, but backend device has"
-			       " emulate_atomnic disabled\n");
-			return TCM_UNSUPPORTED_SCSI_OPCODE;
-		}
-		size = 8;
-		cmd->execute_cmd = sbc_execute_atomic;
-		pr_err("%s2 WRITE_ATOMIC_16 cmd=%pS execute_cmd=%pS size=%d unknown_data_length=%d\n", __func__, cmd, cmd->execute_cmd, size, cmd->unknown_data_length);
-		break;
 	case WRITE_SAME_16:
 		sectors = transport_get_sectors_16(cdb);
 		if (!sectors) {
@@ -1189,10 +1189,10 @@ sbc_execute_atomic(struct se_cmd *cmd)
 {
 	struct sbc_ops *ops = cmd->protocol_data;
 	struct se_device *dev = cmd->se_dev;
-	pr_err("%s cmd=%pS ops=%pS dev=%pS ops->execute_unmap=%pS\n", __func__, cmd, ops, dev, ops->execute_unmap);
+	pr_err("%s cmd=%pS ops=%pS dev=%pS ops->execute_atomic=%pS\n", __func__, cmd, ops, dev, ops->execute_atomic);
 	//WARN_ON_ONCE(1);
 
-	return TCM_INVALID_CDB_FIELD;
+	return ops->execute_atomic(cmd, cmd->t_data_sg, cmd->t_data_nents);
 }
 
 void

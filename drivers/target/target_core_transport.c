@@ -2150,7 +2150,7 @@ void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
 	}
 
 	if ((countty % 100) == 0)
-		pr_err("%s cmd=%pS execute_cmd=%pS\n", __func__, cmd, cmd->execute_cmd);
+		pr_err("%s cmd=%pS execute_cmd=%pS countty=%d\n", __func__, cmd, cmd->execute_cmd, countty);
 	ret = cmd->execute_cmd(cmd);
 	countty++;
 	if (!ret)

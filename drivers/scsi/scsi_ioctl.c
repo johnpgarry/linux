@@ -419,6 +419,8 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 	struct scsi_cmnd *scmd;
 	struct bio *bio;
 
+	pr_err("%s hdr=%pS\n", __func__, hdr);
+
 	if (hdr->interface_id != 'S')
 		return -EINVAL;
 
@@ -444,6 +446,7 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
 	scmd = blk_mq_rq_to_pdu(rq);
+	pr_err("%s0 iovec_count=%d dxfer_len=0x%x hdr=%pS rq=%pS scmd->cmnd[0]=0x%x\n", __func__, hdr->iovec_count, hdr->dxfer_len, hdr, rq, scmd->cmnd[0]);
 
 	if (hdr->cmd_len > sizeof(scmd->cmnd)) {
 		ret = -EINVAL;
@@ -455,7 +458,7 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 		goto out_put_request;
 
 	ret = 0;
-	pr_err("%s iovec_count=%d dxfer_len=0x%x hdr=%pS rq=%pS scmd->cmnd[0]=0x%x\n", __func__, hdr->iovec_count, hdr->dxfer_len, hdr, rq, scmd->cmnd[0]);
+	pr_err("%s1 iovec_count=%d dxfer_len=0x%x hdr=%pS rq=%pS scmd->cmnd[0]=0x%x\n", __func__, hdr->iovec_count, hdr->dxfer_len, hdr, rq, scmd->cmnd[0]);
 	if (hdr->iovec_count && hdr->dxfer_len) {
 		struct iov_iter i;
 		struct iovec *iov = NULL;
@@ -475,9 +478,10 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 		ret = blk_rq_map_user_iov(rq->q, rq, NULL, &i, GFP_KERNEL);
 		kfree(iov);
 	} else if (hdr->dxfer_len) {
-		pr_err("%s3 hdr=%pS hdr->dxferp=%pS hdr->dxfer_len=%d\n", __func__, hdr, hdr->dxferp, hdr->dxfer_len);
+		pr_err("%s3 hdr=%pS hdr->dxferp=%pS hdr->dxfer_len=%d rq->bio=%pS\n", __func__, hdr, hdr->dxferp, hdr->dxfer_len, rq->bio);
 		ret = blk_rq_map_user(rq->q, rq, NULL, hdr->dxferp,
 				      hdr->dxfer_len, GFP_KERNEL);
+		pr_err("%s4 hdr=%pS hdr->dxferp=%pS hdr->dxfer_len=%d rq->bio=%pS\n", __func__, hdr, hdr->dxferp, hdr->dxfer_len, rq->bio);
 		//print_hex_dump(KERN_ERR, "data: ", DUMP_PREFIX_NONE, 32, 1,
 		//	hdr->dxferp, hdr->dxfer_len, 1);
 	}
