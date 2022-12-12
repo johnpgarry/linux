@@ -790,8 +790,10 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 			return TCM_UNSUPPORTED_SCSI_OPCODE;
 		}
 		size = 8;
+		//sectors = transport_get_sectors_10(cdb);
+		cmd->t_task_lba = transport_lba_64(cdb);
 		cmd->execute_cmd = sbc_execute_atomic;
-		pr_err("%s2 WRITE_ATOMIC_16 cmd=%pS execute_cmd=%pS size=%d unknown_data_length=%d\n", __func__, cmd, cmd->execute_cmd, size, cmd->unknown_data_length);
+		pr_err("%s2 WRITE_ATOMIC_16 cmd=%pS execute_cmd=%pS size=%d unknown_data_length=%d t_task_lba=0x%llx\n", __func__, cmd, cmd->execute_cmd, size, cmd->unknown_data_length, cmd->t_task_lba);
 		break;
 	case READ_6:
 		sectors = transport_get_sectors_6(cdb);

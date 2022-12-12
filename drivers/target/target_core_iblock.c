@@ -480,7 +480,14 @@ iblock_execute_atomic(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents
 {
 	struct block_device *bdev = IBLOCK_DEV(cmd->se_dev)->ibd_bd;
 	struct se_device *dev = cmd->se_dev;
-	pr_err("%s blkdev_issue_atomic() does not exist yet:bdev=%pS dev=%pS sgl=%pS sgl_nents=%d\n", __func__, bdev, dev, sgl, sgl_nents);
+	sector_t nolb = sbc_get_write_same_sectors(cmd);
+	sector_t s1, s2, lba = cmd->t_task_lba;
+
+	s1 = target_to_linux_sector(dev, lba),
+	s2 = target_to_linux_sector(dev,  nolb),
+
+	pr_err("%s blkdev_issue_atomic() stubbed: bdev=%pS dev=%pS sgl=%pS sgl_nents=%d\n", __func__, bdev, dev, sgl, sgl_nents);
+	pr_err("%s1 blkdev_issue_atomic() stubbed: lba=0x%llx nolb=0x%llx s1=0x%llx s2=0x%llx\n", __func__, lba, nolb, s1, s2);
 
 	if (sgl) {
 		struct scatterlist *sg;
