@@ -481,6 +481,25 @@ iblock_execute_atomic(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents
 	struct block_device *bdev = IBLOCK_DEV(cmd->se_dev)->ibd_bd;
 	struct se_device *dev = cmd->se_dev;
 	pr_err("%s blkdev_issue_atomic() does not exist yet:bdev=%pS dev=%pS sgl=%pS sgl_nents=%d\n", __func__, bdev, dev, sgl, sgl_nents);
+
+	if (sgl) {
+		struct scatterlist *sg;
+		int i;
+
+		for_each_sg(sgl, sg, sgl_nents, i) {
+			struct page *page = sg_page(sg);
+			u8 *kto = kmap_atomic(page);
+			u8 *_kto;
+
+			if (!kto)
+				continue;
+
+			_kto = kto + sg->offset;
+			pr_err("%s2 sg=%pS kto=%pS [0...3]=0x%x %x %x %x length=%d offset=%d\n", __func__, sg, kto, _kto[0], _kto[1], _kto[2], _kto[3], sg->length, sg->offset);
+
+			kunmap_atomic(kto);
+		}
+	}
 	return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 }
 
