@@ -192,6 +192,171 @@ struct bio_vec *bio_last_bvec_all(struct bio *bio)
 	return &bio->bi_io_vec[bio->bi_vcnt - 1];
 }
 
+
+void bio_first_folio(struct folio_iter *fi, struct bio *bio,
+				   int i)
+{
+	struct bio_vec *bvec = bio_first_bvec_all(bio) + i;
+
+	fi->folio = page_folio(bvec->bv_page);
+	fi->offset = bvec->bv_offset +
+			PAGE_SIZE * (bvec->bv_page - &fi->folio->page);
+	fi->_seg_count = bvec->bv_len;
+	fi->length = min(folio_size(fi->folio) - fi->offset, fi->_seg_count);
+	fi->_next = folio_next(fi->folio);
+	fi->_i = i;
+}
+
+void bio_next_folio(struct folio_iter *fi, struct bio *bio)
+{
+	fi->_seg_count -= fi->length;
+	if (fi->_seg_count) {
+		fi->folio = fi->_next;
+		fi->offset = 0;
+		fi->length = min(folio_size(fi->folio), fi->_seg_count);
+		fi->_next = folio_next(fi->folio);
+	} else if (fi->_i + 1 < bio->bi_vcnt) {
+		bio_first_folio(fi, bio, fi->_i + 1);
+	} else {
+		fi->folio = NULL;
+	}
+}
+
+
+struct bio *bio_next_split(struct bio *bio, int sectors,
+					 gfp_t gfp, struct bio_set *bs)
+{
+	if (sectors >= bio_sectors(bio))
+		return bio;
+
+	return bio_split(bio, sectors, gfp, bs);
+}
+
+struct bio *bio_alloc(struct block_device *bdev,
+		unsigned short nr_vecs, blk_opf_t opf, gfp_t gfp_mask)
+{
+	return bio_alloc_bioset(bdev, nr_vecs, opf, gfp_mask, &fs_bio_set);
+}
+
+int bio_iov_vecs_to_alloc(struct iov_iter *iter, int max_segs)
+{
+	if (iov_iter_is_bvec(iter))
+		return 0;
+	return iov_iter_npages(iter, max_segs);
+}
+
+
+int bio_list_empty(const struct bio_list *bl)
+{
+	return bl->head == NULL;
+}
+
+void bio_list_init(struct bio_list *bl)
+{
+	bl->head = bl->tail = NULL;
+}
+
+unsigned bio_list_size(const struct bio_list *bl)
+{
+	unsigned sz = 0;
+	struct bio *bio;
+
+	bio_list_for_each(bio, bl)
+		sz++;
+
+	return sz;
+}
+
+void bio_list_add(struct bio_list *bl, struct bio *bio)
+{
+	bio->bi_next = NULL;
+
+	if (bl->tail)
+		bl->tail->bi_next = bio;
+	else
+		bl->head = bio;
+
+	bl->tail = bio;
+}
+
+void bio_list_add_head(struct bio_list *bl, struct bio *bio)
+{
+	bio->bi_next = bl->head;
+
+	bl->head = bio;
+
+	if (!bl->tail)
+		bl->tail = bio;
+}
+
+void bio_list_merge(struct bio_list *bl, struct bio_list *bl2)
+{
+	if (!bl2->head)
+		return;
+
+	if (bl->tail)
+		bl->tail->bi_next = bl2->head;
+	else
+		bl->head = bl2->head;
+
+	bl->tail = bl2->tail;
+}
+
+void bio_list_merge_head(struct bio_list *bl,
+				       struct bio_list *bl2)
+{
+	if (!bl2->head)
+		return;
+
+	if (bl->head)
+		bl2->tail->bi_next = bl->head;
+	else
+		bl->tail = bl2->tail;
+
+	bl->head = bl2->head;
+}
+
+struct bio *bio_list_peek(struct bio_list *bl)
+{
+	return bl->head;
+}
+
+struct bio *bio_list_pop(struct bio_list *bl)
+{
+	struct bio *bio = bl->head;
+
+	if (bio) {
+		bl->head = bl->head->bi_next;
+		if (!bl->head)
+			bl->tail = NULL;
+
+		bio->bi_next = NULL;
+	}
+
+	return bio;
+}
+
+struct bio *bio_list_get(struct bio_list *bl)
+{
+	struct bio *bio = bl->head;
+
+	bl->head = bl->tail = NULL;
+
+	return bio;
+}
+
+/*
+ * Increment chain count for the bio. Make sure the CHAIN flag update
+ * is visible before the raised count.
+ */
+void bio_inc_remaining(struct bio *bio)
+{
+	bio_set_flag(bio, BIO_CHAIN);
+	smp_mb__before_atomic();
+	atomic_inc(&bio->__bi_remaining);
+}
+
+
 struct bio_alloc_cache {
 	struct bio		*free_list;
 	unsigned int		nr;

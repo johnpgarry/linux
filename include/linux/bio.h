@@ -163,34 +163,10 @@ struct folio_iter {
 	int _i;
 };
 
-static inline void bio_first_folio(struct folio_iter *fi, struct bio *bio,
-				   int i)
-{
-	struct bio_vec *bvec = bio_first_bvec_all(bio) + i;
+void bio_first_folio(struct folio_iter *fi, struct bio *bio,
+				   int i);
 
-	fi->folio = page_folio(bvec->bv_page);
-	fi->offset = bvec->bv_offset +
-			PAGE_SIZE * (bvec->bv_page - &fi->folio->page);
-	fi->_seg_count = bvec->bv_len;
-	fi->length = min(folio_size(fi->folio) - fi->offset, fi->_seg_count);
-	fi->_next = folio_next(fi->folio);
-	fi->_i = i;
-}
-
-static inline void bio_next_folio(struct folio_iter *fi, struct bio *bio)
-{
-	fi->_seg_count -= fi->length;
-	if (fi->_seg_count) {
-		fi->folio = fi->_next;
-		fi->offset = 0;
-		fi->length = min(folio_size(fi->folio), fi->_seg_count);
-		fi->_next = folio_next(fi->folio);
-	} else if (fi->_i + 1 < bio->bi_vcnt) {
-		bio_first_folio(fi, bio, fi->_i + 1);
-	} else {
-		fi->folio = NULL;
-	}
-}
+void bio_next_folio(struct folio_iter *fi, struct bio *bio);
 
 /**
  * bio_for_each_folio_all - Iterate over each folio in a bio.
@@ -275,14 +251,9 @@ extern struct bio *bio_split(struct bio *bio, int sectors,
  * Return: a bio representing the next @sectors of @bio - if the bio is smaller
  * than @sectors, returns the original bio unchanged.
  */
-static inline struct bio *bio_next_split(struct bio *bio, int sectors,
-					 gfp_t gfp, struct bio_set *bs)
-{
-	if (sectors >= bio_sectors(bio))
-		return bio;
+struct bio *bio_next_split(struct bio *bio, int sectors,
+					 gfp_t gfp, struct bio_set *bs);
 
-	return bio_split(bio, sectors, gfp, bs);
-}
 
 enum {
 	BIOSET_NEED_BVECS = BIT(0),
@@ -306,11 +277,8 @@ int bio_init_clone(struct block_device *bdev, struct bio *bio,
 
 extern struct bio_set fs_bio_set;
 
-static inline struct bio *bio_alloc(struct block_device *bdev,
-		unsigned short nr_vecs, blk_opf_t opf, gfp_t gfp_mask)
-{
-	return bio_alloc_bioset(bdev, nr_vecs, opf, gfp_mask, &fs_bio_set);
-}
+struct bio *bio_alloc(struct block_device *bdev,
+		unsigned short nr_vecs, blk_opf_t opf, gfp_t gfp_mask);
 
 void submit_bio(struct bio *bio);
 
@@ -334,12 +302,7 @@ static inline void bio_wouldblock_error(struct bio *bio)
  * pointed by @iter. If @iter is backed by bvec it's going to be reused
  * instead of allocating a new one.
  */
-static inline int bio_iov_vecs_to_alloc(struct iov_iter *iter, int max_segs)
-{
-	if (iov_iter_is_bvec(iter))
-		return 0;
-	return iov_iter_npages(iter, max_segs);
-}
+int bio_iov_vecs_to_alloc(struct iov_iter *iter, int max_segs);
 
 struct request_queue;
 
@@ -415,120 +378,37 @@ struct bio_list {
 	struct bio *tail;
 };
 
-static inline int bio_list_empty(const struct bio_list *bl)
-{
-	return bl->head == NULL;
-}
+int bio_list_empty(const struct bio_list *bl);
 
-static inline void bio_list_init(struct bio_list *bl)
-{
-	bl->head = bl->tail = NULL;
-}
+void bio_list_init(struct bio_list *bl);
 
 #define BIO_EMPTY_LIST	{ NULL, NULL }
 
 #define bio_list_for_each(bio, bl) \
 	for (bio = (bl)->head; bio; bio = bio->bi_next)
 
-static inline unsigned bio_list_size(const struct bio_list *bl)
-{
-	unsigned sz = 0;
-	struct bio *bio;
+unsigned bio_list_size(const struct bio_list *bl);
 
-	bio_list_for_each(bio, bl)
-		sz++;
+void bio_list_add(struct bio_list *bl, struct bio *bio);
 
-	return sz;
-}
+void bio_list_add_head(struct bio_list *bl, struct bio *bio);
 
-static inline void bio_list_add(struct bio_list *bl, struct bio *bio)
-{
-	bio->bi_next = NULL;
+void bio_list_merge(struct bio_list *bl, struct bio_list *bl2);
 
-	if (bl->tail)
-		bl->tail->bi_next = bio;
-	else
-		bl->head = bio;
+void bio_list_merge_head(struct bio_list *bl,
+				       struct bio_list *bl2);
 
-	bl->tail = bio;
-}
+struct bio *bio_list_peek(struct bio_list *bl);
 
-static inline void bio_list_add_head(struct bio_list *bl, struct bio *bio)
-{
-	bio->bi_next = bl->head;
+struct bio *bio_list_pop(struct bio_list *bl);
 
-	bl->head = bio;
-
-	if (!bl->tail)
-		bl->tail = bio;
-}
-
-static inline void bio_list_merge(struct bio_list *bl, struct bio_list *bl2)
-{
-	if (!bl2->head)
-		return;
-
-	if (bl->tail)
-		bl->tail->bi_next = bl2->head;
-	else
-		bl->head = bl2->head;
-
-	bl->tail = bl2->tail;
-}
-
-static inline void bio_list_merge_head(struct bio_list *bl,
-				       struct bio_list *bl2)
-{
-	if (!bl2->head)
-		return;
-
-	if (bl->head)
-		bl2->tail->bi_next = bl->head;
-	else
-		bl->tail = bl2->tail;
-
-	bl->head = bl2->head;
-}
-
-static inline struct bio *bio_list_peek(struct bio_list *bl)
-{
-	return bl->head;
-}
-
-static inline struct bio *bio_list_pop(struct bio_list *bl)
-{
-	struct bio *bio = bl->head;
-
-	if (bio) {
-		bl->head = bl->head->bi_next;
-		if (!bl->head)
-			bl->tail = NULL;
-
-		bio->bi_next = NULL;
-	}
-
-	return bio;
-}
-
-static inline struct bio *bio_list_get(struct bio_list *bl)
-{
-	struct bio *bio = bl->head;
-
-	bl->head = bl->tail = NULL;
-
-	return bio;
-}
+struct bio *bio_list_get(struct bio_list *bl);
 
 /*
  * Increment chain count for the bio. Make sure the CHAIN flag update
  * is visible before the raised count.
  */
-static inline void bio_inc_remaining(struct bio *bio)
-{
-	bio_set_flag(bio, BIO_CHAIN);
-	smp_mb__before_atomic();
-	atomic_inc(&bio->__bi_remaining);
-}
+void bio_inc_remaining(struct bio *bio);
 
 /*
  * bio_set is used to allow other portions of the IO system to

@@ -2787,6 +2787,8 @@ static void bio_set_ioprio(struct bio *bio)
  * It will not queue the request if there is an error with the bio, or at the
  * request creation.
  */
+
+
 void blk_mq_submit_bio(struct bio *bio)
 {
 	struct request_queue *q = bdev_get_queue(bio->bi_bdev);
@@ -2797,7 +2799,8 @@ void blk_mq_submit_bio(struct bio *bio)
 	blk_status_t ret;
 	static int countttt;
 
-	WARN_ON((countttt % 100000) == 0);
+	WARN((countttt % 100000) == 0, "%s bio=%pS bi_next=%pS bi_bdev=%pS bi_vcnt=%d bi_io_vec=%pS\n",
+		__func__, bio, bio->bi_next, bio->bi_bdev, bio->bi_vcnt, bio->bi_io_vec);
 	countttt++;
 
 	bio = blk_queue_bounce(bio, q);
