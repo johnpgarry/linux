@@ -1727,6 +1727,10 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
 	int reason;
+	static int countttt;
+
+	WARN_ON((countttt % 1000000) == 0);
+	countttt++;
 
 	WARN_ON_ONCE(cmd->budget_token < 0);
 
