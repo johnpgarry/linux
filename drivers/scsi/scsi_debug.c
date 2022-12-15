@@ -419,7 +419,8 @@ enum sdeb_opcode_index {
 	SDEB_I_PRE_FETCH = 29,		/* 10, 16 */
 	SDEB_I_ZONE_OUT = 30,		/* 0x94+SA; includes no data xfer */
 	SDEB_I_ZONE_IN = 31,		/* 0x95+SA; all have data-in */
-	SDEB_I_LAST_ELEM_P1 = 32,	/* keep this last (previous + 1) */
+	SDEB_I_ATOMIC_WRITE_16 = 32,	/* keep this last (previous + 1) */
+	SDEB_I_LAST_ELEM_P1 = 33,	/* keep this last (previous + 1) */
 };
 
 
@@ -453,7 +454,8 @@ static const unsigned char opcode_ind_arr[256] = {
 	0, 0, 0, SDEB_I_VERIFY,
 	SDEB_I_PRE_FETCH, SDEB_I_SYNC_CACHE, 0, SDEB_I_WRITE_SAME,
 	SDEB_I_ZONE_OUT, SDEB_I_ZONE_IN, 0, 0,
-	0, 0, 0, 0, 0, 0, SDEB_I_SERV_ACT_IN_16, SDEB_I_SERV_ACT_OUT_16,
+	0, 0, 0, 0,
+	SDEB_I_ATOMIC_WRITE_16, 0, SDEB_I_SERV_ACT_IN_16, SDEB_I_SERV_ACT_OUT_16,
 /* 0xa0; 0xa0->0xbf: 12 byte cdbs */
 	SDEB_I_REPORT_LUNS, SDEB_I_ATA_PT, 0, SDEB_I_MAINT_IN,
 	     SDEB_I_MAINT_OUT, 0, 0, 0,
@@ -501,6 +503,7 @@ static int resp_write_buffer(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_sync_cache(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_pre_fetch(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_report_zones(struct scsi_cmnd *, struct sdebug_dev_info *);
+static int resp_atomic_write(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_open_zone(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_close_zone(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_finish_zone(struct scsi_cmnd *, struct sdebug_dev_info *);
@@ -735,6 +738,11 @@ static const struct opcode_info_t opcode_info_arr[SDEB_I_LAST_ELEM_P1 + 1] = {
 		 0xff, 0xff, 0x0, 0x0, 0xff, 0xff, 0x1, 0xc7} },
 	{ARRAY_SIZE(zone_in_iarr), 0x95, 0x0, F_SA_LOW | F_M_ACCESS,
 	    resp_report_zones, zone_in_iarr, /* ZONE_IN(16), REPORT ZONES) */
+		{16,  0x0 /* SA */, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0xc7} },
+/* 31 */
+	{0, 0x95, 0x0, 1234,
+	    resp_atomic_write, zone_in_iarr, /*ATOMIC WRITE 16 */
 		{16,  0x0 /* SA */, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0xc7} },
 /* sentinel */
@@ -4649,6 +4657,31 @@ fini:
 	return ret;
 }
 
+
+static int resp_atomic_write(struct scsi_cmnd *scp,
+			     struct sdebug_dev_info *devip)
+{
+	u8 *cmd = scp->cmnd;
+	u64 lba;
+	u16 boundary;
+	u16 len;
+
+	pr_err("0 scp=%pS devip=%pS\n", scp, devip);
+
+	if (!scsi_debug_atomic_write()) {
+		mk_sense_invalid_opcode(scp);
+		return check_condition_result;
+	}
+	
+	lba = get_unaligned_be64(cmd + 2);
+	boundary = get_unaligned_be16(cmd + 10);
+	len = get_unaligned_be16(cmd + 12);
+
+	pr_err("1 scp=%pS devip=%pS lba=0x%llx boundary=%d len=%d\n", scp, devip, lba, boundary, len);
+
+	return 0;
+}
+
 /* Logic transplanted from tcmu-runner, file_zbc.c */
 static void zbc_open_all(struct sdebug_dev_info *devip)
 {
@@ -5711,6 +5744,8 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 		ns_from_boot = ktime_get_boottime_ns();
 
 	/* one of the resp_*() response functions is called here */
+	if (cmnd->cmnd[0] == 0x9c)
+		pr_err("ATOMIC WRITE (16) pfp=%pS\n", pfp);
 	cmnd->result = pfp ? pfp(cmnd, devip) : 0;
 	if (cmnd->result & SDEG_RES_IMMED_MASK) {
 		cmnd->result &= ~SDEG_RES_IMMED_MASK;
@@ -7715,7 +7750,10 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 	bool inject_now;
 
 	if (scp->cmnd[0] == INQUIRY)
-		pr_err("%s INQUIRY\n", __func__);
+		pr_err("INQUIRY\n");
+
+	if (opcode == 0x9c)
+		pr_err("ATOMIC WRITE (16)\n");
 
 	scsi_set_resid(scp, 0);
 	if (sdebug_statistics) {
@@ -7747,8 +7785,15 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 	if (unlikely(lun_index >= sdebug_max_luns && !has_wlun_rl))
 		goto err_out;
 
+	if (opcode == 0x9c)
+		pr_err("1 AC WRITE (16)\n");
+
 	sdeb_i = opcode_ind_arr[opcode];	/* fully mapped */
+	if (opcode == 0x9c)
+		pr_err("2 ATOMIC WRITE (16) sdeb_i=%d\n", sdeb_i);
 	oip = &opcode_info_arr[sdeb_i];		/* safe if table consistent */
+	if (opcode == 0x9c)
+		pr_err("3 ATOMIC WRITE (16) oip=%d\n", sdeb_i);
 	devip = (struct sdebug_dev_info *)sdp->hostdata;
 	if (unlikely(!devip)) {
 		devip = find_build_dev_info(sdp);
@@ -7760,6 +7805,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 
 	na = oip->num_attached;
 	r_pfp = oip->pfp;
+	if (opcode == 0x9c)
+		pr_err("4 ATOMIC WRITE (16) na=%d r_pfp=%pS\n", na, r_pfp);
 	if (na) {	/* multiple commands with this opcode */
 		r_oip = oip;
 		if (FF_SA & r_oip->flags) {
