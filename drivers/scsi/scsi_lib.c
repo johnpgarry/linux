@@ -732,6 +732,7 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 			}
 			break;
 		case ILLEGAL_REQUEST:
+			pr_err("%s ILLEGAL_REQUEST\n", __func__);
 			/* If we had an ILLEGAL REQUEST returned, then
 			 * we may have performed an unsupported
 			 * command.  The only thing this should be
