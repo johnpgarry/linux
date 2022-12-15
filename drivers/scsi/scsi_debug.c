@@ -1523,11 +1523,13 @@ static int inquiry_vpd_b0(unsigned char *arr)
 	put_unaligned_be64(sdebug_write_same_length, &arr[32]);
 
 	if (sdebug_atomic_write) {
-		put_unaligned_be32(sdebug_atomic_max_size_blks, &arr[44]);
-		put_unaligned_be32(sdebug_atomic_alignment_blks, &arr[48]);
-		put_unaligned_be32(sdebug_atomic_granularity_blks, &arr[52]);
-		put_unaligned_be32(sdebug_atomic_max_size_boundary_blks, &arr[56]);
-		put_unaligned_be32(sdebug_atomic_boundary_blks, &arr[60]);
+		pr_err("%s sdebug_atomic_max_size_blks=%d sdebug_atomic_alignment_blks=%d sdebug_atomic_boundary_blks=%d\n",
+		 __func__, sdebug_atomic_max_size_blks, sdebug_atomic_alignment_blks, sdebug_atomic_boundary_blks);
+		put_unaligned_be32(sdebug_atomic_max_size_blks, &arr[40]);
+		put_unaligned_be32(sdebug_atomic_alignment_blks, &arr[44]);
+		put_unaligned_be32(sdebug_atomic_granularity_blks, &arr[48]);
+		put_unaligned_be32(sdebug_atomic_max_size_boundary_blks, &arr[52]);
+		put_unaligned_be32(sdebug_atomic_boundary_blks, &arr[56]);
 	}
 
 	return 0x3c; /* Mandatory page length for Logical Block Provisioning */
