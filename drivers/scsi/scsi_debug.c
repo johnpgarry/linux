@@ -149,6 +149,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_VIRTUAL_GB   0
 #define DEF_VPD_USE_HOSTNO 1
 #define DEF_WRITESAME_LENGTH 0xFFFF
+#define DEF_ATOMIC_WRITE 1
 #define DEF_ATOMIC_MAX_LENGTH 0xFFFFFFFF
 #define DEF_ATOMIC_ALIGNMENT 0
 #define DEF_ATOMIC_GRANULARITY 1
@@ -784,6 +785,7 @@ static unsigned int sdebug_unmap_granularity = DEF_UNMAP_GRANULARITY;
 static unsigned int sdebug_unmap_max_blocks = DEF_UNMAP_MAX_BLOCKS;
 static unsigned int sdebug_unmap_max_desc = DEF_UNMAP_MAX_DESC;
 static unsigned int sdebug_write_same_length = DEF_WRITESAME_LENGTH;
+static unsigned int sdebug_atomic_write = DEF_ATOMIC_WRITE;
 static unsigned int sdebug_atomic_max_size_blks = DEF_ATOMIC_MAX_LENGTH;
 static unsigned int sdebug_atomic_alignment_blks = DEF_ATOMIC_ALIGNMENT;
 static unsigned int sdebug_atomic_granularity_blks = DEF_ATOMIC_GRANULARITY;
@@ -1519,6 +1521,14 @@ static int inquiry_vpd_b0(unsigned char *arr)
 
 	/* Maximum WRITE SAME Length */
 	put_unaligned_be64(sdebug_write_same_length, &arr[32]);
+
+	if (sdebug_atomic_write) {
+		put_unaligned_be32(sdebug_atomic_max_size_blks, &arr[44]);
+		put_unaligned_be32(sdebug_atomic_alignment_blks, &arr[48]);
+		put_unaligned_be32(sdebug_atomic_granularity_blks, &arr[52]);
+		put_unaligned_be32(sdebug_atomic_max_size_boundary_blks, &arr[56]);
+		put_unaligned_be32(sdebug_atomic_boundary_blks, &arr[60]);
+	}
 
 	return 0x3c; /* Mandatory page length for Logical Block Provisioning */
 }
@@ -5840,6 +5850,7 @@ module_param_named(lbprz, sdebug_lbprz, int, S_IRUGO);
 module_param_named(lbpu, sdebug_lbpu, int, S_IRUGO);
 module_param_named(lbpws, sdebug_lbpws, int, S_IRUGO);
 module_param_named(lbpws10, sdebug_lbpws10, int, S_IRUGO);
+module_param_named(atomic_write, sdebug_atomic_write, int, S_IRUGO);
 module_param_named(lowest_aligned, sdebug_lowest_aligned, int, S_IRUGO);
 module_param_named(lun_format, sdebug_lun_am_i, int, S_IRUGO | S_IWUSR);
 module_param_named(max_luns, sdebug_max_luns, int, S_IRUGO | S_IWUSR);
@@ -5916,6 +5927,7 @@ MODULE_PARM_DESC(lbprz,
 MODULE_PARM_DESC(lbpu, "enable LBP, support UNMAP command (def=0)");
 MODULE_PARM_DESC(lbpws, "enable LBP, support WRITE SAME(16) with UNMAP bit (def=0)");
 MODULE_PARM_DESC(lbpws10, "enable LBP, support WRITE SAME(10) with UNMAP bit (def=0)");
+MODULE_PARM_DESC(atomic_write, "enable ATOMIC WRITE support, support WRITE ATOMIC(16) (def=0)");
 MODULE_PARM_DESC(lowest_aligned, "lowest aligned lba (def=0)");
 MODULE_PARM_DESC(lun_format, "LUN format: 0->peripheral (def); 1 --> flat address method");
 MODULE_PARM_DESC(max_luns, "number of LUNs per target to simulate(def=1)");
