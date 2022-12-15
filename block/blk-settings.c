@@ -384,6 +384,7 @@ EXPORT_SYMBOL(blk_queue_alignment_offset);
 
 void blk_queue_write_atomic_max_bytes(struct request_queue *q, unsigned int max_bytes)
 {
+	pr_err("%s max_bytes=%d\n", __func__, max_bytes);
 	q->limits.queue_write_atomic_max_bytes = max_bytes;
 }
 EXPORT_SYMBOL_GPL(blk_queue_write_atomic_max_bytes);

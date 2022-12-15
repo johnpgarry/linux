@@ -872,7 +872,7 @@ static blk_status_t sd_setup_unmap_cmnd(struct scsi_cmnd *cmd)
 static void sd_config_atomic(struct scsi_disk *sdkp)
 {
 	struct request_queue *q = sdkp->disk->queue;
-
+	pr_err("%s sdkp=%pS q=%pS\n", __func__, sdkp, q);
 	blk_queue_write_atomic_max_bytes(q, sdkp->max_atomic);
 	blk_queue_write_atomic_granularity(q, sdkp->atomic_granularity);
 	blk_queue_write_atomic_alignment(q, sdkp->atomic_alignment);
@@ -2882,7 +2882,7 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 	sdkp->opt_xfer_blocks = get_unaligned_be32(&vpd->data[12]);
 	pr_err("%s sdkp=%pS sdev=%pS min_xfer_blocks=%d max_xfer_blocks=%d opt_xfer_blocks=%d\n", 
 		__func__, sdkp, sdkp->device, sdkp->min_xfer_blocks, sdkp->max_xfer_blocks, sdkp->opt_xfer_blocks);
-	pr_err("%s0.1 sdkp=%pS lbpvpd=%d vpd->len=%d\n", __func__, sdkp,  sdkp->lbpvpd, vpd->len);
+	pr_err("%s0.1 sdkp=%pS lbpvpd=%d vpd->len=%d lbpme=%d\n", __func__, sdkp,  sdkp->lbpvpd, vpd->len, sdkp->lbpme);
 
 	if (vpd->len >= 64) {
 		unsigned int lba_count, desc_count;
@@ -2899,7 +2899,7 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 			sdkp->max_unmap_blocks = lba_count;
 
 		sdkp->unmap_granularity = get_unaligned_be32(&vpd->data[28]);
-		pr_err("%s0.2 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
+	//	pr_err("%s0.2 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 
 		if (vpd->data[32] & 0x80)
 			sdkp->unmap_alignment =
@@ -2908,25 +2908,25 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 		if (!sdkp->lbpvpd) { /* LBP VPD page not provided */
 
 			if (sdkp->max_unmap_blocks) {
-				pr_err("%s0.3 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
+			//	pr_err("%s0.3 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_UNMAP);
 			} else {
-				pr_err("%s0.4 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
+			//	pr_err("%s0.4 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_WS16);
 			}
 
 		} else {	/* LBP VPD page tells us what to use */
 			if (sdkp->lbpu && sdkp->max_unmap_blocks) {
-				pr_err("%s0.5 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
+			//	pr_err("%s0.5 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_UNMAP);
 			} else if (sdkp->lbpws) {
-				pr_err("%s0.6 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
+			//	pr_err("%s0.6 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_WS16);
 			} else if (sdkp->lbpws10) {
-				pr_err("%s0.7 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
+			//	pr_err("%s0.7 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_WS10);
 			} else {
-				pr_err("%s0.8 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
+			//	pr_err("%s0.8 sdkp=%pS unmap_granularity=%d\n", __func__, sdkp, sdkp->unmap_granularity);
 				sd_config_discard(sdkp, SD_LBP_DISABLE);
 			}
 		}

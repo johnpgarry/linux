@@ -1181,8 +1181,8 @@ static blk_status_t scsi_setup_scsi_cmnd(struct scsi_device *sdev,
 		struct request *req)
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
-	if (cmd->cmnd[0] == 0x9c)
-		pr_err("%s cmd=%pS req=%pS bio=%pS\n", __func__, cmd, req, req->bio);
+	//if (cmd->cmnd[0] == 0x9c)
+	//	pr_err("%s cmd=%pS req=%pS bio=%pS\n", __func__, cmd, req, req->bio);
 	/*
 	 * Passthrough requests may transfer data, in which case they must
 	 * a bio attached to them.  Or they might contain a SCSI command
@@ -1603,8 +1603,8 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 	 * Special handling for passthrough commands, which don't go to the ULP
 	 * at all:
 	 */
-	if (cmd->cmnd[0] == 0x9c)
-		pr_err("%s atomic write 9c cmd=%pS rq=%pS pt=%d\n", __func__, cmd, req, blk_rq_is_passthrough(req));
+	//if (cmd->cmnd[0] == 0x9c)
+	//	pr_err("%s atomic write 9c cmd=%pS rq=%pS pt=%d\n", __func__, cmd, req, blk_rq_is_passthrough(req));
 	if (blk_rq_is_passthrough(req))
 		return scsi_setup_scsi_cmnd(sdev, req);
 

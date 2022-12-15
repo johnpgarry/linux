@@ -1623,7 +1623,7 @@ static int resp_inquiry(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 	arr = kzalloc(SDEBUG_MAX_INQ_ARR_SZ, GFP_ATOMIC);
 	if (! arr)
 		return DID_REQUEUE << 16;
-	pr_err("%s resp_inquiry=%pS\n", __func__, resp_inquiry);
+	//pr_err("%s resp_inquiry=%pS\n", __func__, resp_inquiry);
 	is_disk = (sdebug_ptype == TYPE_DISK);
 	is_zbc = (devip->zmodel != BLK_ZONED_NONE);
 	is_disk_zbc = (is_disk || is_zbc);
@@ -1654,7 +1654,7 @@ static int resp_inquiry(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 		target_dev_id = ((host_no + 1) * 2000) +
 				 (devip->target * 1000) - 3;
 		len = scnprintf(lu_id_str, 6, "%d", lu_id_num);
-		pr_err("%s2 resp_inquiry=%pS\n", __func__, resp_inquiry);
+		//pr_err("%s2 resp_inquiry=%pS\n", __func__, resp_inquiry);
 		if (0 == cmd[2]) { /* supported vital product data pages */
 			arr[1] = cmd[2];	/*sanity */
 			n = 4;
@@ -1677,7 +1677,7 @@ static int resp_inquiry(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 			}
 			arr[3] = n - 4;	  /* number of supported VPD pages */
 		} else if (0x80 == cmd[2]) { /* unit serial number */
-			pr_err("%s3 resp_inquiry=%pS\n", __func__, resp_inquiry);
+		//	pr_err("%s3 resp_inquiry=%pS\n", __func__, resp_inquiry);
 			arr[1] = cmd[2];	/*sanity */
 			arr[3] = len;
 			memcpy(&arr[4], lu_id_str, len);
@@ -1741,7 +1741,7 @@ static int resp_inquiry(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 			arr[1] = cmd[2];        /*sanity */
 			arr[3] = inquiry_vpd_b6(devip, &arr[4]);
 		} else {
-			pr_err("%s15 resp_inquiry=%pS\n", __func__, resp_inquiry);
+			//pr_err("%s15 resp_inquiry=%pS\n", __func__, resp_inquiry);
 			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 2, -1);
 			kfree(arr);
 			return check_condition_result;
@@ -4661,14 +4661,16 @@ fini:
 static int resp_atomic_write(struct scsi_cmnd *scp,
 			     struct sdebug_dev_info *devip)
 {
+	struct scsi_device *device = scp->device;
 	u8 *cmd = scp->cmnd;
 	u64 lba;
 	u16 boundary;
 	u16 len;
 
-	pr_err("0 scp=%pS devip=%pS\n", scp, devip);
+	pr_err("0 scp=%pS devip=%pS device=%pS \n", scp, devip, device);
 
 	if (!scsi_debug_atomic_write()) {
+		pr_err("0.1 scp=%pS devip=%pS atomic writes disabled\n", scp, devip);
 		mk_sense_invalid_opcode(scp);
 		return check_condition_result;
 	}
@@ -4678,7 +4680,7 @@ static int resp_atomic_write(struct scsi_cmnd *scp,
 	len = get_unaligned_be16(cmd + 12);
 
 	pr_err("1 scp=%pS devip=%pS lba=0x%llx boundary=%d len=%d\n", scp, devip, lba, boundary, len);
-
+//ret = do_device_access(sip, scp, sg_off, lba, num, true);
 	return 0;
 }
 
@@ -7749,8 +7751,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 	bool has_wlun_rl;
 	bool inject_now;
 
-	if (scp->cmnd[0] == INQUIRY)
-		pr_err("INQUIRY\n");
+	//if (scp->cmnd[0] == INQUIRY)
+	//	pr_err("INQUIRY\n");
 
 	if (opcode == 0x9c)
 		pr_err("ATOMIC WRITE (16)\n");
@@ -7786,7 +7788,7 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 		goto err_out;
 
 	if (opcode == 0x9c)
-		pr_err("1 AC WRITE (16)\n");
+		pr_err("1 ATOMIC WRITE (16)\n");
 
 	sdeb_i = opcode_ind_arr[opcode];	/* fully mapped */
 	if (opcode == 0x9c)
