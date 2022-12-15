@@ -2890,7 +2890,7 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 		sdkp->max_ws_blocks = (u32)get_unaligned_be64(&vpd->data[36]);
 
 		if (!sdkp->lbpme)
-			goto out;
+			goto read_atomics;
 
 		lba_count = get_unaligned_be32(&vpd->data[20]);
 		desc_count = get_unaligned_be32(&vpd->data[24]);
@@ -2931,6 +2931,7 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 			}
 		}
 
+read_atomics:
 		sdkp->max_atomic = get_unaligned_be32(&vpd->data[44]);
 		sdkp->atomic_alignment  = get_unaligned_be32(&vpd->data[48]);
 		sdkp->atomic_granularity  = get_unaligned_be32(&vpd->data[52]);
