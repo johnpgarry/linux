@@ -151,8 +151,8 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_WRITESAME_LENGTH 0xFFFF
 #define DEF_ATOMIC_WRITE 1
 #define DEF_ATOMIC_MAX_LENGTH 0xFF
-#define DEF_ATOMIC_ALIGNMENT 0
-#define DEF_ATOMIC_GRANULARITY 0
+#define DEF_ATOMIC_ALIGNMENT 2
+#define DEF_ATOMIC_GRANULARITY 2
 #define DEF_ATOMIC_BOUNDARY_MAX_LENGTH (DEF_ATOMIC_MAX_LENGTH)
 #define DEF_ATOMIC_MAX_BOUNDARY 0
 #define DEF_STRICT 0
@@ -4682,22 +4682,59 @@ static int resp_atomic_write(struct scsi_cmnd *scp,
 	len = get_unaligned_be16(cmd + 12);
 
 	pr_err("1 scp=%pS devip=%pS lba=0x%llx boundary=%d len=%d sdebug_atomic_max_size_blks=%d\n", scp, devip, lba, boundary, len, sdebug_atomic_max_size_blks);
+/*
+static unsigned int sdebug_atomic_max_size_blks = DEF_ATOMIC_MAX_LENGTH;
+static unsigned int sdebug_atomic_alignment_blks = DEF_ATOMIC_ALIGNMENT;
+static unsigned int sdebug_atomic_granularity_blks = DEF_ATOMIC_GRANULARITY;
+static unsigned int sdebug_atomic_max_size_boundary_blks = DEF_ATOMIC_BOUNDARY_MAX_LENGTH;
+static unsigned int sdebug_atomic_boundary_blks = DEF_ATOMIC_MAX_BOUNDARY;
 
-	if (boundary) {
+*/
 
 
+	if (sdebug_atomic_alignment_blks && lba % sdebug_atomic_alignment_blks) {
+		pr_err("2 alignement fault scp=%pS lba=0x%llx boundary=%d len=%d sdebug_atomic_alignment_blks=%d\n", scp, lba, boundary, len, sdebug_atomic_alignment_blks);
 
+		/* Does not meet alignment requirement */
+		mk_sense_buffer(scp, ILLEGAL_REQUEST, INVALID_FIELD_IN_CDB, 0);
+		return check_condition_result;
+	}
+
+	if (sdebug_atomic_granularity_blks && len % sdebug_atomic_granularity_blks) {
+		pr_err("3 granularity fault scp=%pS len=%d sdebug_atomic_granularity_blks=%d\n", scp, len, sdebug_atomic_granularity_blks);
+
+		/* Does not meet alignment requirement */
+		mk_sense_buffer(scp, ILLEGAL_REQUEST, INVALID_FIELD_IN_CDB, 0);
+		return check_condition_result;
+	}
+
+	if (boundary > 0) {
+		if (boundary > sdebug_atomic_boundary_blks) {
+			pr_err("7 boundary (%d) > sdebug_atomic_boundary_blks (%d) scp=%pS\n", boundary, sdebug_atomic_boundary_blks, scp);
+			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
+			return check_condition_result;
+		}
+
+		if (len > sdebug_atomic_max_size_with_boundary_blks) {
+			pr_err("8 len (%d) > sdebug_atomic_max_size_with_boundary_blks (%d) scp=%pS\n", len, sdebug_atomic_max_size_with_boundary_blks, scp);
+			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
+			return check_condition_result;
+		}
 	} else {
 		if (len > sdebug_atomic_max_size_blks) {
-			pr_err("9 len > sdebug_atomic_max_size_blks   scp=%pS devip=%pS lba=0x%llx boundary=%d len=%d\n", scp, devip, lba, boundary, len);
+			pr_err("9 len (%d) > sdebug_atomic_max_size_blks (%d) scp=%pS\n", len, sdebug_atomic_max_size_blks, scp);
 			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
 			return check_condition_result;
 		}
 	}
 
+	sdeb_write_lock(sip);
 	ret = do_device_access(sip, scp, 0, lba, len, true);
+	sdeb_write_unlock(sip);
 	pr_err("10 scp=%pS ret=%d\n", scp, ret);
 	if (unlikely(ret == -1))
+		return DID_ERROR << 16;
+	if (unlikely(ret != len * sdebug_sector_size))
 		return DID_ERROR << 16;
 	return 0;
 }
