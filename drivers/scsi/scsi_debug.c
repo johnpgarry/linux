@@ -13,7 +13,7 @@
  */
 
 
-#define pr_fmt(fmt) KBUILD_MODNAME ":%s: " fmt, __func__
+#define pr_fmt(fmt) KBUILD_MODNAME " : %s: " fmt, __func__
 
 #include <linux/module.h>
 #include <linux/align.h>
