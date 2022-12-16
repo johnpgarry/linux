@@ -150,7 +150,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_VPD_USE_HOSTNO 1
 #define DEF_WRITESAME_LENGTH 0xFFFF
 #define DEF_ATOMIC_WRITE 1
-#define DEF_ATOMIC_MAX_LENGTH 0xFFFF
+#define DEF_ATOMIC_MAX_LENGTH 0xFF
 #define DEF_ATOMIC_ALIGNMENT 0
 #define DEF_ATOMIC_GRANULARITY 0
 #define DEF_ATOMIC_BOUNDARY_MAX_LENGTH (DEF_ATOMIC_MAX_LENGTH)
@@ -808,7 +808,7 @@ static bool sdebug_host_lock = DEF_HOST_LOCK;
 static bool sdebug_strict = DEF_STRICT;
 static bool sdebug_any_injecting_opt;
 static bool sdebug_no_rwlock;
-static bool sdebug_verbose;
+static bool sdebug_verbose = 1;
 static bool have_dif_prot;
 static bool write_since_sync;
 static bool sdebug_statistics = DEF_STATISTICS;
@@ -4666,21 +4666,39 @@ static int resp_atomic_write(struct scsi_cmnd *scp,
 	u64 lba;
 	u16 boundary;
 	u16 len;
+	int ret;
+	struct sdeb_store_info *sip = devip2sip(devip, true);
 
-	pr_err("0 scp=%pS devip=%pS device=%pS \n", scp, devip, device);
+	pr_err("0 scp=%pS devip=%pS device=%pS sip=%pS\n", scp, devip, device, sip);
 
 	if (!scsi_debug_atomic_write()) {
 		pr_err("0.1 scp=%pS devip=%pS atomic writes disabled\n", scp, devip);
 		mk_sense_invalid_opcode(scp);
 		return check_condition_result;
 	}
-	
+
 	lba = get_unaligned_be64(cmd + 2);
 	boundary = get_unaligned_be16(cmd + 10);
 	len = get_unaligned_be16(cmd + 12);
 
-	pr_err("1 scp=%pS devip=%pS lba=0x%llx boundary=%d len=%d\n", scp, devip, lba, boundary, len);
-//ret = do_device_access(sip, scp, sg_off, lba, num, true);
+	pr_err("1 scp=%pS devip=%pS lba=0x%llx boundary=%d len=%d sdebug_atomic_max_size_blks=%d\n", scp, devip, lba, boundary, len, sdebug_atomic_max_size_blks);
+
+	if (boundary) {
+
+
+
+	} else {
+		if (len > sdebug_atomic_max_size_blks) {
+			pr_err("9 len > sdebug_atomic_max_size_blks   scp=%pS devip=%pS lba=0x%llx boundary=%d len=%d\n", scp, devip, lba, boundary, len);
+			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
+			return check_condition_result;
+		}
+	}
+
+	ret = do_device_access(sip, scp, 0, lba, len, true);
+	pr_err("10 scp=%pS ret=%d\n", scp, ret);
+	if (unlikely(ret == -1))
+		return DID_ERROR << 16;
 	return 0;
 }
 
@@ -7167,31 +7185,40 @@ static unsigned int sdebug_atomic_boundary_blks = DEF_ATOMIC_MAX_BOUNDARY;
 		pr_err("%s checking atomic write params sdebug_atomic_max_size_blks=%d sdebug_atomic_max_size_with_boundary_blks=%d sdebug_atomic_alignment_blks=%d sdebug_atomic_granularity_blks=%d sdebug_atomic_boundary_blks=%d\n", 
 			__func__, sdebug_atomic_max_size_blks, sdebug_atomic_max_size_with_boundary_blks, sdebug_atomic_alignment_blks, sdebug_atomic_granularity_blks, sdebug_atomic_boundary_blks);
 
+		/* All the rounding to pow-of-2 is arbitary but makes sanitizing values easier */
 		sdebug_atomic_max_size_blks =
 			clamp(sdebug_atomic_max_size_blks, 0U, sdebug_store_sectors);
+		sdebug_atomic_max_size_blks = rounddown_pow_of_two(sdebug_atomic_max_size_blks);
 
 		sdebug_atomic_max_size_with_boundary_blks =
 			clamp(sdebug_atomic_max_size_with_boundary_blks, 0U, sdebug_atomic_max_size_blks);
+		sdebug_atomic_max_size_with_boundary_blks = rounddown_pow_of_two(sdebug_atomic_max_size_with_boundary_blks);
 
 		if (sdebug_atomic_alignment_blks > 1) {
 			sdebug_atomic_alignment_blks =
-				clamp(sdebug_atomic_alignment_blks, 0U, sdebug_atomic_max_size_blks);
+				clamp(sdebug_atomic_alignment_blks, 2U, sdebug_atomic_max_size_blks);
 
-			/* Ensuring a power-of-2 is just arbitary */
+			/* Ensure max lengths are multiple of alignment */
 			sdebug_atomic_alignment_blks = rounddown_pow_of_two(sdebug_atomic_alignment_blks);
+		} else {
+			sdebug_atomic_alignment_blks = 0;
 		}
 
 		if (sdebug_atomic_granularity_blks > 1) {
 			sdebug_atomic_granularity_blks =
-				clamp(sdebug_atomic_granularity_blks, 0U, sdebug_atomic_max_size_blks);
+				clamp(sdebug_atomic_granularity_blks, 2U, sdebug_atomic_max_size_blks);
 
-			/* Ensuring a power-of-2 is just arbitary */
+			/* Ensure max lengths are multiple of granularity */
 			sdebug_atomic_granularity_blks = rounddown_pow_of_two(sdebug_atomic_granularity_blks);
+		} else {
+			sdebug_atomic_granularity_blks = 0;
 		}
 
 		if (sdebug_atomic_boundary_blks > 1) {
-			while (sdebug_atomic_boundary_blks % sdebug_atomic_granularity_blks)
-				sdebug_atomic_boundary_blks++;
+			/* Boundary should be multiple of granularity */
+			sdebug_atomic_boundary_blks =
+				clamp(sdebug_atomic_boundary_blks, 2U, sdebug_atomic_max_size_with_boundary_blks);
+			sdebug_atomic_boundary_blks = rounddown_pow_of_two(sdebug_atomic_boundary_blks);
 
 			if (sdebug_atomic_boundary_blks > sdebug_atomic_max_size_with_boundary_blks) {
 				pr_err("atomic boundary blks (%d) cannot be greater than limit (%d), atomic granularity blks is %d\n",
@@ -7199,6 +7226,8 @@ static unsigned int sdebug_atomic_boundary_blks = DEF_ATOMIC_MAX_BOUNDARY;
 				ret = -EINVAL;
 				goto free_q_arr;
 			}
+		} else {
+			sdebug_atomic_boundary_blks = 0;
 		}
 
 		pr_err("%s2 checking atomic write params sdebug_atomic_max_size_blks=%d sdebug_atomic_max_size_with_boundary_blks=%d sdebug_atomic_alignment_blks=%d sdebug_atomic_granularity_blks=%d sdebug_atomic_boundary_blks=%d\n", 
