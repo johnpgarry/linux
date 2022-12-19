@@ -149,6 +149,12 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_VIRTUAL_GB   0
 #define DEF_VPD_USE_HOSTNO 1
 #define DEF_WRITESAME_LENGTH 0xFFFF
+#define DEF_ATOMIC_WRITE 1
+#define DEF_ATOMIC_MAX_LENGTH 0xFF
+#define DEF_ATOMIC_ALIGNMENT 2
+#define DEF_ATOMIC_GRANULARITY 2
+#define DEF_ATOMIC_BOUNDARY_MAX_LENGTH (DEF_ATOMIC_MAX_LENGTH)
+#define DEF_ATOMIC_MAX_BOUNDARY 0
 #define DEF_STRICT 0
 #define DEF_STATISTICS false
 #define DEF_SUBMIT_QUEUES 1
@@ -413,7 +419,8 @@ enum sdeb_opcode_index {
 	SDEB_I_PRE_FETCH = 29,		/* 10, 16 */
 	SDEB_I_ZONE_OUT = 30,		/* 0x94+SA; includes no data xfer */
 	SDEB_I_ZONE_IN = 31,		/* 0x95+SA; all have data-in */
-	SDEB_I_LAST_ELEM_P1 = 32,	/* keep this last (previous + 1) */
+	SDEB_I_ATOMIC_WRITE_16 = 32,	/* keep this last (previous + 1) */
+	SDEB_I_LAST_ELEM_P1 = 33,	/* keep this last (previous + 1) */
 };
 
 
@@ -447,7 +454,8 @@ static const unsigned char opcode_ind_arr[256] = {
 	0, 0, 0, SDEB_I_VERIFY,
 	SDEB_I_PRE_FETCH, SDEB_I_SYNC_CACHE, 0, SDEB_I_WRITE_SAME,
 	SDEB_I_ZONE_OUT, SDEB_I_ZONE_IN, 0, 0,
-	0, 0, 0, 0, 0, 0, SDEB_I_SERV_ACT_IN_16, SDEB_I_SERV_ACT_OUT_16,
+	0, 0, 0, 0,
+	SDEB_I_ATOMIC_WRITE_16, 0, SDEB_I_SERV_ACT_IN_16, SDEB_I_SERV_ACT_OUT_16,
 /* 0xa0; 0xa0->0xbf: 12 byte cdbs */
 	SDEB_I_REPORT_LUNS, SDEB_I_ATA_PT, 0, SDEB_I_MAINT_IN,
 	     SDEB_I_MAINT_OUT, 0, 0, 0,
@@ -495,6 +503,7 @@ static int resp_write_buffer(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_sync_cache(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_pre_fetch(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_report_zones(struct scsi_cmnd *, struct sdebug_dev_info *);
+static int resp_atomic_write(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_open_zone(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_close_zone(struct scsi_cmnd *, struct sdebug_dev_info *);
 static int resp_finish_zone(struct scsi_cmnd *, struct sdebug_dev_info *);
@@ -731,6 +740,11 @@ static const struct opcode_info_t opcode_info_arr[SDEB_I_LAST_ELEM_P1 + 1] = {
 	    resp_report_zones, zone_in_iarr, /* ZONE_IN(16), REPORT ZONES) */
 		{16,  0x0 /* SA */, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0xc7} },
+/* 31 */
+	{0, 0x0, 0x0, F_D_OUT,
+	    resp_atomic_write, NULL, /* ATOMIC WRITE 16 */
+		{16,  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} },
 /* sentinel */
 	{0xff, 0, 0, 0, NULL, NULL,		/* terminating element */
 	    {0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
@@ -779,6 +793,12 @@ static unsigned int sdebug_unmap_granularity = DEF_UNMAP_GRANULARITY;
 static unsigned int sdebug_unmap_max_blocks = DEF_UNMAP_MAX_BLOCKS;
 static unsigned int sdebug_unmap_max_desc = DEF_UNMAP_MAX_DESC;
 static unsigned int sdebug_write_same_length = DEF_WRITESAME_LENGTH;
+static unsigned int sdebug_atomic_write = DEF_ATOMIC_WRITE;
+static unsigned int sdebug_atomic_max_size_blks = DEF_ATOMIC_MAX_LENGTH;
+static unsigned int sdebug_atomic_alignment_blks = DEF_ATOMIC_ALIGNMENT;
+static unsigned int sdebug_atomic_granularity_blks = DEF_ATOMIC_GRANULARITY;
+static unsigned int sdebug_atomic_max_size_with_boundary_blks = DEF_ATOMIC_BOUNDARY_MAX_LENGTH;
+static unsigned int sdebug_atomic_boundary_blks = DEF_ATOMIC_MAX_BOUNDARY;
 static int sdebug_uuid_ctl = DEF_UUID_CTL;
 static bool sdebug_random = DEF_RANDOM;
 static bool sdebug_per_host_store = DEF_PER_HOST_STORE;
@@ -878,6 +898,11 @@ static inline bool scsi_debug_lbp(void)
 {
 	return 0 == sdebug_fake_rw &&
 		(sdebug_lbpu || sdebug_lbpws || sdebug_lbpws10);
+}
+
+static inline bool scsi_debug_atomic_write(void)
+{
+	return 0 == sdebug_fake_rw && sdebug_atomic_write;
 }
 
 static void *lba2fake_store(struct sdeb_store_info *sip,
@@ -1509,6 +1534,14 @@ static int inquiry_vpd_b0(unsigned char *arr)
 
 	/* Maximum WRITE SAME Length */
 	put_unaligned_be64(sdebug_write_same_length, &arr[32]);
+
+	if (sdebug_atomic_write) {
+		put_unaligned_be32(sdebug_atomic_max_size_blks, &arr[40]);
+		put_unaligned_be32(sdebug_atomic_alignment_blks, &arr[44]);
+		put_unaligned_be32(sdebug_atomic_granularity_blks, &arr[48]);
+		put_unaligned_be32(sdebug_atomic_max_size_with_boundary_blks, &arr[52]);
+		put_unaligned_be32(sdebug_atomic_boundary_blks, &arr[56]);
+	}
 
 	return 0x3c; /* Mandatory page length for Logical Block Provisioning */
 
@@ -4614,6 +4647,63 @@ fini:
 	return ret;
 }
 
+static int resp_atomic_write(struct scsi_cmnd *scp,
+			     struct sdebug_dev_info *devip)
+{
+	struct sdeb_store_info *sip = devip2sip(devip, true);
+	u8 *cmd = scp->cmnd;
+	u16 boundary, len;
+	u64 lba;
+	int ret;
+
+	if (!scsi_debug_atomic_write()) {
+		mk_sense_invalid_opcode(scp);
+		return check_condition_result;
+	}
+
+	lba = get_unaligned_be64(cmd + 2);
+	boundary = get_unaligned_be16(cmd + 10);
+	len = get_unaligned_be16(cmd + 12);
+
+	if (sdebug_atomic_alignment_blks && lba % sdebug_atomic_alignment_blks) {
+		/* Does not meet alignment requirement */
+		mk_sense_buffer(scp, ILLEGAL_REQUEST, INVALID_FIELD_IN_CDB, 0);
+		return check_condition_result;
+	}
+
+	if (sdebug_atomic_granularity_blks && len % sdebug_atomic_granularity_blks) {
+		/* Does not meet alignment requirement */
+		mk_sense_buffer(scp, ILLEGAL_REQUEST, INVALID_FIELD_IN_CDB, 0);
+		return check_condition_result;
+	}
+
+	if (boundary > 0) {
+		if (boundary > sdebug_atomic_boundary_blks) {
+			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
+			return check_condition_result;
+		}
+
+		if (len > sdebug_atomic_max_size_with_boundary_blks) {
+			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
+			return check_condition_result;
+		}
+	} else {
+		if (len > sdebug_atomic_max_size_blks) {
+			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
+			return check_condition_result;
+		}
+	}
+
+	sdeb_write_lock(sip);
+	ret = do_device_access(sip, scp, 0, lba, len, true);
+	sdeb_write_unlock(sip);
+	if (unlikely(ret == -1))
+		return DID_ERROR << 16;
+	if (unlikely(ret != len * sdebug_sector_size))
+		return DID_ERROR << 16;
+	return 0;
+}
+
 /* Logic transplanted from tcmu-runner, file_zbc.c */
 static void zbc_open_all(struct sdebug_dev_info *devip)
 {
@@ -5839,6 +5929,7 @@ module_param_named(lbprz, sdebug_lbprz, int, S_IRUGO);
 module_param_named(lbpu, sdebug_lbpu, int, S_IRUGO);
 module_param_named(lbpws, sdebug_lbpws, int, S_IRUGO);
 module_param_named(lbpws10, sdebug_lbpws10, int, S_IRUGO);
+module_param_named(atomic_write, sdebug_atomic_write, int, S_IRUGO);
 module_param_named(lowest_aligned, sdebug_lowest_aligned, int, S_IRUGO);
 module_param_named(lun_format, sdebug_lun_am_i, int, S_IRUGO | S_IWUSR);
 module_param_named(max_luns, sdebug_max_luns, int, S_IRUGO | S_IWUSR);
@@ -5873,6 +5964,11 @@ module_param_named(unmap_alignment, sdebug_unmap_alignment, int, S_IRUGO);
 module_param_named(unmap_granularity, sdebug_unmap_granularity, int, S_IRUGO);
 module_param_named(unmap_max_blocks, sdebug_unmap_max_blocks, int, S_IRUGO);
 module_param_named(unmap_max_desc, sdebug_unmap_max_desc, int, S_IRUGO);
+module_param_named(atomic_max_size_blks, sdebug_unmap_alignment, int, S_IRUGO);
+module_param_named(atomic_alignment_blks, sdebug_atomic_alignment_blks, int, S_IRUGO);
+module_param_named(atomic_granularity_blks, sdebug_atomic_granularity_blks, int, S_IRUGO);
+module_param_named(atomic_max_size_with_boundary_blks, sdebug_atomic_max_size_with_boundary_blks, int, S_IRUGO);
+module_param_named(atomic_boundary_blks, sdebug_atomic_boundary_blks, int, S_IRUGO);
 module_param_named(uuid_ctl, sdebug_uuid_ctl, int, S_IRUGO);
 module_param_named(virtual_gb, sdebug_virtual_gb, int, S_IRUGO | S_IWUSR);
 module_param_named(vpd_use_hostno, sdebug_vpd_use_hostno, int,
@@ -5915,6 +6011,7 @@ MODULE_PARM_DESC(lbprz,
 MODULE_PARM_DESC(lbpu, "enable LBP, support UNMAP command (def=0)");
 MODULE_PARM_DESC(lbpws, "enable LBP, support WRITE SAME(16) with UNMAP bit (def=0)");
 MODULE_PARM_DESC(lbpws10, "enable LBP, support WRITE SAME(10) with UNMAP bit (def=0)");
+MODULE_PARM_DESC(atomic_write, "enable ATOMIC WRITE support, support WRITE ATOMIC(16) (def=1)");
 MODULE_PARM_DESC(lowest_aligned, "lowest aligned lba (def=0)");
 MODULE_PARM_DESC(lun_format, "LUN format: 0->peripheral (def); 1 --> flat address method");
 MODULE_PARM_DESC(max_luns, "number of LUNs per target to simulate(def=1)");
@@ -5946,6 +6043,11 @@ MODULE_PARM_DESC(unmap_alignment, "lowest aligned thin provisioning lba (def=0)"
 MODULE_PARM_DESC(unmap_granularity, "thin provisioning granularity in blocks (def=1)");
 MODULE_PARM_DESC(unmap_max_blocks, "max # of blocks can be unmapped in one cmd (def=0xffffffff)");
 MODULE_PARM_DESC(unmap_max_desc, "max # of ranges that can be unmapped in one cmd (def=256)");
+MODULE_PARM_DESC(atomic_max_size_blks, "max # of blocks can be atomically written in one cmd (def=0xff)");
+MODULE_PARM_DESC(atomic_alignment_blks, "minimum alignment of atomic write in blocks (def=2)");
+MODULE_PARM_DESC(atomic_granularity_blks, "minimum granularity of atomic write in blocks (def=2)");
+MODULE_PARM_DESC(atomic_max_size_with_boundary_blks, "max # of blocks can be atomically written in one cmd with boundary set (def=0xff)");
+MODULE_PARM_DESC(atomic_boundary_blks, "max # boundaries per atomic write (def=0)");
 MODULE_PARM_DESC(uuid_ctl,
 		 "1->use uuid for lu name, 0->don't, 2->all use same (def=0)");
 MODULE_PARM_DESC(virtual_gb, "virtual gigabyte (GiB) size (def=0 -> use dev_size_mb)");
@@ -7081,6 +7183,51 @@ static int __init scsi_debug_init(void)
 			goto free_q_arr;
 		}
 	}
+	if (scsi_debug_atomic_write()) {
+		/* All the rounding to pow-of-2 is arbitary but makes sanitizing values easier */
+		sdebug_atomic_max_size_blks =
+			clamp(sdebug_atomic_max_size_blks, 0U, sdebug_store_sectors);
+		sdebug_atomic_max_size_blks = rounddown_pow_of_two(sdebug_atomic_max_size_blks);
+
+		sdebug_atomic_max_size_with_boundary_blks =
+			clamp(sdebug_atomic_max_size_with_boundary_blks, 0U, sdebug_atomic_max_size_blks);
+		sdebug_atomic_max_size_with_boundary_blks = rounddown_pow_of_two(sdebug_atomic_max_size_with_boundary_blks);
+
+		if (sdebug_atomic_alignment_blks > 1) {
+			sdebug_atomic_alignment_blks =
+				clamp(sdebug_atomic_alignment_blks, 2U, sdebug_atomic_max_size_blks);
+
+			/* Ensure max lengths are multiple of alignment */
+			sdebug_atomic_alignment_blks = rounddown_pow_of_two(sdebug_atomic_alignment_blks);
+		} else {
+			sdebug_atomic_alignment_blks = 0;
+		}
+
+		if (sdebug_atomic_granularity_blks > 1) {
+			sdebug_atomic_granularity_blks =
+				clamp(sdebug_atomic_granularity_blks, 2U, sdebug_atomic_max_size_blks);
+
+			/* Ensure max lengths are multiple of granularity */
+			sdebug_atomic_granularity_blks = rounddown_pow_of_two(sdebug_atomic_granularity_blks);
+		} else {
+			sdebug_atomic_granularity_blks = 0;
+		}
+
+		if (sdebug_atomic_boundary_blks > 1) {
+			/* Boundary should be multiple of granularity */
+			sdebug_atomic_boundary_blks =
+				clamp(sdebug_atomic_boundary_blks, 2U, sdebug_atomic_max_size_with_boundary_blks);
+			sdebug_atomic_boundary_blks = rounddown_pow_of_two(sdebug_atomic_boundary_blks);
+
+			if (sdebug_atomic_boundary_blks > sdebug_atomic_max_size_with_boundary_blks) {
+				ret = -EINVAL;
+				goto free_q_arr;
+			}
+		} else {
+			sdebug_atomic_boundary_blks = 0;
+		}
+	}
+
 	xa_init_flags(per_store_ap, XA_FLAGS_ALLOC | XA_FLAGS_LOCK_IRQ);
 	if (want_store) {
 		idx = sdebug_add_store();
