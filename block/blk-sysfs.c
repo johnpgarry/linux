@@ -557,6 +557,21 @@ static ssize_t queue_dax_show(struct request_queue *q, char *page)
 	return queue_var_show(blk_queue_dax(q), page);
 }
 
+static ssize_t queue_write_atomic_max_bytes_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(q->limits.queue_write_atomic_max_bytes, page);
+}
+
+static ssize_t queue_write_atomic_granularity_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(q->limits.queue_write_atomic_granularity, page);
+}
+
+static ssize_t queue_write_atomic_alignment_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(q->limits.queue_write_atomic_alignment, page);
+}
+
 #define QUEUE_RO_ENTRY(_prefix, _name)			\
 static struct queue_sysfs_entry _prefix##_entry = {	\
 	.attr	= { .name = _name, .mode = 0444 },	\
@@ -612,6 +627,10 @@ QUEUE_RW_ENTRY(queue_io_timeout, "io_timeout");
 QUEUE_RW_ENTRY(queue_wb_lat, "wbt_lat_usec");
 QUEUE_RO_ENTRY(queue_virt_boundary_mask, "virt_boundary_mask");
 QUEUE_RO_ENTRY(queue_dma_alignment, "dma_alignment");
+
+QUEUE_RO_ENTRY(queue_write_atomic_max_bytes, "write_atomic_max_bytes");
+QUEUE_RO_ENTRY(queue_write_atomic_granularity, "write_atomic_granularity");
+QUEUE_RO_ENTRY(queue_write_atomic_alignment, "write_atomic_alignment");
 
 #ifdef CONFIG_BLK_DEV_THROTTLING_LOW
 QUEUE_RW_ENTRY(blk_throtl_sample_time, "throttle_sample_time");
@@ -674,6 +693,9 @@ static struct attribute *queue_attrs[] = {
 #endif
 	&queue_virt_boundary_mask_entry.attr,
 	&queue_dma_alignment_entry.attr,
+	&queue_write_atomic_max_bytes_entry.attr,
+	&queue_write_atomic_granularity_entry.attr,
+	&queue_write_atomic_alignment_entry.attr,
 	NULL,
 };
 

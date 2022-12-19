@@ -382,6 +382,24 @@ void blk_queue_alignment_offset(struct request_queue *q, unsigned int offset)
 }
 EXPORT_SYMBOL(blk_queue_alignment_offset);
 
+void blk_queue_write_atomic_max_bytes(struct request_queue *q, unsigned int max_bytes)
+{
+	q->limits.queue_write_atomic_max_bytes = max_bytes;
+}
+EXPORT_SYMBOL_GPL(blk_queue_write_atomic_max_bytes);
+
+void blk_queue_write_atomic_granularity(struct request_queue *q, unsigned int size)
+{
+	q->limits.queue_write_atomic_granularity = size;
+}
+EXPORT_SYMBOL_GPL(blk_queue_write_atomic_granularity);
+
+void blk_queue_write_atomic_alignment(struct request_queue *q, unsigned int alignment)
+{
+	q->limits.queue_write_atomic_alignment = alignment;
+}
+EXPORT_SYMBOL_GPL(blk_queue_write_atomic_alignment);
+
 void disk_update_readahead(struct gendisk *disk)
 {
 	struct request_queue *q = disk->queue;

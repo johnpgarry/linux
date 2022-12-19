@@ -318,6 +318,10 @@ struct queue_limits {
 	 * due to possible offsets.
 	 */
 	unsigned int		dma_alignment;
+
+	unsigned int		queue_write_atomic_max_bytes;
+	unsigned int		queue_write_atomic_granularity;
+	unsigned int		queue_write_atomic_alignment;
 };
 
 typedef int (*report_zones_cb)(struct blk_zone *zone, unsigned int idx,
@@ -871,6 +875,10 @@ extern int blk_lld_busy(struct request_queue *q);
 extern int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags);
 extern void blk_queue_exit(struct request_queue *q);
 extern void blk_sync_queue(struct request_queue *q);
+
+extern void blk_queue_write_atomic_max_bytes(struct request_queue *q, unsigned int max_bytes);
+extern void blk_queue_write_atomic_granularity(struct request_queue *q, unsigned int size);
+extern void blk_queue_write_atomic_alignment(struct request_queue *q, unsigned int alignment);
 
 /* Helper to convert REQ_OP_XXX to its string format XXX */
 extern const char *blk_op_str(enum req_op op);
