@@ -866,6 +866,22 @@ static blk_status_t sd_setup_unmap_cmnd(struct scsi_cmnd *cmd)
 	return scsi_alloc_sgtables(cmd);
 }
 
+static void sd_config_atomic(struct scsi_disk *sdkp)
+{
+	unsigned int logical_block_size = sdkp->device->sector_size;
+	struct request_queue *q = sdkp->disk->queue;
+
+	if (sdkp->max_atomic == 0) {
+		blk_queue_write_atomic_max_bytes(q, logical_block_size);
+		blk_queue_write_atomic_granularity(q, logical_block_size);
+		blk_queue_write_atomic_alignment(q, 0);
+	} else {
+		blk_queue_write_atomic_max_bytes(q, sdkp->max_atomic * logical_block_size);
+		blk_queue_write_atomic_granularity(q, sdkp->atomic_granularity * logical_block_size);
+		blk_queue_write_atomic_alignment(q, sdkp->atomic_alignment * logical_block_size);
+	}
+}
+
 static blk_status_t sd_setup_write_same16_cmnd(struct scsi_cmnd *cmd,
 		bool unmap)
 {
@@ -2867,7 +2883,7 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 		sdkp->max_ws_blocks = (u32)get_unaligned_be64(&vpd->data[36]);
 
 		if (!sdkp->lbpme)
-			goto out;
+			goto read_atomics;
 
 		lba_count = get_unaligned_be32(&vpd->data[20]);
 		desc_count = get_unaligned_be32(&vpd->data[24]);
@@ -2898,6 +2914,14 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 			else
 				sd_config_discard(sdkp, SD_LBP_DISABLE);
 		}
+read_atomics:
+		sdkp->max_atomic = get_unaligned_be32(&vpd->data[44]);
+		sdkp->atomic_alignment  = get_unaligned_be32(&vpd->data[48]);
+		sdkp->atomic_granularity  = get_unaligned_be32(&vpd->data[52]);
+		sdkp->max_atomic_with_boundary  = get_unaligned_be32(&vpd->data[56]);
+		sdkp->max_atomic_boundary = get_unaligned_be32(&vpd->data[60]);
+
+		sd_config_atomic(sdkp);
 	}
 
  out:
