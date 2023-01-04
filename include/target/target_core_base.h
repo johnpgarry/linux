@@ -101,6 +101,8 @@
 #define DA_IS_NONROT				0
 /* Queue Algorithm Modifier default for restricted reordering in control mode page */
 #define DA_EMULATE_REST_REORD			0
+/* Emulation for SCSI atomic operations by default */
+#define DA_EMULATE_ATOMIC			0
 
 #define SE_INQUIRY_BUF				1024
 #define SE_MODE_PAGE_BUF			512
@@ -687,6 +689,7 @@ struct se_dev_attrib {
 	bool		emulate_tas;
 	bool		emulate_tpu;
 	bool		emulate_tpws;
+	bool		emulate_atomic;
 	bool		emulate_caw;
 	bool		emulate_3pc;
 	bool		emulate_pr;
@@ -710,6 +713,10 @@ struct se_dev_attrib {
 	u32		unmap_granularity_alignment;
 	u32		max_write_same_len;
 	u32		max_bytes_per_io;
+	u32		max_atomic;
+	u32		atomic_alignment;
+	u32		atomic_granularity;
+
 	struct se_device *da_dev;
 	struct config_group da_group;
 };

@@ -518,7 +518,7 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 {
 	struct se_device *dev = cmd->se_dev;
 	u32 mtl = 0;
-	int have_tp = 0, opt, min;
+	int have_tp = 0, opt, min, full_vpd_valid = 0;
 
 	/*
 	 * Following spc3r22 section 6.5.3 Block Limits VPD page, when
@@ -528,8 +528,11 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	if (dev->dev_attrib.emulate_tpu || dev->dev_attrib.emulate_tpws)
 		have_tp = 1;
 
+	if (have_tp || dev->dev_attrib.emulate_atomic)
+		full_vpd_valid = 1;
+
 	buf[0] = dev->transport->get_device_type(dev);
-	buf[3] = have_tp ? 0x3c : 0x10;
+	buf[3] = full_vpd_valid ? 0x3c : 0x10;
 
 	/* Set WSNZ to 1 */
 	buf[4] = 0x01;
@@ -602,6 +605,12 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	 */
 max_write_same:
 	put_unaligned_be64(dev->dev_attrib.max_write_same_len, &buf[36]);
+
+	if (!dev->dev_attrib.emulate_atomic)
+		return 0;
+	put_unaligned_be32(dev->dev_attrib.max_atomic, &buf[44]);
+	put_unaligned_be32(dev->dev_attrib.atomic_alignment, &buf[48]);
+	put_unaligned_be32(dev->dev_attrib.atomic_granularity, &buf[52]);
 
 	return 0;
 }

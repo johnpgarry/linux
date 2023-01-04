@@ -802,6 +802,7 @@ struct se_device *target_alloc_device(struct se_hba *hba, const char *name)
 	dev->dev_attrib.emulate_tpu = DA_EMULATE_TPU;
 	dev->dev_attrib.emulate_tpws = DA_EMULATE_TPWS;
 	dev->dev_attrib.emulate_caw = DA_EMULATE_CAW;
+	dev->dev_attrib.emulate_atomic = DA_EMULATE_ATOMIC;
 	dev->dev_attrib.emulate_3pc = DA_EMULATE_3PC;
 	dev->dev_attrib.emulate_pr = DA_EMULATE_PR;
 	dev->dev_attrib.pi_prot_type = TARGET_DIF_TYPE0_PROT;
@@ -861,6 +862,20 @@ bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
 	return true;
 }
 EXPORT_SYMBOL(target_configure_unmap_from_queue);
+
+bool target_configure_atomic_from_queue(struct se_dev_attrib *attrib,
+				       struct block_device *bdev)
+{
+	int block_size = bdev_logical_block_size(bdev);
+	struct request_queue *q = bdev_get_queue(bdev);
+
+	attrib->max_atomic = q->limits.queue_write_atomic_max_bytes / block_size;
+	attrib->atomic_alignment = q->limits.queue_write_atomic_alignment / block_size;
+	attrib->atomic_granularity = q->limits.queue_write_atomic_granularity / block_size;
+
+	return true;
+}
+EXPORT_SYMBOL(target_configure_atomic_from_queue);
 
 /*
  * Convert from blocksize advertised to the initiator to the 512 byte
@@ -973,6 +988,11 @@ int target_configure_device(struct se_device *dev)
 	if (dev->transport->configure_unmap &&
 	    dev->transport->configure_unmap(dev)) {
 		pr_debug("Discard support available, but disabled by default.\n");
+	}
+
+	if (dev->transport->configure_atomic &&
+	    dev->transport->configure_atomic(dev)) {
+		pr_debug("atomic support available, but disabled by default.\n");
 	}
 
 	/*
