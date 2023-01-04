@@ -761,6 +761,14 @@ sbc_check_dpofua(struct se_device *dev, struct se_cmd *cmd, unsigned char *cdb)
 	return 0;
 }
 
+static sense_reason_t
+sbc_execute_atomic(struct se_cmd *cmd)
+{
+	struct sbc_ops *ops = cmd->protocol_data;
+
+	return ops->execute_atomic(cmd, cmd->t_data_sg, cmd->t_data_nents);
+}
+
 sense_reason_t
 sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 {
@@ -773,6 +781,20 @@ sbc_parse_cdb(struct se_cmd *cmd, struct sbc_ops *ops)
 	cmd->protocol_data = ops;
 
 	switch (cdb[0]) {
+	case WRITE_ATOMIC_16:
+		if (!ops->execute_atomic)
+			return TCM_UNSUPPORTED_SCSI_OPCODE;
+
+		if (!dev->dev_attrib.emulate_atomic) {
+			pr_err("Got ATOMIC WRITE, but backend device has"
+			       " emulate_atomic disabled\n");
+			return TCM_UNSUPPORTED_SCSI_OPCODE;
+		}
+		sectors = get_unaligned_be16(&cdb[12]);
+		size = sbc_get_size(cmd, sectors);
+		cmd->t_task_lba = transport_lba_64(cdb);
+		cmd->execute_cmd = sbc_execute_atomic;
+		break;
 	case READ_6:
 		sectors = transport_get_sectors_6(cdb);
 		cmd->t_task_lba = transport_lba_21(cdb);
