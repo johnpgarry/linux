@@ -673,7 +673,7 @@ static struct ata_queued_cmd *ata_scsi_qc_new(struct ata_device *dev,
 		tag = scsi_cmd_to_rq(cmd)->tag;
 	}
 
-	qc = __ata_qc_from_tag(ap, tag);
+	qc = ata_scmd_to_qc(cmd);
 	qc->tag = qc->hw_tag = tag;
 	qc->ap = ap;
 	qc->dev = dev;
@@ -4025,7 +4025,8 @@ unsigned int ata_scsi_queue_internal(struct scsi_cmnd *scmd,
 		goto did_err;
 
 	/* initialize internal qc */
-	qc = __ata_qc_from_tag(ap, ATA_TAG_INTERNAL);
+	qc = ata_scmd_to_qc(scmd);
+	qc->scsicmd = scmd;
 	link->preempted_tag = link->active_tag;
 	link->preempted_sactive = link->sactive;
 	ap->preempted_qc_active = ap->qc_active;
@@ -4307,6 +4308,7 @@ int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
 		shost->max_lun = 1;
 		shost->max_channel = 1;
 		shost->max_cmd_len = 32;
+		shost->can_queue += shost->nr_reserved_cmds;
 
 		/* Schedule policy is determined by ->qc_defer()
 		 * callback and it needs to see every deferred qc.
