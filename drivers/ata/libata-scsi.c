@@ -673,10 +673,14 @@ static struct ata_queued_cmd *ata_scsi_qc_new(struct ata_device *dev,
 			goto fail;
 		tag = cmd->budget_token;
 	} else {
-		tag = scsi_cmd_to_rq(cmd)->tag;
+		/*
+		 * The block layer puts the reserved tags at the bottom of the
+		 * tagset, so offset by 1 to make the tag range begin at 0
+		 */
+		tag = scsi_cmd_to_rq(cmd)->tag - ATA_RESERVED_TAGS;
 	}
 
-	qc = __ata_qc_from_tag(ap, tag);
+	qc = ata_scmd_to_qc(cmd);
 	qc->tag = qc->hw_tag = tag;
 	qc->ap = ap;
 	qc->dev = dev;
@@ -4155,7 +4159,8 @@ unsigned int ata_scsi_queue_internal(struct scsi_cmnd *scmd,
 		goto did_err;
 
 	/* initialize internal qc */
-	qc = __ata_qc_from_tag(ap, ATA_TAG_INTERNAL);
+	qc = ata_scmd_to_qc(scmd);
+	qc->scsicmd = scmd;
 	link->preempted_tag = link->active_tag;
 	link->preempted_sactive = link->sactive;
 	ap->preempted_qc_active = ap->qc_active;
