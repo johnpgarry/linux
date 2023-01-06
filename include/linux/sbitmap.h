@@ -57,9 +57,14 @@ struct sbitmap {
 
 	/**
 	 * @map_nr: Number of words (cachelines) being used for the bitmap.
+	 *			Unset for NUMA spreading.
 	 */
 	unsigned int map_nr;
 
+	/**
+	 * @map_nr: Number of words (cachelines) being used for the bitmap per NUMA node.
+	 *			Set only for NUMA spreading.
+	 */
 	unsigned int map_nr_per_node;
 
 	/**
@@ -71,6 +76,10 @@ struct sbitmap {
 	 * @map: Allocated bitmap.
 	 */
 	struct sbitmap_word *map;
+
+	/**
+	 * @numa_map: Allocated NUMA-spreading bitmap.
+	 */
 	struct sbitmap_word *numa_map[MAX_NUMNODES];
 
 	/*
@@ -266,8 +275,6 @@ static inline void __sbitmap_for_each_set(struct sbitmap *sb,
 	unsigned int index;
 	unsigned int nr;
 	unsigned int scanned = 0;
-	struct sbitmap_word *normal_map = sb->map;
-	struct sbitmap_word **numa_map = sb->numa_map;
 
 	if (start >= sb->depth)
 		start = 0;
@@ -279,12 +286,12 @@ static inline void __sbitmap_for_each_set(struct sbitmap *sb,
 		unsigned int depth = min_t(unsigned int,
 					   __map_depth(sb, index) - nr,
 					   sb->depth - scanned);
-		struct sbitmap_word *map;
+	//	struct sbitmap_word *map = NULL; //fixme
 
-		map = sbitmap_get_map(sb, normal_map, numa_map, index);
+	//	map = sbitmap_get_map(sb, normal_map, numa_map, index);
 
 		scanned += depth;
-		word = map->word & ~ map->cleared;
+		word = sb->map[index].word & ~sb->map[index].cleared;
 		if (!word)
 			goto next;
 
@@ -325,9 +332,9 @@ static inline void sbitmap_for_each_set(struct sbitmap *sb, sb_for_each_fn fn,
 static inline unsigned long *__sbitmap_word(struct sbitmap *sb,
 					    unsigned int bitnr)
 {
-	struct sbitmap_word *normal_map = sb->map;
-	struct sbitmap_word **numa_map = sb->numa_map;
-	struct sbitmap_word *map = sbitmap_get_map(sb, normal_map, numa_map, SB_NR_TO_INDEX(sb, bitnr));
+	struct sbitmap_word *map = sb->map;
+	if (map)
+		return &sb->map[SB_NR_TO_INDEX(sb, bitnr)].word;
 
 	return &map->word;
 }
@@ -352,16 +359,23 @@ static inline void sbitmap_clear_bit(struct sbitmap *sb, unsigned int bitnr)
  */
 static inline void sbitmap_deferred_clear_bit(struct sbitmap *sb, unsigned int bitnr)
 {
-	struct sbitmap_word *map;
-	unsigned long *addr;
+	struct sbitmap_word *map = sb->map;
+	struct sbitmap_word **numa_map;
+	unsigned long *addr1;
 
-	struct sbitmap_word *normal_map = sb->map;
-	struct sbitmap_word **numa_map = sb->numa_map;
+	if (map) {
+		unsigned long *addr = &sb->map[SB_NR_TO_INDEX(sb, bitnr)].cleared;
 
-	map = sbitmap_get_map(sb, normal_map, numa_map, SB_NR_TO_INDEX(sb, bitnr));
-	addr = &map->cleared;
+		set_bit(SB_NR_TO_BIT(sb, bitnr), addr);
+		return;
+	}
 
-	set_bit(SB_NR_TO_BIT(sb, bitnr), addr);
+	numa_map = sb->numa_map;
+
+	map = sbitmap_get_map(sb, NULL, numa_map, SB_NR_TO_INDEX(sb, bitnr));
+	addr1 = &map->cleared;
+
+	set_bit(SB_NR_TO_BIT(sb, bitnr), addr1);
 }
 
 /*
