@@ -10,6 +10,150 @@
 #include <linux/seq_file.h>
 #include <linux/mm.h>
 
+struct sbitmap_word_orig {
+	 unsigned long depth;
+	/**
+	 * @word: word holding free bits
+	 */
+
+	/**
+ 	 * @word: word holding free bits
+ 	 */
+	unsigned long word ____cacheline_aligned_in_smp;
+	/**
+	 * @cleared: word holding cleared bits
+	 */
+	unsigned long cleared ____cacheline_aligned_in_smp;
+} ____cacheline_aligned_in_smp;
+
+unsigned int __map_depth(const struct sbitmap *sb, int index)
+{
+	if (index == sb->map_nr - 1)
+		return sb->depth - (index << sb->shift);
+	return 1U << sb->shift;
+}
+
+void sbitmap_deferred_clear_bit(struct sbitmap *sb, unsigned int bitnr)
+{
+	struct sbitmap_word *map = sb->map;
+	struct sbitmap_word **map_numa;
+	unsigned long *addr1;
+
+	if (map) {
+		unsigned long *addr = &sb->map[SB_NR_TO_INDEX(sb, bitnr)].cleared;
+
+		set_bit(SB_NR_TO_BIT(sb, bitnr), addr);
+		return;
+	}
+	BUG();
+	map_numa = sb->map_numa;
+
+	map = sbitmap_get_map(sb, NULL, map_numa, SB_NR_TO_INDEX(sb, bitnr));
+	addr1 = &map->cleared;
+
+	set_bit(SB_NR_TO_BIT(sb, bitnr), addr1);
+}
+
+void sbitmap_put(struct sbitmap *sb, unsigned int bitnr)
+{
+	sbitmap_deferred_clear_bit(sb, bitnr);
+
+	if (likely(sb->alloc_hint && !sb->round_robin && bitnr < sb->depth))
+		*raw_cpu_ptr(sb->alloc_hint) = bitnr;
+}
+
+int sbitmap_test_bit(struct sbitmap *sb, unsigned int bitnr)
+{
+	return test_bit(SB_NR_TO_BIT(sb, bitnr), __sbitmap_word(sb, bitnr));
+}
+
+int sbitmap_calculate_shift(unsigned int depth)
+{
+	int	shift = ilog2(BITS_PER_LONG);
+
+	/*
+	 * If the bitmap is small, shrink the number of bits per word so
+	 * we spread over a few cachelines, at least. If less than 4
+	 * bits, just forget about it, it's not going to work optimally
+	 * anyway.
+	 */
+	if (depth >= 4) {
+		while ((4U << shift) > depth)
+			shift--;
+	}
+
+	return shift;
+}
+
+void sbitmap_set_bit(struct sbitmap *sb, unsigned int bitnr)
+{
+	set_bit(SB_NR_TO_BIT(sb, bitnr), __sbitmap_word(sb, bitnr));
+}
+
+void sbitmap_clear_bit(struct sbitmap *sb, unsigned int bitnr)
+{
+	clear_bit(SB_NR_TO_BIT(sb, bitnr), __sbitmap_word(sb, bitnr));
+}
+
+/**
+ * __sbitmap_for_each_set() - Iterate over each set bit in a &struct sbitmap.
+ * @start: Where to start the iteration.
+ * @sb: Bitmap to iterate over.
+ * @fn: Callback. Should return true to continue or false to break early.
+ * @data: Pointer to pass to callback.
+ *
+ * This is inline even though it's non-trivial so that the function calls to the
+ * callback will hopefully get optimized away.
+ */
+void __sbitmap_for_each_set(struct sbitmap *sb,
+					  unsigned int start,
+					  sb_for_each_fn fn, void *data)
+{
+	unsigned int index;
+	unsigned int nr;
+	unsigned int scanned = 0;
+
+	if (start >= sb->depth)
+		start = 0;
+	index = SB_NR_TO_INDEX(sb, start);
+	nr = SB_NR_TO_BIT(sb, start);
+
+	while (scanned < sb->depth) {
+		unsigned long word;
+		unsigned int depth = min_t(unsigned int,
+					   __map_depth(sb, index) - nr,
+					   sb->depth - scanned);
+	//	struct sbitmap_word *map = NULL; //fixme
+
+	//	map = sbitmap_get_map(sb, normal_map, numa_map, index);
+
+		scanned += depth;
+		word = sb->map[index].word & ~sb->map[index].cleared;
+		if (!word)
+			goto next;
+
+		/*
+		 * On the first iteration of the outer loop, we need to add the
+		 * bit offset back to the size of the word for find_next_bit().
+		 * On all other iterations, nr is zero, so this is a noop.
+		 */
+		depth += nr;
+		while (1) {
+			nr = find_next_bit(&word, depth, nr);
+			if (nr >= depth)
+				break;
+			if (!fn(sb, (index << sb->shift) + nr, data))
+				return;
+
+			nr++;
+		}
+next:
+		nr = 0;
+		if (++index >= sb->map_nr)
+			index = 0;
+	}
+}
+
 static int init_alloc_hint(struct sbitmap *sb, gfp_t flags)
 {
 	unsigned depth = sb->depth;
@@ -27,7 +171,7 @@ static int init_alloc_hint(struct sbitmap *sb, gfp_t flags)
 	return 0;
 }
 
-static inline unsigned update_alloc_hint_before_get(struct sbitmap *sb,
+unsigned update_alloc_hint_before_get(struct sbitmap *sb,
 						    unsigned int depth)
 {
 	unsigned hint;
@@ -41,7 +185,7 @@ static inline unsigned update_alloc_hint_before_get(struct sbitmap *sb,
 	return hint;
 }
 
-static inline void update_alloc_hint_after_get(struct sbitmap *sb,
+void update_alloc_hint_after_get(struct sbitmap *sb,
 					       unsigned int depth,
 					       unsigned int hint,
 					       unsigned int nr)
@@ -58,10 +202,20 @@ static inline void update_alloc_hint_after_get(struct sbitmap *sb,
 	}
 }
 
+unsigned long *__sbitmap_word(struct sbitmap *sb,
+					    unsigned int bitnr)
+{
+	struct sbitmap_word *map = sb->map;
+	if (map)
+		return &sb->map[SB_NR_TO_INDEX(sb, bitnr)].word;
+
+	return &map->word;
+}
+
 /*
  * See if we have deferred clears that we can batch move
  */
-static inline bool sbitmap_deferred_clear(struct sbitmap_word *map)
+bool sbitmap_deferred_clear(struct sbitmap_word *map)
 {
 	unsigned long mask;
 
@@ -100,20 +254,51 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 	map_nr = DIV_ROUND_UP(sb->depth, bits_per_word);
 	sb->round_robin = round_robin;
 
-	if (depth == 0) {
-		sb->map = NULL;
+	if (depth == 0)
 		return 0;
-	}
 
 	if (node == NUMA_NO_NODE) {
-		WARN_ON_ONCE(1);
+		unsigned int nid;
+
+		pr_err("%s NUMA_NO_NODE sb=%pS depth=%d map_nr=%d bits_per_word=%d num_nodes=%d sizeof(struct sbitmap_word)=%ld orig=%ld\n",
+			__func__, sb, sb->depth, map_nr, bits_per_word, num_nodes, sizeof(struct sbitmap_word),
+			sizeof(struct sbitmap_word_orig));
 		if (map_nr < num_nodes) {
-			sb->map_nr_per_node = 1;
+			sb->map_nr_numa = 1;
 		} else {
-			sb->map_nr_per_node = map_nr / num_nodes;
+			sb->map_nr_numa = map_nr / num_nodes;
 		}
+		sb->numa_nodes = num_nodes;
+
+		pr_err("%s2 NUMA_NO_NODE sb=%pS depth=%d map_nr=%d bits_per_word=%d num_nodes=%d map_nr_numa=%d\n",
+			__func__, sb, sb->depth, map_nr, bits_per_word, num_nodes, sb->map_nr_numa);
+		for (nid = 0; nid < sb->numa_nodes; nid++) {
+			unsigned int cnt;
+			struct page *page;
+
+			if (nid == 0) {
+				cnt = sb->map_nr_numa + (map_nr % sb->map_nr_numa);
+			} else {
+				cnt = sb->map_nr_numa;
+			}
+
+			pr_err("%s3 NUMA_NO_NODE sb=%pS nid=%d cnt=%d\n", __func__, sb, nid, cnt);
+			sb->map_numa[nid] = kvzalloc_node(cnt * sizeof(*sb->map), flags, nid);
+			if (!sb->map_numa[nid])
+					return -ENOMEM;
+			page = virt_to_page(sb->map_numa[nid]);
+
+			pr_err("%s4 NUMA_NO_NODE sb=%pS nid=%d sb->map_numa[nid]=%pS (nid=%d)\n",
+				__func__, sb, nid, sb->map_numa[nid], page_to_nid(page));
+		}
+		BUG();
 	} else {
 		sb->map_nr = map_nr;
+		sb->map = kvzalloc_node(map_nr * sizeof(*sb->map), flags, node);
+		if (!sb->map) {
+			free_percpu(sb->alloc_hint);
+			return -ENOMEM;
+		}
 	}
 
 	if (alloc_hint) {
@@ -123,38 +308,6 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 		sb->alloc_hint = NULL;
 	}
 
-	if (node == NUMA_NO_NODE) {
-		unsigned int nid;
-
-		pr_err("%s2 NUMA_NO_NODE sb=%pS depth=%d map_nr=%d bits_per_word=%d num_nodes=%d map_nr_per_node=%d\n",
-			__func__, sb, sb->depth, map_nr, bits_per_word, num_nodes, sb->map_nr_per_node);
-		for (nid = 0; nid < num_nodes; nid++) {
-			unsigned int cnt;
-			struct page *page;
-
-			if (nid == 0) {
-				cnt = sb->map_nr_per_node + (map_nr % sb->map_nr_per_node);
-			} else {
-				cnt = sb->map_nr_per_node;
-			}
-
-			pr_err("%s3 NUMA_NO_NODE sb=%pS nid=%d cnt=%d\n", __func__, sb, nid, cnt);
-			sb->numa_map[nid] = kvzalloc_node(cnt * sizeof(*sb->map), flags, nid);
-			if (!sb->numa_map[nid])
-					return -ENOMEM;
-			page = virt_to_page(sb->numa_map[nid]);
-
-			pr_err("%s4 NUMA_NO_NODE sb=%pS nid=%d sb->numa_map[nid]=%pS (nid=%d)\n",
-				__func__, sb, nid, sb->numa_map[nid], page_to_nid(page));
-		}
-	} else {
-		sb->map = kvzalloc_node(map_nr * sizeof(*sb->map), flags, node);
-		if (!sb->map) {
-			free_percpu(sb->alloc_hint);
-			return -ENOMEM;
-		}
-	}
-
 	return 0;
 }
 EXPORT_SYMBOL_GPL(sbitmap_init_node);
@@ -162,13 +315,24 @@ EXPORT_SYMBOL_GPL(sbitmap_init_node);
 void sbitmap_resize(struct sbitmap *sb, unsigned int depth)
 {
 	unsigned int bits_per_word = 1U << sb->shift;
-	unsigned int i;
+	unsigned int i, new_map_nr = DIV_ROUND_UP(depth, bits_per_word);
 
-	for (i = 0; i < sb->map_nr; i++)
-		sbitmap_deferred_clear(&sb->map[i]);
+	if (sb->map) {
+		for (i = 0; i < sb->map_nr; i++)
+			sbitmap_deferred_clear(&sb->map[i]);
+		sb->map_nr = new_map_nr;
+	} else {
+		unsigned int nid;
+
+		for (nid = 0; nid < sb->numa_nodes; nid++) {
+				struct sbitmap_word *map_numa = sb->map_numa[nid];
+
+				for (i = 0; i < sb->map_nr_numa; i++, map_numa++)
+					sbitmap_deferred_clear(map_numa);
+		}
+	}
 
 	sb->depth = depth;
-	sb->map_nr = DIV_ROUND_UP(sb->depth, bits_per_word);
 }
 EXPORT_SYMBOL_GPL(sbitmap_resize);
 

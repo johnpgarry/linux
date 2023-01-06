@@ -65,7 +65,9 @@ struct sbitmap {
 	 * @map_nr: Number of words (cachelines) being used for the bitmap per NUMA node.
 	 *			Set only for NUMA spreading.
 	 */
-	unsigned int map_nr_per_node;
+	unsigned int map_nr_numa;
+
+	unsigned int numa_nodes;
 
 	/**
 	 * @round_robin: Allocate bits in strict round-robin order.
@@ -80,7 +82,7 @@ struct sbitmap {
 	/**
 	 * @numa_map: Allocated NUMA-spreading bitmap.
 	 */
-	struct sbitmap_word *numa_map[MAX_NUMNODES];
+	struct sbitmap_word *map_numa[MAX_NUMNODES];
 
 	/*
 	 * @alloc_hint: Cache of last successfully allocated or freed bit.
@@ -178,12 +180,7 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 		      gfp_t flags, int node, bool round_robin, bool alloc_hint);
 
 /* sbitmap internal helper */
-static inline unsigned int __map_depth(const struct sbitmap *sb, int index)
-{
-	if (index == sb->map_nr - 1)
-		return sb->depth - (index << sb->shift);
-	return 1U << sb->shift;
-}
+unsigned int __map_depth(const struct sbitmap *sb, int index);
 
 /**
  * sbitmap_free() - Free memory used by a &struct sbitmap.
@@ -191,6 +188,7 @@ static inline unsigned int __map_depth(const struct sbitmap *sb, int index)
  */
 static inline void sbitmap_free(struct sbitmap *sb)
 {
+	BUG(); // fixe map numa node
 	free_percpu(sb->alloc_hint);
 	kvfree(sb->map);
 	sb->map = NULL;
@@ -251,71 +249,16 @@ static inline struct sbitmap_word *sbitmap_get_map(struct sbitmap *sb,
 		struct sbitmap_word **numa_map,
 		unsigned int index)
 {
-	if (sb->numa_map) {
+	if (sb->map_numa) {
 
 		return NULL;
 	}
 	return normal_map + index;
 }
 
-/**
- * __sbitmap_for_each_set() - Iterate over each set bit in a &struct sbitmap.
- * @start: Where to start the iteration.
- * @sb: Bitmap to iterate over.
- * @fn: Callback. Should return true to continue or false to break early.
- * @data: Pointer to pass to callback.
- *
- * This is inline even though it's non-trivial so that the function calls to the
- * callback will hopefully get optimized away.
- */
-static inline void __sbitmap_for_each_set(struct sbitmap *sb,
+void __sbitmap_for_each_set(struct sbitmap *sb,
 					  unsigned int start,
-					  sb_for_each_fn fn, void *data)
-{
-	unsigned int index;
-	unsigned int nr;
-	unsigned int scanned = 0;
-
-	if (start >= sb->depth)
-		start = 0;
-	index = SB_NR_TO_INDEX(sb, start);
-	nr = SB_NR_TO_BIT(sb, start);
-
-	while (scanned < sb->depth) {
-		unsigned long word;
-		unsigned int depth = min_t(unsigned int,
-					   __map_depth(sb, index) - nr,
-					   sb->depth - scanned);
-	//	struct sbitmap_word *map = NULL; //fixme
-
-	//	map = sbitmap_get_map(sb, normal_map, numa_map, index);
-
-		scanned += depth;
-		word = sb->map[index].word & ~sb->map[index].cleared;
-		if (!word)
-			goto next;
-
-		/*
-		 * On the first iteration of the outer loop, we need to add the
-		 * bit offset back to the size of the word for find_next_bit().
-		 * On all other iterations, nr is zero, so this is a noop.
-		 */
-		depth += nr;
-		while (1) {
-			nr = find_next_bit(&word, depth, nr);
-			if (nr >= depth)
-				break;
-			if (!fn(sb, (index << sb->shift) + nr, data))
-				return;
-
-			nr++;
-		}
-next:
-		nr = 0;
-		if (++index >= sb->map_nr)
-			index = 0;
-	}
-}
+					  sb_for_each_fn fn, void *data);
 
 /**
  * sbitmap_for_each_set() - Iterate over each set bit in a &struct sbitmap.
@@ -329,27 +272,14 @@ static inline void sbitmap_for_each_set(struct sbitmap *sb, sb_for_each_fn fn,
 	__sbitmap_for_each_set(sb, 0, fn, data);
 }
 
-static inline unsigned long *__sbitmap_word(struct sbitmap *sb,
-					    unsigned int bitnr)
-{
-	struct sbitmap_word *map = sb->map;
-	if (map)
-		return &sb->map[SB_NR_TO_INDEX(sb, bitnr)].word;
-
-	return &map->word;
-}
+unsigned long *__sbitmap_word(struct sbitmap *sb,
+					    unsigned int bitnr);
 
 /* Helpers equivalent to the operations in asm/bitops.h and linux/bitmap.h */
 
-static inline void sbitmap_set_bit(struct sbitmap *sb, unsigned int bitnr)
-{
-	set_bit(SB_NR_TO_BIT(sb, bitnr), __sbitmap_word(sb, bitnr));
-}
+void sbitmap_set_bit(struct sbitmap *sb, unsigned int bitnr);
 
-static inline void sbitmap_clear_bit(struct sbitmap *sb, unsigned int bitnr)
-{
-	clear_bit(SB_NR_TO_BIT(sb, bitnr), __sbitmap_word(sb, bitnr));
-}
+void sbitmap_clear_bit(struct sbitmap *sb, unsigned int bitnr);
 
 /*
  * This one is special, since it doesn't actually clear the bit, rather it
@@ -357,61 +287,16 @@ static inline void sbitmap_clear_bit(struct sbitmap *sb, unsigned int bitnr)
  * the caller doing sbitmap_deferred_clear() if a given index is full, which
  * will clear the previously freed entries in the corresponding ->word.
  */
-static inline void sbitmap_deferred_clear_bit(struct sbitmap *sb, unsigned int bitnr)
-{
-	struct sbitmap_word *map = sb->map;
-	struct sbitmap_word **numa_map;
-	unsigned long *addr1;
-
-	if (map) {
-		unsigned long *addr = &sb->map[SB_NR_TO_INDEX(sb, bitnr)].cleared;
-
-		set_bit(SB_NR_TO_BIT(sb, bitnr), addr);
-		return;
-	}
-
-	numa_map = sb->numa_map;
-
-	map = sbitmap_get_map(sb, NULL, numa_map, SB_NR_TO_INDEX(sb, bitnr));
-	addr1 = &map->cleared;
-
-	set_bit(SB_NR_TO_BIT(sb, bitnr), addr1);
-}
+void sbitmap_deferred_clear_bit(struct sbitmap *sb, unsigned int bitnr);
 
 /*
  * Pair of sbitmap_get, and this one applies both cleared bit and
  * allocation hint.
  */
-static inline void sbitmap_put(struct sbitmap *sb, unsigned int bitnr)
-{
-	sbitmap_deferred_clear_bit(sb, bitnr);
+void sbitmap_put(struct sbitmap *sb, unsigned int bitnr);
+int sbitmap_test_bit(struct sbitmap *sb, unsigned int bitnr);
 
-	if (likely(sb->alloc_hint && !sb->round_robin && bitnr < sb->depth))
-		*raw_cpu_ptr(sb->alloc_hint) = bitnr;
-}
-
-static inline int sbitmap_test_bit(struct sbitmap *sb, unsigned int bitnr)
-{
-	return test_bit(SB_NR_TO_BIT(sb, bitnr), __sbitmap_word(sb, bitnr));
-}
-
-static inline int sbitmap_calculate_shift(unsigned int depth)
-{
-	int	shift = ilog2(BITS_PER_LONG);
-
-	/*
-	 * If the bitmap is small, shrink the number of bits per word so
-	 * we spread over a few cachelines, at least. If less than 4
-	 * bits, just forget about it, it's not going to work optimally
-	 * anyway.
-	 */
-	if (depth >= 4) {
-		while ((4U << shift) > depth)
-			shift--;
-	}
-
-	return shift;
-}
+int sbitmap_calculate_shift(unsigned int depth);
 
 /**
  * sbitmap_show() - Dump &struct sbitmap information to a &struct seq_file.
