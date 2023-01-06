@@ -36,7 +36,6 @@ unsigned int __map_depth(const struct sbitmap *sb, int index)
 void sbitmap_deferred_clear_bit(struct sbitmap *sb, unsigned int bitnr)
 {
 	struct sbitmap_word *map = sb->map;
-	struct sbitmap_word **map_numa;
 	unsigned long *addr1;
 
 	if (map) {
@@ -46,9 +45,9 @@ void sbitmap_deferred_clear_bit(struct sbitmap *sb, unsigned int bitnr)
 		return;
 	}
 	BUG();
-	map_numa = sb->map_numa;
+	//map_numa = sb->map_numa;
 
-	map = sbitmap_get_map(sb, NULL, map_numa, SB_NR_TO_INDEX(sb, bitnr));
+	map = sbitmap_get_map(sb, NULL, NULL, SB_NR_TO_INDEX(sb, bitnr));
 	addr1 = &map->cleared;
 
 	set_bit(SB_NR_TO_BIT(sb, bitnr), addr1);
@@ -208,7 +207,7 @@ unsigned long *__sbitmap_word(struct sbitmap *sb,
 	struct sbitmap_word *map = sb->map;
 	if (map)
 		return &sb->map[SB_NR_TO_INDEX(sb, bitnr)].word;
-
+	BUG();
 	return &map->word;
 }
 
@@ -239,8 +238,8 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 		      gfp_t flags, int node, bool round_robin,
 		      bool alloc_hint)
 {
-	int num_nodes = num_online_nodes();
-	unsigned int bits_per_word, map_nr;
+	int numa_nodes = num_online_nodes();
+	unsigned int bits_per_word;
 
 	if (shift < 0)
 		shift = sbitmap_calculate_shift(depth);
@@ -251,7 +250,6 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 
 	sb->shift = shift;
 	sb->depth = depth;
-	map_nr = DIV_ROUND_UP(sb->depth, bits_per_word);
 	sb->round_robin = round_robin;
 
 	if (depth == 0)
@@ -259,31 +257,20 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 
 	if (node == NUMA_NO_NODE) {
 		unsigned int nid;
+		sb->numa_nodes = numa_nodes;
 
-		pr_err("%s NUMA_NO_NODE sb=%pS depth=%d map_nr=%d bits_per_word=%d num_nodes=%d sizeof(struct sbitmap_word)=%ld orig=%ld\n",
-			__func__, sb, sb->depth, map_nr, bits_per_word, num_nodes, sizeof(struct sbitmap_word),
+		pr_err("%s NUMA_NO_NODE sb=%pS depth=%d bits_per_word=%d numa_nodes=%d sizeof(struct sbitmap_word)=%ld orig=%ld\n",
+			__func__, sb, sb->depth, bits_per_word, numa_nodes, sizeof(struct sbitmap_word),
 			sizeof(struct sbitmap_word_orig));
-		if (map_nr < num_nodes) {
-			sb->map_nr_numa = 1;
-		} else {
-			sb->map_nr_numa = map_nr / num_nodes;
-		}
-		sb->numa_nodes = num_nodes;
+		sb->map_nr_numa = DIV_ROUND_UP(depth, sb->numa_nodes * bits_per_word);
 
-		pr_err("%s2 NUMA_NO_NODE sb=%pS depth=%d map_nr=%d bits_per_word=%d num_nodes=%d map_nr_numa=%d\n",
-			__func__, sb, sb->depth, map_nr, bits_per_word, num_nodes, sb->map_nr_numa);
+		pr_err("%s2 NUMA_NO_NODE sb=%pS depth=%d bits_per_word=%d numa_nodes=%d map_nr_numa=%d\n",
+			__func__, sb, sb->depth, bits_per_word, numa_nodes, sb->map_nr_numa);
 		for (nid = 0; nid < sb->numa_nodes; nid++) {
-			unsigned int cnt;
 			struct page *page;
 
-			if (nid == 0) {
-				cnt = sb->map_nr_numa + (map_nr % sb->map_nr_numa);
-			} else {
-				cnt = sb->map_nr_numa;
-			}
-
-			pr_err("%s3 NUMA_NO_NODE sb=%pS nid=%d cnt=%d\n", __func__, sb, nid, cnt);
-			sb->map_numa[nid] = kvzalloc_node(cnt * sizeof(*sb->map), flags, nid);
+			pr_err("%s3 NUMA_NO_NODE sb=%pS nid=%d\n", __func__, sb, nid);
+			sb->map_numa[nid] = kvzalloc_node(sb->map_nr_numa * sizeof(*sb->map), flags, nid);
 			if (!sb->map_numa[nid])
 					return -ENOMEM;
 			page = virt_to_page(sb->map_numa[nid]);
@@ -293,8 +280,8 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 		}
 		BUG();
 	} else {
-		sb->map_nr = map_nr;
-		sb->map = kvzalloc_node(map_nr * sizeof(*sb->map), flags, node);
+		sb->map_nr = DIV_ROUND_UP(sb->depth, bits_per_word);
+		sb->map = kvzalloc_node(sb->map_nr * sizeof(*sb->map), flags, node);
 		if (!sb->map) {
 			free_percpu(sb->alloc_hint);
 			return -ENOMEM;
