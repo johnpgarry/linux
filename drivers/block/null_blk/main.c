@@ -85,7 +85,7 @@ static int g_no_sched;
 module_param_named(no_sched, g_no_sched, int, 0444);
 MODULE_PARM_DESC(no_sched, "No io scheduler");
 
-static int g_submit_queues = 1;
+static int g_submit_queues = NR_CPUS;
 module_param_named(submit_queues, g_submit_queues, int, 0444);
 MODULE_PARM_DESC(submit_queues, "Number of submission queues");
 
@@ -157,7 +157,7 @@ static int g_max_sectors;
 module_param_named(max_sectors, g_max_sectors, int, 0444);
 MODULE_PARM_DESC(max_sectors, "Maximum size of a command (in 512B sectors)");
 
-static unsigned int nr_devices = 1;
+static unsigned int nr_devices = 20;
 module_param(nr_devices, uint, 0444);
 MODULE_PARM_DESC(nr_devices, "Number of devices to register");
 
@@ -165,11 +165,11 @@ static bool g_blocking;
 module_param_named(blocking, g_blocking, bool, 0444);
 MODULE_PARM_DESC(blocking, "Register as a blocking blk-mq driver device");
 
-static bool shared_tags;
+static bool shared_tags = 1;
 module_param(shared_tags, bool, 0444);
 MODULE_PARM_DESC(shared_tags, "Share tag set between devices for blk-mq");
 
-static bool g_shared_tag_bitmap;
+static bool g_shared_tag_bitmap = true;
 module_param_named(shared_tag_bitmap, g_shared_tag_bitmap, bool, 0444);
 MODULE_PARM_DESC(shared_tag_bitmap, "Use shared tag bitmap for all submission queues for blk-mq");
 
@@ -193,7 +193,7 @@ static unsigned long g_completion_nsec = 10000;
 module_param_named(completion_nsec, g_completion_nsec, ulong, 0444);
 MODULE_PARM_DESC(completion_nsec, "Time in ns to complete a request in hardware. Default: 10,000ns");
 
-static int g_hw_queue_depth = 64;
+static int g_hw_queue_depth = 256;
 module_param_named(hw_queue_depth, g_hw_queue_depth, int, 0444);
 MODULE_PARM_DESC(hw_queue_depth, "Queue depth for each hardware queue. Default: 64");
 
@@ -1914,13 +1914,14 @@ static int null_gendisk_register(struct nullb *nullb)
 
 	return add_disk(disk);
 }
-
+bool special_sbitmap;
 static int null_init_tag_set(struct nullb *nullb, struct blk_mq_tag_set *set)
 {
 	unsigned int flags = BLK_MQ_F_SHOULD_MERGE;
 	int hw_queues, numa_node;
 	unsigned int queue_depth;
 	int poll_queues;
+	int rc;
 
 	if (nullb) {
 		hw_queues = nullb->dev->submit_queues;
@@ -1960,7 +1961,12 @@ static int null_init_tag_set(struct nullb *nullb, struct blk_mq_tag_set *set)
 		set->nr_maps = 1;
 	}
 
-	return blk_mq_alloc_tag_set(set);
+	pr_err("%s set=%pS\n", __func__, set);
+	special_sbitmap = true;
+	rc = blk_mq_alloc_tag_set(set);
+	special_sbitmap = false;
+
+	return rc;
 }
 
 static int null_validate_conf(struct nullb_device *dev)
