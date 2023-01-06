@@ -278,7 +278,6 @@ int sbitmap_init_node(struct sbitmap *sb, unsigned int depth, int shift,
 			pr_err("%s4 NUMA_NO_NODE sb=%pS nid=%d sb->map_numa[nid]=%pS (nid=%d)\n",
 				__func__, sb, nid, sb->map_numa[nid], page_to_nid(page));
 		}
-		BUG();
 	} else {
 		sb->map_nr = DIV_ROUND_UP(sb->depth, bits_per_word);
 		sb->map = kvzalloc_node(sb->map_nr * sizeof(*sb->map), flags, node);
@@ -313,9 +312,12 @@ void sbitmap_resize(struct sbitmap *sb, unsigned int depth)
 
 		for (nid = 0; nid < sb->numa_nodes; nid++) {
 				struct sbitmap_word *map_numa = sb->map_numa[nid];
+				pr_err("%s sb=%pS map_numa=%pS nid=%d sb->map_nr_numa=%d depth=%d\n", __func__, sb, map_numa, nid, sb->map_nr_numa, sb->depth);
 
-				for (i = 0; i < sb->map_nr_numa; i++, map_numa++)
+				for (i = 0; i < sb->map_nr_numa; i++, map_numa++) {
+					pr_err("%s2 map_numa=%pS nid=%d i=%d\n", __func__, map_numa, nid, i);
 					sbitmap_deferred_clear(map_numa);
+				}
 		}
 	}
 
@@ -359,17 +361,16 @@ static int __sbitmap_get_word(unsigned long *word, unsigned long depth,
 
 //static int sbitmap_find_bit_in_index(struct sbitmap_word *map, unsigned int depth,
 //				     unsigned int alloc_hint, unsigned int round_robin)
-static int sbitmap_find_bit_in_index(struct sbitmap *sb, int index,
-				     unsigned int alloc_hint)
+static int sbitmap_find_bit_in_index(struct sbitmap_word *map, unsigned int depth, 
+				     unsigned int alloc_hint, bool round_robin)
 {
-	struct sbitmap_word *map = &sb->map[index];
 	int nr;
 
 	do {
 	//	nr = __sbitmap_get_word(&map->word, depth,
 //					alloc_hint, !round_robin);
-		nr = __sbitmap_get_word(&map->word, __map_depth(sb, index),
-					alloc_hint, !sb->round_robin);
+		nr = __sbitmap_get_word(&map->word, depth,
+					alloc_hint, !round_robin);
 		if (nr != -1)
 			break;
 		if (!sbitmap_deferred_clear(map))
@@ -382,12 +383,12 @@ static int sbitmap_find_bit_in_index(struct sbitmap *sb, int index,
 static int __sbitmap_get(struct sbitmap *sb, unsigned int alloc_hint)
 {
 	unsigned int i, index;
-//	unsigned int round_robin = sb->round_robin;
+	bool round_robin = sb->round_robin;
 	int nr = -1;
 
 //	struct sbitmap_word *normal_map = sb->map;
 //	struct sbitmap_word **numa_map = sb->numa_map;
-	index = SB_NR_TO_INDEX(sb, alloc_hint);
+	
 
 	/*
 	 * Unless we're doing round robin tag allocation, just use the
@@ -399,24 +400,46 @@ static int __sbitmap_get(struct sbitmap *sb, unsigned int alloc_hint)
 	else
 		alloc_hint = 0;
 
-	for (i = 0; i < sb->map_nr; i++) {
-//		struct sbitmap_word *map;
-//		unsigned int depth;
+	if (sb->map) {
+		index = SB_NR_TO_INDEX(sb, alloc_hint);
 
-	//	map = sbitmap_get_map(sb, normal_map, numa_map, index);
-	//	depth = __map_depth(sb, index);
+		for (i = 0; i < sb->map_nr; i++) {
 
-	//	nr = sbitmap_find_bit_in_index(map, depth, alloc_hint, round_robin);
-		nr = sbitmap_find_bit_in_index(sb, index, alloc_hint);
-		if (nr != -1) {
-			nr += index << sb->shift;
-			break;
+			nr = sbitmap_find_bit_in_index(&sb->map[index], __map_depth(sb, index), alloc_hint, round_robin);
+			if (nr != -1) {
+				nr += index << sb->shift;
+				break;
+			}
+
+			/* Jump to next index. */
+			alloc_hint = 0;
+			if (++index >= sb->map_nr)
+				index = 0;
 		}
+	} else {
+		unsigned int nid;
 
-		/* Jump to next index. */
-		alloc_hint = 0;
-		if (++index >= sb->map_nr)
-			index = 0;
+		for (nid = 0; nid < sb->numa_nodes; nid++) {
+			for (i = 0; i < sb->map_nr_numa; i++) {
+				struct sbitmap_word *map;
+		//		unsigned int depth;
+
+			//	map = sbitmap_get_map(sb, normal_map, numa_map, index);
+			//	depth = __map_depth(sb, index);
+
+			//	nr = sbitmap_find_bit_in_index(map, depth, alloc_hint, round_robin);
+				nr = sbitmap_find_bit_in_index(map, __map_depth(sb, index), 0, round_robin);
+				if (nr != -1) {
+					nr += index << sb->shift;
+					break;
+				}
+
+				/* Jump to next index. */
+				alloc_hint = 0;
+				if (++index >= sb->map_nr)
+					index = 0;
+			}
+		}
 	}
 
 	return nr;
