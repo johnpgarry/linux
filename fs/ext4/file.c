@@ -184,12 +184,24 @@ static int ext4_release_file(struct inode *inode, struct file *filp)
 static bool
 ext4_unaligned_io(struct inode *inode, struct iov_iter *from, loff_t pos)
 {
+	static int count;
 	struct super_block *sb = inode->i_sb;
 	unsigned long blockmask = sb->s_blocksize - 1;
 
-	if ((pos | iov_iter_alignment(from)) & blockmask)
-		return true;
+	if (count == 0) {
+		count = 1;
+	//	pr_err("%s sb=%pS blockmask=0x%lx s_blocksize=0x%lx pos=%lld iov_iter_alignment(from)=0x%lx\n",
+	//		__func__, sb, blockmask, sb->s_blocksize, pos, iov_iter_alignment(from));
+	}
 
+	if ((pos | iov_iter_alignment(from)) & blockmask) {
+		pr_err("%s unaligned sb=%pS blockmask=0x%lx s_blocksize=0x%lx pos=%lld iov_iter_alignment(from)=0x%lx from=%pS\n",
+			__func__, sb, blockmask, sb->s_blocksize, pos, iov_iter_alignment(from), from);
+		return true;
+	}
+
+		pr_err("%s aligned sb=%pS blockmask=0x%lx s_blocksize=0x%lx pos=%lld iov_iter_alignment(from)=0x%lx from=%pS\n",
+			__func__, sb, blockmask, sb->s_blocksize, pos, iov_iter_alignment(from), from);
 	return false;
 }
 

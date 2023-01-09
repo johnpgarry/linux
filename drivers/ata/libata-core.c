@@ -4805,11 +4805,50 @@ EXPORT_SYMBOL_GPL(ata_qc_get_active);
  *	LOCKING:
  *	spin_lock_irqsave(host lock)
  */
+
+
+static inline sector_t sectors_to_logical(struct scsi_device *sdev, sector_t sector)
+{
+	return sector >> (ilog2(sdev->sector_size) - 9);
+}
 void ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	struct ata_link *link = qc->dev->link;
 	u8 prot = qc->tf.protocol;
+	struct scsi_cmnd *scsi_cmnd = qc->scsicmd;
+
+	if (scsi_cmnd) {
+		struct request *rq = scsi_cmd_to_rq(scsi_cmnd);
+
+		if (op_is_write(req_op(rq))) {
+			struct scatterlist *sg, *scatter = qc->sg;
+			struct bio *bio = rq->bio;
+			struct scsi_device *scsi_device = scsi_cmnd->device;
+			sector_t lba = sectors_to_logical(scsi_device, blk_rq_pos(rq));
+
+			pr_err("%s scsi_cmnd=%pS rq=%pS transfersize=%d op_is_write scatter=%pS n_elem=%d bio=%pS lba=0x%llx\n",
+				__func__, scsi_cmnd, rq, scsi_cmnd->transfersize, scatter, qc->n_elem, bio, lba);
+
+			if (scatter) {
+				int i, n_elem = qc->n_elem;
+
+				for_each_sg(scatter, sg, n_elem, i) {
+					pr_err("%s2 scsi_cmnd=%pS i=%d length=%d\n", __func__, scsi_cmnd, i, sg->length);
+				}
+			}
+
+			if (bio) {
+				struct req_iterator iter;
+				struct bio_vec bv;
+
+				rq_for_each_bvec(bv, rq, iter) {
+
+					pr_err("%s3 scsi_cmnd=%pS page=%pS bv_len=%d bv_offset=%d\n", __func__, scsi_cmnd, bv.bv_page, bv.bv_len, bv.bv_offset);
+				}
+			}
+		}
+	}
 
 	/* Make sure only one non-NCQ command is outstanding.  The
 	 * check is skipped for old EH because it reuses active qc to

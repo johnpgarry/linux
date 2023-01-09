@@ -1201,6 +1201,7 @@ static unsigned long iov_iter_alignment_iovec(const struct iov_iter *i)
 
 	for (k = 0; k < i->nr_segs; k++, skip = 0) {
 		size_t len = i->iov[k].iov_len - skip;
+		pr_err("%s i=%pS k=%d len=%zu iov_base=0x%lx iov_offset=0x%zu count=%ld i->nr_segs=%ld\n", __func__, i, k, len, (unsigned long)i->iov[k].iov_base, i->iov_offset, i->count, i->nr_segs);
 		if (len) {
 			res |= (unsigned long)i->iov[k].iov_base + skip;
 			if (len > size)
@@ -1211,6 +1212,7 @@ static unsigned long iov_iter_alignment_iovec(const struct iov_iter *i)
 				break;
 		}
 	}
+	pr_err("%s2 i=%pS res=0x%lx\n", __func__, i, res);
 	return res;
 }
 
@@ -1238,28 +1240,36 @@ unsigned long iov_iter_alignment(const struct iov_iter *i)
 {
 	if (likely(iter_is_ubuf(i))) {
 		size_t size = i->count;
+		pr_err("%s i=%pS ubuf\n", __func__, i);
 		if (size)
 			return ((unsigned long)i->ubuf + i->iov_offset) | size;
 		return 0;
 	}
 
 	/* iovec and kvec have identical layouts */
-	if (likely(iter_is_iovec(i) || iov_iter_is_kvec(i)))
+	if (likely(iter_is_iovec(i) || iov_iter_is_kvec(i))) {
+		pr_err("%s i=%pS iovec or kvec\n", __func__, i);
 		return iov_iter_alignment_iovec(i);
+	}
 
-	if (iov_iter_is_bvec(i))
+	if (iov_iter_is_bvec(i)) {
+		pr_err("%s i=%pS bvec\n", __func__, i);
 		return iov_iter_alignment_bvec(i);
+	}
 
 	if (iov_iter_is_pipe(i)) {
 		size_t size = i->count;
+		pr_err("%s i=%pS pipe\n", __func__, i);
 
 		if (size && i->last_offset > 0)
 			return size | i->last_offset;
 		return size;
 	}
 
-	if (iov_iter_is_xarray(i))
+	if (iov_iter_is_xarray(i)) {
+		pr_err("%s i=%pS xarray\n", __func__, i);
 		return (i->xarray_start + i->iov_offset) | i->count;
+	}
 
 	return 0;
 }

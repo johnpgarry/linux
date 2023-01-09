@@ -4944,7 +4944,7 @@ int ext4_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		u64 start, u64 len)
 {
 	int error = 0;
-
+	WARN_ON_ONCE(1);
 	if (fieinfo->fi_flags & FIEMAP_FLAG_CACHE) {
 		error = ext4_ext_precache(inode);
 		if (error)

@@ -4058,6 +4058,10 @@ int ata_scsi_queuecmd(struct Scsi_Host *shost, struct scsi_cmnd *cmd)
 	struct scsi_device *scsidev = cmd->device;
 	int rc = 0;
 	unsigned long irq_flags;
+	struct request *rq = scsi_cmd_to_rq(cmd);
+
+	if (op_is_write(req_op(rq)))
+		pr_err("%s cmd=%pS rq=%pS transfersize=%d op_is_write\n", __func__, cmd, rq, cmd->transfersize);
 
 	ap = ata_shost_to_port(shost);
 
