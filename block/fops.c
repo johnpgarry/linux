@@ -94,6 +94,11 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		bio.bi_opf |= REQ_NOWAIT;
 
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		WARN_ONCE(1, "ki_pos=0x%llx\n", iocb->ki_pos);
+		bio.bi_opf |= REQ_SNAKE;
+	}
+
 	submit_bio_wait(&bio);
 
 	bio_release_pages(&bio, should_dirty);

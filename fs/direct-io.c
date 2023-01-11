@@ -1203,6 +1203,8 @@ ssize_t __blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 		dio->opf = REQ_OP_WRITE | REQ_SYNC | REQ_IDLE;
 		if (iocb->ki_flags & IOCB_NOWAIT)
 			dio->opf |= REQ_NOWAIT;
+		if (iocb->ki_flags & IOCB_SNAKE)
+			dio->opf |= REQ_SNAKE;
 	} else {
 		dio->opf = REQ_OP_READ;
 	}

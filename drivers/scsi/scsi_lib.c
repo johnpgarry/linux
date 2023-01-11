@@ -1714,6 +1714,8 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	WARN_ON_ONCE(cmd->budget_token < 0);
 
+	WARN_ON_ONCE(req->cmd_flags & REQ_SNAKE);
+
 	/*
 	 * If the device is not in running state we will reject some or all
 	 * commands.
