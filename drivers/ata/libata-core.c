@@ -4835,6 +4835,7 @@ void ata_qc_issue(struct ata_queued_cmd *qc)
 
 				for_each_sg(scatter, sg, n_elem, i) {
 					pr_err("%s2 scsi_cmnd=%pS i=%d length=%d\n", __func__, scsi_cmnd, i, sg->length);
+					WARN_ON_ONCE(i == 1 && sg->length == 1024);
 				}
 			}
 

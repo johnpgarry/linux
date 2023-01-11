@@ -499,6 +499,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct blk_plug plug;
 	struct iomap_dio *dio;
 
+	pr_err("%s iter=%pS ops=%pS iocb=%pS\n", __func__, iter, ops, iocb);
+
 	if (!iomi.len)
 		return NULL;
 
