@@ -45,12 +45,13 @@ static blk_opf_t dio_bio_write_op(struct kiocb *iocb)
 static bool blkdev_dio_unaligned(struct block_device *bdev, loff_t pos,
 			      struct iov_iter *iter, bool print)
 {
+	// pos is in bytes from pwritev2 off arg
 	if (pos & (bdev_logical_block_size(bdev) - 1)) {
 		pr_err("%s1 unaligned pos=0x%llx bdev_logical_block_size(bdev)=0x%x\n", __func__, pos, bdev_logical_block_size(bdev));
 	}
 
 	if (!bdev_iter_is_aligned(bdev, iter, print)) {
-		pr_err("%s2 unaligned pos=0x%llx bdev_logical_block_size(bdev)=0x%x\n", __func__, pos, bdev_logical_block_size(bdev));
+		pr_err("%s2 unaligned pos=0x%llx bdev_iter_is_aligned=false\n", __func__, pos);
 	}
 
 	return pos & (bdev_logical_block_size(bdev) - 1) ||
@@ -71,7 +72,7 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bool print = false;
 
 	if (iocb->ki_flags & IOCB_SNAKE) {
-		pr_err("%s2.1 SNAKE ki_pos=0x%llx nr_pages=%d\n", __func__, iocb->ki_pos, nr_pages);
+		pr_err("%s SNAKE ki_pos=0x%llx nr_pages=%d\n", __func__, iocb->ki_pos, nr_pages);
 		print = true;
 	}
 	if (blkdev_dio_unaligned(bdev, pos, iter, print)) {

@@ -15,7 +15,7 @@ char string1[] __attribute__((aligned(4096))) = "The " ;
 char string2[] __attribute__((aligned(4096))) = "clumber\n" ;
 
 char data1[1024] __attribute__((aligned(4096))) = "The " ;  
-char data2[1024] __attribute__((aligned(4096))) = "clumber\n" ;
+char data2[1024] __attribute__((aligned(256))) = "clumber\n" ;
 
 int main (int argc, char *argv[]) {
 	int pfd;

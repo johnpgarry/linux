@@ -594,6 +594,19 @@ static inline blk_status_t blk_check_zone_append(struct request_queue *q,
 	return BLK_STS_OK;
 }
 
+static inline blk_status_t blk_validate_atomic_op(struct request_queue *q,
+						 struct bio *bio)
+{
+	pr_err("%s q=%pS bio=%pS bi_sector=0x%llx\n", __func__, q, bio, bio->bi_iter.bi_sector);
+
+	/* We must keep the atomic as-is. 
+	 Some block drivers (like NVMe) may not be able to detect if the bio satisfies
+	 alignment/granualarity requirements */
+	bio->bi_opf |= REQ_NOMERGE;
+
+	return BLK_STS_OK;
+}
+
 static void __submit_bio(struct bio *bio)
 {
 	struct gendisk *disk = bio->bi_bdev->bd_disk;
@@ -700,7 +713,7 @@ void submit_bio_noacct_nocheck(struct bio *bio)
 	else
 		__submit_bio_noacct(bio);
 }
-
+  
 /**
  * submit_bio_noacct - re-submit a bio to the block device layer for I/O
  * @bio:  The bio describing the location in memory and on the device.
@@ -757,6 +770,13 @@ void submit_bio_noacct(struct bio *bio)
 		bio_clear_polled(bio);
 
 	switch (bio_op(bio)) {
+	case REQ_OP_WRITE:
+		if (bio->bi_opf & REQ_SNAKE) {
+			status = blk_validate_atomic_op(q, bio);
+			if (status != BLK_STS_OK)
+				goto end_io;
+		}
+		break;
 	case REQ_OP_DISCARD:
 		if (!bdev_max_discard_sectors(bdev))
 			goto not_supported;

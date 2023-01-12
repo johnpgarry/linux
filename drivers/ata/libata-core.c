@@ -4817,9 +4817,15 @@ void ata_qc_issue(struct ata_queued_cmd *qc)
 	struct ata_link *link = qc->dev->link;
 	u8 prot = qc->tf.protocol;
 	struct scsi_cmnd *scsi_cmnd = qc->scsicmd;
+	struct request *rq = NULL;
+	bool snake = false; 
 
 	if (scsi_cmnd) {
-		struct request *rq = scsi_cmd_to_rq(scsi_cmnd);
+		rq = scsi_cmd_to_rq(scsi_cmnd);
+		snake = !!(rq->cmd_flags & REQ_SNAKE); 
+	}
+
+	if (snake) {
 
 		if (op_is_write(req_op(rq))) {
 			struct scatterlist *sg, *scatter = qc->sg;
@@ -4834,19 +4840,20 @@ void ata_qc_issue(struct ata_queued_cmd *qc)
 				int i, n_elem = qc->n_elem;
 
 				for_each_sg(scatter, sg, n_elem, i) {
-					pr_err("%s2 scsi_cmnd=%pS i=%d length=%d\n", __func__, scsi_cmnd, i, sg->length);
+					pr_err("%s2 scsi_cmnd=%pS i=%d length=%d sg=%pS\n", __func__, scsi_cmnd, i, sg->length, sg);
 					WARN_ON_ONCE(i == 1 && sg->length == 1024);
 				}
 			}
 
-			if (bio) {
+			if (bio && 0) {
 				struct req_iterator iter;
 				struct bio_vec bv;
-
+				pr_err("%s3.1 scsi_cmnd=%pS\n", __func__, scsi_cmnd);
 				rq_for_each_bvec(bv, rq, iter) {
 
 					pr_err("%s3 scsi_cmnd=%pS page=%pS bv_len=%d bv_offset=%d\n", __func__, scsi_cmnd, bv.bv_page, bv.bv_len, bv.bv_offset);
 				}
+				pr_err("%s3.2 scsi_cmnd=%pS\n", __func__, scsi_cmnd);
 			}
 		}
 	}

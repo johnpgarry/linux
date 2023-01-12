@@ -2563,6 +2563,10 @@ static void blk_mq_bio_to_request(struct request *rq, struct bio *bio,
 {
 	int err;
 
+	if (bio->bi_opf & REQ_SNAKE) {
+		WARN_ONCE(1, "rq=%pS bio=%pS nr_segs=%d\n", rq, bio, nr_segs);
+	}
+
 	if (bio->bi_opf & REQ_RAHEAD)
 		rq->cmd_flags |= REQ_FAILFAST_MASK;
 

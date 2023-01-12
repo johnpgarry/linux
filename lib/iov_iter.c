@@ -1101,21 +1101,23 @@ static bool iov_iter_aligned_iovec(const struct iov_iter *i, unsigned addr_mask,
 	unsigned k;
 
 	if (print)
-		pr_err("%s i=%pS addr_mask=0x%x len_mask=0x%x size=%zd skip=%zd\n", __func__, i, addr_mask, len_mask, size, skip);
+		pr_err("%s i=%pS addr_mask=0x%x len_mask=0x%x size=i->count=%zd skip=i->iov_offset=%zd \n", __func__, i, addr_mask, len_mask, size, skip);
 
 	for (k = 0; k < i->nr_segs; k++, skip = 0) {
 		size_t len = i->iov[k].iov_len - skip;
 
+		if (print)
+			pr_err("%s1 k=%d i=%pS iov_base=%pS iov_len=0x%lx len=%zd skip=%zd\n", __func__, k, i, i->iov[k].iov_base, i->iov[k].iov_len, len, skip);
 		if (len > size)
 			len = size;
 		if (len & len_mask) {
 			if (print)
-				pr_err("%s1 fail k=%d i=%pS addr_mask=0x%x len_mask=0x%x\n", __func__, k, i, addr_mask, len_mask);
+				pr_err("%s2 fail k=%d i=%pS len=%zd len_mask=0x%x\n", __func__, k, i, len, len_mask);
 			return false;
 		}
 		if ((unsigned long)(i->iov[k].iov_base + skip) & addr_mask) {
 			if (print)
-				pr_err("%s2 fail k=%d iov_base=%pS skip=%zd i=%pS addr_mask=0x%x len_mask=0x%x\n", __func__, k, i->iov[k].iov_base, skip, i, addr_mask, len_mask);
+				pr_err("%s3 fail k=%d iov_base=%pS skip=%zd i=%pS addr_mask=0x%x\n", __func__, k, i->iov[k].iov_base, skip, i, addr_mask);
 			return false;
 		}
 
@@ -1164,7 +1166,8 @@ bool iov_iter_is_aligned(const struct iov_iter *i, unsigned addr_mask,
 			 unsigned len_mask, bool print)
 {
 	if (print)
-		pr_err("%s i=%pS addr_mask=0x%x len_mask=%d\n", __func__, i, addr_mask, len_mask);
+		pr_err("%s i=%pS addr_mask=0x%x (dma alignment arg from iov_iter_is_aligned()) len_mask=%d iter_is_ubuf=%d i->count=%zd\n", 
+			__func__, i, addr_mask, len_mask, iter_is_ubuf(i), i->count);
 
 	if (likely(iter_is_ubuf(i))) {
 		if (i->count & len_mask) {
