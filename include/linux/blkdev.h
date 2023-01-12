@@ -1320,10 +1320,12 @@ static inline unsigned int bdev_dma_alignment(struct block_device *bdev)
 }
 
 static inline bool bdev_iter_is_aligned(struct block_device *bdev,
-					struct iov_iter *iter)
+					struct iov_iter *iter, bool print)
 {
+	if (print)
+		pr_err("%s bdev=%pS iter=%pS bdev_dma_alignment=%d\n", __func__, bdev, iter, bdev_dma_alignment(bdev));
 	return iov_iter_is_aligned(iter, bdev_dma_alignment(bdev),
-				   bdev_logical_block_size(bdev) - 1);
+				   bdev_logical_block_size(bdev) - 1, print);
 }
 
 static inline int blk_rq_aligned(struct request_queue *q, unsigned long addr,

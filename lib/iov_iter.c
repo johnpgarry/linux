@@ -1094,21 +1094,30 @@ void iov_iter_discard(struct iov_iter *i, unsigned int direction, size_t count)
 EXPORT_SYMBOL(iov_iter_discard);
 
 static bool iov_iter_aligned_iovec(const struct iov_iter *i, unsigned addr_mask,
-				   unsigned len_mask)
+				   unsigned len_mask, bool print)
 {
 	size_t size = i->count;
 	size_t skip = i->iov_offset;
 	unsigned k;
+
+	if (print)
+		pr_err("%s i=%pS addr_mask=0x%x len_mask=0x%x size=%zd skip=%zd\n", __func__, i, addr_mask, len_mask, size, skip);
 
 	for (k = 0; k < i->nr_segs; k++, skip = 0) {
 		size_t len = i->iov[k].iov_len - skip;
 
 		if (len > size)
 			len = size;
-		if (len & len_mask)
+		if (len & len_mask) {
+			if (print)
+				pr_err("%s1 fail k=%d i=%pS addr_mask=0x%x len_mask=0x%x\n", __func__, k, i, addr_mask, len_mask);
 			return false;
-		if ((unsigned long)(i->iov[k].iov_base + skip) & addr_mask)
+		}
+		if ((unsigned long)(i->iov[k].iov_base + skip) & addr_mask) {
+			if (print)
+				pr_err("%s2 fail k=%d iov_base=%pS skip=%zd i=%pS addr_mask=0x%x len_mask=0x%x\n", __func__, k, i->iov[k].iov_base, skip, i, addr_mask, len_mask);
 			return false;
+		}
 
 		size -= len;
 		if (!size)
@@ -1152,18 +1161,27 @@ static bool iov_iter_aligned_bvec(const struct iov_iter *i, unsigned addr_mask,
  * Return: false if any addresses or lengths intersect with the provided masks
  */
 bool iov_iter_is_aligned(const struct iov_iter *i, unsigned addr_mask,
-			 unsigned len_mask)
+			 unsigned len_mask, bool print)
 {
+	if (print)
+		pr_err("%s i=%pS addr_mask=0x%x len_mask=%d\n", __func__, i, addr_mask, len_mask);
+
 	if (likely(iter_is_ubuf(i))) {
-		if (i->count & len_mask)
+		if (i->count & len_mask) {
+			if (print)
+				pr_err("%s1 fail i=%pS addr_mask=0x%x len_mask=0x%x i->count=%zd\n", __func__, i, addr_mask, len_mask, i->count);
 			return false;
-		if ((unsigned long)(i->ubuf + i->iov_offset) & addr_mask)
+		}
+		if ((unsigned long)(i->ubuf + i->iov_offset) & addr_mask) {
+			if (print)
+				pr_err("%s2 fail i=%pS addr_mask=0x%x len_mask=0x%x i->ubuf=%pS iov_offset=%zd\n", __func__, i, addr_mask, len_mask, i->ubuf, i->iov_offset);
 			return false;
+		}
 		return true;
 	}
 
 	if (likely(iter_is_iovec(i) || iov_iter_is_kvec(i)))
-		return iov_iter_aligned_iovec(i, addr_mask, len_mask);
+		return iov_iter_aligned_iovec(i, addr_mask, len_mask, print);
 
 	if (iov_iter_is_bvec(i))
 		return iov_iter_aligned_bvec(i, addr_mask, len_mask);
@@ -1201,7 +1219,7 @@ static unsigned long iov_iter_alignment_iovec(const struct iov_iter *i)
 
 	for (k = 0; k < i->nr_segs; k++, skip = 0) {
 		size_t len = i->iov[k].iov_len - skip;
-		pr_err("%s i=%pS k=%d len=%zu iov_base=0x%lx iov_offset=0x%zu count=%ld i->nr_segs=%ld\n", __func__, i, k, len, (unsigned long)i->iov[k].iov_base, i->iov_offset, i->count, i->nr_segs);
+		pr_err("%s i=%pS k=%d len=%zu iov_base=0x%lx iov_offset=%zu count=%ld i->nr_segs=%ld\n", __func__, i, k, len, (unsigned long)i->iov[k].iov_base, i->iov_offset, i->count, i->nr_segs);
 		if (len) {
 			res |= (unsigned long)i->iov[k].iov_base + skip;
 			if (len > size)

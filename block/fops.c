@@ -43,10 +43,18 @@ static blk_opf_t dio_bio_write_op(struct kiocb *iocb)
 }
 
 static bool blkdev_dio_unaligned(struct block_device *bdev, loff_t pos,
-			      struct iov_iter *iter)
+			      struct iov_iter *iter, bool print)
 {
+	if (pos & (bdev_logical_block_size(bdev) - 1)) {
+		pr_err("%s1 unaligned pos=0x%llx bdev_logical_block_size(bdev)=0x%x\n", __func__, pos, bdev_logical_block_size(bdev));
+	}
+
+	if (!bdev_iter_is_aligned(bdev, iter, print)) {
+		pr_err("%s2 unaligned pos=0x%llx bdev_logical_block_size(bdev)=0x%x\n", __func__, pos, bdev_logical_block_size(bdev));
+	}
+
 	return pos & (bdev_logical_block_size(bdev) - 1) ||
-		!bdev_iter_is_aligned(bdev, iter);
+		!bdev_iter_is_aligned(bdev, iter, false);
 }
 
 #define DIO_INLINE_BIO_VECS 4
@@ -60,9 +68,18 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bool should_dirty = false;
 	struct bio bio;
 	ssize_t ret;
+	bool print = false;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s2.1 SNAKE ki_pos=0x%llx nr_pages=%d\n", __func__, iocb->ki_pos, nr_pages);
+		print = true;
+	}
+	if (blkdev_dio_unaligned(bdev, pos, iter, print)) {
+		if (iocb->ki_flags & IOCB_SNAKE) {
+			pr_err("%s2.1 SNAKE ki_pos=0x%llx nr_pages=%d unaligned\n", __func__, iocb->ki_pos, nr_pages);
+		}
 		return -EINVAL;
+	}
 
 	if (nr_pages <= DIO_INLINE_BIO_VECS)
 		vecs = inline_vecs;
@@ -111,6 +128,9 @@ out:
 
 	bio_uninit(&bio);
 
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s10 out SNAKE ki_pos=0x%llx ret=%zdn", __func__, iocb->ki_pos, ret);
+	}
 	return ret;
 }
 
@@ -183,9 +203,19 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	blk_opf_t opf = is_read ? REQ_OP_READ : dio_bio_write_op(iocb);
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
+	bool print = false;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s SNAKE ki_pos=0x%llx nr_pages=%x\n", __func__, iocb->ki_pos, nr_pages);
+		print = true;
+	}
+
+	if (blkdev_dio_unaligned(bdev, pos, iter, print)) {
+		if (iocb->ki_flags & IOCB_SNAKE) {
+			pr_err("%s1 unaligned SNAKE ki_pos=0x%llx nr_pages=%x\n", __func__, iocb->ki_pos, nr_pages);
+		}
 		return -EINVAL;
+	}
 
 	if (iocb->ki_flags & IOCB_ALLOC_CACHE)
 		opf |= REQ_ALLOC_CACHE;
@@ -308,7 +338,7 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	if (blkdev_dio_unaligned(bdev, pos, iter, false))
 		return -EINVAL;
 
 	if (iocb->ki_flags & IOCB_ALLOC_CACHE)
@@ -364,14 +394,38 @@ static ssize_t blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 {
 	unsigned int nr_pages;
 
-	if (!iov_iter_count(iter))
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s SNAKE ki_pos=0x%llx\n", __func__, iocb->ki_pos);
+	}
+
+	if (!iov_iter_count(iter)) {
+		if (iocb->ki_flags & IOCB_SNAKE) {
+			pr_err("%s2 SNAKE ki_pos=0x%llx !iov_iter_count\n", __func__, iocb->ki_pos);
+		}
+
 		return 0;
+	}
 
 	nr_pages = bio_iov_vecs_to_alloc(iter, BIO_MAX_VECS + 1);
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s2.1 SNAKE ki_pos=0x%llx nr_pages=%d BIO MAX VECS=%d\n", __func__, iocb->ki_pos, nr_pages, BIO_MAX_VECS);
+	}
 	if (likely(nr_pages <= BIO_MAX_VECS)) {
-		if (is_sync_kiocb(iocb))
+		if (is_sync_kiocb(iocb)) {
+
+			if (iocb->ki_flags & IOCB_SNAKE) {
+				pr_err("%s3 SNAKE ki_pos=0x%llx is_sync_kiocb\n", __func__, iocb->ki_pos);
+			}
+
 			return __blkdev_direct_IO_simple(iocb, iter, nr_pages);
+		}
+		if (iocb->ki_flags & IOCB_SNAKE) {
+				pr_err("%s4 SNAKE ki_pos=0x%llx !is_sync_kiocb\n", __func__, iocb->ki_pos);
+		}
 		return __blkdev_direct_IO_async(iocb, iter, nr_pages);
+	}
+	if (iocb->ki_flags & IOCB_SNAKE) {
+			pr_err("%s5 SNAKE ki_pos=0x%llx is_sync_kiocb\n", __func__, iocb->ki_pos);
 	}
 	return __blkdev_direct_IO(iocb, iter, bio_max_segs(nr_pages));
 }

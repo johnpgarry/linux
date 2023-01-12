@@ -3660,8 +3660,13 @@ generic_file_direct_write(struct kiocb *iocb, struct iov_iter *from)
 	size_t		write_len;
 	pgoff_t		end;
 
+
 	write_len = iov_iter_count(from);
 	end = (pos + write_len - 1) >> PAGE_SHIFT;
+
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s SNAKE pos=0x%llx write_len=%zu end=%zu\n", __func__, pos, write_len, end);
+	}
 
 	if (iocb->ki_flags & IOCB_NOWAIT) {
 		/* If there are pages to writeback, return */
@@ -3695,6 +3700,10 @@ generic_file_direct_write(struct kiocb *iocb, struct iov_iter *from)
 
 	written = mapping->a_ops->direct_IO(iocb, from);
 
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s2 SNAKE pos=0x%llx write_len=%zu end=0x%lx written=%zd direct_IO=%pS\n", 
+			__func__, pos, write_len, end, written, mapping->a_ops->direct_IO);
+	}
 	/*
 	 * Finally, try again to invalidate clean pages which might have been
 	 * cached by non-direct readahead, or faulted in by get_user_pages()
@@ -3728,6 +3737,10 @@ generic_file_direct_write(struct kiocb *iocb, struct iov_iter *from)
 	if (written != -EIOCBQUEUED)
 		iov_iter_revert(from, write_len - iov_iter_count(from));
 out:
+
+	if (iocb->ki_flags & IOCB_SNAKE) {
+		pr_err("%s10 out SNAKE pos=0x%llx write_len=%zu end=%zu written=%zu\n", __func__, pos, write_len, end, written);
+	}
 	return written;
 }
 EXPORT_SYMBOL(generic_file_direct_write);

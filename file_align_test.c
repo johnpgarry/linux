@@ -59,8 +59,8 @@ int main (int argc, char *argv[]) {
 		exit(1);
 	}
 	offset = atoi(argv[2]);
-	printf("pfd=%d offset=%d argv[2]=%s iov2[]={{%p %zu}, {%p %zu}}\n", pfd, offset, argv[2], iov2[0].iov_base, iov2[0].iov_len, iov2[1].iov_base, iov2[1].iov_len);
-	nwritten = pwritev2(pfd, &iov2[0], 2, offset, flags);
+	printf("pfd=%d offset=0x%x argv[2]=%s iov2[]={{%p %zu}, {%p %zu}}\n", pfd, offset, argv[2], iov2[0].iov_base, iov2[0].iov_len, iov2[1].iov_base, iov2[1].iov_len);
+	nwritten = pwritev2(pfd, &iov2[0], 2, offset, flags); //offset in bytes
 	printf("nwritten=%d\n", nwritten);
 
 
