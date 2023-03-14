@@ -881,7 +881,8 @@ static inline bool xfs_file_sync_writes(struct file *filp)
 #define	XFS_FALLOC_FL_SUPPORTED						\
 		(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE |		\
 		 FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_ZERO_RANGE |	\
-		 FALLOC_FL_INSERT_RANGE | FALLOC_FL_UNSHARE_RANGE)
+		 FALLOC_FL_INSERT_RANGE | FALLOC_FL_UNSHARE_RANGE | \
+		 FALLOC_FL_ATOMIC_ALIGN)
 
 STATIC long
 xfs_file_fallocate(
@@ -896,6 +897,9 @@ xfs_file_fallocate(
 	uint			iolock = XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL;
 	loff_t			new_size = 0;
 	bool			do_file_insert = false;
+
+	/* Hack userspace should set this */
+	mode |= FALLOC_FL_ATOMIC_ALIGN;
 
 	if (!S_ISREG(inode->i_mode))
 		return -EINVAL;
@@ -1033,6 +1037,9 @@ xfs_file_fallocate(
 				goto out_unlock;
 			}
 		}
+
+		if (mode & FALLOC_FL_ATOMIC_ALIGN)
+			xfs_iflags_set(ip, XFS_ATOMIC_EXTENT_ALIGN);
 
 		if (!xfs_is_always_cow_inode(ip)) {
 			error = xfs_alloc_file_space(ip, offset, len);

@@ -3286,8 +3286,17 @@ xfs_bmap_compute_alignments(
 
 	if (ap->flags & XFS_BMAPI_COWFORK)
 		align = xfs_get_cowextsz_hint(ap->ip);
-	else if (ap->datatype & XFS_ALLOC_USERDATA)
-		align = xfs_get_extsz_hint(ap->ip);
+	else if (ap->datatype & XFS_ALLOC_USERDATA) {
+		//struct block_device *bdev = mp->m_ddev_targp->bt_bdev;
+		//struct request_queue *bd_queue = bdev->bd_queue;
+		int queue_write_atomic_alignment = 256;
+
+		if (xfs_iflags_test(ap->ip, XFS_ATOMIC_EXTENT_ALIGN))
+			args->alignment = align = queue_write_atomic_alignment;
+		else
+			align = xfs_get_extsz_hint(ap->ip);
+	}
+
 	if (align) {
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
@@ -3666,6 +3675,10 @@ xfs_bmap_btalloc(
 
 	/* Trim the allocation back to the maximum an AG can fit. */
 	args.maxlen = min(ap->length, mp->m_ag_max_usable);
+
+	if (xfs_iflags_test(ap->ip, XFS_ATOMIC_EXTENT_ALIGN)) {
+		args.maxlen = rounddown(args.maxlen, args.prod);
+	}
 
 	if ((ap->datatype & XFS_ALLOC_USERDATA) &&
 	    xfs_inode_is_filestream(ap->ip))
