@@ -115,7 +115,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_CDB_LEN 10
 #define DEF_JDELAY   1		/* if > 0 unit is a jiffy */
 #define DEF_DEV_SIZE_PRE_INIT   0
-#define DEF_DEV_SIZE_MB   8
+#define DEF_DEV_SIZE_MB   200
 #define DEF_ZBC_DEV_SIZE_MB   128
 #define DEF_DIF 0
 #define DEF_DIX 0
