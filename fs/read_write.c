@@ -1083,6 +1083,7 @@ SYSCALL_DEFINE6(pwritev2, unsigned long, fd, const struct iovec __user *, vec,
 		rwf_t, flags)
 {
 	loff_t pos = pos_from_hilo(pos_h, pos_l);
+	pr_err("%s fd=%ld pos_l=%ld flags=0x%x\n", __func__, fd, pos_l, flags);
 
 	if (pos == -1)
 		return do_writev(fd, vec, vlen, flags);
@@ -1171,6 +1172,7 @@ COMPAT_SYSCALL_DEFINE6(pwritev2, compat_ulong_t, fd,
 		compat_ulong_t, vlen, u32, pos_low, u32, pos_high, rwf_t, flags)
 {
 	loff_t pos = ((loff_t)pos_high << 32) | pos_low;
+	pr_err("%s fd=%d\n", __func__, fd);
 
 	if (pos == -1)
 		return do_writev(fd, vec, vlen, flags);

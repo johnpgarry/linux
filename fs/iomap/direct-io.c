@@ -245,6 +245,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
+	pr_err("%s iter=%pS dio=%pS iomap len=%lld (%lld blocks)\n", __func__, iter, dio, iomap->length, iomap->length / fs_block_size);
+
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
@@ -453,6 +455,28 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 	}
 }
 
+unsigned int find_max_alignment(const unsigned int blocks, const unsigned int pos)
+{
+	unsigned int max_alignment = pos;
+
+	while (1) {
+		unsigned int mod1 = pos % max_alignment;
+		unsigned int mod2 = blocks % max_alignment;
+
+	//	pr_err("%s blocks=%d pos=%d max_alignment=%d mod1=%d mod2=%d\n", __func__, blocks, pos, max_alignment, mod1, mod2);
+		if (!mod1 && !mod2)
+			break;
+		max_alignment--;
+		if (max_alignment == 0) {
+			pr_err("%s2 blocks=%d pos=%d max_alignment=%d mod=1\n", __func__, blocks, pos, max_alignment);
+			return 1;
+		}
+	}
+
+	pr_err("%s10 blocks=%d pos=%d max_alignment=%d\n", __func__, blocks, pos, max_alignment);
+	return max_alignment;
+}
+
 /*
  * iomap_dio_rw() always completes O_[D]SYNC writes regardless of whether the IO
  * is being issued as AIO or not.  This allows us to optimise pure data writes
@@ -492,6 +516,11 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		is_sync_kiocb(iocb) || (dio_flags & IOMAP_DIO_FORCE_WAIT);
 	struct blk_plug plug;
 	struct iomap_dio *dio;
+	unsigned int fs_block_size = i_blocksize(inode);
+	unsigned int blocks = iomi.len / fs_block_size;
+	unsigned long long max_alignment = find_max_alignment(blocks, iocb->ki_pos / fs_block_size);
+
+	pr_err("%s iomi.len=%lld (%d blocks, max_alignment=%lld) ops=%pS dops=%pS type=%d pos=%lld\n", __func__, iomi.len, blocks, max_alignment, ops, dops, iov_iter_type(iter), iocb->ki_pos);
 
 	if (!iomi.len)
 		return NULL;
@@ -592,7 +621,15 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+		unsigned long long iomi_processed_blocks;
 		iomi.processed = iomap_dio_iter(&iomi, dio);
+		pr_err("%s2 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
+			__func__, iomi.len, iomi.len / fs_block_size,
+			iomi.processed, iomi.processed / fs_block_size);
+
+		iomi_processed_blocks = iomi.processed / fs_block_size;
+		BUG_ON(iomi_processed_blocks % max_alignment != 0);
+
 
 		/*
 		 * We can only poll for single bio I/Os.
@@ -679,11 +716,16 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		unsigned int dio_flags, void *private, size_t done_before)
 {
 	struct iomap_dio *dio;
+	ssize_t res;
+	pr_err("%s iocb=%pS\n", __func__, iocb);
 
 	dio = __iomap_dio_rw(iocb, iter, ops, dops, dio_flags, private,
 			     done_before);
+	pr_err("%s1 iocb=%pS dio=%pS\n", __func__, iocb, dio);
 	if (IS_ERR_OR_NULL(dio))
 		return PTR_ERR_OR_ZERO(dio);
-	return iomap_dio_complete(dio);
+	res = iomap_dio_complete(dio);
+	pr_err("%s10 iocb=%pS res=%zd\n", __func__, iocb, res);
+	return res;
 }
 EXPORT_SYMBOL_GPL(iomap_dio_rw);
