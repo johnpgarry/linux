@@ -280,7 +280,11 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 * we are done.
 	 */
 	orig_count = iov_iter_count(dio->submit.iter);
+	pr_err("%s2 calling iov_iter_truncate iter=%pS dio=%pS iomap len=%lld (%lld blocks) orig_count=%zd\n",
+		__func__, iter, dio, iomap->length, iomap->length / fs_block_size, orig_count);
 	iov_iter_truncate(dio->submit.iter, length);
+	pr_err("%s3 after iov_iter_truncate iter=%pS dio=%pS iomap len=%lld (%lld blocks) iov_iter_count=%zd\n",
+		__func__, iter, dio, iomap->length, iomap->length / fs_block_size, iov_iter_count(dio->submit.iter));
 
 	if (!iov_iter_count(dio->submit.iter))
 		goto out;
@@ -289,12 +293,19 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 * We can only poll for single bio I/Os.
 	 */
 	if (need_zeroout ||
-	    ((dio->flags & IOMAP_DIO_WRITE) && pos >= i_size_read(inode)))
+	    ((dio->flags & IOMAP_DIO_WRITE) && pos >= i_size_read(inode))) {
+		bool second = ((dio->flags & IOMAP_DIO_WRITE) && pos >= i_size_read(inode));
+		pr_err("%s4 clearing IOCB_HIPRI (was %d) iter=%pS dio=%pS iomap len=%lld (%lld blocks) need_zeroout=%d || %d\n",
+		__func__, !!(dio->iocb->ki_flags & IOCB_HIPRI),
+		iter, dio, iomap->length, iomap->length / fs_block_size, need_zeroout, second);
 		dio->iocb->ki_flags &= ~IOCB_HIPRI;
+	}
 
 	if (need_zeroout) {
 		/* zero out from the start of the block to the write offset */
 		pad = pos & (fs_block_size - 1);
+		pr_err("%s5 need_zeroout set iter=%pS dio=%pS iomap len=%lld (%lld blocks) pad=%d\n",
+		__func__, iter, dio, iomap->length, iomap->length / fs_block_size, pad);
 		if (pad)
 			iomap_dio_zero(iter, dio, pos - pad, pad);
 	}
@@ -322,6 +333,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		bio->bi_ioprio = dio->iocb->ki_ioprio;
 		bio->bi_private = dio;
 		bio->bi_end_io = iomap_dio_bio_end_io;
+		pr_err("%s7 calling bio_iov_iter_get_pages nr_pages=%d bi_sector=%lld\n",
+		__func__, nr_pages, bio->bi_iter.bi_sector);
 
 		ret = bio_iov_iter_get_pages(bio, dio->submit.iter);
 		if (unlikely(ret)) {
@@ -336,6 +349,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		n = bio->bi_iter.bi_size;
+		pr_err("%s8 checking dirty nr_pages=%d bi_sector=%lld bi_size=%d\n",
+		__func__, nr_pages, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);
 		} else {
@@ -348,6 +363,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 		nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter,
 						 BIO_MAX_VECS);
+		pr_err("%s9 after bio_iov_vecs_to_alloc nr_pages=%d bi_sector=%lld bi_size=%d calling iomap_dio_submit_bio\n",
+		__func__, nr_pages, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 		/*
 		 * We can only poll for single bio I/Os.
 		 */
@@ -364,6 +381,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 * reads of the EOF block.
 	 */
 zero_tail:
+	pr_err("%s9.1 zero_tail nr_pages=%d bi_sector=%lld bi_size=%d\n",
+		__func__, nr_pages, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	if (need_zeroout ||
 	    ((dio->flags & IOMAP_DIO_WRITE) && pos >= i_size_read(inode))) {
 		/* zero out from the end of the write to the end of the block */
@@ -374,6 +393,8 @@ zero_tail:
 out:
 	/* Undo iter limitation to current extent */
 	iov_iter_reexpand(dio->submit.iter, orig_count - copied);
+	pr_err("%s10 out copied=%zd ret=%d\n",
+		__func__, copied, ret);
 	if (copied)
 		return copied;
 	return ret;
@@ -385,6 +406,8 @@ static loff_t iomap_dio_hole_iter(const struct iomap_iter *iter,
 	loff_t length = iov_iter_zero(iomap_length(iter), dio->submit.iter);
 
 	dio->size += length;
+	pr_err("%s iter=%pS dio=%pS length=%lld dio->size=%lld\n",
+		__func__, iter, dio, length, dio->size);
 	if (!length)
 		return -EFAULT;
 	return length;
@@ -400,6 +423,7 @@ static loff_t iomap_dio_inline_iter(const struct iomap_iter *iomi,
 	loff_t pos = iomi->pos;
 	size_t copied;
 
+	pr_err("%s iter=%pS dio=%pS iomap len=%lld\n", __func__, iter, dio, iomap->length);
 	if (WARN_ON_ONCE(!iomap_inline_data_valid(iomap)))
 		return -EIO;
 
@@ -520,7 +544,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	unsigned int blocks = iomi.len / fs_block_size;
 	unsigned long long max_alignment = find_max_alignment(blocks, iocb->ki_pos / fs_block_size);
 
-	pr_err("%s iomi.len=%lld (%d blocks, max_alignment=%lld) ops=%pS dops=%pS type=%d pos=%lld\n", __func__, iomi.len, blocks, max_alignment, ops, dops, iov_iter_type(iter), iocb->ki_pos);
+	pr_err("%s len=%lld (%d blocks, max_align=%lld blocks) ops=%pS dops=%pS type=%d pos=%lld (%lld blocks)\n",
+		__func__, iomi.len, blocks, max_alignment, ops, dops, iov_iter_type(iter), iocb->ki_pos, iocb->ki_pos / fs_block_size);
 
 	if (!iomi.len)
 		return NULL;
@@ -622,13 +647,25 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
 		unsigned long long iomi_processed_blocks;
+		pr_err("%s2.0 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks) type=%d %s\n",
+			__func__, iomi.len, iomi.len / fs_block_size,
+			iomi.processed, iomi.processed / fs_block_size,
+			iomi.iomap.type,
+			iomap_type_to_str(iomi.iomap.type));
 		iomi.processed = iomap_dio_iter(&iomi, dio);
-		pr_err("%s2 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
+		pr_err("%s2.1 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
 			__func__, iomi.len, iomi.len / fs_block_size,
 			iomi.processed, iomi.processed / fs_block_size);
 
 		iomi_processed_blocks = iomi.processed / fs_block_size;
-		BUG_ON(iomi_processed_blocks % max_alignment != 0);
+		if(iomi_processed_blocks % max_alignment != 0) {
+			ret = -EFAULT;
+			pr_err("%s3 error iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
+			__func__, iomi.len, iomi.len / fs_block_size,
+			iomi.processed, iomi.processed / fs_block_size);
+
+			break;
+		}
 
 
 		/*

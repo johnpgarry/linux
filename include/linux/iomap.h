@@ -31,6 +31,22 @@ struct vm_fault;
 #define IOMAP_UNWRITTEN	3	/* blocks allocated at @addr in unwritten state */
 #define IOMAP_INLINE	4	/* data inline in the inode */
 
+static inline char *iomap_type_to_str(unsigned int val)
+{
+	if (val == IOMAP_HOLE)
+		return "HOLE";
+	if (val == IOMAP_DELALLOC)
+		return "DELALLOC";
+	if (val == IOMAP_MAPPED)
+		return "MAPPED";
+	if (val == IOMAP_UNWRITTEN)
+		return "UNWRITTEN";
+	if (val == IOMAP_INLINE)
+		return "INLINE";
+
+	return "unknown";
+}
+
 /*
  * Flags reported by the file system from iomap_begin:
  *
