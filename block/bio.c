@@ -1246,10 +1246,11 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	unsigned len, i = 0;
 	size_t offset, trim, trim2, size2;
 	int ret = 0;
-	unsigned int write_atomic_max_bytes = 256 * 4 * 1024;
-	pr_err("%s bi_size=%d nr_pages=%d entries_left=%d bi_max_vecs=%d bi_vcnt=%d atomic max=%d\n",
+	unsigned int write_atomic_max_bytes = 131072;
+	unsigned int write_atomic_gran = 4096;
+	pr_err("%s bi_size=%d nr_pages=%d entries_left=%d bi_max_vecs=%d bi_vcnt=%d atomic max=%d gran=%d\n",
 		__func__, bio->bi_iter.bi_size, nr_pages, entries_left, bio->bi_max_vecs, bio->bi_vcnt,
-		write_atomic_max_bytes);
+		write_atomic_max_bytes, write_atomic_gran);
 
 	/*
 	 * Move page array up in the allocated memory for the bio vecs as far as

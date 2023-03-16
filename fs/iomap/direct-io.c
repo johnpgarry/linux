@@ -35,6 +35,7 @@ struct iomap_dio {
 	int			error;
 	size_t			done_before;
 	bool			wait_for_completion;
+	unsigned int max_alignment_fs_blocks;
 
 	union {
 		/* used during submission and for synchronous completion: */
@@ -321,6 +322,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	pr_err("%s7 nr_pages=%d from bio_iov_vecs_to_alloc\n", __func__, nr_pages);
 	do {
 		size_t n;
+		unsigned int bi_size_fs_blocks, bi_addr_fs_blocks;
 		if (dio->error) {
 			iov_iter_revert(dio->submit.iter, copied);
 			copied = ret = 0;
@@ -366,6 +368,21 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 						 BIO_MAX_VECS);
 		pr_err("%s9 after bio_iov_vecs_to_alloc nr_pages=%d bi_sector=%lld bi_size=%d calling iomap_dio_submit_bio\n",
 		__func__, nr_pages, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
+
+		bi_size_fs_blocks = bio->bi_iter.bi_size / fs_block_size;
+		bi_addr_fs_blocks = bio->bi_iter.bi_sector / fs_block_size;
+
+		if (bi_size_fs_blocks % dio->max_alignment_fs_blocks) {
+			pr_err("%s9XXX size bi_size_fs_blocks=%d max_alignment_fs_blocks=%d\n", __func__,
+			bi_size_fs_blocks, dio->max_alignment_fs_blocks);
+			return -1;
+		}
+		if (bi_addr_fs_blocks % dio->max_alignment_fs_blocks) {
+			pr_err("%s9XXX address bi_addr_fs_blocks=%d max_alignment_fs_blocks=%d\n", __func__,
+			bi_addr_fs_blocks, dio->max_alignment_fs_blocks);
+			return -1;
+		}
+
 		/*
 		 * We can only poll for single bio I/Os.
 		 */
@@ -480,26 +497,33 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 	}
 }
 
-unsigned int find_max_alignment(const unsigned int blocks, const unsigned int pos)
+unsigned int find_max_alignment(const unsigned int fs_blocks, const unsigned int pos_fs_blocks)
 {
-	unsigned int max_alignment = pos;
+	unsigned int max_fs_blocks_alignment = pos_fs_blocks;
 
 	while (1) {
-		unsigned int mod1 = pos % max_alignment;
-		unsigned int mod2 = blocks % max_alignment;
+		unsigned int mod1;
+		unsigned int mod2;
 
-	//	pr_err("%s blocks=%d pos=%d max_alignment=%d mod1=%d mod2=%d\n", __func__, blocks, pos, max_alignment, mod1, mod2);
-		if (!mod1 && !mod2)
-			break;
-		max_alignment--;
-		if (max_alignment == 0) {
-			pr_err("%s2 blocks=%d pos=%d max_alignment=%d mod=1\n", __func__, blocks, pos, max_alignment);
+		if (!is_power_of_2(max_fs_blocks_alignment))
+			goto end;
+		
+		if (max_fs_blocks_alignment == 0) {
+			pr_err("%s2 fs_blocks=%d pos_fs_blocks=%d max_fs_blocks_alignment=%d mod=1\n", 
+				__func__, fs_blocks, pos_fs_blocks, max_fs_blocks_alignment);
 			return 1;
 		}
+	//	pr_err("%s blocks=%d pos=%d max_alignment=%d mod1=%d mod2=%d\n", __func__, blocks, pos, max_alignment, mod1, mod2);
+		mod1 = pos_fs_blocks % max_fs_blocks_alignment;
+		mod2 = fs_blocks % max_fs_blocks_alignment;
+		if (!mod1 && !mod2)
+			break;
+end:
+		max_fs_blocks_alignment--;
 	}
 
-	pr_err("%s10 blocks=%d pos=%d max_alignment=%d\n", __func__, blocks, pos, max_alignment);
-	return max_alignment;
+	pr_err("%s10 blocks=%d pos_blocks=%d max_alignment=%d FS blocks\n", __func__, fs_blocks, pos_fs_blocks, max_fs_blocks_alignment);
+	return max_fs_blocks_alignment;
 }
 
 /*
@@ -543,10 +567,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct iomap_dio *dio;
 	unsigned int fs_block_size = i_blocksize(inode);
 	unsigned int blocks = iomi.len / fs_block_size;
-	unsigned long long max_alignment = find_max_alignment(blocks, iocb->ki_pos / fs_block_size);
+	unsigned long long max_alignment_fs_blocks = find_max_alignment(blocks, iocb->ki_pos / fs_block_size);
 
-	pr_err("%s len=%lld (%d blocks, max_align=%lld blocks) ops=%pS dops=%pS type=%d pos=%lld (%lld blocks)\n",
-		__func__, iomi.len, blocks, max_alignment, ops, dops, iov_iter_type(iter), iocb->ki_pos, iocb->ki_pos / fs_block_size);
+	pr_err("%s len=%lld (%d blocks, max_align=%lld FS blocks) ops=%pS dops=%pS type=%d pos=%lld (%lld blocks)\n",
+		__func__, iomi.len, blocks, max_alignment_fs_blocks, ops, dops, iov_iter_type(iter), iocb->ki_pos, iocb->ki_pos / fs_block_size);
 
 	if (!iomi.len)
 		return NULL;
@@ -563,6 +587,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	dio->error = 0;
 	dio->flags = 0;
 	dio->done_before = done_before;
+
+	dio->max_alignment_fs_blocks = max_alignment_fs_blocks;
 
 	dio->submit.iter = iter;
 	dio->submit.waiter = current;
@@ -659,7 +685,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 			iomi.processed, iomi.processed / fs_block_size);
 
 		iomi_processed_blocks = iomi.processed / fs_block_size;
-		if(iomi_processed_blocks % max_alignment != 0) {
+		if(iomi_processed_blocks % max_alignment_fs_blocks != 0) {
 		//	ret = -EFAULT;
 			pr_err("%s3 error iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
 			__func__, iomi.len, iomi.len / fs_block_size,
