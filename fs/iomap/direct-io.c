@@ -318,6 +318,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua);
 
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
+	pr_err("%s7 nr_pages=%d from bio_iov_vecs_to_alloc\n", __func__, nr_pages);
 	do {
 		size_t n;
 		if (dio->error) {
@@ -333,8 +334,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		bio->bi_ioprio = dio->iocb->ki_ioprio;
 		bio->bi_private = dio;
 		bio->bi_end_io = iomap_dio_bio_end_io;
-		pr_err("%s7 calling bio_iov_iter_get_pages nr_pages=%d bi_sector=%lld\n",
-		__func__, nr_pages, bio->bi_iter.bi_sector);
+		pr_err("%s7 calling bio_iov_iter_get_pages nr_pages=%d bi_sector=%lld bvec iter=%d\n",
+		__func__, nr_pages, bio->bi_iter.bi_sector, iov_iter_is_bvec(dio->submit.iter));
 
 		ret = bio_iov_iter_get_pages(bio, dio->submit.iter);
 		if (unlikely(ret)) {
@@ -659,12 +660,12 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 		iomi_processed_blocks = iomi.processed / fs_block_size;
 		if(iomi_processed_blocks % max_alignment != 0) {
-			ret = -EFAULT;
+		//	ret = -EFAULT;
 			pr_err("%s3 error iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
 			__func__, iomi.len, iomi.len / fs_block_size,
 			iomi.processed, iomi.processed / fs_block_size);
 
-			break;
+		//	break;
 		}
 
 
@@ -676,6 +677,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	blk_finish_plug(&plug);
 
+	pr_err("%s4\n", __func__);
 	/*
 	 * We only report that we've read data up to i_size.
 	 * Revert iter to a state corresponding to that as some callers (such
@@ -684,6 +686,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (iov_iter_rw(iter) == READ && iomi.pos >= dio->i_size)
 		iov_iter_revert(iter, iomi.pos - dio->i_size);
 
+	pr_err("%s5\n", __func__);
 	if (ret == -EFAULT && dio->size && (dio_flags & IOMAP_DIO_PARTIAL)) {
 		if (!(iocb->ki_flags & IOCB_NOWAIT))
 			wait_for_completion = true;
@@ -695,6 +698,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		wait_for_completion = true;
 		ret = 0;
 	}
+	pr_err("%s6\n", __func__);
 	if (ret < 0)
 		iomap_dio_set_error(dio, ret);
 
@@ -707,6 +711,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	WRITE_ONCE(iocb->private, dio->submit.poll_bio);
 
+	pr_err("%s7\n", __func__);
 	/*
 	 * We are about to drop our additional submission reference, which
 	 * might be the last reference to the dio.  There are three different
@@ -724,23 +729,30 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	 */
 	dio->wait_for_completion = wait_for_completion;
 	if (!atomic_dec_and_test(&dio->ref)) {
-		if (!wait_for_completion)
+		pr_err("%s8\n", __func__);
+		if (!wait_for_completion) {
+			pr_err("%s8.1 EIOCBQUEUED !wait_for_completion\n", __func__);
 			return ERR_PTR(-EIOCBQUEUED);
+		}
 
 		for (;;) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			if (!READ_ONCE(dio->submit.waiter))
+			if (!READ_ONCE(dio->submit.waiter)) {
+				pr_err("%s8.2 breaking\n", __func__);
 				break;
+			}
 
 			blk_io_schedule();
 		}
 		__set_current_state(TASK_RUNNING);
 	}
 
+	pr_err("%s10 exit\n", __func__);
 	return dio;
 
 out_free_dio:
 	kfree(dio);
+	pr_err("%s10 out_free_dio exit2 ret=%lld\n", __func__, ret);
 	if (ret)
 		return ERR_PTR(ret);
 	return NULL;

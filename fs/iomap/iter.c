@@ -87,8 +87,8 @@ int iomap_iter(struct iomap_iter *iter, const struct iomap_ops *ops)
 	trace_iomap_iter(iter, ops, _RET_IP_);
 	pr_err("%s2 calling iomap_iter_advance iter->iomap.length=%lld processed=%lld\n", __func__, iter->iomap.length, iter->processed);
 	ret = iomap_iter_advance(iter);
+	pr_err("%s2.2 ret=%d exiting iter->iomap.length=%lld processed=%lld\n", __func__, ret, iter->iomap.length, iter->processed);
 	if (ret <= 0) {
-		pr_err("%s2.2 error=%d exiting iter->iomap.length=%lld processed=%lld\n", __func__, ret, iter->iomap.length, iter->processed);
 		return ret;
 	}
 
@@ -96,7 +96,7 @@ int iomap_iter(struct iomap_iter *iter, const struct iomap_ops *ops)
 	ret = ops->iomap_begin(iter->inode, iter->pos, iter->len, iter->flags,
 			       &iter->iomap, &iter->srcmap);
 	if (ret < 0) {
-		pr_err("%s2.3 error=%d exiting iter->iomap.length=%lld processed=%lld\n", __func__, ret, iter->iomap.length, iter->processed);
+		pr_err("%s2.3 ret=%d exiting iter->iomap.length=%lld processed=%lld\n", __func__, ret, iter->iomap.length, iter->processed);
 		return ret;
 	}
 	iomap_iter_done(iter);

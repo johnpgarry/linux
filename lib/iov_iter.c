@@ -1430,6 +1430,7 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 {
 	unsigned int n, gup_flags = 0;
 
+	pr_err("%s maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld *start=%zd\n", __func__, maxsize, maxpages, i->count, MAX_RW_COUNT, *start);
 	if (maxsize > i->count)
 		maxsize = i->count;
 	if (!maxsize)
@@ -1442,7 +1443,6 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 	if (likely(user_backed_iter(i))) {
 		unsigned long addr;
 		int res;
-
 		if (iov_iter_rw(i) != WRITE)
 			gup_flags |= FOLL_WRITE;
 		if (i->nofault)
@@ -1450,20 +1450,29 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 
 		addr = first_iovec_segment(i, &maxsize);
 		*start = addr % PAGE_SIZE;
+
+		pr_err("%s2 user_backed_iter maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld addr=%ld (0x%lx) *start=%zd\n", __func__,
+			maxsize, maxpages, i->count, MAX_RW_COUNT, addr, addr, *start);
 		addr &= PAGE_MASK;
+		pr_err("%s2.1 maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld *start=%zd addr=%ld\n",
+			__func__, maxsize, maxpages, i->count, MAX_RW_COUNT, *start, addr);
 		n = want_pages_array(pages, maxsize, *start, maxpages);
 		if (!n)
 			return -ENOMEM;
 		res = get_user_pages_fast(addr, n, gup_flags, *pages);
 		if (unlikely(res <= 0))
 			return res;
+		pr_err("%s2.5 maxsize=%zd res (%d) * PAGE_SIZE - *start (%zd) =%zd\n", __func__, maxsize, res, *start, res * PAGE_SIZE - *start);
 		maxsize = min_t(size_t, maxsize, res * PAGE_SIZE - *start);
 		iov_iter_advance(i, maxsize);
+		pr_err("%s2.6 returning maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld\n", __func__, maxsize, maxpages, i->count, MAX_RW_COUNT);
 		return maxsize;
 	}
 	if (iov_iter_is_bvec(i)) {
 		struct page **p;
 		struct page *page;
+
+		pr_err("%s2 iov_iter_is_bvec maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld\n", __func__, maxsize, maxpages, i->count, MAX_RW_COUNT);
 
 		page = first_bvec_segment(i, &maxsize, start);
 		n = want_pages_array(pages, maxsize, *start, maxpages);
@@ -1482,10 +1491,14 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 		}
 		return maxsize;
 	}
-	if (iov_iter_is_pipe(i))
+	if (iov_iter_is_pipe(i)) {
+		pr_err("%s3 iov_iter_is_pipe maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld\n", __func__, maxsize, maxpages, i->count, MAX_RW_COUNT);
 		return pipe_get_pages(i, pages, maxsize, maxpages, start);
-	if (iov_iter_is_xarray(i))
+	}
+	if (iov_iter_is_xarray(i)) {
+		pr_err("%s4 iov_iter_is_xarray maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld\n", __func__, maxsize, maxpages, i->count, MAX_RW_COUNT);
 		return iter_xarray_get_pages(i, pages, maxsize, maxpages, start);
+	}
 	return -EFAULT;
 }
 
@@ -1496,6 +1509,7 @@ ssize_t iov_iter_get_pages(struct iov_iter *i,
 	if (!maxpages)
 		return 0;
 	BUG_ON(!pages);
+	pr_err("%s maxsize=%zd maxpages=%d\n", __func__, maxsize, maxpages);
 
 	return __iov_iter_get_pages_alloc(i, &pages, maxsize, maxpages,
 					  start, extraction_flags);
