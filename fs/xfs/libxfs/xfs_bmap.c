@@ -3269,6 +3269,8 @@ xfs_bmap_btalloc_accounting(
 		args->len);
 }
 
+int queue_write_atomic_alignment_fs_blocks = 256;
+
 static int
 xfs_bmap_compute_alignments(
 	struct xfs_bmalloca	*ap,
@@ -3289,12 +3291,13 @@ xfs_bmap_compute_alignments(
 	else if (ap->datatype & XFS_ALLOC_USERDATA) {
 		//struct block_device *bdev = mp->m_ddev_targp->bt_bdev;
 		//struct request_queue *bd_queue = bdev->bd_queue;
-		int queue_write_atomic_alignment = 256;
 
-		if (xfs_iflags_test(ap->ip, XFS_ATOMIC_EXTENT_ALIGN))
-			args->alignment = align = queue_write_atomic_alignment;
-		else
+		if (xfs_iflags_test(ap->ip, XFS_ATOMIC_EXTENT_ALIGN)) {
+			pr_err_once("%s XFS_ATOMIC_EXTENT_ALIGN set\n", __func__);
+			args->alignment = align = queue_write_atomic_alignment_fs_blocks;
+		} else {
 			align = xfs_get_extsz_hint(ap->ip);
+		}
 	}
 
 	if (align) {
