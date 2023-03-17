@@ -370,7 +370,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		__func__, nr_pages, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 
 		bi_size_fs_blocks = bio->bi_iter.bi_size / fs_block_size;
-		bi_addr_fs_blocks = bio->bi_iter.bi_sector / fs_block_size;
+		bi_addr_fs_blocks = (bio->bi_iter.bi_sector * 512) / fs_block_size;
 
 		if (bi_size_fs_blocks % dio->max_alignment_fs_blocks) {
 			pr_err("%s9XXX size bi_size_fs_blocks=%d max_alignment_fs_blocks=%d\n", __func__,
