@@ -1298,7 +1298,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	pr_err("%s5 nr_pages=%d size=%zd left=%zd trim=%zd bdev_bs=%d offset=%zd size2=%zd trim2=%zd\n",
 		__func__, nr_pages, size, left, trim, bdev_logical_block_size(bio->bi_bdev), offset, size2, trim2);
 	#if 1
-//	trim = trim2;
+	trim = trim2;
 	#endif
 	iov_iter_revert(iter, trim);
 
@@ -1371,8 +1371,8 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 		ret = __bio_iov_iter_get_pages(bio, iter);
 		pr_err("%s2 bio=%pS iter=%pS ret=%d iov_iter_count=%zd bio_full=%d\n",
 			__func__, bio, iter, ret, iov_iter_count(iter), bio_full(bio, 0));
-	} while (!ret && iov_iter_count(iter) && !bio_full(bio, 0));
-	//} while (!ret && iov_iter_count(iter) && 0);
+	//} while (!ret && iov_iter_count(iter) && !bio_full(bio, 0));
+	} while (!ret && iov_iter_count(iter) && 0);
 
 	pr_err("%s10 exit bio=%pS iter=%pS bio->bi_vcnt=%d\n", __func__, bio, iter, bio->bi_vcnt);
 	return bio->bi_vcnt ? 0 : ret;

@@ -375,12 +375,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		if (bi_size_fs_blocks % dio->max_alignment_fs_blocks) {
 			pr_err("%s9XXX size bi_size_fs_blocks=%d max_alignment_fs_blocks=%d\n", __func__,
 			bi_size_fs_blocks, dio->max_alignment_fs_blocks);
-			//return -1;
+			return -1;
 		}
 		if (bi_addr_fs_blocks % dio->max_alignment_fs_blocks) {
 			pr_err("%s9XXX address bi_addr_fs_blocks=%d max_alignment_fs_blocks=%d\n", __func__,
 			bi_addr_fs_blocks, dio->max_alignment_fs_blocks);
-			//return -1;
+			return -1;
 		}
 
 		/*
