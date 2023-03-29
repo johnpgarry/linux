@@ -41,6 +41,8 @@ int main(int argc, char *argv[])
 		printf("%s2 could not alloc buffer buffer=%p\n", __func__);
 		return -1;
 	}
+	
+	printf("wrv2 buffer=%p len=0x%x\n", buffer, len);
 	memcpy(buffer, image, sizeof(image));
 
 	int f = open(file, O_WRONLY|O_DIRECT, S_IRWXU);

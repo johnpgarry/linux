@@ -1392,16 +1392,24 @@ static unsigned long first_iovec_segment(const struct iov_iter *i, size_t *size)
 	size_t skip;
 	long k;
 
-	if (iter_is_ubuf(i))
+	if (iter_is_ubuf(i)) {
+		pr_err("%s is_ubuf=0x%lx iov_offset=0x%zx\n", __func__, 
+			(unsigned long)i->ubuf, i->iov_offset);
 		return (unsigned long)i->ubuf + i->iov_offset;
+	}
 
+	// iov_offset is how much we have iter'ed
 	for (k = 0, skip = i->iov_offset; k < i->nr_segs; k++, skip = 0) {
 		size_t len = i->iov[k].iov_len - skip;
 
+		pr_err("%s2 k=%ld skip=0x%zx (iov_offset initially) iov_base=%pS iov_len=0x%zx len=0x%zx\n", __func__, 
+			k, skip, i->iov[k].iov_base, i->iov[k].iov_len, len);
 		if (unlikely(!len))
 			continue;
 		if (*size > len)
 			*size = len;
+		pr_err("%s10 returning 0x%lx k=%ld skip=0x%zx iov_base=%pS iov_len=0x%zx len=0x%zx *size=0x%zx (or maxsize from __iov_iter_get_pages_alloc())\n", __func__, 
+			((unsigned long)i->iov[k].iov_base + skip), k, skip, i->iov[k].iov_base, i->iov[k].iov_len, len, *size);
 		return (unsigned long)i->iov[k].iov_base + skip;
 	}
 	BUG(); // if it had been empty, we wouldn't get called
@@ -1425,12 +1433,14 @@ static struct page *first_bvec_segment(const struct iov_iter *i,
 
 static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 		   struct page ***pages, size_t maxsize,
-		   unsigned int maxpages, size_t *start,
+		   unsigned int maxpages, size_t *start, //alias to offset in __bio_iov_iter_get_pages()
 		   iov_iter_extraction_t extraction_flags)
 {
 	unsigned int n, gup_flags = 0;
+	size_t old_maxsize;
 
-	pr_err("%s maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld *start=%zd\n", __func__, maxsize, maxpages, i->count, MAX_RW_COUNT, *start);
+	pr_err("%s maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld *start=%zd (0x%zx)\n",
+		__func__, maxsize, maxpages, i->count, MAX_RW_COUNT, *start, *start);
 	if (maxsize > i->count)
 		maxsize = i->count;
 	if (!maxsize)
@@ -1449,13 +1459,14 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 			gup_flags |= FOLL_NOFAULT;
 
 		addr = first_iovec_segment(i, &maxsize);
+		//  maxsize is max how much is remaining, limited at MAX_RW_COUNT
 		*start = addr % PAGE_SIZE;
 
-		pr_err("%s2 user_backed_iter maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld addr=%ld (0x%lx) *start=%zd\n", __func__,
-			maxsize, maxpages, i->count, MAX_RW_COUNT, addr, addr, *start);
+		pr_err("%s2 user_backed_iter maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld addr=%ld (0x%lx) *start=%zd (0x%zx)\n", __func__,
+			maxsize, maxpages, i->count, MAX_RW_COUNT, addr, addr, *start, *start);
 		addr &= PAGE_MASK;
-		pr_err("%s2.1 maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld *start=%zd addr=%ld\n",
-			__func__, maxsize, maxpages, i->count, MAX_RW_COUNT, *start, addr);
+		pr_err("%s2.1 maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld *start=%zd (0x%zx) addr=%ld (0x%lx)\n",
+			__func__, maxsize, maxpages, i->count, MAX_RW_COUNT, *start, *start, addr, addr);
 		n = want_pages_array(pages, maxsize, *start, maxpages);
 		if (!n)
 			return -ENOMEM;
@@ -1463,9 +1474,15 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 		if (unlikely(res <= 0))
 			return res;
 		pr_err("%s2.5 maxsize=%zd res (%d) * PAGE_SIZE - *start (%zd) =%zd\n", __func__, maxsize, res, *start, res * PAGE_SIZE - *start);
+		old_maxsize = maxsize;
 		maxsize = min_t(size_t, maxsize, res * PAGE_SIZE - *start);
+		pr_err("%s2.5.1%s maxsize=%zd res (%d) * PAGE_SIZE - *start (%zd) =%zd iov_offset=0x%zx, calling iov_iter_advance\n", 
+			__func__,
+			(maxsize == old_maxsize) ? " final" : "",
+			 maxsize, res, *start, res * PAGE_SIZE - *start, i->iov_offset);
 		iov_iter_advance(i, maxsize);
-		pr_err("%s2.6 returning maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld\n", __func__, maxsize, maxpages, i->count, MAX_RW_COUNT);
+		pr_err("%s2.6 returning maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld iov_offset=0x%zx\n",
+			__func__, maxsize, maxpages, i->count, MAX_RW_COUNT, i->iov_offset);
 		return maxsize;
 	}
 	if (iov_iter_is_bvec(i)) {

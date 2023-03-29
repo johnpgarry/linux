@@ -1308,8 +1308,8 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 		goto out;
 	}
 
-	pr_err("%s6 size=%zd left=%zd trim=%zd\n",
-		__func__, size, left, trim);
+	pr_err("%s6 size=%zd (after trimming) left=%zd trim=%zd offset=0x%zx (into sector align)\n",
+		__func__, size, left, trim, offset);
 	for (left = size, i = 0; left > 0; left -= len, i++) {
 		struct page *page = pages[i];
 
@@ -1325,7 +1325,9 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 		offset = 0;
 	}
 
+	pr_err("%s7 left=%zd i->count=%zd before iov_iter_revert\n", __func__, left, iter->count);
 	iov_iter_revert(iter, left);
+	pr_err("%s8 i->count=%zd after iov_iter_revert\n", __func__, iter->count);
 out:
 	while (i < nr_pages)
 		put_page(pages[i++]);
@@ -1364,6 +1366,7 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	}
 
 	do {
+		// iov_iter_count() is how much remains to be iter'ed
 		pr_err("%s bio=%pS iter=%pS calling __bio_iov_iter_get_pages iov_iter_count=%zd\n", __func__, bio, iter, iov_iter_count(iter));
 		ret = __bio_iov_iter_get_pages(bio, iter);
 		pr_err("%s2 bio=%pS iter=%pS ret=%d iov_iter_count=%zd bio_full=%d\n",
