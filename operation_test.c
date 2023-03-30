@@ -24,7 +24,7 @@ int do_operation(int f, int size)
 {
 	void *buffer;
 	int position = rand();
-	int len = rand();
+	int len;
 	int written;
 	int flags = RWF_SYNC;
 	
@@ -38,14 +38,17 @@ int do_operation(int f, int size)
 		}
 	}
 
+calculate_len:
+	len = rand();
 	len = len % 16;
 	len = len * size * 1024;
+	if (len == 0)
+		goto calculate_len;
 
 	position = position % 16;
 	position = position * size * 1024;
 
-	posix_memalign(&buffer, BLOCKSIZE * 8, len);
-	//buffer = malloc(len);
+	//posix_memalign(&buffer, BLOCKSIZE * 8, len);
 	
 	if (buffer == 0) {
 		printf("%s2 could not alloc buffer buffer=%p\n", __func__);
