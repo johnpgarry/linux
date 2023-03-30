@@ -3269,7 +3269,7 @@ xfs_bmap_btalloc_accounting(
 		args->len);
 }
 
-int queue_write_atomic_alignment_fs_blocks = 256;
+int queue_write_atomic_alignment_fs_blocks = 128;
 
 static int
 xfs_bmap_compute_alignments(

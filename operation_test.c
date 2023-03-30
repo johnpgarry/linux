@@ -6,7 +6,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <math.h>
-#define BLOCKSIZE 512
+#define SECTOR_SIZE 512
 char image[] =
 {
 	'P', '5', ' ', '2', '4', ' ', '7', ' ', '1', '5', '\n',
