@@ -1293,7 +1293,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	if (size2 >= write_atomic_max_bytes) {
 		size2 = write_atomic_max_bytes;
 	} else if (size > alignment_bytes) {
-		size2 = rounddown(size2, alignment_bytes);
+	//	size2 = rounddown(size2, alignment_bytes);
 	}
 
 	trim2 = size - size2;

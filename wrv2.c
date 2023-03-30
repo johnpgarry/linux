@@ -34,9 +34,9 @@ int main(int argc, char *argv[])
 	position = atoi(argv[2]);
 	len = atoi(argv[3]);
 
-	posix_memalign(&buffer, BLOCKSIZE * 8, len);
-	//buffer = malloc(len);
-	
+	//posix_memalign(&buffer, BLOCKSIZE * 8, len);
+	buffer = malloc(len);
+
 	if (buffer == 0) {
 		printf("%s2 could not alloc buffer buffer=%p\n", __func__);
 		return -1;

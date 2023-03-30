@@ -23,8 +23,8 @@ char image[] =
 int do_operation(int f, int size)
 {
 	void *buffer;
-	int position = rand();
-	int len;
+	unsigned int position = rand();
+	unsigned int len;
 	int written;
 	int flags = RWF_SYNC;
 	
@@ -39,16 +39,22 @@ int do_operation(int f, int size)
 	}
 
 calculate_len:
-	len = rand();
-	len = len % 16;
-	len = len * size * 1024;
+	len = rand() % 256;
+	len = len * size;
 	if (len == 0)
 		goto calculate_len;
+	// +int queue_write_atomic_alignment_fs_blocks = 128;
+	if (len >= (128 * 8 * 4)) //2nd 4 is arbitary
+		goto calculate_len;
 
-	position = position % 16;
+	len *= 1024;
+	//printf("%s len=%d\n", __func__, len);
+
+	position = position % 48;
 	position = position * size * 1024;
 
-	//posix_memalign(&buffer, BLOCKSIZE * 8, len);
+	posix_memalign(&buffer, SECTOR_SIZE * 8, len);
+	//buffer = malloc(len);
 	
 	if (buffer == 0) {
 		printf("%s2 could not alloc buffer buffer=%p\n", __func__);
@@ -63,7 +69,7 @@ calculate_len:
 		},
 
 	};
-	printf("%s len=%d position=%d bs=%d\n", __func__, len, position, size);
+	printf("%s len=%d (%d) position=%d (%d) bs=%d\n", __func__, len, len / 4096, position, position / 4096, size);
 	written = pwritev2(f, iov, 1, position, flags);
 	free(buffer);
 	if (written != len) {
@@ -103,9 +109,9 @@ int main(int argc, char *argv[])
 			break;
 		count++;
 
-		if (count >= 10)
+		if (count >= 100000)
 			break;
-		sleep(5);
+		//sleep(1);
 	}
 	
 	close(f);
