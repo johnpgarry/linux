@@ -1283,11 +1283,8 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 
 	size2 = size;
 	do {
-		if (size2 > write_atomic_max_bytes) {
+		if (size2 >= write_atomic_max_bytes) {
 			size2 = write_atomic_max_bytes;
-			break;
-		} else if (size2 == write_atomic_max_bytes) {
-			break;
 		} else {
 			write_atomic_max_bytes /= 2;
 		}
