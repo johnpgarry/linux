@@ -1237,6 +1237,7 @@ static int bio_iov_add_zone_append_page(struct bio *bio, struct page *page,
  */
 
 extern int queue_write_atomic_alignment_fs_blocks;
+unsigned int find_max_alignment_fs_blocks(const unsigned int fs_blocks, const unsigned int pos_fs_blocks);
 static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 {
 	iov_iter_extraction_t extraction_flags = 0;
@@ -1251,9 +1252,14 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	unsigned int fs_block_size = 4096;
 	unsigned int write_atomic_max_bytes = queue_write_atomic_alignment_fs_blocks * fs_block_size;
 	unsigned int write_atomic_gran = 4096;
-	pr_err("%s bi_size=%d nr_pages=%d entries_left=%d bi_max_vecs=%d bi_vcnt=%d atomic max bytes=%d gran=%d\n",
+	sector_t bi_sector = bio->bi_iter.bi_sector;
+	unsigned int alignment_fs_blocks = find_max_alignment_fs_blocks(iov_iter_count(iter) / fs_block_size, 0 / fs_block_size);
+	unsigned int alignment_bytes = alignment_fs_blocks * 4096;
+	pr_err("%s bi_size=%d nr_pages=%d entries_left=%d bi_max_vecs=%d bi_vcnt=%d atomic max bytes=%d gran=%d alignment_fs_blocks=%d iov_iter_count=%zd bi_sector=%lld\n",
 		__func__, bio->bi_iter.bi_size, nr_pages, entries_left, bio->bi_max_vecs, bio->bi_vcnt,
-		write_atomic_max_bytes, write_atomic_gran);
+		write_atomic_max_bytes, write_atomic_gran,
+		alignment_fs_blocks, iov_iter_count(iter),
+		bi_sector);
 
 	/*
 	 * Move page array up in the allocated memory for the bio vecs as far as
@@ -1276,19 +1282,19 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	size = iov_iter_get_pages(iter, pages,
 				  UINT_MAX - bio->bi_iter.bi_size,
 				  nr_pages, &offset, extraction_flags);
-	if (unlikely(size <= 0))
+	if (unlikely(size <= 0)) {
+		pr_err("%s fault\n", __func__);
 		return size ? size : -EFAULT;
+	}
 
 	nr_pages = DIV_ROUND_UP(offset + size, PAGE_SIZE);
 
 	size2 = size;
-	do {
-		if (size2 >= write_atomic_max_bytes) {
-			size2 = write_atomic_max_bytes;
-		} else {
-			write_atomic_max_bytes /= 2;
-		}
-	} while (1);
+	if (size2 >= write_atomic_max_bytes) {
+		size2 = write_atomic_max_bytes;
+	} else if (size > alignment_bytes) {
+		size2 = rounddown(size2, alignment_bytes);
+	}
 
 	trim2 = size - size2;
 	trim = size & (bdev_logical_block_size(bio->bi_bdev) - 1);
