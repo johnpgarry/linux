@@ -499,13 +499,16 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 	}
 }
 
-unsigned int find_max_alignment(const unsigned int fs_blocks, const unsigned int pos_fs_blocks)
+unsigned int find_max_alignment_fs_blocks(const unsigned int fs_blocks, const unsigned int pos_fs_blocks)
 {
-	unsigned int max_fs_blocks_alignment = pos_fs_blocks;
+	unsigned int max_fs_blocks_alignment = fs_blocks;
 	unsigned long my_gcd = 0;//gcd(fs_blocks, pos_fs_blocks);
 	unsigned long my_lcm =  0;//lcm(fs_blocks, pos_fs_blocks);
 	unsigned int max_fs_blocks_alignment2;
 	unsigned int max_fs_blocks_alignment3;
+
+	if (fs_blocks == 0)
+		return 1;
 
 	if (pos_fs_blocks == 0) {
 		my_gcd = my_lcm = fs_blocks;
@@ -524,7 +527,8 @@ unsigned int find_max_alignment(const unsigned int fs_blocks, const unsigned int
 		if (max_fs_blocks_alignment == 0) {
 			pr_err("%s1 fs_blocks=%d pos_fs_blocks=%d max_fs_blocks_alignment=%d mod=1\n", 
 				__func__, fs_blocks, pos_fs_blocks, max_fs_blocks_alignment);
-			return 1;
+			max_fs_blocks_alignment = 1;
+			break;
 		}
 	//	pr_err("%s blocks=%d pos=%d max_alignment=%d mod1=%d mod2=%d\n", __func__, blocks, pos, max_alignment, mod1, mod2);
 		mod1 = pos_fs_blocks % max_fs_blocks_alignment;
@@ -535,7 +539,7 @@ end:
 		max_fs_blocks_alignment--;
 	}
 
-	max_fs_blocks_alignment2 = __rounddown_pow_of_two(pos_fs_blocks);
+	max_fs_blocks_alignment2 = __rounddown_pow_of_two(fs_blocks);
 
 	while (1) {
 		unsigned int mod1;
@@ -543,8 +547,9 @@ end:
 
 		if (max_fs_blocks_alignment2 == 0) {
 			pr_err("%s2 fs_blocks=%d pos_fs_blocks=%d max_fs_blocks_alignment=%d mod=1\n", 
-				__func__, fs_blocks, pos_fs_blocks, max_fs_blocks_alignment);
-			return 1;
+				__func__, fs_blocks, pos_fs_blocks, max_fs_blocks_alignment2);
+			max_fs_blocks_alignment2 = 1;
+			break;
 		}
 	//	pr_err("%s blocks=%d pos=%d max_alignment=%d mod1=%d mod2=%d\n", __func__, blocks, pos, max_alignment, mod1, mod2);
 		mod1 = pos_fs_blocks % max_fs_blocks_alignment2;
@@ -605,7 +610,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct iomap_dio *dio;
 	unsigned int fs_block_size = i_blocksize(inode);
 	unsigned int blocks = iomi.len / fs_block_size;
-	unsigned long long max_alignment_fs_blocks = find_max_alignment(blocks, iocb->ki_pos / fs_block_size);
+	unsigned long long max_alignment_fs_blocks = find_max_alignment_fs_blocks(blocks, iocb->ki_pos / fs_block_size);
 
 	// iocb->ki_pos is pwritev2 offset, i.e. offset in file
 	pr_err("%s len=%lld (%d blocks, max_align=%lld FS blocks) ops=%pS dops=%pS type=%d pos=%lld (%lld blocks)\n",
