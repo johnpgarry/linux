@@ -166,9 +166,11 @@ static struct bio *bio_split_write_zeroes(struct bio *bio,
  * requests that are submitted to a block device if the start of a bio is not
  * aligned to a physical block boundary.
  */
+extern int queue_write_atomic_alignment_fs_blocks;
 static inline unsigned get_max_io_size(struct bio *bio,
 				       const struct queue_limits *lim)
 {
+	#ifdef dsdsd
 	unsigned pbs = lim->physical_block_size >> SECTOR_SHIFT;
 	unsigned lbs = lim->logical_block_size >> SECTOR_SHIFT;
 	unsigned max_sectors = lim->max_sectors, start, end;
@@ -184,6 +186,9 @@ static inline unsigned get_max_io_size(struct bio *bio,
 	if (end > start)
 		return end - start;
 	return max_sectors & ~(lbs - 1);
+	#else
+	return queue_write_atomic_alignment_fs_blocks * 8; // sectors, no fs blocks
+	#endif
 }
 
 /**

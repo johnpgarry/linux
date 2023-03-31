@@ -2942,7 +2942,9 @@ void blk_mq_submit_bio(struct bio *bio)
 
 	bio = blk_queue_bounce(bio, q);
 	if (bio_may_exceed_limits(bio, &q->limits)) {
+		pr_err("%s bio=%pS calling __bio_split_to_limits\n", __func__, bio);
 		bio = __bio_split_to_limits(bio, &q->limits, &nr_segs);
+		pr_err("%s2 bio=%pS\n", __func__, bio);
 		if (!bio)
 			return;
 	}
