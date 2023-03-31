@@ -724,11 +724,11 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
 		unsigned long long iomi_processed_blocks;
-		pr_err("%s2.0 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks) type=%d %s\n",
+		pr_err("%s2.0 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks) type=%d %s flags=0x%x\n",
 			__func__, iomi.len, iomi.len / fs_block_size,
 			iomi.processed, iomi.processed / fs_block_size,
 			iomi.iomap.type,
-			iomap_type_to_str(iomi.iomap.type));
+			iomap_type_to_str(iomi.iomap.type), flags);
 		iomi.processed = iomap_dio_iter(&iomi, dio);
 		pr_err("%s2.1 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
 			__func__, iomi.len, iomi.len / fs_block_size,

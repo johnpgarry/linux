@@ -898,9 +898,6 @@ xfs_file_fallocate(
 	loff_t			new_size = 0;
 	bool			do_file_insert = false;
 
-	/* Hack userspace should set this */
-	mode |= FALLOC_FL_ATOMIC_ALIGN;
-
 	if (!S_ISREG(inode->i_mode))
 		return -EINVAL;
 	if (mode & ~XFS_FALLOC_FL_SUPPORTED)

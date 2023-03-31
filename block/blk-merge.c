@@ -358,7 +358,7 @@ struct bio *__bio_split_to_limits(struct bio *bio,
 	struct bio_set *bs = &bio->bi_bdev->bd_disk->bio_split;
 	struct bio *split;
 
-	pr_err("%s bio=%pS\n", __func__, bio);
+	pr_err("%s bio=%pS size=%d\n", __func__, bio, bio->bi_iter.bi_size);
 	switch (bio_op(bio)) {
 	case REQ_OP_DISCARD:
 	case REQ_OP_SECURE_ERASE:
@@ -378,12 +378,13 @@ struct bio *__bio_split_to_limits(struct bio *bio,
 	if (split) {
 		/* there isn't chance to merge the split bio */
 		split->bi_opf |= REQ_NOMERGE;
-		pr_err("%s2 bio=%pS split=%pS\n", __func__, bio, split);
 
 		blkcg_bio_issue_init(split);
 		bio_chain(split, bio);
 		trace_block_split(split, bio->bi_iter.bi_sector);
 		submit_bio_noacct(bio);
+		pr_err("%s2 bio=%pS size=%d split=%pS size=%d\n", __func__, bio, bio->bi_iter.bi_size,
+													split, split->bi_iter.bi_size);
 		return split;
 	}
 	return bio;
