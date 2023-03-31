@@ -927,7 +927,13 @@ static ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
 	struct iovec *iov = iovstack;
 	struct iov_iter iter;
 	ssize_t ret;
-
+	// pos is offset in file
+	// vec is userspace vector table
+	// vlen is vector count, I think
+	if (pos)
+		pr_err("%s vec=%pS vlen=%ld *pos=0x%llx (%lld) ARRAY_SIZE(iovstack)=%ld\n", __func__, vec, vlen, *pos, *pos, ARRAY_SIZE(iovstack));
+	else
+		pr_err("%s vec=%pS vlen=%ld pos=NULL\n", __func__, vec, vlen);
 	ret = import_iovec(ITER_SOURCE, vec, vlen, ARRAY_SIZE(iovstack), &iov, &iter);
 	if (ret >= 0) {
 		file_start_write(file);

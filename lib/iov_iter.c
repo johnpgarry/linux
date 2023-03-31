@@ -1387,7 +1387,7 @@ static ssize_t iter_xarray_get_pages(struct iov_iter *i,
 }
 
 /* must be done on non-empty ITER_UBUF or ITER_IOVEC one */
-static unsigned long first_iovec_segment(const struct iov_iter *i, size_t *size)
+static unsigned long first_iovec_segment(const struct iov_iter *i, size_t *maxsize)
 {
 	size_t skip;
 	long k;
@@ -1402,14 +1402,14 @@ static unsigned long first_iovec_segment(const struct iov_iter *i, size_t *size)
 	for (k = 0, skip = i->iov_offset; k < i->nr_segs; k++, skip = 0) {
 		size_t len = i->iov[k].iov_len - skip;
 
-		pr_err("%s2 k=%ld skip=0x%zx (iov_offset initially) iov_base=%pS iov_len=0x%zx len=0x%zx\n", __func__, 
-			k, skip, i->iov[k].iov_base, i->iov[k].iov_len, len);
+		pr_err("%s2 k=%ld skip=%zd (0x%zx) [how much iter'ed] *maxsize=%zd iov_base=%pS iov_len=0x%zx [from pwritev2] len=0x%zx [how much remaining]\n", __func__, 
+			k, skip, skip, *maxsize, i->iov[k].iov_base, i->iov[k].iov_len, len);
 		if (unlikely(!len))
 			continue;
-		if (*size > len)
-			*size = len;
-		pr_err("%s10 returning 0x%lx k=%ld skip=0x%zx iov_base=%pS iov_len=0x%zx len=0x%zx *size=0x%zx (or maxsize from __iov_iter_get_pages_alloc())\n", __func__, 
-			((unsigned long)i->iov[k].iov_base + skip), k, skip, i->iov[k].iov_base, i->iov[k].iov_len, len, *size);
+		if (*maxsize > len)
+			*maxsize = len;
+		pr_err("%s10 returning 0x%lx k=%ld skip=0x%zx iov_base=%pS iov_len=0x%zx len=0x%zx *maxsize=%zd\n", __func__, 
+			((unsigned long)i->iov[k].iov_base + skip), k, skip, i->iov[k].iov_base, i->iov[k].iov_len, len, *maxsize);
 		return (unsigned long)i->iov[k].iov_base + skip;
 	}
 	BUG(); // if it had been empty, we wouldn't get called
@@ -1462,14 +1462,15 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 		//  maxsize is max how much is remaining, limited at MAX_RW_COUNT
 		*start = addr % PAGE_SIZE;
 
-		pr_err("%s2 user_backed_iter maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld addr=%ld (0x%lx) *start=%zd (0x%zx)\n", __func__,
-			maxsize, maxpages, i->count, MAX_RW_COUNT, addr, addr, *start, *start);
+		pr_err("%s2 user_backed_iter i->count=%zd MAX_RW_COUNT=%ld addr=%ld (0x%lx) *start=%zd (0x%zx)\n", __func__,
+			i->count, MAX_RW_COUNT, addr, addr, *start, *start);
 		addr &= PAGE_MASK;
-		pr_err("%s2.1 maxsize=%zd maxpages=%d i->count=%zd MAX_RW_COUNT=%ld *start=%zd (0x%zx) addr=%ld (0x%lx)\n",
-			__func__, maxsize, maxpages, i->count, MAX_RW_COUNT, *start, *start, addr, addr);
+		pr_err("%s2.1 maxsize=%zd maxpages=%d *start=%zd (0x%zx) addr=%ld (0x%lx) calling want_pages_array and then pin\n",
+			__func__, maxsize, maxpages, *start, *start, addr, addr);
 		n = want_pages_array(pages, maxsize, *start, maxpages);
 		if (!n)
 			return -ENOMEM;
+		// *** here we pin the pages ****
 		res = get_user_pages_fast(addr, n, gup_flags, *pages);
 		if (unlikely(res <= 0))
 			return res;

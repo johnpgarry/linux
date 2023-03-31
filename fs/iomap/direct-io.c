@@ -321,7 +321,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua);
 
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
-	pr_err("%s7 nr_pages=%d from bio_iov_vecs_to_alloc\n", __func__, nr_pages);
+	pr_err("%s6 nr_pages=%d from bio_iov_vecs_to_alloc iov_iter_type=%d ITER_IOVEC=%d\n",
+		__func__, nr_pages, iov_iter_type(dio->submit.iter), ITER_IOVEC);
 	do {
 		size_t n;
 		unsigned int bi_size_fs_blocks, bi_addr_fs_blocks;
@@ -377,17 +378,17 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		if (bi_size_fs_blocks % dio->max_alignment_fs_blocks) {
 			pr_err("%s9XXX size bi_size_fs_blocks=%d max_alignment_fs_blocks=%d\n", __func__,
 			bi_size_fs_blocks, dio->max_alignment_fs_blocks);
-			return -1;
+			//return -1;
 		}
 		if (bi_addr_fs_blocks % dio->max_alignment_fs_blocks) {
 			pr_err("%s9YYY address bi_addr_fs_blocks=%d max_alignment_fs_blocks=%d\n", __func__,
 			bi_addr_fs_blocks, dio->max_alignment_fs_blocks);
-			return -1;
+			//return -1;
 		}
 		if (bi_size_fs_blocks > queue_write_atomic_alignment_fs_blocks) {
 			pr_err("%s9ZZZ size bi_size_fs_blocks=%d queue_write_atomic_alignment_fs_blocks=%d\n", __func__,
 			bi_size_fs_blocks, queue_write_atomic_alignment_fs_blocks);
-			return -1;
+			//return -1;
 		}
 
 		/*

@@ -23,6 +23,7 @@ static struct bio_map_data *bio_alloc_map_data(struct iov_iter *data,
 {
 	struct bio_map_data *bmd;
 
+	pr_err("%s data=%pS\n", __func__, data);
 	if (data->nr_segs > UIO_MAXIOV)
 		return NULL;
 
@@ -49,6 +50,7 @@ static int bio_copy_from_iter(struct bio *bio, struct iov_iter *iter)
 	struct bio_vec *bvec;
 	struct bvec_iter_all iter_all;
 
+	pr_err("%s bio=%pS\n", __func__, bio);
 	bio_for_each_segment_all(bvec, bio, iter_all) {
 		ssize_t ret;
 
@@ -80,6 +82,7 @@ static int bio_copy_to_iter(struct bio *bio, struct iov_iter iter)
 	struct bio_vec *bvec;
 	struct bvec_iter_all iter_all;
 
+	pr_err("%s bio=%pS\n", __func__, bio);
 	bio_for_each_segment_all(bvec, bio, iter_all) {
 		ssize_t ret;
 
@@ -138,6 +141,7 @@ static int bio_copy_user_iov(struct request *rq, struct rq_map_data *map_data,
 	unsigned int len = iter->count;
 	unsigned int offset = map_data ? offset_in_page(map_data->offset) : 0;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	bmd = bio_alloc_map_data(iter, gfp_mask);
 	if (!bmd)
 		return -ENOMEM;
@@ -247,6 +251,7 @@ static struct bio *blk_rq_map_bio_alloc(struct request *rq,
 {
 	struct bio *bio;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	if (rq->cmd_flags & REQ_ALLOC_CACHE) {
 		bio = bio_alloc_bioset(NULL, nr_vecs, rq->cmd_flags, gfp_mask,
 					&fs_bio_set);
@@ -271,6 +276,7 @@ static int bio_map_user_iov(struct request *rq, struct iov_iter *iter,
 	int ret;
 	int j;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	if (!iov_iter_count(iter))
 		return -EINVAL;
 
@@ -392,6 +398,7 @@ static struct bio *bio_map_kern(struct request_queue *q, void *data,
 	struct bio *bio;
 
 	bio = bio_kmalloc(nr_pages, gfp_mask);
+	pr_err("%s bio=%pS\n", __func__, bio);
 	if (!bio)
 		return ERR_PTR(-ENOMEM);
 	bio_init(bio, NULL, bio->bi_inline_vecs, nr_pages, 0);
@@ -482,6 +489,7 @@ static struct bio *bio_copy_kern(struct request_queue *q, void *data,
 
 	nr_pages = end - start;
 	bio = bio_kmalloc(nr_pages, gfp_mask);
+	pr_err("%s bio=%pS\n", __func__, bio);
 	if (!bio)
 		return ERR_PTR(-ENOMEM);
 	bio_init(bio, NULL, bio->bi_inline_vecs, nr_pages, 0);
@@ -533,6 +541,7 @@ int blk_rq_append_bio(struct request *rq, struct bio *bio)
 	struct bio_vec bv;
 	unsigned int nr_segs = 0;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	bio_for_each_bvec(bv, bio, iter)
 		nr_segs++;
 
@@ -563,6 +572,7 @@ static int blk_rq_map_user_bvec(struct request *rq, const struct iov_iter *iter)
 	struct bio *bio;
 	size_t i;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	if (!nr_iter || (nr_iter >> SECTOR_SHIFT) > queue_max_hw_sectors(q))
 		return -EINVAL;
 	if (nr_segs > queue_max_segments(q))
@@ -632,6 +642,8 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 	struct iov_iter i;
 	int ret = -EINVAL;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
+
 	if (map_data)
 		copy = true;
 	else if (blk_queue_may_bounce(q))
@@ -684,6 +696,7 @@ int blk_rq_map_user(struct request_queue *q, struct request *rq,
 	struct iov_iter i;
 	int ret = import_ubuf(rq_data_dir(rq), ubuf, len, &i);
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	if (unlikely(ret < 0))
 		return ret;
 
@@ -697,6 +710,7 @@ int blk_rq_map_user_io(struct request *req, struct rq_map_data *map_data,
 {
 	int ret = 0;
 
+	pr_err("%s rq=%pS\n", __func__, req);
 	if (vec) {
 		struct iovec fast_iov[UIO_FASTIOV];
 		struct iovec *iov = fast_iov;
@@ -780,6 +794,7 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 	struct bio *bio;
 	int ret;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	if (len > (queue_max_hw_sectors(q) << 9))
 		return -EINVAL;
 	if (!len || !kbuf)

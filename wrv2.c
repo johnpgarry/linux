@@ -42,7 +42,6 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	
-	printf("wrv2 buffer=%p len=0x%x\n", buffer, len);
 	memcpy(buffer, image, sizeof(image));
 
 	int f = open(file, O_WRONLY|O_DIRECT, S_IRWXU);
@@ -58,6 +57,7 @@ int main(int argc, char *argv[])
 		},
 
 	};
+	printf("wrv2 buffer=%p len=0x%x iov=%p\n", buffer, len, iov);
 	written = pwritev2(f, iov, 1, position, flags);
 	if (written != len) {
 		printf("%s5 error written=%d != len=%d\n", __func__, written, len);

@@ -1247,7 +1247,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	struct page **pages = (struct page **)bv;
 	ssize_t size, left;
 	unsigned len, i = 0;
-	size_t offset, trim, trim2, size2;
+	size_t offset = -1, trim, trim2, size2;
 	int ret = 0;
 	unsigned int fs_block_size = 4096;
 	unsigned int write_atomic_max_bytes = queue_write_atomic_alignment_fs_blocks * fs_block_size;
@@ -1255,7 +1255,8 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	sector_t bi_sector = bio->bi_iter.bi_sector;
 	unsigned int alignment_fs_blocks = find_max_alignment_fs_blocks(iov_iter_count(iter) / fs_block_size, 0 / fs_block_size);
 	unsigned int alignment_bytes = alignment_fs_blocks * 4096;
-	pr_err("%s bi_size=%d nr_pages=%d entries_left=%d bi_max_vecs=%d bi_vcnt=%d atomic max bytes=%d gran=%d alignment_fs_blocks=%d iov_iter_count=%zd bi_sector=%lld\n",
+
+	pr_err("\n%s bi_size=%d nr_pages=%d entries_left=%d bi_max_vecs=%d bi_vcnt=%d atomic max bytes=%d gran=%d alignment_fs_blocks=%d iov_iter_count=%zd bi_sector=%lld\n",
 		__func__, bio->bi_iter.bi_size, nr_pages, entries_left, bio->bi_max_vecs, bio->bi_vcnt,
 		write_atomic_max_bytes, write_atomic_gran,
 		alignment_fs_blocks, iov_iter_count(iter),
@@ -1301,7 +1302,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	pr_err("%s5 nr_pages=%d size=%zd left=%zd trim=%zd bdev_bs=%d offset=%zd size2=%zd trim2=%zd\n",
 		__func__, nr_pages, size, left, trim, bdev_logical_block_size(bio->bi_bdev), offset, size2, trim2);
 	#if 1
-	trim = trim2;
+	//trim = trim2;
 	#endif
 	iov_iter_revert(iter, trim);
 
@@ -1311,12 +1312,14 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 		goto out;
 	}
 
-	pr_err("%s6 size=%zd (after trimming) left=%zd trim=%zd offset=0x%zx (into sector align)\n",
+	pr_err("%s6 -+- size=%zd (after trimming) left=%zd trim=%zd offset=0x%zx (into sector align)\n",
 		__func__, size, left, trim, offset);
 	for (left = size, i = 0; left > 0; left -= len, i++) {
 		struct page *page = pages[i];
 
 		len = min_t(size_t, PAGE_SIZE - offset, left);
+		if (i <= 2 || i >= 253)
+			pr_err("%s6.1 i=%d len=%d left=%zd\n", __func__, i, len, left);
 		if (bio_op(bio) == REQ_OP_ZONE_APPEND) {
 			ret = bio_iov_add_zone_append_page(bio, page, len,
 					offset);
