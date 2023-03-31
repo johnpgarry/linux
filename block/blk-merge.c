@@ -358,6 +358,7 @@ struct bio *__bio_split_to_limits(struct bio *bio,
 	struct bio_set *bs = &bio->bi_bdev->bd_disk->bio_split;
 	struct bio *split;
 
+	pr_err("%s bio=%pS\n", __func__, bio);
 	switch (bio_op(bio)) {
 	case REQ_OP_DISCARD:
 	case REQ_OP_SECURE_ERASE:
@@ -377,6 +378,7 @@ struct bio *__bio_split_to_limits(struct bio *bio,
 	if (split) {
 		/* there isn't chance to merge the split bio */
 		split->bi_opf |= REQ_NOMERGE;
+		pr_err("%s2 bio=%pS split=%pS\n", __func__, bio, split);
 
 		blkcg_bio_issue_init(split);
 		bio_chain(split, bio);
@@ -402,9 +404,16 @@ struct bio *bio_split_to_limits(struct bio *bio)
 {
 	const struct queue_limits *lim = &bdev_get_queue(bio->bi_bdev)->limits;
 	unsigned int nr_segs;
+	bool may_exceed;
 
-	if (bio_may_exceed_limits(bio, lim))
-		return __bio_split_to_limits(bio, lim, &nr_segs);
+	may_exceed = bio_may_exceed_limits(bio, lim);
+	pr_err("%s bio=%pS may_exceed=%d\n", __func__, bio, may_exceed);
+	if (may_exceed) {
+		struct bio *split_bio;
+		split_bio = __bio_split_to_limits(bio, lim, &nr_segs);
+		pr_err("%s2 called __bio_split_to_limits bio=%pS split_bio=%pS\n", __func__, bio, split_bio);
+		return split_bio;
+	}
 	return bio;
 }
 EXPORT_SYMBOL(bio_split_to_limits);
