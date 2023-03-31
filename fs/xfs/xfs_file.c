@@ -897,6 +897,7 @@ xfs_file_fallocate(
 	uint			iolock = XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL;
 	loff_t			new_size = 0;
 	bool			do_file_insert = false;
+	pr_err("%s mode=0x%x\n", __func__, mode);
 
 	if (!S_ISREG(inode->i_mode))
 		return -EINVAL;

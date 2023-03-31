@@ -26,7 +26,8 @@ int main(int argc, char *argv[])
 	int len;
 	int written;
 	int flags = RWF_SYNC;
-	if (argc != 4) {
+	int aligned = 1;
+	if (argc < 4) {
 		printf("%s argc=%d vs expected 4\n", __func__, argc);
 		return -1;
 	}
@@ -34,8 +35,17 @@ int main(int argc, char *argv[])
 	position = atoi(argv[2]);
 	len = atoi(argv[3]);
 
-	//posix_memalign(&buffer, BLOCKSIZE * 8, len);
-	buffer = malloc(len);
+	if (argc == 5)
+		aligned = atoi(argv[4]);
+	if (aligned != 0 && aligned != 1) {
+		printf("%s expected 0/1 for aligned\n", __func__);
+		return -1;	
+	}
+
+	if (aligned)
+		posix_memalign(&buffer, BLOCKSIZE * 8, len);
+	else
+		buffer = malloc(len);
 
 	if (buffer == 0) {
 		printf("%s2 could not alloc buffer buffer=%p\n", __func__);

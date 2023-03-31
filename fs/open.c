@@ -246,6 +246,8 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	struct inode *inode = file_inode(file);
 	long ret;
 
+	pr_err("%s mode=0x%x\n", __func__, mode);
+
 	if (offset < 0 || len <= 0)
 		return -EINVAL;
 

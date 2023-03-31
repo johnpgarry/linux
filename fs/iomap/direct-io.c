@@ -617,10 +617,13 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	unsigned int fs_block_size = i_blocksize(inode);
 	unsigned int blocks = iomi.len / fs_block_size;
 	unsigned long long max_alignment_fs_blocks = find_max_alignment_fs_blocks(blocks, iocb->ki_pos / fs_block_size);
+	bool special = (iomi.len == 2162688);
+
+	special = false;
 
 	// iocb->ki_pos is pwritev2 offset, i.e. offset in file
-	pr_err("%s len=%lld (%d blocks, max_align=%lld FS blocks) ops=%pS dops=%pS type=%d pos=%lld (%lld blocks)\n",
-		__func__, iomi.len, blocks, max_alignment_fs_blocks, ops, dops, iov_iter_type(iter), iocb->ki_pos, iocb->ki_pos / fs_block_size);
+	pr_err("%s len=%lld %s(%d blocks, max_align=%lld FS blocks) ops=%pS dops=%pS type=%d pos=%lld (%lld blocks)\n",
+		__func__, iomi.len, special ? "* " : "", blocks, max_alignment_fs_blocks, ops, dops, iov_iter_type(iter), iocb->ki_pos, iocb->ki_pos / fs_block_size);
 
 	if (!iomi.len)
 		return NULL;
@@ -724,11 +727,23 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
 		unsigned long long iomi_processed_blocks;
-		pr_err("%s2.0 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks) type=%d %s flags=0x%x\n",
+		pr_err("%s2.0 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks) type=%d %s flags=0x%x IOMAP_F_DIRTY=0x%x\n",
 			__func__, iomi.len, iomi.len / fs_block_size,
 			iomi.processed, iomi.processed / fs_block_size,
 			iomi.iomap.type,
-			iomap_type_to_str(iomi.iomap.type), flags);
+			iomap_type_to_str(iomi.iomap.type), iomi.iomap.flags,
+			IOMAP_F_DIRTY);
+		if (special) {
+			if (iomi.iomap.type != IOMAP_MAPPED) {
+				ret = -EIO;
+				break;
+			}
+			if (iomi.iomap.flags & IOMAP_F_DIRTY) {
+				ret = -ENOTTY;
+				break;
+			}
+		}
+
 		iomi.processed = iomap_dio_iter(&iomi, dio);
 		pr_err("%s2.1 iomi.len=%lld (%lld blocks) iomi.processed=%lld (%lld blocks)\n",
 			__func__, iomi.len, iomi.len / fs_block_size,
