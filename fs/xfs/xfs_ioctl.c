@@ -4,6 +4,7 @@
  * All Rights Reserved.
  */
 #include "xfs.h"
+#include "xfs_fs_staging.h"
 #include "xfs_fs.h"
 #include "xfs_shared.h"
 #include "xfs_format.h"
@@ -2148,6 +2149,9 @@ xfs_file_ioctl(
 		sb_end_write(mp->m_super);
 		return error;
 	}
+
+	case XFS_IOC_FALLOCATE2:
+		return xfs_fallocate2(filp, arg);
 
 	default:
 		return -ENOTTY;

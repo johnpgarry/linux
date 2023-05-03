@@ -3275,7 +3275,9 @@ xfs_bmap_compute_alignments(
 	struct xfs_alloc_arg	*args)
 {
 	struct xfs_mount	*mp = args->mp;
-	xfs_extlen_t		align = 0; /* minimum allocation alignment */
+
+	/* minimum allocation alignment */
+	xfs_extlen_t		align = args->alignment;
 	int			stripe_align = 0;
 
 	/* stripe alignment for allocation is determined by mount parameters */
@@ -3652,6 +3654,7 @@ xfs_bmap_btalloc(
 		.datatype	= ap->datatype,
 		.alignment	= 1,
 		.minalignslop	= 0,
+		.alignment	= ap->align,
 	};
 	xfs_fileoff_t		orig_offset;
 	xfs_extlen_t		orig_length;
@@ -4279,12 +4282,14 @@ xfs_bmapi_write(
 	uint32_t		flags,		/* XFS_BMAPI_... */
 	xfs_extlen_t		total,		/* total blocks needed */
 	struct xfs_bmbt_irec	*mval,		/* output: map values */
-	int			*nmap)		/* i/o: mval size/count */
+	int			*nmap,
+	xfs_extlen_t		align)		/* i/o: mval size/count */
 {
 	struct xfs_bmalloca	bma = {
 		.tp		= tp,
 		.ip		= ip,
 		.total		= total,
+		.align		= align,
 	};
 	struct xfs_mount	*mp = ip->i_mount;
 	int			whichfork = xfs_bmapi_whichfork(flags);

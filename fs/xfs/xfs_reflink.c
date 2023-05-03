@@ -420,7 +420,7 @@ xfs_reflink_fill_cow_hole(
 	nimaps = 1;
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC, 0, cmap,
-			&nimaps);
+			&nimaps, 0);
 	if (error)
 		goto out_trans_cancel;
 
@@ -490,7 +490,7 @@ xfs_reflink_fill_delalloc(
 		error = xfs_bmapi_write(tp, ip, cmap->br_startoff,
 				cmap->br_blockcount,
 				XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC, 0,
-				cmap, &nimaps);
+				cmap, &nimaps, 0);
 		if (error)
 			goto out_trans_cancel;
 
