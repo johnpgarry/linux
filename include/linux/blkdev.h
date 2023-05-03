@@ -1514,6 +1514,8 @@ void sync_bdevs(bool wait);
 void bdev_statx_dioalign(struct inode *inode, struct kstat *stat);
 void bdev_statx_atomic(struct inode *inode, struct kstat *stat);
 void printk_all_partitions(void);
+unsigned int bdev_find_max_atomic_write_alignment(struct block_device *bdev,
+				loff_t pos, unsigned int len);
 #else
 static inline void invalidate_bdev(struct block_device *bdev)
 {
@@ -1538,6 +1540,13 @@ static inline void bdev_statx_atomic(struct inode *inode, struct kstat *stat)
 static inline void printk_all_partitions(void)
 {
 }
+static inline unsigned int bdev_find_max_atomic_write_alignment(
+				struct block_device *bdev,
+				loff_t pos, unsigned int len)
+{
+	return 0;
+}		
+				
 #endif /* CONFIG_BLOCK */
 
 int fsync_bdev(struct block_device *bdev);
