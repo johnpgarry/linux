@@ -295,6 +295,11 @@ struct queue_limits {
 	unsigned int		discard_alignment;
 	unsigned int		zone_write_granularity;
 
+	unsigned int		atomic_write_boundary;
+	unsigned int		atomic_write_max_bytes;
+	unsigned int		atomic_write_unit_min;
+	unsigned int		atomic_write_unit_max;
+
 	unsigned short		max_segments;
 	unsigned short		max_integrity_segments;
 	unsigned short		max_discard_segments;
@@ -914,6 +919,14 @@ void blk_queue_zone_write_granularity(struct request_queue *q,
 				      unsigned int size);
 extern void blk_queue_alignment_offset(struct request_queue *q,
 				       unsigned int alignment);
+extern void blk_queue_atomic_write_max_bytes(struct request_queue *q,
+					     unsigned int size);
+extern void blk_queue_atomic_write_unit_max(struct request_queue *q,
+					    unsigned int sectors);
+extern void blk_queue_atomic_write_unit_min(struct request_queue *q,
+					    unsigned int sectors);
+extern void blk_queue_atomic_write_boundary(struct request_queue *q,
+					    unsigned int size);
 void disk_update_readahead(struct gendisk *disk);
 extern void blk_limits_io_min(struct queue_limits *limits, unsigned int min);
 extern void blk_queue_io_min(struct request_queue *q, unsigned int min);
@@ -1314,6 +1327,16 @@ static inline bool bdev_is_zone_start(struct block_device *bdev,
 static inline int queue_dma_alignment(const struct request_queue *q)
 {
 	return q ? q->limits.dma_alignment : 511;
+}
+
+static inline unsigned int queue_atomic_write_unit_max(const struct request_queue *q)
+{
+	return q->limits.atomic_write_unit_max << SECTOR_SHIFT;
+}
+
+static inline unsigned int queue_atomic_write_unit_min(const struct request_queue *q)
+{
+	return q->limits.atomic_write_unit_min << SECTOR_SHIFT;
 }
 
 static inline unsigned int bdev_dma_alignment(struct block_device *bdev)
