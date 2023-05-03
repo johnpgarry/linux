@@ -36,6 +36,8 @@ struct iomap_dio {
 	size_t			done_before;
 	bool			wait_for_completion;
 
+	unsigned int atomic_write_unit;
+
 	union {
 		/* used during submission and for synchronous completion: */
 		struct {
@@ -229,9 +231,21 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 	return opflags;
 }
 
+
+/*
+ * Note: For atomic writes, each bio which we create when we iter should have
+ *	 bi_sector aligned to atomic_write_unit and also its bi_size should be
+ *	 a multiple of atomic_write_unit.
+ *	 The call to bio_iov_iter_get_pages() -> __bio_iov_iter_get_pages()
+ *	 should trim the length to a multiple of atomic_write_unit for us.
+ *	 This allows us to split each bio later in the block layer to fit
+ *	 request_queue limit.
+ */
 static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		struct iomap_dio *dio)
 {
+	bool atomic_write = (dio->iocb->ki_flags & IOCB_ATOMIC) &&
+			    (dio->flags & IOMAP_DIO_WRITE);
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
 	unsigned int fs_block_size = i_blocksize(inode), pad;
@@ -248,6 +262,14 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
+
+
+	if (atomic_write && !iocb_is_dsync(dio->iocb)) {
+		if (iomap->flags & IOMAP_F_DIRTY)
+			return -EIO;
+		if (iomap->type != IOMAP_MAPPED)
+			return -EIO;
+	}
 
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
@@ -318,6 +340,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 					  GFP_KERNEL);
 		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
 		bio->bi_ioprio = dio->iocb->ki_ioprio;
+		if (atomic_write) {
+			bio->bi_opf |= REQ_ATOMIC;
+			bio->atomic_write_unit = dio->atomic_write_unit;
+		}
 		bio->bi_private = dio;
 		bio->bi_end_io = iomap_dio_bio_end_io;
 
@@ -492,6 +518,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		is_sync_kiocb(iocb) || (dio_flags & IOMAP_DIO_FORCE_WAIT);
 	struct blk_plug plug;
 	struct iomap_dio *dio;
+	bool is_read = iov_iter_rw(iter) == READ;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
 
 	if (!iomi.len)
 		return NULL;
@@ -499,6 +527,20 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
 	if (!dio)
 		return ERR_PTR(-ENOMEM);
+
+	if (atomic_write) {
+		/*
+		 * Note: This lookup is not proper for a multi-device scenario,
+		 *	 however for current iomap users, the bdev per iter
+		 *	 will be fixed, so "works" for now.
+		 */
+		struct super_block *i_sb = inode->i_sb;
+		struct block_device *bdev = i_sb->s_bdev;
+
+		dio->atomic_write_unit =
+			bdev_find_max_atomic_write_alignment(bdev,
+					iomi.pos, iomi.len);
+	}
 
 	dio->iocb = iocb;
 	atomic_set(&dio->ref, 1);
@@ -513,7 +555,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	dio->submit.waiter = current;
 	dio->submit.poll_bio = NULL;
 
-	if (iov_iter_rw(iter) == READ) {
+	if (is_read) {
 		if (iomi.pos >= dio->i_size)
 			goto out_free_dio;
 
@@ -567,7 +609,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (ret)
 		goto out_free_dio;
 
-	if (iov_iter_rw(iter) == WRITE) {
+	if (!is_read) {
 		/*
 		 * Try to invalidate cache pages for the range we are writing.
 		 * If this invalidation fails, let the caller fall back to
@@ -592,6 +634,32 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+		if (atomic_write) {
+			const struct iomap *_iomap = &iomi.iomap;
+			loff_t iomi_length = iomap_length(&iomi);
+
+			/*
+			 * Ensure length and start address is a multiple of
+			 * atomic_write_unit - this is critical. If the length
+			 * is not a multiple of atomic_write_unit, then we
+			 * cannot create a set of bio's in iomap_dio_bio_iter()
+			 * who are each a length which is a multiple of
+			 * atomic_write_unit.
+			 *
+			 * Note: It may be more appropiate to have this check
+			 *	 in iomap_dio_bio_iter()
+			 */
+			if ((iomap_sector(_iomap, iomi.pos) << SECTOR_SHIFT) %
+			    dio->atomic_write_unit) {
+				ret = -EIO;
+				break;
+			}
+
+			if (iomi_length % dio->atomic_write_unit) {
+				ret = -EIO;
+				break;
+			}
+		}
 		iomi.processed = iomap_dio_iter(&iomi, dio);
 
 		/*
