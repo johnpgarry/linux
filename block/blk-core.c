@@ -585,6 +585,27 @@ static inline blk_status_t blk_check_zone_append(struct request_queue *q,
 	return BLK_STS_OK;
 }
 
+static blk_status_t blk_validate_atomic_write_op(struct request_queue *q,
+						 struct bio *bio)
+{
+	struct queue_limits *limits = &q->limits;
+
+	if (bio->bi_iter.bi_size % bio->atomic_write_unit)
+		return BLK_STS_IOERR;
+
+	if ((bio->bi_iter.bi_size >> SECTOR_SHIFT) %
+	    limits->atomic_write_unit_min)
+		return BLK_STS_IOERR;
+
+	if (bio->bi_iter.bi_sector % limits->atomic_write_unit_min)
+		return BLK_STS_IOERR;
+
+	/* No support to merge yet, so disable */
+	bio->bi_opf |= REQ_NOMERGE;
+
+	return BLK_STS_OK;
+}
+
 static void __submit_bio(struct bio *bio)
 {
 	if (unlikely(!blk_crypto_bio_prep(&bio)))
@@ -764,6 +785,13 @@ void submit_bio_noacct(struct bio *bio)
 		bio_clear_polled(bio);
 
 	switch (bio_op(bio)) {
+	case REQ_OP_WRITE:
+		if (bio->bi_opf & REQ_ATOMIC) {
+			status = blk_validate_atomic_write_op(q, bio);
+			if (status != BLK_STS_OK)
+				goto end_io;
+		}
+		break;
 	case REQ_OP_DISCARD:
 		if (!bdev_max_discard_sectors(bdev))
 			goto not_supported;
