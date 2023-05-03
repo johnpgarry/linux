@@ -59,6 +59,9 @@ void blk_set_default_limits(struct queue_limits *lim)
 	lim->zoned = BLK_ZONED_NONE;
 	lim->zone_write_granularity = 0;
 	lim->dma_alignment = 511;
+	lim->atomic_write_unit_min = lim->atomic_write_unit_max = 1;
+	lim->atomic_write_max_bytes = 512;
+	lim->atomic_write_boundary = 0;
 }
 
 /**
@@ -182,6 +185,59 @@ void blk_queue_max_discard_sectors(struct request_queue *q,
 	q->limits.max_discard_sectors = max_discard_sectors;
 }
 EXPORT_SYMBOL(blk_queue_max_discard_sectors);
+
+/**
+ * blk_queue_atomic_write_max_bytes - set max bytes supported by
+ * the device for atomic write operations.
+ * @q:  the request queue for the device
+ * @size: maximum bytes supported
+ */
+void blk_queue_atomic_write_max_bytes(struct request_queue *q,
+				      unsigned int size)
+{
+	q->limits.atomic_write_max_bytes = size;
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_max_bytes);
+
+/**
+ * blk_queue_atomic_write_boundary - Device's logical block address space
+ * which an atomic write should not cross.
+ * @q:  the request queue for the device
+ * @size: size in bytes. Must be a power-of-two.
+ */
+void blk_queue_atomic_write_boundary(struct request_queue *q,
+				     unsigned int size)
+{
+	q->limits.atomic_write_boundary = size;
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_boundary);
+
+/**
+ * blk_queue_atomic_write_unit_min - smallest unit that can be written
+ *				     atomically to the device.
+ * @q:  the request queue for the device
+ * @sectors: must be a power-of-two.
+ */
+void blk_queue_atomic_write_unit_min(struct request_queue *q,
+				     unsigned int sectors)
+{
+	q->limits.atomic_write_unit_min = sectors;
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_unit_min);
+
+/*
+ * blk_queue_atomic_write_unit_max - largest unit that can be written
+ * atomically to the device.
+ * @q: the reqeust queue for the device
+ * @sectors: must be a power-of-two.
+ */
+void blk_queue_atomic_write_unit_max(struct request_queue *q,
+				     unsigned int sectors)
+{
+	struct queue_limits *limits = &q->limits;
+	limits->atomic_write_unit_max = sectors;
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_unit_max);
 
 /**
  * blk_queue_max_secure_erase_sectors - set max sectors for a secure erase
