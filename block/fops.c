@@ -43,8 +43,17 @@ static blk_opf_t dio_bio_write_op(struct kiocb *iocb)
 }
 
 static bool blkdev_dio_unaligned(struct block_device *bdev, loff_t pos,
-			      struct iov_iter *iter)
+			      struct iov_iter *iter, bool atomic_write)
 {
+	if (atomic_write) {
+		unsigned int atomic_write_unit_min =
+			queue_atomic_write_unit_min(bdev_get_queue(bdev));
+		if (pos % atomic_write_unit_min)
+			return false;
+		if (iov_iter_count(iter) % atomic_write_unit_min)
+			return false;
+	}
+
 	return pos & (bdev_logical_block_size(bdev) - 1) ||
 		!bdev_iter_is_aligned(bdev, iter);
 }
@@ -56,12 +65,21 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 {
 	struct block_device *bdev = iocb->ki_filp->private_data;
 	struct bio_vec inline_vecs[DIO_INLINE_BIO_VECS], *vecs;
+	bool is_read = iov_iter_rw(iter) == READ;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
+	unsigned int max_align_bytes = 0;
 	loff_t pos = iocb->ki_pos;
 	bool should_dirty = false;
 	struct bio bio;
 	ssize_t ret;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	/* iov_iter_count() return value will change later, so calculate now */
+	if (atomic_write) {
+		max_align_bytes = bdev_find_max_atomic_write_alignment(bdev,
+					iocb->ki_pos, iov_iter_count(iter));
+	}
+
+	if (blkdev_dio_unaligned(bdev, pos, iter, atomic_write))
 		return -EINVAL;
 
 	if (nr_pages <= DIO_INLINE_BIO_VECS)
@@ -73,7 +91,7 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 			return -ENOMEM;
 	}
 
-	if (iov_iter_rw(iter) == READ) {
+	if (is_read) {
 		bio_init(&bio, bdev, vecs, nr_pages, REQ_OP_READ);
 		if (user_backed_iter(iter))
 			should_dirty = true;
@@ -82,6 +100,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	}
 	bio.bi_iter.bi_sector = pos >> SECTOR_SHIFT;
 	bio.bi_ioprio = iocb->ki_ioprio;
+	if (atomic_write) {
+		bio.bi_opf |= REQ_ATOMIC;
+		bio.atomic_write_unit = max_align_bytes;
+	}
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
 	if (unlikely(ret))
@@ -175,11 +197,19 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	struct blkdev_dio *dio;
 	struct bio *bio;
 	bool is_read = (iov_iter_rw(iter) == READ), is_sync;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
 	blk_opf_t opf = is_read ? REQ_OP_READ : dio_bio_write_op(iocb);
+	unsigned int max_align_bytes = 0;
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	/* iov_iter_count() return value will change later, so calculate now */
+	if (atomic_write) {
+		max_align_bytes = bdev_find_max_atomic_write_alignment(bdev,
+					iocb->ki_pos, iov_iter_count(iter));
+	}
+
+	if (blkdev_dio_unaligned(bdev, pos, iter, atomic_write))
 		return -EINVAL;
 
 	if (iocb->ki_flags & IOCB_ALLOC_CACHE)
@@ -214,6 +244,8 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 		bio->bi_private = dio;
 		bio->bi_end_io = blkdev_bio_end_io;
 		bio->bi_ioprio = iocb->ki_ioprio;
+		if (atomic_write)
+			bio->atomic_write_unit = max_align_bytes;
 
 		ret = bio_iov_iter_get_pages(bio, iter);
 		if (unlikely(ret)) {
@@ -244,8 +276,11 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 			if (dio->flags & DIO_SHOULD_DIRTY)
 				bio_set_pages_dirty(bio);
 		} else {
+			if (atomic_write)
+				bio->bi_opf |= REQ_ATOMIC;
 			task_io_account_write(bio->bi_iter.bi_size);
 		}
+
 		dio->size += bio->bi_iter.bi_size;
 		pos += bio->bi_iter.bi_size;
 
@@ -313,13 +348,20 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 	struct block_device *bdev = iocb->ki_filp->private_data;
 	bool is_read = iov_iter_rw(iter) == READ;
 	blk_opf_t opf = is_read ? REQ_OP_READ : dio_bio_write_op(iocb);
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
+	unsigned int max_align_bytes = 0;
 	struct blkdev_dio *dio;
 	struct bio *bio;
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	if (blkdev_dio_unaligned(bdev, pos, iter, atomic_write))
 		return -EINVAL;
+
+	if (atomic_write) {
+		max_align_bytes = bdev_find_max_atomic_write_alignment(bdev,
+					iocb->ki_pos, iov_iter_count(iter));
+	}
 
 	if (iocb->ki_flags & IOCB_ALLOC_CACHE)
 		opf |= REQ_ALLOC_CACHE;
@@ -331,6 +373,8 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 	bio->bi_iter.bi_sector = pos >> SECTOR_SHIFT;
 	bio->bi_end_io = blkdev_bio_end_io_async;
 	bio->bi_ioprio = iocb->ki_ioprio;
+	if (atomic_write)
+		bio->atomic_write_unit = max_align_bytes;
 
 	if (iov_iter_is_bvec(iter)) {
 		/*
@@ -355,6 +399,8 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 			bio_set_pages_dirty(bio);
 		}
 	} else {
+		if (atomic_write)
+			bio->bi_opf |= REQ_ATOMIC;
 		task_io_account_write(bio->bi_iter.bi_size);
 	}
 
