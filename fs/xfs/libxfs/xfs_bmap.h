@@ -26,6 +26,7 @@ struct xfs_bmalloca {
 	xfs_fileoff_t		offset;	/* offset in file filling in */
 	xfs_extlen_t		length;	/* i/o length asked/allocated */
 	xfs_fsblock_t		blkno;	/* starting block of new extent */
+	xfs_extlen_t		align;
 
 	struct xfs_btree_cur	*cur;	/* btree cursor */
 	struct xfs_iext_cursor	icur;	/* incore extent cursor */
@@ -189,7 +190,8 @@ int	xfs_bmapi_read(struct xfs_inode *ip, xfs_fileoff_t bno,
 		int *nmap, uint32_t flags);
 int	xfs_bmapi_write(struct xfs_trans *tp, struct xfs_inode *ip,
 		xfs_fileoff_t bno, xfs_filblks_t len, uint32_t flags,
-		xfs_extlen_t total, struct xfs_bmbt_irec *mval, int *nmap);
+		xfs_extlen_t total, struct xfs_bmbt_irec *mval, int *nmap,
+		xfs_extlen_t align);
 int	__xfs_bunmapi(struct xfs_trans *tp, struct xfs_inode *ip,
 		xfs_fileoff_t bno, xfs_filblks_t *rlen, uint32_t flags,
 		xfs_extnum_t nexts);

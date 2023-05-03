@@ -328,7 +328,7 @@ xfs_dquot_disk_alloc(
 	/* Create the block mapping. */
 	error = xfs_bmapi_write(tp, quotip, dqp->q_fileoffset,
 			XFS_DQUOT_CLUSTER_SIZE_FSB, XFS_BMAPI_METADATA, 0, &map,
-			&nmaps);
+			&nmaps, 0);
 	if (error)
 		goto err_cancel;
 

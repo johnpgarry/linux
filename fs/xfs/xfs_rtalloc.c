@@ -817,7 +817,7 @@ xfs_growfs_rt_alloc(
 		 */
 		nmap = 1;
 		error = xfs_bmapi_write(tp, ip, oblocks, nblocks - oblocks,
-					XFS_BMAPI_METADATA, 0, &map, &nmap);
+					XFS_BMAPI_METADATA, 0, &map, &nmap, 0);
 		if (!error && nmap < 1)
 			error = -ENOSPC;
 		if (error)

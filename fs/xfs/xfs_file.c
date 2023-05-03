@@ -883,12 +883,13 @@ static inline bool xfs_file_sync_writes(struct file *filp)
 		 FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_ZERO_RANGE |	\
 		 FALLOC_FL_INSERT_RANGE | FALLOC_FL_UNSHARE_RANGE)
 
-STATIC long
-xfs_file_fallocate(
+long
+_xfs_file_fallocate(
 	struct file		*file,
 	int			mode,
 	loff_t			offset,
-	loff_t			len)
+	loff_t			len,
+	loff_t 			alignment)
 {
 	struct inode		*inode = file_inode(file);
 	struct xfs_inode	*ip = XFS_I(inode);
@@ -1035,7 +1036,7 @@ xfs_file_fallocate(
 		}
 
 		if (!xfs_is_always_cow_inode(ip)) {
-			error = xfs_alloc_file_space(ip, offset, len);
+			error = xfs_alloc_file_space(ip, offset, len, alignment);
 			if (error)
 				goto out_unlock;
 		}
@@ -1071,6 +1072,16 @@ xfs_file_fallocate(
 out_unlock:
 	xfs_iunlock(ip, iolock);
 	return error;
+}
+
+STATIC long
+xfs_file_fallocate(
+	struct file		*file,
+	int			mode,
+	loff_t			offset,
+	loff_t			len)
+{
+	return _xfs_file_fallocate(file, mode, offset, len, 0);
 }
 
 STATIC int
