@@ -247,6 +247,7 @@ void bio_init(struct bio *bio, struct block_device *bdev, struct bio_vec *table,
 	      unsigned short max_vecs, blk_opf_t opf)
 {
 	bio->bi_next = NULL;
+	bio->atomic_write_unit = 0;
 	bio->bi_bdev = bdev;
 	bio->bi_opf = opf;
 	bio->bi_flags = 0;
@@ -815,6 +816,7 @@ static int __bio_clone(struct bio *bio, struct bio *bio_src, gfp_t gfp)
 	bio->bi_ioprio = bio_src->bi_ioprio;
 	bio->bi_iter = bio_src->bi_iter;
 
+	bio->atomic_write_unit = bio_src->atomic_write_unit;
 	if (bio->bi_bdev) {
 		if (bio->bi_bdev == bio_src->bi_bdev &&
 		    bio_flagged(bio_src, BIO_REMAPPED))
@@ -1274,7 +1276,10 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 
 	nr_pages = DIV_ROUND_UP(offset + size, PAGE_SIZE);
 
-	trim = size & (bdev_logical_block_size(bio->bi_bdev) - 1);
+	if (bio->atomic_write_unit)
+		trim = size & (bio->atomic_write_unit - 1);
+	else
+		trim = size & (bdev_logical_block_size(bio->bi_bdev) - 1);
 	iov_iter_revert(iter, trim);
 
 	size -= trim;
