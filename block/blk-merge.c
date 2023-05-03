@@ -171,7 +171,17 @@ static inline unsigned get_max_io_size(struct bio *bio,
 {
 	unsigned pbs = lim->physical_block_size >> SECTOR_SHIFT;
 	unsigned lbs = lim->logical_block_size >> SECTOR_SHIFT;
-	unsigned max_sectors = lim->max_sectors, start, end;
+	unsigned max_sectors, start, end;
+
+	/*
+	 * We ignore lim->max_sectors for atomic writes simply because
+	 * it may less than bio->write_atomic_unit, which we cannot
+	 * tolerate.
+	 */
+	if (bio->bi_opf & REQ_ATOMIC)
+		max_sectors = lim->atomic_write_max_bytes >> SECTOR_SHIFT;
+	else
+		max_sectors = lim->max_sectors;
 
 	if (lim->chunk_sectors) {
 		max_sectors = min(max_sectors,
@@ -256,6 +266,22 @@ static bool bvec_split_segs(const struct queue_limits *lim,
 	return len > 0 || bv->bv_len > max_len;
 }
 
+static bool bio_straddles_boundary(struct bio *bio, unsigned int bytes,
+				   unsigned int boundary)
+{
+	loff_t start = bio->bi_iter.bi_sector << SECTOR_SHIFT;
+	loff_t end = start + bytes;
+	loff_t start_mod = start % boundary;
+	loff_t end_mod = end % boundary;
+
+	if (end - start > boundary)
+		return true;
+	if ((start_mod > end_mod) && (start_mod && end_mod))
+		return true;
+
+	return false;
+}
+
 /**
  * bio_split_rw - split a bio in two bios
  * @bio:  [in] bio to be split
@@ -276,10 +302,15 @@ static bool bvec_split_segs(const struct queue_limits *lim,
  * responsible for ensuring that @bs is only destroyed after processing of the
  * split bio has finished.
  */
+
+
 struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 		unsigned *segs, struct bio_set *bs, unsigned max_bytes)
 {
+	unsigned int atomic_write_boundary = lim->atomic_write_boundary;
+	bool atomic_write = bio->bi_opf & REQ_ATOMIC;
 	struct bio_vec bv, bvprv, *bvprvp = NULL;
+	bool straddles_boundary = false;
 	struct bvec_iter iter;
 	unsigned nsegs = 0, bytes = 0;
 
@@ -291,14 +322,31 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 		if (bvprvp && bvec_gap_to_prev(lim, bvprvp, bv.bv_offset))
 			goto split;
 
+		if (atomic_write && atomic_write_boundary) {
+			straddles_boundary = bio_straddles_boundary(bio,
+					bytes + bv.bv_len, atomic_write_boundary);
+		}
 		if (nsegs < lim->max_segments &&
 		    bytes + bv.bv_len <= max_bytes &&
-		    bv.bv_offset + bv.bv_len <= PAGE_SIZE) {
+		    bv.bv_offset + bv.bv_len <= PAGE_SIZE &&
+		    !straddles_boundary) {
 			nsegs++;
 			bytes += bv.bv_len;
 		} else {
-			if (bvec_split_segs(lim, &bv, &nsegs, &bytes,
-					lim->max_segments, max_bytes))
+			bool split_the_segs =
+				bvec_split_segs(lim, &bv, &nsegs, &bytes,
+						lim->max_segments, max_bytes);
+
+			/*
+			 * We may not actually straddle the boundary as we may
+			 * have added less bytes than anticipated
+			 */
+			if (straddles_boundary) {
+				straddles_boundary = bio_straddles_boundary(bio,
+						bytes, atomic_write_boundary);
+			}
+
+			if (split_the_segs || straddles_boundary)
 				goto split;
 		}
 
@@ -321,12 +369,25 @@ split:
 
 	*segs = nsegs;
 
-	/*
-	 * Individual bvecs might not be logical block aligned. Round down the
-	 * split size so that each bio is properly block size aligned, even if
-	 * we do not use the full hardware limits.
-	 */
-	bytes = ALIGN_DOWN(bytes, lim->logical_block_size);
+	if (straddles_boundary) {
+		loff_t new_end = (bio->bi_iter.bi_sector << SECTOR_SHIFT) + bytes;
+		unsigned int trim = new_end & (atomic_write_boundary - 1);
+		bytes -= trim;
+		new_end = (bio->bi_iter.bi_sector << SECTOR_SHIFT) + bytes;
+		BUG_ON(new_end % atomic_write_boundary);
+	} else if (bio->atomic_write_unit) {
+		unsigned int atomic_write_unit = bio->atomic_write_unit;
+		unsigned int trim = bytes % atomic_write_unit;
+
+		bytes -= trim;
+	} else {
+		/*
+		 * Individual bvecs might not be logical block aligned. Round down the
+		 * split size so that each bio is properly block size aligned, even if
+		 * we do not use the full hardware limits.
+		 */
+		bytes = ALIGN_DOWN(bytes, lim->logical_block_size);
+	}
 
 	/*
 	 * Bio splitting may cause subtle trouble such as hang when doing sync
@@ -355,7 +416,8 @@ struct bio *__bio_split_to_limits(struct bio *bio,
 				  const struct queue_limits *lim,
 				  unsigned int *nr_segs)
 {
-	struct bio_set *bs = &bio->bi_bdev->bd_disk->bio_split;
+	struct block_device *bi_bdev = bio->bi_bdev;
+	struct bio_set *bs = &bi_bdev->bd_disk->bio_split;
 	struct bio *split;
 
 	switch (bio_op(bio)) {
