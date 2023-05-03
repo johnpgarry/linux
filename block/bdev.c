@@ -1014,3 +1014,24 @@ void bdev_statx_dioalign(struct inode *inode, struct kstat *stat)
 
 	blkdev_put_no_open(bdev);
 }
+
+/*
+ * Handle statx for block devices to get properties of WRITE ATOMIC
+ * feature support.
+ */
+void bdev_statx_atomic(struct inode *inode, struct kstat *stat)
+{
+	struct block_device *bdev;
+
+	bdev = blkdev_get_no_open(inode->i_rdev);
+	if (!bdev)
+		return;
+
+	stat->atomic_write_unit_min = queue_atomic_write_unit_min(bdev->bd_queue);
+	stat->atomic_write_unit_max = queue_atomic_write_unit_max(bdev->bd_queue);
+	stat->attributes |= STATX_ATTR_WRITE_ATOMIC;
+	stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC;
+	stat->result_mask |= STATX_WRITE_ATOMIC;
+
+	blkdev_put_no_open(bdev);
+}

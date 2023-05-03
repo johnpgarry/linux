@@ -1527,6 +1527,7 @@ int sync_blockdev_range(struct block_device *bdev, loff_t lstart, loff_t lend);
 int sync_blockdev_nowait(struct block_device *bdev);
 void sync_bdevs(bool wait);
 void bdev_statx_dioalign(struct inode *inode, struct kstat *stat);
+void bdev_statx_atomic(struct inode *inode, struct kstat *stat);
 void printk_all_partitions(void);
 #else
 static inline void invalidate_bdev(struct block_device *bdev)
@@ -1544,6 +1545,9 @@ static inline void sync_bdevs(bool wait)
 {
 }
 static inline void bdev_statx_dioalign(struct inode *inode, struct kstat *stat)
+{
+}
+static inline void bdev_statx_atomic(struct inode *inode, struct kstat *stat)
 {
 }
 static inline void printk_all_partitions(void)
