@@ -3323,8 +3323,9 @@ xfs_bmap_compute_alignments(
 
 	if (ap->flags & XFS_BMAPI_COWFORK)
 		align = xfs_get_cowextsz_hint(ap->ip);
-	else if (ap->datatype & XFS_ALLOC_USERDATA)
-		align = xfs_get_extsz_hint(ap->ip);
+	else if (ap->datatype & XFS_ALLOC_USERDATA) {
+		align = args->alignment = 16;//xfs_get_extsz_hint(ap->ip);
+	}
 	if (align) {
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
