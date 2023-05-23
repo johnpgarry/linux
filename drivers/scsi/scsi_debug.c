@@ -5209,6 +5209,10 @@ static bool stop_qc_helper(struct sdebug_defer *sd_dp,
 	return false;
 }
 
+struct scsi_debug_abort_data {
+	struct completion completion;
+	struct scsi_cmnd *cmnd;
+};
 
 static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 {
@@ -5231,18 +5235,73 @@ static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 	return true;
 }
 
+/* All we currently support is to abort an individual command, so call it directly */
+static int scsi_debug_reserved_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *cmd)
+{
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	struct scsi_debug_abort_data *data = rq->end_io_data;
+	struct scsi_cmnd *abort_cmd = data->cmnd;
+	struct sdebug_scsi_cmd *sdsc = scsi_cmd_priv(abort_cmd);
+	unsigned long flags;
+	int res;
+
+	pr_err("%s cmd=%pS abort_cmd=%pS calling scsi_debug_stop_cmnd\n", __func__, cmd, abort_cmd);
+
+	spin_lock_irqsave(&sdsc->lock, flags);
+	res = scsi_debug_stop_cmnd(abort_cmd);
+	spin_unlock_irqrestore(&sdsc->lock, flags);
+
+	pr_err("%s2 cmd=%pS abort_cmd=%pS res=%d after calling scsi_debug_stop_cmnd\n", __func__, cmd, abort_cmd, res);
+
+	return 0;
+}
+
+static enum blk_eh_timer_return scsi_debug_reserved_timedout(struct scsi_cmnd *scmd)
+{
+
+	pr_err("%s scmd=%pS\n", __func__, scmd);
+	return BLK_EH_DONE;
+}
+
+enum rq_end_io_ret scsi_debug_end_sync_rq(struct request *rq, blk_status_t error)
+{
+	struct scsi_debug_abort_data *data = rq->end_io_data;
+
+	pr_err("%s rq=%pS end_io_data=%pS calling complete\n", __func__, rq, rq->end_io_data);
+	complete(&data->completion);
+
+	return RQ_END_IO_NONE;
+}
+
 /*
  * Called from scsi_debug_abort() only, which is for timed-out cmd.
  */
 static bool scsi_debug_abort_cmnd(struct scsi_cmnd *cmnd)
 {
-	struct sdebug_scsi_cmd *sdsc = scsi_cmd_priv(cmnd);
-	unsigned long flags;
+	struct scsi_device *sdev = cmnd->device;
+	struct request *rq;
 	bool res;
+	struct scsi_debug_abort_data data = {
+		.cmnd = cmnd,
+		.completion = COMPLETION_INITIALIZER(data.completion),
+	};
 
-	spin_lock_irqsave(&sdsc->lock, flags);
-	res = scsi_debug_stop_cmnd(cmnd);
-	spin_unlock_irqrestore(&sdsc->lock, flags);
+	rq = scsi_alloc_request(sdev->request_queue, REQ_OP_DRV_IN,
+					BLK_MQ_REQ_RESERVED | BLK_MQ_REQ_NOWAIT);
+
+	pr_err("%s rq=%pS &data=%pS cmnd=%pS\n", __func__, rq, &data, cmnd);
+	if (IS_ERR(rq))
+		return false;
+
+	rq->end_io = scsi_debug_end_sync_rq;
+	rq->end_io_data = &data;
+
+	pr_err("%s2 calling blk_execute_rq_nowait rq=%pS &data=%pS\n", __func__, rq, &data);
+	blk_execute_rq_nowait(rq, true);
+	pr_err("%s3 calling wait_for_completion rq=%pS &data=%pS\n", __func__, rq, &data);
+	wait_for_completion(&data.completion);
+	pr_err("%s4 got completion rq=%pS &data=%pS\n", __func__, rq, &data);
+
 
 	return res;
 }
@@ -7684,6 +7743,8 @@ static struct scsi_host_template sdebug_driver_template = {
 	.slave_destroy =	scsi_debug_slave_destroy,
 	.ioctl =		scsi_debug_ioctl,
 	.queuecommand =		scsi_debug_queuecommand,
+	.reserved_queuecommand = scsi_debug_reserved_queuecommand,
+	.reserved_timedout = scsi_debug_reserved_timedout,
 	.change_queue_depth =	sdebug_change_qdepth,
 	.map_queues =		sdebug_map_queues,
 	.mq_poll =		sdebug_blk_mq_poll,
@@ -7702,6 +7763,7 @@ static struct scsi_host_template sdebug_driver_template = {
 	.track_queue_depth =	1,
 	.cmd_size = sizeof(struct sdebug_scsi_cmd),
 	.init_cmd_priv = sdebug_init_cmd_priv,
+	.nr_reserved_cmds = 2,
 };
 
 static int sdebug_driver_probe(struct device *dev)
