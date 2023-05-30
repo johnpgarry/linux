@@ -62,6 +62,7 @@ void blk_set_default_limits(struct queue_limits *lim)
 	lim->atomic_write_unit_min = lim->atomic_write_unit_max = 1;
 	lim->atomic_write_max_bytes = 512;
 	lim->atomic_write_boundary = 0;
+	pr_err("%s lim=%pS\n", __func__, lim);
 }
 
 /**
@@ -85,6 +86,7 @@ void blk_set_stacking_limits(struct queue_limits *lim)
 	lim->max_dev_sectors = UINT_MAX;
 	lim->max_write_zeroes_sectors = UINT_MAX;
 	lim->max_zone_append_sectors = UINT_MAX;
+	pr_err("%s lim=%pS\n", __func__, lim);
 }
 EXPORT_SYMBOL(blk_set_stacking_limits);
 
@@ -627,6 +629,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		     sector_t start)
 {
 	unsigned int top, bottom, alignment, ret = 0;
+	pr_err("%s t=%pS b=%pS\n", __func__, t, b);
 
 	t->max_sectors = min_not_zero(t->max_sectors, b->max_sectors);
 	t->max_hw_sectors = min_not_zero(t->max_hw_sectors, b->max_hw_sectors);
