@@ -118,7 +118,9 @@ static umode_t ddr_perf_identifier_attr_visible(struct kobject *kobj,
 {
 	struct device *dev = kobj_to_dev(kobj);
 	struct ddr_pmu *pmu = dev_get_drvdata(dev);
-
+	pr_err("%s dev=%pS pmu=%pS attr=%pS\n", __func__, dev, pmu, attr);
+	pr_err("%s2 dev=%pS devtype_data=%pS\n", __func__, dev, pmu->devtype_data);
+	pr_err("%s2 dev=%pS identifier=%pS\n", __func__, dev, pmu->devtype_data->identifier);
 	if (!pmu->devtype_data->identifier)
 		return 0;
 	return attr->mode;
@@ -612,7 +614,7 @@ static int ddr_perf_init(struct ddr_pmu *pmu, void __iomem *base,
 	return pmu->id;
 }
 
-static irqreturn_t ddr_perf_irq_handler(int irq, void *p)
+static __maybe_unused irqreturn_t ddr_perf_irq_handler(int irq, void *p)
 {
 	int i;
 	struct ddr_pmu *pmu = (struct ddr_pmu *) p;
@@ -677,21 +679,30 @@ static int ddr_perf_probe(struct platform_device *pdev)
 {
 	struct ddr_pmu *pmu;
 	struct device_node *np;
-	void __iomem *base;
+	void __iomem *base = NULL;
+	struct device *dev = &pdev->dev;
 	char *name;
 	int num;
 	int ret;
-	int irq;
+	__maybe_unused int irq;
+	dev_err(dev, "%s start\n", __func__);
 
+	#ifdef HACKOUT
 	base = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(base))
+	if (IS_ERR(base)) {
+		dev_err(dev, "%s error base\n", __func__);
 		return PTR_ERR(base);
+	}
+	#endif
 
 	np = pdev->dev.of_node;
 
 	pmu = devm_kzalloc(&pdev->dev, sizeof(*pmu), GFP_KERNEL);
-	if (!pmu)
+	if (!pmu) {
+	
+		dev_err(dev, "%s2 error pmu memory\n", __func__);
 		return -ENOMEM;
+	}
 
 	num = ddr_perf_init(pmu, base, &pdev->dev);
 
@@ -701,10 +712,11 @@ static int ddr_perf_probe(struct platform_device *pdev)
 			      num);
 	if (!name) {
 		ret = -ENOMEM;
+		dev_err(dev, "%s3 error pmu name\n", __func__);
 		goto cpuhp_state_err;
 	}
 
-	pmu->devtype_data = of_device_get_match_data(&pdev->dev);
+	pmu->devtype_data = &imx8mn_devtype_data;//of_device_get_match_data(&pdev->dev);
 
 	pmu->cpu = raw_smp_processor_id();
 	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN,
@@ -727,6 +739,7 @@ static int ddr_perf_probe(struct platform_device *pdev)
 	}
 
 	/* Request irq */
+	#ifdef HACKOUT
 	irq = of_irq_get(np, 0);
 	if (irq < 0) {
 		dev_err(&pdev->dev, "Failed to get irq: %d", irq);
@@ -750,10 +763,13 @@ static int ddr_perf_probe(struct platform_device *pdev)
 		dev_err(pmu->dev, "Failed to set interrupt affinity!\n");
 		goto ddr_perf_err;
 	}
+	#endif
 
 	ret = perf_pmu_register(&pmu->pmu, name, -1);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "%s error pmu register\n", __func__);
 		goto ddr_perf_err;
+	}
 
 	return 0;
 
@@ -766,6 +782,43 @@ cpuhp_state_err:
 	dev_warn(&pdev->dev, "i.MX8 DDR Perf PMU failed (%d), disabled\n", ret);
 	return ret;
 }
+
+static const struct platform_device_id amatch[] = {
+	{ "imx8_ddr0", 0},
+	{ "imx8_ddr1", 0},
+	{ }
+};
+MODULE_DEVICE_TABLE(platform, amatch);
+
+static struct resource p0r[] = {
+	{
+		.flags          = IORESOURCE_MEM,
+		.start = 0x00000,
+		.end = 0x00000 + 0x1000 -1,
+	}
+};
+
+static struct platform_device p0 = {
+	.name = "imx8_ddr0",
+	.id = -1,
+	.resource = p0r,
+	.num_resources = ARRAY_SIZE(p0r),
+};
+
+static struct resource p1r[] = {
+	{
+		.flags          = IORESOURCE_MEM,
+		.start = 0x10000,
+		.end = 0x10000 + 0x1000 -1,
+	}
+};
+
+static struct platform_device p1 = {
+	.name = "imx8_ddr1",
+	.id = -1,
+	.resource = p1r,
+	.num_resources = ARRAY_SIZE(p1r),
+};
 
 static int ddr_perf_remove(struct platform_device *pdev)
 {
@@ -781,6 +834,7 @@ static int ddr_perf_remove(struct platform_device *pdev)
 }
 
 static struct platform_driver imx_ddr_pmu_driver = {
+	.id_table = amatch,
 	.driver         = {
 		.name   = "imx-ddr-pmu",
 		.of_match_table = imx_ddr_pmu_dt_ids,
@@ -790,5 +844,18 @@ static struct platform_driver imx_ddr_pmu_driver = {
 	.remove         = ddr_perf_remove,
 };
 
-module_platform_driver(imx_ddr_pmu_driver);
+static int __init imx_ddr_pmu_init(void)
+{
+	int ret;
+	pr_err("%s\n", __func__);
+	platform_device_register(&p0);
+	platform_device_register(&p1);
+
+	ret = platform_driver_register(&imx_ddr_pmu_driver);
+	pr_err("%s2 ret=%d\n", __func__, ret);
+	return ret;
+	
+}
+module_init(imx_ddr_pmu_init);
+
 MODULE_LICENSE("GPL v2");
