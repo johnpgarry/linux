@@ -5212,6 +5212,7 @@ static bool stop_qc_helper(struct sdebug_defer *sd_dp,
 struct scsi_debug_abort_data {
 	struct completion completion;
 	struct scsi_cmnd *cmnd;
+	blk_status_t ret;
 };
 
 static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
@@ -5248,18 +5249,20 @@ static int scsi_debug_reserved_queuecommand(struct Scsi_Host *shost, struct scsi
 	pr_err("%s cmd=%pS abort_cmd=%pS calling scsi_debug_stop_cmnd\n", __func__, cmd, abort_cmd);
 
 	spin_lock_irqsave(&sdsc->lock, flags);
-	res = scsi_debug_stop_cmnd(abort_cmd);
+	cmd->result = scsi_debug_stop_cmnd(abort_cmd);
 	spin_unlock_irqrestore(&sdsc->lock, flags);
 
 	pr_err("%s2 cmd=%pS abort_cmd=%pS res=%d after calling scsi_debug_stop_cmnd\n", __func__, cmd, abort_cmd, res);
-
+	scsi_done(cmd);
 	return 0;
 }
 
 static enum blk_eh_timer_return scsi_debug_reserved_timedout(struct scsi_cmnd *scmd)
 {
+	struct scsi_debug_abort_data *data = rq->end_io_data;
 
-	pr_err("%s scmd=%pS\n", __func__, scmd);
+	pr_err("%s rq=%pS end_io_data=%pS calling complete\n", __func__, rq, rq->end_io_data);
+	complete(&data->completion);
 	return BLK_EH_DONE;
 }
 
@@ -5298,11 +5301,13 @@ static bool scsi_debug_abort_cmnd(struct scsi_cmnd *cmnd)
 
 	pr_err("%s2 calling blk_execute_rq_nowait rq=%pS &data=%pS\n", __func__, rq, &data);
 	blk_execute_rq_nowait(rq, true);
+
 	pr_err("%s3 calling wait_for_completion rq=%pS &data=%pS\n", __func__, rq, &data);
 	wait_for_completion(&data.completion);
-	pr_err("%s4 got completion rq=%pS &data=%pS\n", __func__, rq, &data);
+	pr_err("%s4 got completion rq=%pS &data=%pS \n", __func__, rq, &data);
 
-
+	res = 0;
+	blk_mq_free_request(rq);
 	return res;
 }
 
@@ -5360,6 +5365,7 @@ static bool scsi_debug_stop_all_queued_iter(struct request *rq, void *data)
 static void scsi_debug_stop_all_queued(struct scsi_device *sdp)
 {
 	struct Scsi_Host *shost = sdp->host;
+			pr_err("%s sdp=%pS\n", __func__, sdp);
 
 	blk_mq_tagset_busy_iter(&shost->tag_set,
 				scsi_debug_stop_all_queued_iter, sdp);
@@ -5370,6 +5376,7 @@ static int scsi_debug_device_reset(struct scsi_cmnd *SCpnt)
 	struct scsi_device *sdp = SCpnt->device;
 	struct sdebug_dev_info *devip = sdp->hostdata;
 
+			pr_err("%s SCpnt=%pS\n", __func__, SCpnt);
 	++num_dev_resets;
 
 	if (SDEBUG_OPT_ALL_NOISE & sdebug_opts)
@@ -5388,6 +5395,7 @@ static int scsi_debug_target_reset(struct scsi_cmnd *SCpnt)
 	struct sdebug_host_info *sdbg_host = shost_to_sdebug_host(sdp->host);
 	struct sdebug_dev_info *devip;
 	int k = 0;
+			pr_err("%s SCpnt=%pS\n", __func__, SCpnt);
 
 	++num_target_resets;
 	if (SDEBUG_OPT_ALL_NOISE & sdebug_opts)
@@ -5413,6 +5421,7 @@ static int scsi_debug_bus_reset(struct scsi_cmnd *SCpnt)
 	struct sdebug_host_info *sdbg_host = shost_to_sdebug_host(sdp->host);
 	struct sdebug_dev_info *devip;
 	int k = 0;
+			pr_err("%s SCpnt=%pS\n", __func__, SCpnt);
 
 	++num_bus_resets;
 
@@ -5435,6 +5444,7 @@ static int scsi_debug_host_reset(struct scsi_cmnd *SCpnt)
 	struct sdebug_host_info *sdbg_host;
 	struct sdebug_dev_info *devip;
 	int k = 0;
+			pr_err("%s SCpnt=%pS\n", __func__, SCpnt);
 
 	++num_host_resets;
 	if (SDEBUG_OPT_ALL_NOISE & sdebug_opts)
@@ -7392,8 +7402,10 @@ static bool fake_timeout(struct scsi_cmnd *scp)
 	if (0 == (atomic_read(&sdebug_cmnd_count) % abs(sdebug_every_nth))) {
 		if (sdebug_every_nth < -1)
 			sdebug_every_nth = -1;
-		if (SDEBUG_OPT_TIMEOUT & sdebug_opts)
+		if (SDEBUG_OPT_TIMEOUT & sdebug_opts) {
+			pr_err("%s scp=%pS\n", __func__, scp);
 			return true; /* ignore command causing timeout */
+		}
 		else if (SDEBUG_OPT_MAC_TIMEOUT & sdebug_opts &&
 			 scsi_medium_access_command(scp))
 			return true; /* time out reads and writes */

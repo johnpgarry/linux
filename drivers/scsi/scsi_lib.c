@@ -1740,6 +1740,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	int reason;
 
 	if (blk_mq_is_reserved_rq(req)) {
+		pr_err("%s cmd=%pS\n", __func__, cmd);
 		if (!(req->rq_flags & RQF_DONTPREP)) {
 			ret = scsi_prepare_cmd(req);
 			if (ret != BLK_STS_OK)
