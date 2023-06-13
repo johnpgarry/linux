@@ -152,72 +152,53 @@ SMMU_PMU_EVENT_ATTR_EXTRACTOR(filter_enable, config1, 33, 33);
 
 static inline void smmu_pmu_enable(struct pmu *pmu)
 {
-	struct smmu_pmu *smmu_pmu = to_smmu_pmu(pmu);
-
-	writel(SMMU_PMCG_IRQ_CTRL_IRQEN,
-	       smmu_pmu->reg_base + SMMU_PMCG_IRQ_CTRL);
-	writel(SMMU_PMCG_CR_ENABLE, smmu_pmu->reg_base + SMMU_PMCG_CR);
 }
 
 static inline void smmu_pmu_disable(struct pmu *pmu)
 {
-	struct smmu_pmu *smmu_pmu = to_smmu_pmu(pmu);
-
-	writel(0, smmu_pmu->reg_base + SMMU_PMCG_CR);
-	writel(0, smmu_pmu->reg_base + SMMU_PMCG_IRQ_CTRL);
 }
+
+u64 global_value;
 
 static inline void smmu_pmu_counter_set_value(struct smmu_pmu *smmu_pmu,
 					      u32 idx, u64 value)
 {
-	if (smmu_pmu->counter_mask & BIT(32))
-		writeq(value, smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx, 8));
-	else
-		writel(value, smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx, 4));
+	global_value = value;
 }
 
 static inline u64 smmu_pmu_counter_get_value(struct smmu_pmu *smmu_pmu, u32 idx)
 {
-	u64 value;
+	static u64 value;
 
-	if (smmu_pmu->counter_mask & BIT(32))
-		value = readq(smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx, 8));
-	else
-		value = readl(smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx, 4));
+	value++;
 
-	return value;
+	return global_value + value;
 }
 
 static inline void smmu_pmu_counter_enable(struct smmu_pmu *smmu_pmu, u32 idx)
 {
-	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_CNTENSET0);
 }
 
 static inline void smmu_pmu_counter_disable(struct smmu_pmu *smmu_pmu, u32 idx)
 {
-	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_CNTENCLR0);
 }
 
 static inline void smmu_pmu_interrupt_enable(struct smmu_pmu *smmu_pmu, u32 idx)
 {
-	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_INTENSET0);
 }
 
 static inline void smmu_pmu_interrupt_disable(struct smmu_pmu *smmu_pmu,
 					      u32 idx)
 {
-	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_INTENCLR0);
 }
 
 static inline void smmu_pmu_set_evtyper(struct smmu_pmu *smmu_pmu, u32 idx,
 					u32 val)
 {
-	writel(val, smmu_pmu->reg_base + SMMU_PMCG_EVTYPER(idx));
 }
 
 static inline void smmu_pmu_set_smr(struct smmu_pmu *smmu_pmu, u32 idx, u32 val)
 {
-	writel(val, smmu_pmu->reg_base + SMMU_PMCG_SMR(idx));
 }
 
 static void smmu_pmu_event_update(struct perf_event *event)
@@ -227,16 +208,16 @@ static void smmu_pmu_event_update(struct perf_event *event)
 	__maybe_unused u64 delta, prev, now;
 	__maybe_unused u32 idx = hwc->idx;
 
-//	do {
-//		prev = local64_read(&hwc->prev_count);
-//		now = smmu_pmu_counter_get_value(smmu_pmu, idx);
-//	} while (local64_cmpxchg(&hwc->prev_count, prev, now) != prev);
+	do {
+		prev = local64_read(&hwc->prev_count);
+		now = smmu_pmu_counter_get_value(smmu_pmu, idx);
+	} while (local64_cmpxchg(&hwc->prev_count, prev, now) != prev);
 
 	/* handle overflow. */
-//	delta = now - prev;
-//	delta &= smmu_pmu->counter_mask;
+	delta = now - prev;
+	delta &= smmu_pmu->counter_mask;
 
-//	local64_add(delta, &event->count);
+	local64_add(delta, &event->count);
 }
 
 static void smmu_pmu_set_period(struct smmu_pmu *smmu_pmu,
