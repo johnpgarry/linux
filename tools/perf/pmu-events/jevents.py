@@ -748,6 +748,85 @@ static void decompress_metric(int offset, struct pmu_metric *pm)
       _args.output_file.write('\twhile (*p++);')
   _args.output_file.write("""}
 
+
+#include <linux/zalloc.h>
+
+struct event_iter_data {
+  struct pmu_event *table;
+  unsigned int event_count;
+};
+
+static int
+metricgroup__metric_sys_event_count(__maybe_unused const struct pmu_event *pe,
+           __maybe_unused const struct pmu_events_table *table,
+           void *data)
+{
+  unsigned int *count = data;
+
+  (*count)++;
+  return 0;
+}
+
+/*
+struct pmu_sys_events {
+  const char *name;
+  struct pmu_events_table event_table;
+  struct pmu_metrics_table metric_table;
+};
+
+struct pmu_metrics_table {
+        const struct compact_pmu_event *entries;
+        size_t length;
+};
+*/
+
+static struct pmu_sys_events *sys_pmu_map;
+
+/*
+ * fake_pmu argument is to avoid adding a fake_pmu to the list of PMUs in
+ * pmu.c::pmus
+ */
+void metricgroup_init_sys_pmu_list(void)
+{
+	unsigned int event_count = 0;
+	struct compact_pmu_event *entries;
+	static int done;
+
+	if (sys_pmu_map || done)
+		return;
+
+	pmu_for_each_sys_event(metricgroup__metric_sys_event_count,
+         &event_count);
+
+	if (event_count == 0) {
+		done = 1;
+		return;
+	}
+
+	entries = zalloc(event_count * sizeof(struct compact_pmu_event));
+	if (!entries)
+		return;
+
+	sys_pmu_map = malloc(sizeof(*sys_pmu_map));
+	if (!sys_pmu_map) {
+		free(entries);
+		return;
+	}
+
+  sys_pmu_map->metric_table.entries = entries;
+  sys_pmu_map->metric_table.length = 12;
+}
+
+void metricgroup_cleanup_sys_pmu_list(void)
+{
+	/* Test for sys events found */
+	if (sys_pmu_map) {
+		free((struct compact_pmu_event *)sys_pmu_map->metric_table.entries);
+		free(sys_pmu_map);
+	}
+	sys_pmu_map = NULL;
+}
+
 int pmu_events_table_for_each_event(const struct pmu_events_table *table,
                                     pmu_event_iter_fn fn,
                                     void *data)

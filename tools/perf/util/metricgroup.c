@@ -1299,6 +1299,8 @@ static int metricgroup__add_metric_list(const char *pmu, const char *list,
 		return -ENOMEM;
 	list_itr = list_copy;
 
+	metricgroup_init_sys_pmu_list();
+
 	while ((metric_name = strsep(&list_itr, ",")) != NULL) {
 		modifier = strchr(metric_name, ':');
 		if (modifier)
@@ -1317,6 +1319,8 @@ static int metricgroup__add_metric_list(const char *pmu, const char *list,
 		count++;
 	}
 	free(list_copy);
+
+	metricgroup_cleanup_sys_pmu_list();
 
 	if (!ret) {
 		/*
