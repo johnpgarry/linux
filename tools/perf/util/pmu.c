@@ -726,7 +726,7 @@ static bool perf_pmu__match_ignoring_suffix(const char *pmu_name, const char *to
  *            "socketX_pmunameY".
  * @name: a real full PMU name as from sysfs.
  */
-static bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
+bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
 {
 	char *tmp = NULL, *tok, *str;
 	bool res;

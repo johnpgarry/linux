@@ -269,4 +269,6 @@ int perf_pmu__pathname_fd(int dirfd, const char *pmu_name, const char *filename,
 
 void perf_pmu__destroy(void);
 
+bool pmu_uncore_alias_match(const char *pmu_name, const char *name);
+
 #endif /* __PMU_H */

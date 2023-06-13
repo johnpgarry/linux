@@ -55,6 +55,7 @@ struct pmu_metric {
 	const char *metric_group;
 	const char *metric_expr;
 	const char *metric_threshold;
+	const char *pmu;
 	const char *unit;
 	const char *compat;
 	const char *desc;
