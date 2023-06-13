@@ -367,17 +367,18 @@ static int ddr_perf_event_init(struct perf_event *event)
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	struct perf_event *sibling;
-	pr_err("%s pmu=%pS\n", __func__, pmu);
+	//pr_err("%s pmu=%pS\n", __func__, pmu);
 	if (event->attr.type != event->pmu->type) {
-		pr_err("%s1 error1 pmu=%pS\n", __func__, pmu);
+		pr_err_once("%s1 error1 pmu=%pS event->attr.type=%d event->pmu->type=%d\n",
+			__func__, pmu, event->attr.type, event->pmu->type);
 		return -ENOENT;
 	}
 
 	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK) {
-		pr_err("%s2 error2 pmu=%pS\n", __func__, pmu);
+	//	pr_err("%s2 error2 pmu=%pS\n", __func__, pmu);
 		return -EOPNOTSUPP;
 	}
-	pr_err("%s2.1\n", __func__);
+	//pr_err("%s2.1\n", __func__);
 	if (event->cpu < 0) {
 		dev_warn(pmu->dev, "Can't provide per-task data!\n");
 		return -EOPNOTSUPP;
@@ -393,7 +394,7 @@ static int ddr_perf_event_init(struct perf_event *event)
 		pr_err("%s3 error3 pmu=%pS\n", __func__, pmu);
 		return -EINVAL;
 	}
-	pr_err("%s3.1\n", __func__);
+	//pr_err("%s3.1\n", __func__);
 
 	if (pmu->devtype_data->quirks & DDR_CAP_AXI_ID_FILTER) {
 		if (!ddr_perf_filters_compatible(event, event->group_leader)) {
@@ -407,7 +408,7 @@ static int ddr_perf_event_init(struct perf_event *event)
 			}
 		}
 	}
-	pr_err("%s5.1\n", __func__);
+	//pr_err("%s5.1\n", __func__);
 
 	for_each_sibling_event(sibling, event->group_leader) {
 		if (sibling->pmu != event->pmu &&
@@ -419,7 +420,7 @@ static int ddr_perf_event_init(struct perf_event *event)
 
 	event->cpu = pmu->cpu;
 	hwc->idx = -1;
-	pr_err("%s6.1\n", __func__);
+	//pr_err("%s6.1\n", __func__);
 
 	return 0;
 }
@@ -455,7 +456,7 @@ static bool ddr_perf_counter_overflow(struct ddr_pmu *pmu, int counter)
 
 	return val & CNTL_OVER;
 	#else
-	pr_err("%s stubbed\n", __func__);
+	//pr_err_once("%s stubbed\n", __func__);
 	return 0;
 	#endif
 }
@@ -473,7 +474,7 @@ static void ddr_perf_counter_clear(struct ddr_pmu *pmu, int counter)
 	val |= CNTL_CLEAR;
 	writel(val, pmu->base + reg);
 	#else
-	pr_err("%s stubbed\n", __func__);
+	//pr_err_once("%s stubbed\n", __func__);
 	#endif
 }
 
@@ -565,12 +566,12 @@ static void ddr_perf_event_stop(struct perf_event *event, int flags)
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	int counter = hwc->idx;
-	pr_err("%s1 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
+	//pr_err("%s1 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 
 	ddr_perf_counter_enable(pmu, event->attr.config, counter, false);
-	pr_err("%s2 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
+	//pr_err("%s2 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 	ddr_perf_event_update(event);
-	pr_err("%s3 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
+	//pr_err("%s3 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 
 	hwc->state |= PERF_HES_STOPPED;
 }
@@ -580,13 +581,13 @@ static void ddr_perf_event_del(struct perf_event *event, int flags)
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	int counter = hwc->idx;
-	pr_err("%s1 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
+	//pr_err("%s1 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 
 	ddr_perf_event_stop(event, PERF_EF_UPDATE);
-	pr_err("%s2\n", __func__);
+//	pr_err("%s2\n", __func__);
 
 	ddr_perf_free_counter(pmu, counter);
-	pr_err("%s3\n", __func__);
+	//pr_err("%s3\n", __func__);
 	hwc->idx = -1;
 }
 
