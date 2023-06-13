@@ -312,7 +312,7 @@ static bool ddr_perf_filters_compatible(struct perf_event *a,
 	return ddr_perf_filter_val(a) == ddr_perf_filter_val(b);
 }
 
-static bool ddr_perf_is_enhanced_filtered(struct perf_event *event)
+static __maybe_unused bool ddr_perf_is_enhanced_filtered(struct perf_event *event)
 {
 	unsigned int filt;
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
@@ -322,7 +322,7 @@ static bool ddr_perf_is_enhanced_filtered(struct perf_event *event)
 		ddr_perf_is_filtered(event);
 }
 
-static u32 ddr_perf_alloc_counter(struct ddr_pmu *pmu, int event)
+static __maybe_unused u32 ddr_perf_alloc_counter(struct ddr_pmu *pmu, int event)
 {
 	int i;
 
@@ -353,17 +353,13 @@ static void ddr_perf_free_counter(struct ddr_pmu *pmu, int counter)
 
 static u32 ddr_perf_read_counter(struct ddr_pmu *pmu, int counter)
 {
-	struct perf_event *event = pmu->events[counter];
-	void __iomem *base = pmu->base;
+//	struct perf_event *event = pmu->events[counter];
+	static int count;
 
-	/*
-	 * return bytes instead of bursts from ddr transaction for
-	 * axid-read and axid-write event if PMU core supports enhanced
-	 * filter.
-	 */
-	base += ddr_perf_is_enhanced_filtered(event) ? COUNTER_DPCR1 :
-						       COUNTER_READ;
-	return readl_relaxed(base + counter * 4);
+	count++;
+
+	return count + counter;
+
 }
 
 static int ddr_perf_event_init(struct perf_event *event)
@@ -371,13 +367,17 @@ static int ddr_perf_event_init(struct perf_event *event)
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	struct perf_event *sibling;
-
-	if (event->attr.type != event->pmu->type)
+	pr_err("%s pmu=%pS\n", __func__, pmu);
+	if (event->attr.type != event->pmu->type) {
+		pr_err("%s1 error1 pmu=%pS\n", __func__, pmu);
 		return -ENOENT;
+	}
 
-	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
+	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK) {
+		pr_err("%s2 error2 pmu=%pS\n", __func__, pmu);
 		return -EOPNOTSUPP;
-
+	}
+	pr_err("%s2.1\n", __func__);
 	if (event->cpu < 0) {
 		dev_warn(pmu->dev, "Can't provide per-task data!\n");
 		return -EOPNOTSUPP;
@@ -389,26 +389,37 @@ static int ddr_perf_event_init(struct perf_event *event)
 	 * periodically read when a hrtimer aka cpu-clock leader triggers).
 	 */
 	if (event->group_leader->pmu != event->pmu &&
-			!is_software_event(event->group_leader))
+			!is_software_event(event->group_leader)) {
+		pr_err("%s3 error3 pmu=%pS\n", __func__, pmu);
 		return -EINVAL;
+	}
+	pr_err("%s3.1\n", __func__);
 
 	if (pmu->devtype_data->quirks & DDR_CAP_AXI_ID_FILTER) {
-		if (!ddr_perf_filters_compatible(event, event->group_leader))
+		if (!ddr_perf_filters_compatible(event, event->group_leader)) {
+			pr_err("%s4 pmu=%pS\n", __func__, pmu);
 			return -EINVAL;
+		}
 		for_each_sibling_event(sibling, event->group_leader) {
-			if (!ddr_perf_filters_compatible(event, sibling))
+			if (!ddr_perf_filters_compatible(event, sibling)) {
+				pr_err("%s5 pmu=%pS\n", __func__, pmu);
 				return -EINVAL;
+			}
 		}
 	}
+	pr_err("%s5.1\n", __func__);
 
 	for_each_sibling_event(sibling, event->group_leader) {
 		if (sibling->pmu != event->pmu &&
-				!is_software_event(sibling))
+				!is_software_event(sibling)) {
+			pr_err("%s6 pmu=%pS\n", __func__, pmu);
 			return -EINVAL;
+		}
 	}
 
 	event->cpu = pmu->cpu;
 	hwc->idx = -1;
+	pr_err("%s6.1\n", __func__);
 
 	return 0;
 }
@@ -416,8 +427,8 @@ static int ddr_perf_event_init(struct perf_event *event)
 static void ddr_perf_counter_enable(struct ddr_pmu *pmu, int config,
 				  int counter, bool enable)
 {
-	u8 reg = counter * 4 + COUNTER_CNTL;
-	int val;
+//	u8 reg = counter * 4 + COUNTER_CNTL;
+//	int val;
 
 	if (enable) {
 		/*
@@ -426,28 +437,32 @@ static void ddr_perf_counter_enable(struct ddr_pmu *pmu, int config,
 		 * need write 0 into CLEAR bit and it turns out to be 1 by
 		 * hardware. Below enable flow is harmless for all counters.
 		 */
-		writel(0, pmu->base + reg);
-		val = CNTL_EN | CNTL_CLEAR;
-		val |= FIELD_PREP(CNTL_CSV_MASK, config);
-		writel(val, pmu->base + reg);
+//		writel(0, pmu->base + reg);
+	//	val = CNTL_EN | CNTL_CLEAR;
+	//	val |= FIELD_PREP(CNTL_CSV_MASK, config);
+	//	writel(val, pmu->base + reg);
 	} else {
 		/* Disable counter */
-		val = readl_relaxed(pmu->base + reg) & CNTL_EN_MASK;
-		writel(val, pmu->base + reg);
 	}
 }
 
 static bool ddr_perf_counter_overflow(struct ddr_pmu *pmu, int counter)
 {
+	#if 0
 	int val;
 
 	val = readl_relaxed(pmu->base + counter * 4 + COUNTER_CNTL);
 
 	return val & CNTL_OVER;
+	#else
+	pr_err("%s stubbed\n", __func__);
+	return 0;
+	#endif
 }
 
 static void ddr_perf_counter_clear(struct ddr_pmu *pmu, int counter)
 {
+	#if 0
 	u8 reg = counter * 4 + COUNTER_CNTL;
 	int val;
 
@@ -457,6 +472,9 @@ static void ddr_perf_counter_clear(struct ddr_pmu *pmu, int counter)
 
 	val |= CNTL_CLEAR;
 	writel(val, pmu->base + reg);
+	#else
+	pr_err("%s stubbed\n", __func__);
+	#endif
 }
 
 static void ddr_perf_event_update(struct perf_event *event)
@@ -502,6 +520,7 @@ static void ddr_perf_event_start(struct perf_event *event, int flags)
 
 static int ddr_perf_event_add(struct perf_event *event, int flags)
 {
+#if 0
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	int counter;
@@ -537,7 +556,7 @@ static int ddr_perf_event_add(struct perf_event *event, int flags)
 
 	if (flags & PERF_EF_START)
 		ddr_perf_event_start(event, flags);
-
+#endif
 	return 0;
 }
 
@@ -546,9 +565,12 @@ static void ddr_perf_event_stop(struct perf_event *event, int flags)
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	int counter = hwc->idx;
+	pr_err("%s1 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 
 	ddr_perf_counter_enable(pmu, event->attr.config, counter, false);
+	pr_err("%s2 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 	ddr_perf_event_update(event);
+	pr_err("%s3 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 
 	hwc->state |= PERF_HES_STOPPED;
 }
@@ -558,10 +580,13 @@ static void ddr_perf_event_del(struct perf_event *event, int flags)
 	struct ddr_pmu *pmu = to_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	int counter = hwc->idx;
+	pr_err("%s1 hwc=%pS pmu=%pS\n", __func__, hwc, pmu);
 
 	ddr_perf_event_stop(event, PERF_EF_UPDATE);
+	pr_err("%s2\n", __func__);
 
 	ddr_perf_free_counter(pmu, counter);
+	pr_err("%s3\n", __func__);
 	hwc->idx = -1;
 }
 
