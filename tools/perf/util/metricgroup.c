@@ -508,6 +508,30 @@ static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
 	return metricgroup__add_to_mep_groups(pm, groups);
 }
 
+static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
+					const struct pmu_metrics_table *table __maybe_unused,
+					__maybe_unused void *vdata)
+{
+	/*
+
+	const char *pmu;
+	const char *metric_name;
+	const char *metric_group;
+	const char *metric_expr;
+	const char *metric_threshold;
+	const char *unit;
+	const char *compat;
+	const char *desc;
+	const char *long_desc;
+	const char *metricgroup_no_group;
+	enum aggr_mode_class aggr_mode;
+
+	*/
+	printf("%s pm pmu=%s metric_name=%s compat=%s\n",
+		__func__, pm->pmu, pm->metric_name, pm->compat);
+	return 0;
+}
+
 void metricgroup__print(const struct print_callbacks *print_cb, void *print_state)
 {
 	struct rblist groups;
@@ -518,13 +542,22 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 	groups.node_new = mep_new;
 	groups.node_cmp = mep_cmp;
 	groups.node_delete = mep_delete;
+	printf("%s calling metricgroup_init_sys_pmu_list\n", __func__);
+ 	metricgroup_init_sys_pmu_list();
 	table = pmu_metrics_table__find();
 	if (table) {
 		pmu_metrics_table_for_each_metric(table,
 						 metricgroup__add_to_mep_groups_callback,
 						 &groups);
 	}
-	{
+	if (1) {
+
+		struct pmu_metrics_table *sys_events_table = pmu_metrics_sys_events_table();
+		pmu_metrics_table_for_each_metric(sys_events_table,
+			metricgroup__add_to_mep_groups_callback2,
+			NULL);
+
+	} else {
 		struct metricgroup_iter_data data = {
 			.fn = metricgroup__add_to_mep_groups_callback,
 			.data = &groups,
@@ -546,6 +579,8 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 		next = rb_next(node);
 		rblist__remove_node(&groups, node);
 	}
+	printf("%s calling metricgroup_cleanup_sys_pmu_list\n", __func__);
+	metricgroup_cleanup_sys_pmu_list();
 }
 
 static const char *code_characters = ",-=@";
@@ -1299,6 +1334,7 @@ static int metricgroup__add_metric_list(const char *pmu, const char *list,
 		return -ENOMEM;
 	list_itr = list_copy;
 
+	printf("%s calling metricgroup_init_sys_pmu_list\n", __func__);
 	metricgroup_init_sys_pmu_list();
 
 	while ((metric_name = strsep(&list_itr, ",")) != NULL) {

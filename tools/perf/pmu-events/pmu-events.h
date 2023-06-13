@@ -98,4 +98,6 @@ const char *describe_metricgroup(const char *group);
 void metricgroup_init_sys_pmu_list(void);
 void metricgroup_cleanup_sys_pmu_list(void);
 
+struct pmu_metrics_table *pmu_metrics_sys_events_table(void);
+
 #endif

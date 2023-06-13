@@ -780,7 +780,7 @@ struct pmu_metrics_table {
 };
 */
 
-static struct pmu_sys_events *sys_pmu_map;
+static struct pmu_metrics_table *sys_event_table;
 
 /*
  * fake_pmu argument is to avoid adding a fake_pmu to the list of PMUs in
@@ -792,7 +792,7 @@ void metricgroup_init_sys_pmu_list(void)
 	struct compact_pmu_event *entries;
 	static int done;
 
-	if (sys_pmu_map || done)
+	if (sys_event_table || done)
 		return;
 
 	pmu_for_each_sys_event(metricgroup__metric_sys_event_count,
@@ -807,24 +807,29 @@ void metricgroup_init_sys_pmu_list(void)
 	if (!entries)
 		return;
 
-	sys_pmu_map = malloc(sizeof(*sys_pmu_map));
-	if (!sys_pmu_map) {
+	sys_event_table = malloc(sizeof(*sys_event_table));
+	if (!sys_event_table) {
 		free(entries);
 		return;
 	}
 
-  sys_pmu_map->metric_table.entries = entries;
-  sys_pmu_map->metric_table.length = 12;
+  sys_event_table->entries = entries;
+  sys_event_table->length = 12;
+}
+
+struct pmu_metrics_table *pmu_metrics_sys_events_table(void)
+{
+  return sys_event_table;
 }
 
 void metricgroup_cleanup_sys_pmu_list(void)
 {
 	/* Test for sys events found */
-	if (sys_pmu_map) {
-		free((struct compact_pmu_event *)sys_pmu_map->metric_table.entries);
-		free(sys_pmu_map);
+	if (sys_event_table) {
+		//free(sys_event_table->entries);
+		free(sys_event_table);
 	}
-	sys_pmu_map = NULL;
+	sys_event_table = NULL;
 }
 
 int pmu_events_table_for_each_event(const struct pmu_events_table *table,
