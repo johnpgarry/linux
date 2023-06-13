@@ -271,6 +271,7 @@ class JsonEvent:
           'DFPMC': 'amd_df',
           'cpu_core': 'cpu_core',
           'cpu_atom': 'cpu_atom',
+          'smmuv3_pmcg': 'smmuv3_pmcg',
       }
       return table[unit] if unit in table else f'uncore_{unit.lower()}'
 

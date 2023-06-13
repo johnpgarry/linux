@@ -1,0 +1,11 @@
+[
+   {
+           "BriefDescription": "smmu pmcg cycles event",
+           "EventCode": "0x45",
+           "EventName": "smmu_pmcg.cycles",
+           "Unit": "smmuv3_pmcg",
+           "Compat": "0x65000012"
+   }
+]
+
+
