@@ -14,5 +14,21 @@
 	    "ScaleUnit": "9.765625e-4KB",
 	    "Unit": "imx8_ddr",
 	    "Compat": "i.MX8MN"
+   },
+   {
+	    "BriefDescription": "smmu pmcg proper metric wrong compat",
+	    "MetricName": "smmuv3_pmcg_cycles_wrong_compat",
+	    "MetricExpr": "smmu_pmcg.cycles * 4 * 2",
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "i.MX8MN"
+   },
+   {
+	    "BriefDescription": "smmu pmcg proper metric correct compat",
+	    "MetricName": "smmuv3_pmcg_cycles_correct_compat",
+	    "MetricExpr": "smmu_pmcg.cycles * 100",
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "0x65000012"
    }
 ]
