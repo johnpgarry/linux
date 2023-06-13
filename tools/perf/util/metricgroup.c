@@ -490,8 +490,18 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 		return 0;
 
 	while ((pmu = perf_pmus__scan(pmu))) {
+		bool matched;
+		bool print = !!strstr(pmu->name, "smmu");
 
 		if (!pmu->id || strcmp(pmu->id, pm->compat))
+			continue;
+
+		matched = pmu_uncore_alias_match(pm->pmu, pmu->name);
+		if (print)
+			pr_err("matched=%d pm name=%s pmu=%s compat=%s pmu name=%s\n",
+				 matched,
+				 pm->metric_name, pm->pmu, pm->compat, pmu->name);
+		if (!matched)
 			continue;
 
 		return d->fn(pm, table, d->data);
@@ -504,6 +514,10 @@ static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
 					void *vdata)
 {
 	struct rblist *groups = vdata;
+	bool print = !!strstr(pm->metric_name, "smmu");
+
+	if (print)
+		pr_err("%s pm metric_name=%s pmu=%s\n", __func__, pm->metric_name, pm->pmu);
 
 	return metricgroup__add_to_mep_groups(pm, groups);
 }

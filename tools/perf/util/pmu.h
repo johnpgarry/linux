@@ -288,4 +288,6 @@ int perf_pmu__pathname_fd(int dirfd, const char *pmu_name, const char *filename,
 struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char *lookup_name);
 void perf_pmu__delete(struct perf_pmu *pmu);
 
+bool pmu_uncore_alias_match(const char *pmu_name, const char *name);
+
 #endif /* __PMU_H */
