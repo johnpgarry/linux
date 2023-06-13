@@ -921,7 +921,7 @@ static int __add_metric(struct list_head *metric_list,
 			return -1;
 		}
 	}
-
+	pr_err("%s pm metric_name=%s unit=%s compat=%s is_root=%d\n", __func__, pm->metric_name, pm->unit, pm->compat, is_root);
 	if (is_root) {
 		/*
 		 * This metric is the root of a tree and may reference other
@@ -1051,7 +1051,7 @@ static int add_metric(struct list_head *metric_list,
 {
 	int ret = 0;
 
-	pr_debug("metric expr %s for %s\n", pm->metric_expr, pm->metric_name);
+	pr_err("metric expr %s for %s\n", pm->metric_expr, pm->metric_name);
 
 	if (!strstr(pm->metric_expr, "?")) {
 		ret = __add_metric(metric_list, pm, modifier, metric_no_group,

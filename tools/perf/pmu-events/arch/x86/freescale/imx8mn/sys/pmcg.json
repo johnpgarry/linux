@@ -5,6 +5,13 @@
            "EventName": "smmu_pmcg.cycles",
            "Unit": "smmuv3_pmcg",
            "Compat": "0x65000012"
+   },
+   {
+           "BriefDescription": "smmu2 pmcg cycles event",
+           "EventCode": "0x45",
+           "EventName": "smmu_pmcg2.cycles",
+           "Unit": "smmuv3_pmcg_",
+           "Compat": "0x65000012"
    }
 ]
 

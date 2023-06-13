@@ -843,12 +843,26 @@ static int pmu_add_sys_aliases_iter_fn(const struct pmu_event *pe,
 {
 	struct pmu_sys_event_iter_data *idata = data;
 	struct perf_pmu *pmu = idata->pmu;
+	bool print = false;
+
+//	if (strstr(pmu->name, "mmuv3_pmc"))
+//		print = true;
+
+	if (print)
+		pr_err("pmu id=%s name=%s pe->compat=%s pe->pmu=%s\n",
+		 pmu->id, pmu->name, pe->compat, pe->pmu);
 
 	if (!pe->compat || !pe->pmu)
 		return 0;
 
+	if (print)
+		pr_err("2 pmu id=%s name=%s pe->compat=%s pe->pmu=%s\n",
+		 pmu->id, pmu->name, pe->compat, pe->pmu);
 	if (!strcmp(pmu->id, pe->compat) &&
 	    pmu_uncore_alias_match(pe->pmu, pmu->name)) {
+		if (print)
+			pr_err("3 pmu id=%s name=%s pe->compat=%s pe->pmu=%s\n",
+		 pmu->id, pmu->name, pe->compat, pe->pmu);
 		__perf_pmu__new_alias(idata->head, -1,
 				      (char *)pe->name,
 				      (char *)pe->desc,
