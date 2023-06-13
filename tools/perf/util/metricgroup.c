@@ -527,7 +527,7 @@ static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
 	enum aggr_mode_class aggr_mode;
 
 	*/
-	printf("%s pm pmu=%s metric_name=%s compat=%s\n",
+	printf("\n%s pm pmu=%s metric_name=%s compat=%s\n\n",
 		__func__, pm->pmu, pm->metric_name, pm->compat);
 	return 0;
 }
