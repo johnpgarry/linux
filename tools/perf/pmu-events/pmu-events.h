@@ -95,7 +95,7 @@ int pmu_for_each_sys_metric(pmu_metric_iter_fn fn, void *data);
 
 const char *describe_metricgroup(const char *group);
 
-void metricgroup_init_sys_pmu_list(void);
+void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu);
 void metricgroup_cleanup_sys_pmu_list(void);
 
 struct pmu_metrics_table *pmu_metrics_sys_events_table(void);

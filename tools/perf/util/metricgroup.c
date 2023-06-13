@@ -543,7 +543,7 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 	groups.node_cmp = mep_cmp;
 	groups.node_delete = mep_delete;
 	printf("%s calling metricgroup_init_sys_pmu_list\n", __func__);
- 	metricgroup_init_sys_pmu_list();
+ 	metricgroup_init_sys_pmu_list(NULL);
 	table = pmu_metrics_table__find();
 	if (table) {
 		pmu_metrics_table_for_each_metric(table,
@@ -1335,7 +1335,7 @@ static int metricgroup__add_metric_list(const char *pmu, const char *list,
 	list_itr = list_copy;
 
 	printf("%s calling metricgroup_init_sys_pmu_list\n", __func__);
-	metricgroup_init_sys_pmu_list();
+	metricgroup_init_sys_pmu_list(NULL);
 
 	while ((metric_name = strsep(&list_itr, ",")) != NULL) {
 		modifier = strchr(metric_name, ':');

@@ -751,10 +751,6 @@ static void decompress_metric(int offset, struct pmu_metric *pm)
 
 #include <linux/zalloc.h>
 
-struct event_iter_data {
-  struct pmu_event *table;
-  unsigned int event_count;
-};
 
 static int
 metricgroup__metric_sys_event_count(__maybe_unused const struct pmu_event *pe,
@@ -782,14 +778,37 @@ struct pmu_metrics_table {
 
 static struct pmu_metrics_table *sys_event_table;
 
+
+struct event_iter_data {
+  struct pmu_metric *table;
+  unsigned int event_count;
+  struct perf_pmu *fake_pmu;
+};
+
+/* Iterate through all events in the system event table */
+static int metricgroup__metric_event_iter(__maybe_unused const struct pmu_metric *pm,
+           __maybe_unused const struct pmu_metrics_table *table,
+           __maybe_unused void *data)
+{
+
+  if (!pm->metric_expr || !pm->metric_name)
+    return 0;
+  printf(\"%s start pm pmu=%s metric_name=%s compat=%s end\",
+    __func__, pm->pmu, pm->metric_name, pm->compat);
+
+  return 0;
+}
+
+
 /*
  * fake_pmu argument is to avoid adding a fake_pmu to the list of PMUs in
  * pmu.c::pmus
  */
-void metricgroup_init_sys_pmu_list(void)
+void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
 {
 	unsigned int event_count = 0;
 	struct compact_pmu_event *entries;
+  struct event_iter_data event_iter_data;
 	static int done;
 
 	if (sys_event_table || done)
@@ -812,6 +831,10 @@ void metricgroup_init_sys_pmu_list(void)
 		free(entries);
 		return;
 	} 
+  event_iter_data.event_count = 0;
+  event_iter_data.fake_pmu = fake_pmu;
+
+  pmu_for_each_sys_metric(metricgroup__metric_event_iter, &event_iter_data);
 
   sys_event_table->entries = entries;
   sys_event_table->length = 12;
