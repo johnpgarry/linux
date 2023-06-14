@@ -785,21 +785,6 @@ struct event_iter_data {
   struct perf_pmu *fake_pmu;
 };
 
-/* Iterate through all events in the system event table */
-static int metricgroup__metric_event_iter(__maybe_unused const struct pmu_metric *pm,
-           __maybe_unused const struct pmu_metrics_table *table,
-           __maybe_unused void *data)
-{
-
-  if (!pm->metric_expr || !pm->metric_name)
-    return 0;
-  printf(\"%s start pm pmu=%s metric_name=%s compat=%s end\",
-    __func__, pm->pmu, pm->metric_name, pm->compat);
-
-  return 0;
-}
-
-
 /*
  * fake_pmu argument is to avoid adding a fake_pmu to the list of PMUs in
  * pmu.c::pmus
@@ -882,8 +867,8 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
                 int ret;
 
                 decompress_metric(table->entries[i].offset, &pm);
-                printf(\"%s starter1 pm pmu=%s metric name=%s compat=%s ender1 \",
-                  __func__, pm.pmu, pm.metric_name, pm.compat);
+//                pr_err(\"%s starter1 pm pmu=%s metric name=%s compat=%s ender1 \",
+  //                __func__, pm.pmu, pm.metric_name, pm.compat);
 
                 if (!pm.metric_expr)
                         continue;

@@ -1870,3 +1870,26 @@ int metricgroup__copy_metric_events(struct evlist *evlist, struct cgroup *cgrp,
 	}
 	return 0;
 }
+
+/* Iterate through all events in the system event table */
+int metricgroup__metric_event_iter(__maybe_unused const struct pmu_metric *pm,
+           __maybe_unused const struct pmu_metrics_table *table,
+           __maybe_unused void *data)
+{
+	bool print = false;
+
+	if (!pm->metric_expr || !pm->metric_name)
+		return 0;
+
+	if (!strcmp("imx8mn_ddr_write.all", pm->metric_name))
+		print = true;
+	if (!strcmp("imx8mn_ddr_read.all", pm->metric_name))
+		print = true;
+
+
+	if (print)
+		  pr_err("%s pm->pmu=%s metric_name=%s compat=%s expr=%s\n",
+ 	   __func__, pm->pmu, pm->metric_name, pm->compat, pm->metric_expr);
+
+  return 0;
+}
