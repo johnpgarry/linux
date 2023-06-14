@@ -753,11 +753,16 @@ static bool perf_pmu__valid_suffix(char *pmu_name, char *tok)
 	if (*p == 0)
 		return true;
 
-	if (*p != '_')
-		return false;
+	if (*p != '_') {
+		if (print)
+			pr_err("%s3 skip fail1 pmu_name=%s tok=%s *p=%c\n", __func__, pmu_name, tok, *p);
+		goto check_digit;
+		//return false;
+	}
 
 	++p;
-	if (*p == 0 || !isdigit(*p))
+check_digit:
+	if (*p == 0 || !isdigit(*p)) {
 		return false;
 
 	return true;
