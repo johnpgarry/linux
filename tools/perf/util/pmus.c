@@ -87,8 +87,9 @@ static struct perf_pmu *perf_pmu__find2(int dirfd, const char *name)
 {
 	struct perf_pmu *pmu;
 	bool core_pmu;
-
-	pr_err("%s name=%s\n", __func__, name);
+	bool print = !!strstr(name, "imx");
+	if (print)
+		pr_err("%s name=%s\n", __func__, name);
 	/*
 	 * Once PMU is loaded it stays in the list,
 	 * so we keep us from multiple reading/parsing
@@ -98,13 +99,20 @@ static struct perf_pmu *perf_pmu__find2(int dirfd, const char *name)
 	if (pmu)
 		return pmu;
 
+	if (print)
+		pr_err("%s2 name=%s read_sysfs_all_pmus=%d\n", __func__, name, read_sysfs_all_pmus);
 	if (read_sysfs_all_pmus)
 		return NULL;
 
 	core_pmu = is_pmu_core(name);
-	if (core_pmu && read_sysfs_core_pmus)
+	if (core_pmu && read_sysfs_core_pmus) {
+		if (print)
+				pr_err("%s3 name=%s returning NULL\n", __func__, name);
 		return NULL;
+	}
 
+	if (print)
+		pr_err("%s4 name=%s calling perf_pmu__lookup\n", __func__, name);
 	return perf_pmu__lookup(core_pmu ? &core_pmus : &other_pmus, dirfd, name);
 }
 
@@ -115,16 +123,18 @@ static void pmu_read_sysfs(bool core_only)
 	DIR *dir;
 	struct dirent *dent;
 
-	pr_err("%s\n", __func__);
+//	pr_err("%s read_sysfs_all_pmus=%d  ||  (core_only=%d && read_sysfs_core_pmus=%d)=%d\n",
+
+	//	__func__, read_sysfs_all_pmus, core_only, read_sysfs_core_pmus, (core_only && read_sysfs_core_pmus));
 	if (read_sysfs_all_pmus || (core_only && read_sysfs_core_pmus))
 		return;
 
-	pr_err("%s2\n", __func__);
+	//pr_err("%s2\n", __func__);
 	fd = perf_pmu__event_source_devices_fd();
 	if (fd < 0)
 		return;
 
-	pr_err("%s3\n", __func__);
+	//pr_err("%s3\n", __func__);
 	dir = fdopendir(fd);
 	if (!dir)
 		return;
@@ -140,12 +150,12 @@ static void pmu_read_sysfs(bool core_only)
 
 	closedir(dir);
 	if (core_only) {
-		pr_err("%s4\n", __func__);
+		//pr_err("%s4\n", __func__);
 		read_sysfs_core_pmus = true;
 	} else {
 
-		pr_err("%s5 creating imx8_ddr0=%p\n", __func__, perf_pmu__find2(-44, "imx8_ddr0"));
-		pr_err("%s6 creating imx8_ddr1=%p\n", __func__, perf_pmu__find2(-44, "imx8_ddr1"));
+		pr_err("%s5 creating imx8_ddr0=%p\n", __func__, perf_pmu__find2(-44, "imx8_ddr7"));
+		pr_err("%s6 creating imx8_ddr1=%p\n", __func__, perf_pmu__find2(-44, "imx8_ddr8"));
 		read_sysfs_core_pmus = true;
 		read_sysfs_all_pmus = true;
 	}

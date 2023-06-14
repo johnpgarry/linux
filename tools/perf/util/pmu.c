@@ -648,6 +648,7 @@ __weak const struct pmu_events_table *pmu_events_table__find(void)
 
 __weak const struct pmu_metrics_table *pmu_metrics_table__find(void)
 {
+	pr_err("%s calling perf_pmu__find_metrics_table\n", __func__);
 	return perf_pmu__find_metrics_table(NULL);
 }
 
@@ -870,20 +871,33 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	__u32 type;
 	char *name = pmu_find_real_name(lookup_name);
 	char *alias_name;
+	bool print = !!strstr(lookup_name, "imx");
+
+	if (print)
+		pr_err("%s lookup_name=%s dirfd=%d name=%s\n", __func__,
+			lookup_name, dirfd, name);
 
 	/*
 	 * The pmu data we store & need consists of the pmu
 	 * type value and format definitions. Load both right
 	 * now.
 	 */
-	if (pmu_format(dirfd, name, &format))
+	if (pmu_format(dirfd, name, &format)) {
+		if (print)
+			pr_err("%s2 lookup_name=%s pmu_format error\n", __func__,
+				lookup_name);
 		return NULL;
+	}
 
 	/*
 	 * Check the aliases first to avoid unnecessary work.
 	 */
-	if (pmu_aliases(dirfd, name, &aliases))
+	if (pmu_aliases(dirfd, name, &aliases)) {
+		if (print)
+			pr_err("%s2 lookup_name=%s pmu_aliases error\n", __func__,
+				lookup_name);
 		return NULL;
+	}
 
 	pmu = zalloc(sizeof(*pmu));
 	if (!pmu)
@@ -895,21 +909,37 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 		goto err;
 
 	/* Read type, and ensure that type value is successfully assigned (return 1) */
-	if (perf_pmu__scan_file_at(pmu, dirfd, "type", "%u", &type) != 1)
-		goto err;
+	if (perf_pmu__scan_file_at(pmu, dirfd, "type", "%u", &type) != 1) {
+		if (print) {
+			pr_err("%s3 lookup_name=%s perf_pmu__scan_file_at error continuing\n", __func__,
+				lookup_name);
+			type = 16;
+		} else
+			goto err;
+	}
 
 	alias_name = pmu_find_alias_name(name);
 	if (alias_name) {
 		pmu->alias_name = strdup(alias_name);
-		if (!pmu->alias_name)
+		if (!pmu->alias_name) {
+			if (print)
+				pr_err("%s4 lookup_name=%s alias_name error\n", __func__,
+					lookup_name);
 			goto err;
+		}
 	}
 
 	pmu->type = type;
 	pmu->is_core = is_pmu_core(name);
 	pmu->is_uncore = pmu_is_uncore(dirfd, name);
-	if (pmu->is_uncore)
+	if (pmu->is_uncore) {
+		if (print) {
+			pmu->id = (char *)"i.MX8MN";
+			pr_err("%s4.1 pmu=%p id=%s\n", __func__,
+					pmu, pmu->id);
+		}
 		pmu->id = pmu_id(name);
+	}
 	pmu->max_precise = pmu_max_precise(dirfd, pmu);
 	pmu_add_cpu_aliases(&aliases, pmu);
 	pmu_add_sys_aliases(&aliases, pmu);
@@ -922,7 +952,8 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	list_add_tail(&pmu->list, pmus);
 
 	pmu->default_config = perf_pmu__get_default_config(pmu);
-
+	if (print)
+			pr_err("%s10 returning pmu=%p\n", __func__, pmu);
 	return pmu;
 err:
 	zfree(&pmu->name);

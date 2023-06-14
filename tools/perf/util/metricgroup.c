@@ -527,7 +527,7 @@ static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
 	enum aggr_mode_class aggr_mode;
 
 	*/
-	printf("\n%s pm pmu=%s metric_name=%s compat=%s\n\n",
+	pr_err("\n%s pm pmu=%s metric_name=%s compat=%s\n\n",
 		__func__, pm->pmu, pm->metric_name, pm->compat);
 	return 0;
 }
@@ -542,9 +542,9 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 	groups.node_new = mep_new;
 	groups.node_cmp = mep_cmp;
 	groups.node_delete = mep_delete;
-	printf("%s calling metricgroup_init_sys_pmu_list\n", __func__);
- 	metricgroup_init_sys_pmu_list(NULL);
 	table = pmu_metrics_table__find();
+	pr_err("%s calling metricgroup_init_sys_pmu_list table=%p\n", __func__, table);
+ 	metricgroup_init_sys_pmu_list(NULL);
 	if (table) {
 		pmu_metrics_table_for_each_metric(table,
 						 metricgroup__add_to_mep_groups_callback,
@@ -579,7 +579,7 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 		next = rb_next(node);
 		rblist__remove_node(&groups, node);
 	}
-	printf("%s calling metricgroup_cleanup_sys_pmu_list\n", __func__);
+	pr_err("%s calling metricgroup_cleanup_sys_pmu_list\n", __func__);
 	metricgroup_cleanup_sys_pmu_list();
 }
 
@@ -1334,7 +1334,7 @@ static int metricgroup__add_metric_list(const char *pmu, const char *list,
 		return -ENOMEM;
 	list_itr = list_copy;
 
-	printf("%s calling metricgroup_init_sys_pmu_list\n", __func__);
+	pr_err("%s calling metricgroup_init_sys_pmu_list\n", __func__);
 	metricgroup_init_sys_pmu_list(NULL);
 
 	while ((metric_name = strsep(&list_itr, ",")) != NULL) {
@@ -1356,6 +1356,7 @@ static int metricgroup__add_metric_list(const char *pmu, const char *list,
 	}
 	free(list_copy);
 
+	pr_err("%s calling metricgroup_cleanup_sys_pmu_list\n", __func__);
 	metricgroup_cleanup_sys_pmu_list();
 
 	if (!ret) {

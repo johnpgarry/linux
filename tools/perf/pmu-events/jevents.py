@@ -819,7 +819,8 @@ void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
   event_iter_data.event_count = 0;
   event_iter_data.fake_pmu = fake_pmu;
 
-  pmu_for_each_sys_metric(metricgroup__metric_event_iter, &event_iter_data);
+  if (done == 1541564)
+   pmu_for_each_sys_metric(metricgroup__metric_event_iter, &event_iter_data);
 
   sys_event_table->entries = entries;
   sys_event_table->length = 12;
