@@ -486,11 +486,15 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 	struct metricgroup_iter_data *d = data;
 	struct perf_pmu *pmu = NULL;
 
+	pr_err("%s pm metric_expr=%s compat=%s\n", __func__, pm->metric_expr, pm->compat);
+
 	if (!pm->metric_expr || !pm->compat)
 		return 0;
 
+	pr_err("%s2 pm metric name=%s\n", __func__, pm->metric_name);
 	while ((pmu = perf_pmus__scan(pmu))) {
 
+		pr_err("%s3 pmu=%p pmu->name=%s id=%s pm metric name=%s\n", __func__, pmu, pmu->name, pmu->id, pm->metric_name);
 		if (!pmu->id || strcmp(pmu->id, pm->compat))
 			continue;
 
@@ -550,7 +554,7 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 						 metricgroup__add_to_mep_groups_callback,
 						 &groups);
 	}
-	if (1) {
+	if (0) {
 
 		struct pmu_metrics_table *sys_events_table = pmu_metrics_sys_events_table();
 		pmu_metrics_table_for_each_metric(sys_events_table,

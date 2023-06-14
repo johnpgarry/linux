@@ -932,13 +932,25 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	pmu->type = type;
 	pmu->is_core = is_pmu_core(name);
 	pmu->is_uncore = pmu_is_uncore(dirfd, name);
+	if (print) {
+		pmu->is_core = false;
+		pmu->is_uncore = true;
+		pr_err("%s4.1 pmu=%p name=%s is_uncore=%d\n", __func__,
+				pmu, pmu->name, pmu->is_uncore);
+	}
+	if (print) {
+		pmu->is_core = false;
+		pmu->is_uncore = true;
+		pr_err("%s4.2 pmu=%p name=%s is_uncore=%d\n", __func__,
+				pmu, pmu->name, pmu->is_uncore);
+	}
 	if (pmu->is_uncore) {
 		if (print) {
 			pmu->id = (char *)"i.MX8MN";
-			pr_err("%s4.1 pmu=%p id=%s\n", __func__,
+			pr_err("%s4.3 pmu=%p id=%s\n", __func__,
 					pmu, pmu->id);
-		}
-		pmu->id = pmu_id(name);
+		} else
+			pmu->id = pmu_id(name);
 	}
 	pmu->max_precise = pmu_max_precise(dirfd, pmu);
 	pmu_add_cpu_aliases(&aliases, pmu);
@@ -953,7 +965,7 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 
 	pmu->default_config = perf_pmu__get_default_config(pmu);
 	if (print)
-			pr_err("%s10 returning pmu=%p\n", __func__, pmu);
+			pr_err("%s10 returning pmu=%p id=%s\n", __func__, pmu, pmu->id);
 	return pmu;
 err:
 	zfree(&pmu->name);
