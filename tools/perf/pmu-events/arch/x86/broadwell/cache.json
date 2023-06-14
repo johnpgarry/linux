@@ -1,0 +1,44 @@
+[
+    {
+        "BriefDescription": "L1D data line replacements",
+        "EventCode": "0x51",
+        "EventName": "L1D.REPLACEMENT",
+        "PublicDescription": "This event counts L1D data line replacements including opportunistic replacements, and replacements that require stall-for-replace or block-for-replace.",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x1"
+    },
+    {
+        "BriefDescription": "Cycles a demand request was blocked due to Fill Buffers unavailability.",
+        "CounterMask": "1",
+        "EventCode": "0x48",
+        "EventName": "L1D_PEND_MISS.FB_FULL",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x2"
+    },
+    {
+        "BriefDescription": "L1D miss outstandings duration in cycles",
+        "EventCode": "0x48",
+        "EventName": "L1D_PEND_MISS.PENDING",
+        "PublicDescription": "This event counts duration of L1D miss outstanding, that is each cycle number of Fill Buffers (FB) outstanding required by Demand Reads. FB either is held by demand loads, or it is held by non-demand loads and gets hit at least once by demand. The valid outstanding interval is defined until the FB deallocation by one of the following ways: from FB allocation, if FB is allocated by demand; from the demand Hit FB, if it is allocated by hardware or software prefetch.\nNote: In the L1D, a Demand Read contains cacheable or noncacheable demand loads, including ones causing cache-line splits and reads due to page walks resulted from any request type.",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x1"
+    },
+    {
+        "BriefDescription": "Cycles with L1D load Misses outstanding.",
+        "CounterMask": "1",
+        "EventCode": "0x48",
+        "EventName": "L1D_PEND_MISS.PENDING_CYCLES",
+        "PublicDescription": "This event counts duration of L1D miss outstanding in cycles.",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x1"
+    },
+    {
+        "AnyThread": "1",
+        "BriefDescription": "Cycles with L1D load Misses outstanding from any thread on physical core.",
+        "CounterMask": "1",
+        "EventCode": "0x48",
+        "EventName": "L1D_PEND_MISS.PENDING_CYCLES_ANY",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x1"
+    }
+]
