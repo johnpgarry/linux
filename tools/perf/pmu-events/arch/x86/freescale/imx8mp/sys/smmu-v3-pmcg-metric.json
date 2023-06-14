@@ -1,0 +1,14 @@
+[
+   {
+	    "BriefDescription": "trans per cycle 0x65000012",
+	    "MetricName": "pmcg_trans_per_cycle.all",
+	    "MetricExpr": "smmuv3_pmcg.TRANSACTION / (smmuv3_pmcg.CYCLES + 1)",
+	    "ScaleUnit": "9.765625e-4KB",
+   },
+   {
+	    "BriefDescription": "trans per cycle  0x65000012",
+	    "MetricName": "pmcg_tlb_miss_per_cycle.all",
+	    "MetricExpr": "smmuv3_pmcg.TLB_MISS / (smmuv3_pmcg.CYCLES  + 1)",
+	    "ScaleUnit": "9.765625e-4KB",
+   }
+]
