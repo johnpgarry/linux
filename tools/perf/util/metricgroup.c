@@ -1172,17 +1172,19 @@ static void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
 	unsigned int event_count = 0;
 	struct pmu_event *table;
 	static int done;
-
+	printf("%s sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
 	if (sys_pmu_map || done)
 		return;
 
 	pmu_for_each_sys_event(metricgroup__metric_sys_event_count,
 			       &event_count);
 
+	printf("%s2 sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
 	if (event_count == 0) {
 		done = 1;
 		return;
 	}
+	printf("%s3 sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
 	event_count++; // Add a sentinel
 	event_iter_data.event_count = 0;
 	event_iter_data.fake_pmu = fake_pmu;
@@ -1196,6 +1198,7 @@ static void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
 		free(table);
 		return;
 	}
+	printf("%s10 out sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
 	sys_pmu_map->table = table;
 }
 
@@ -1296,6 +1299,7 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 {
 	char *llist, *nlist, *p;
 	int ret = -EINVAL;
+	printf("%s not yet calling metricgroup_init_sys_pmu_list\n", __func__);
 
 	nlist = strdup(list);
 	if (!nlist)
@@ -1305,6 +1309,7 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 	strbuf_init(events, 100);
 	strbuf_addf(events, "%s", "");
 
+	printf("%s2 calling metricgroup_init_sys_pmu_list\n", __func__);
 	metricgroup_init_sys_pmu_list(fake_pmu);
 
 	while ((p = strsep(&llist, ",")) != NULL) {
@@ -1335,7 +1340,7 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 	struct rblist groups;
 	struct rb_node *node, *next;
 	struct strlist *metriclist = NULL;
-
+	printf("%s not yet calling metricgroup_init_sys_pmu_list\n", __func__);
 	if (!metricgroups) {
 		metriclist = strlist__new(NULL, NULL);
 		if (!metriclist)
@@ -1346,6 +1351,7 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 	groups.node_new = mep_new;
 	groups.node_cmp = mep_cmp;
 	groups.node_delete = mep_delete;
+	printf("%s2 not yet calling metricgroup_init_sys_pmu_list\n", __func__);
 	for (i = 0; map; i++) {
 		pe = &map->table[i];
 
@@ -1359,17 +1365,27 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 			return;
 	}
 
+	printf("%s3 calling metricgroup_init_sys_pmu_list\n", __func__);
 	metricgroup_init_sys_pmu_list(NULL);
 
+	printf("%s3 sys_pmu_map=%p\n", __func__, sys_pmu_map);
 	for (i = 0; sys_pmu_map; i++) {
 		pe = &sys_pmu_map->table[i];
+		printf("%s3.1 sys_pmu_map=%p pe=%p name=%s metric_name=%s\n",
+			__func__, sys_pmu_map, pe, pe->name, pe->metric_name);
 		if (!pe->metric_name)
 			break;
 		if (metricgroup__print_pmu_event(pe, metricgroups, filter,
 						 raw, details, &groups,
-						 metriclist) < 0)
+						 metriclist) < 0) {
+			printf("%s3.2 error sys_pmu_map=%p pe=%p\n", __func__, sys_pmu_map, pe);
 			break;
+		}
+		printf("%s3.3 no sys_pmu_map=%p pe=%p name=%s metric_name=%s\n",
+			__func__, sys_pmu_map, pe, pe->name, pe->metric_name);
 	}
+
+	printf("%s3.4 calling metricgroup_cleanup_sys_pmu_list\n", __func__);
 	metricgroup_cleanup_sys_pmu_list();
 
 	if (!filter || !rblist__empty(&groups)) {
