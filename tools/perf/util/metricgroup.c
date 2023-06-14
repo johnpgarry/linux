@@ -485,19 +485,21 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 {
 	struct metricgroup_iter_data *d = data;
 	struct perf_pmu *pmu = NULL;
+	bool print = !!strstr(pm->metric_name, "imx8mn_ddr_write.all");
 
-	pr_err("%s pm metric_expr=%s compat=%s\n", __func__, pm->metric_expr, pm->compat);
 
 	if (!pm->metric_expr || !pm->compat)
 		return 0;
-
-	pr_err("%s2 pm metric name=%s\n", __func__, pm->metric_name);
+	if (print)
+		pr_err("%s pm metric name=%s compat=%s\n",
+			__func__, pm->metric_name, pm->compat);
 	while ((pmu = perf_pmus__scan(pmu))) {
 
-		pr_err("%s3 pmu=%p pmu->name=%s id=%s pm metric name=%s\n", __func__, pmu, pmu->name, pmu->id, pm->metric_name);
 		if (!pmu->id || strcmp(pmu->id, pm->compat))
 			continue;
-
+		if (print)
+			pr_err("%s3 pmu=%p pmu->name=%s id=%s pm metric name=%s fn=%p\n",
+				__func__, pmu, pmu->name, pmu->id, pm->metric_name, d->fn);
 		return d->fn(pm, table, d->data);
 	}
 	return 0;
@@ -507,7 +509,14 @@ static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
 					const struct pmu_metrics_table *table __maybe_unused,
 					void *vdata)
 {
+	bool print = !!strstr(pm->metric_name, "imx8mn_ddr_write.all");
 	struct rblist *groups = vdata;
+	if (print) {
+		pr_err("%s pm metric name=%s compat=%s table=%p\n", __func__, pm->metric_name, pm->compat, table);
+		if (table) {
+
+		}
+	}
 
 	return metricgroup__add_to_mep_groups(pm, groups);
 }
@@ -531,8 +540,14 @@ static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
 	enum aggr_mode_class aggr_mode;
 
 	*/
-	pr_err("\n%s pm pmu=%s metric_name=%s compat=%s\n\n",
-		__func__, pm->pmu, pm->metric_name, pm->compat);
+	bool print = !!strstr(pm->metric_name, "imx8mn_ddr_write.all");
+	if (print) {
+		pr_err("%s pm metric name=%s compat=%s table=%p\n", __func__, pm->metric_name, pm->compat, table);
+		if (table) {
+
+		}
+	}
+
 	return 0;
 }
 
@@ -566,7 +581,14 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 			.fn = metricgroup__add_to_mep_groups_callback,
 			.data = &groups,
 		};
+		struct metricgroup_iter_data data2 = {
+			.fn = metricgroup__add_to_mep_groups_callback2,
+			.data = &groups,
+		};
 		pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data);
+
+
+		pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data2);
 	}
 
 	for (node = rb_first_cached(&groups.entries); node; node = next) {

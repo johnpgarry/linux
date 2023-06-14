@@ -987,6 +987,7 @@ const struct pmu_events_table *find_sys_events_table(const char *name)
         for (const struct pmu_sys_events *tables = &pmu_sys_event_tables[0];
              tables->name;
              tables++) {
+                printf(\" 111 tables name=%s   name=%s 111    \", tables->name, name);
                 if (!strcmp(tables->name, name))
                         return &tables->event_table;
         }
@@ -1011,7 +1012,10 @@ int pmu_for_each_sys_metric(pmu_metric_iter_fn fn, void *data)
         for (const struct pmu_sys_events *tables = &pmu_sys_event_tables[0];
              tables->name;
              tables++) {
-                int ret = pmu_metrics_table_for_each_metric(&tables->metric_table, fn, data);
+                int ret;
+
+                printf(\" 222 tables name=%s 222    \", tables->name);
+                ret = pmu_metrics_table_for_each_metric(&tables->metric_table, fn, data);
 
                 if (ret)
                         return ret;
