@@ -152,7 +152,7 @@ static void pmu_read_sysfs(bool core_only)
 	if (core_only) {
 		//pr_err("%s4\n", __func__);
 		read_sysfs_core_pmus = true;
-	} else {
+	} else if (!is_virt_env()) {
 		struct perf_pmu *imx8_ddr7 = perf_pmu__find2(-44, "imx8_ddr7");
 		struct perf_pmu *imx8_ddr8 = perf_pmu__find2(-44, "imx8_ddr8");
 		pr_err("%s5 created imx8_ddr7=%p id=%s\n", __func__, imx8_ddr7, imx8_ddr7 ? imx8_ddr7->id : "?");

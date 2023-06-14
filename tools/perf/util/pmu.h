@@ -256,6 +256,7 @@ bool perf_pmu__file_exists(struct perf_pmu *pmu, const char *name);
 
 int perf_pmu__test(void);
 
+bool is_virt_env(void);
 struct perf_event_attr *perf_pmu__get_default_config(struct perf_pmu *pmu);
 void pmu_add_cpu_aliases_table(struct list_head *head, struct perf_pmu *pmu,
 			       const struct pmu_events_table *table);

@@ -863,6 +863,8 @@ static int pmu_max_precise(int dirfd, struct perf_pmu *pmu)
 	return max_precise;
 }
 
+
+
 struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char *lookup_name)
 {
 	struct perf_pmu *pmu;
@@ -872,6 +874,7 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	char *name = pmu_find_real_name(lookup_name);
 	char *alias_name;
 	bool print = !!strstr(lookup_name, "imx");
+	bool special = print && !is_virt_env();
 
 	if (print)
 		pr_err("%s lookup_name=%s dirfd=%d name=%s\n", __func__,
@@ -911,11 +914,16 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	/* Read type, and ensure that type value is successfully assigned (return 1) */
 	if (perf_pmu__scan_file_at(pmu, dirfd, "type", "%u", &type) != 1) {
 		if (print) {
-			pr_err("%s3 lookup_name=%s perf_pmu__scan_file_at error continuing\n", __func__,
+			pr_err("%s3 lookup_name=%s perf_pmu__scan_file_at error\n", __func__,
+				lookup_name);
+		}
+		if (special) {
+			pr_err("%s3.1 lookup_name=%s perf_pmu__scan_file_at error and continuing\n", __func__,
 				lookup_name);
 			type = 16;
-		} else
+		} else {
 			goto err;
+		}
 	}
 
 	alias_name = pmu_find_alias_name(name);
@@ -933,19 +941,17 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	pmu->is_core = is_pmu_core(name);
 	pmu->is_uncore = pmu_is_uncore(dirfd, name);
 	if (print) {
-		pmu->is_core = false;
-		pmu->is_uncore = true;
-		pr_err("%s4.1 pmu=%p name=%s is_uncore=%d\n", __func__,
-				pmu, pmu->name, pmu->is_uncore);
+		pr_err("%s4.1 pmu=%p name=%s is_core=%d is_uncore=%d\n", __func__,
+				pmu, pmu->name, pmu->is_core, pmu->is_uncore);
 	}
-	if (print) {
+	if (special) {
 		pmu->is_core = false;
 		pmu->is_uncore = true;
-		pr_err("%s4.2 pmu=%p name=%s is_uncore=%d\n", __func__,
-				pmu, pmu->name, pmu->is_uncore);
+		pr_err("%s4.2 pmu=%p name=%s NOW is_core=%d is_uncore=%d\n", __func__,
+				pmu, pmu->name, pmu->is_core, pmu->is_uncore);
 	}
 	if (pmu->is_uncore) {
-		if (print) {
+		if (special) {
 			pmu->id = (char *)"i.MX8MN";
 			pr_err("%s4.3 pmu=%p id=%s\n", __func__,
 					pmu, pmu->id);
@@ -1731,6 +1737,12 @@ int perf_pmu__match(char *pattern, char *name, char *tok)
 		return -1;
 
 	return 0;
+}
+
+bool __weak is_virt_env(void)
+{
+
+	return false;
 }
 
 double __weak perf_pmu__cpu_slots_per_cycle(void)
