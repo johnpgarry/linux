@@ -742,16 +742,25 @@ struct pmu_events_map *__weak pmu_events_map__find(void)
 	return perf_pmu__find_map(NULL);
 }
 
-static bool perf_pmu__valid_suffix(char *pmu_name, char *tok)
+static bool perf_pmu__valid_suffix(char *pmu_name, char *tok, bool print)
 {
 	char *p;
 
-	if (strncmp(pmu_name, tok, strlen(tok)))
+	if (print)
+		pr_err("%s pmu_name=%s tok=%s\n", __func__, pmu_name, tok);
+
+	if (strncmp(pmu_name, tok, strlen(tok))) {
+		if (print)
+			pr_err("%s fail1 pmu_name=%s tok=%s\n", __func__, pmu_name, tok);
 		return false;
+	}
 
 	p = pmu_name + strlen(tok);
-	if (*p == 0)
+	if (*p == 0) {
+		if (print)
+			pr_err("%s2 fail1 pmu_name=%s tok=%s\n", __func__, pmu_name, tok); 
 		return true;
+	}
 
 	if (*p != '_') {
 		if (print)
@@ -763,16 +772,21 @@ static bool perf_pmu__valid_suffix(char *pmu_name, char *tok)
 	++p;
 check_digit:
 	if (*p == 0 || !isdigit(*p)) {
+		if (print)
+			pr_err("%s4 fail1 pmu_name=%s tok=%s\n", __func__, pmu_name, tok);
 		return false;
+	}
 
 	return true;
 }
 
-bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
+bool pmu_uncore_alias_match(const char *pmu_name, const char *name, bool print)
 {
 	char *tmp = NULL, *tok, *str;
 	bool res;
 
+	if (print)
+		pr_err("%s pmu_name=%s name=%s\n", __func__, pmu_name, name);
 	str = strdup(pmu_name);
 	if (!str)
 		return false;
@@ -782,6 +796,8 @@ bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
 	 */
 	tok = strtok_r(str, ",", &tmp);
 	if (strncmp(pmu_name, tok, strlen(tok))) {
+		if (print)
+			pr_err("%s2 bad pmu_name=%s tok=%s\n", __func__, pmu_name, tok);
 		res = false;
 		goto out;
 	}
@@ -796,7 +812,14 @@ bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
 	 */
 	for (; tok; name += strlen(tok), tok = strtok_r(NULL, ",", &tmp)) {
 		name = strstr(name, tok);
-		if (!name || !perf_pmu__valid_suffix((char *)name, tok)) {
+		if (!name || !perf_pmu__valid_suffix((char *)name, tok, print)) {
+			if (print) {
+				pr_err("%s3 bad name=%s\n", __func__, name);
+			//	if (!name) {
+			//		bool vall = perf_pmu__valid_suffix((char *)name, tok);
+			//		printf("%s3.1 bad tok=%s perf_pmu__valid_suffix=%d\n", __func__, tok, vall);
+			//	}
+			}
 			res = false;
 			goto out;
 		}
@@ -834,7 +857,7 @@ void pmu_add_cpu_aliases_map(struct list_head *head, struct perf_pmu *pmu,
 		}
 
 		if (pmu_is_uncore(name) &&
-		    pmu_uncore_alias_match(pname, name))
+		    pmu_uncore_alias_match(pname, name, false))
 			goto new_alias;
 
 		if (strcmp(pname, name))
@@ -897,18 +920,32 @@ static int pmu_add_sys_aliases_iter_fn(struct pmu_event *pe,
 {
 	struct pmu_sys_event_iter_data *idata = data;
 	struct perf_pmu *pmu = idata->pmu;
+	bool print = false;
+	if (!strcmp(pmu->name, "imx8_ddr0"))
+		print = true;
 
+	if (print)
+		pr_err("%s pe->name=%s\n", __func__, pe->name);
 	if (!pe->name) {
+		if (print)
+			pr_err("%s2 pe->metric_name=%s\n", __func__, pe->metric_name);
 		if (pe->metric_group || pe->metric_name)
 			return 0;
 		return -EINVAL;
 	}
 
+	if (print)
+		pr_err("%s3 pe->compat=%s pe->pmu=%s\n", __func__, pe->compat, pe->pmu);
 	if (!pe->compat || !pe->pmu)
 		return 0;
 
+	if (print)
+		pr_err("%s4 pmu->id=%s pe->pmu=%s pass=%d\n", __func__, pmu->id, pe->compat, !strcmp(pmu->id, pe->compat));
+	if (print)
+		pr_err("4.1 pmu_uncore_alias_match=%d pe->pmu=%s pmu->name=%s\n", pmu_uncore_alias_match(pe->pmu, pmu->name, false), pe->pmu, pmu->name);
 	if (!strcmp(pmu->id, pe->compat) &&
-	    pmu_uncore_alias_match(pe->pmu, pmu->name)) {
+	    pmu_uncore_alias_match(pe->pmu, pmu->name, print)) {
+		pr_err("%s5 GOOD pe name=%s pmu->name=%s\n", __func__, pe->name, pmu->name);
 		__perf_pmu__new_alias(idata->head, NULL,
 				      (char *)pe->name,
 				      (char *)pe->desc,
@@ -983,8 +1020,13 @@ static struct perf_pmu *pmu_lookup(const char *name)
 	pmu->name = strdup(name);
 	pmu->type = type;
 	pmu->is_uncore = pmu_is_uncore(name);
-	if (pmu->is_uncore)
+	pr_err("%s pmu name=%s is_uncore=%d\n", __func__, pmu->name,
+		pmu->is_uncore);
+	if (pmu->is_uncore) {
 		pmu->id = pmu_id(name);
+		pr_err("%s2 pmu=%p name=%s pmu->id=%s\n", __func__, pmu, pmu->name,
+			pmu->id);
+	}
 	pmu->is_hybrid = perf_pmu__hybrid_mounted(name);
 	pmu->max_precise = pmu_max_precise(name);
 	pmu_add_cpu_aliases(&aliases, pmu);
@@ -1908,7 +1950,7 @@ int perf_pmu__match(char *pattern, char *name, char *tok)
 	if (fnmatch(pattern, name, 0))
 		return -1;
 
-	if (tok && !perf_pmu__valid_suffix(name, tok))
+	if (tok && !perf_pmu__valid_suffix(name, tok, false))
 		return -1;
 
 	return 0;

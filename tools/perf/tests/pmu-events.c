@@ -314,7 +314,7 @@ static int __test__pmu_event_aliases(char *pmu_name, int *count)
 
 		if (!alias) {
 			bool uncore_match = pmu_uncore_alias_match(pmu_name,
-								   te->pmu);
+								   te->pmu, false);
 
 			if (use_uncore_table && !uncore_match) {
 				pr_debug3("testing aliases PMU %s: skip matching alias %s\n",

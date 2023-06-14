@@ -996,7 +996,8 @@ static int parse_groups_sys(struct evlist *perf_evlist,
 			    bool metric_no_group,
 			    struct perf_pmu *fake_pmu,
 			    struct pmu_event *pe,
-			    struct pmu_event *table)
+			    struct pmu_event *table,
+			    bool print)
 {
 	struct parse_events_error parse_error;
 	struct strbuf events;
@@ -1009,10 +1010,14 @@ static int parse_groups_sys(struct evlist *perf_evlist,
 	int ret;
 
 	ret = _add_metric(&metric_list, pe, metric_no_group, &m, NULL, &ids);
+	if (print)
+		pr_err("%s ret=%d out on error\n", __func__, ret);
 	if (ret)
 		goto out;
 
 	ret = resolve_metric(metric_no_group, &metric_list, &map, &ids);
+	if (print)
+		pr_err("%s2 ret=%d out on error\n", __func__, ret);
 	if (ret)
 		goto out;
 
@@ -1020,6 +1025,8 @@ static int parse_groups_sys(struct evlist *perf_evlist,
 	strbuf_addf(&events, "%s", "");
 
 	list_for_each_entry(m, &metric_list, nd) {
+		if (print)
+			pr_err("%s2.1 m metric_name=%s\n", __func__, m->metric_name);
 		if (events.len > 0)
 			strbuf_addf(&events, ",");
 
@@ -1033,7 +1040,11 @@ static int parse_groups_sys(struct evlist *perf_evlist,
 	}
 
 	bzero(&parse_error, sizeof(parse_error));
+	if (print)
+		pr_err("%s3.0 events.buf=%s\n", __func__, events.buf);
 	ret = __parse_events(perf_evlist, events.buf, &parse_error, fake_pmu);
+	if (print)
+		pr_err("%s3.1 ret=%d after __parse_events\n", __func__, ret);
 out:
 	expr_ids__exit(&ids);
 	metricgroup__free_metrics(&metric_list);
@@ -1064,14 +1075,34 @@ static bool match_event_to_pmu(struct pmu_event *event, struct perf_pmu *pmu)
  * b. Alternatively, try to match against PMU+ID for expression term not using an alias
  */
 static bool match_to_pmu(struct pmu_event *found_event, struct perf_pmu *pmu,
-			 struct pmu_event *pe, struct evsel *evsel)
+			 struct pmu_event *pe, struct evsel *evsel, bool print)
 {
+	if (print) {
+		pr_err("mtp found_event name=%s pmu name=%s pe->metric_name=%s evsel->name=%s\n", 
+			found_event ? found_event->name : "?",
+			pmu ? pmu->name : "?",
+			pe ? pe->metric_name : "?",
+			evsel ? evsel->name : "?");
+	}
 	if (found_event)
 		return match_event_to_pmu(found_event, pmu);
 
+	if (print) {
+		pr_err("mtp2 pmu=%p name=%s evsel->pmu_name=%s\n", 
+			pmu,
+			pmu ? pmu->name : "?",
+			evsel ? evsel->pmu_name : "?");
+		pr_err("mtp2.1 evsel->pmu_name=%s pmu->id=%s pe->compat=%s\n", 
+			evsel->pmu_name, pmu->id, pe->compat);
+	}
 	if (pmu->name && evsel->pmu_name &&
 	    !strcmp(pmu->name, evsel->pmu_name) &&
 	    pmu->id && pe->compat && !strcmp(pmu->id, pe->compat)) {
+		if (print)
+			pr_err("mtp3 evsel->name=%s pmu->id=%s pe->compat=%s\n", 
+				evsel ? evsel->name : "?",
+				pmu->id,
+				pe->compat);
 		return true;
 	}
 	return false;
@@ -1089,16 +1120,29 @@ static int metricgroup__metric_event_iter(struct pmu_event *pe,
 	struct evlist *evlist;
 	struct evsel *evsel;
 	int ret;
-
+	bool print = false;
 	if (!pe->metric_expr || !pe->metric_name)
 		return 0;
 
+	if (!strcmp("imx8mn_ddr_write.all", pe->metric_name))
+		print = true;
+	if (!strcmp("imx8mn_ddr_read.all", pe->metric_name))
+		print = true;
+
+	pr_err("%s metric_name=%s print=%d pe=%p metric_expr=%s \n", __func__,
+		pe->metric_name, print, pe, pe->metric_expr);
 	evlist = evlist__new();
-	if (!evlist)
+	if (!evlist) {
+	//	printf("%s1 evlist error pe=%p metric_expr=%s metric_name=%s\n", __func__,
+	//		pe, pe->metric_expr, pe->metric_name);
 		return -ENOMEM;
+	}
 	ret = parse_groups_sys(evlist, false, iter_data->fake_pmu, pe,
-			       event_table);
+			       event_table, print);
 	if (ret) {
+		if (print)
+			pr_err("%s1.1 parse_groups_sys error pe=%p metric_expr=%s metric_name=%s\n", __func__,
+				pe, pe->metric_expr, pe->metric_name);
 		/* Just allow the iter to continue as we could not parse */
 		ret = 0;
 		goto out;
@@ -1111,11 +1155,18 @@ static int metricgroup__metric_event_iter(struct pmu_event *pe,
 	}
 	found_events = 0;
 
+	if (print)
+		pr_err("2 metric_name=%s  events_count=%d metric_expr=%s \n", 
+		pe->metric_name, events_count, pe->metric_expr);
 	/* With the list of events for the metric, try to match for the host */
 	evlist__for_each_entry(evlist, evsel) {
 		struct pmu_event *found_event = NULL, *event = soc_events->table;
 		struct perf_pmu *pmu = NULL;
 
+		if (print)
+			pr_err("3  metric_name=%s  evsel %s pmu=%s\n", 
+				pe->metric_name, evsel->name, evsel->pmu_name);
+		
 		if (!strcmp(evsel->name, "duration_time")) {
 			found_events++;
 			goto test;
@@ -1125,9 +1176,23 @@ static int metricgroup__metric_event_iter(struct pmu_event *pe,
 		 * Scan the events from the metric expression, and try to find
 		 * a match from the table of sys events.
 		 */
+
+		if (print)
+			pr_err("4  event->name=%s metric_name=%s\n", 
+				event->name, event->metric_name);
+	
 		while (event->name || event->metric_name) {
+			if (print)
+				pr_err("5  event->name=%s metric_name=%s\n", 
+				event->name, event->metric_name);
 			if (event->name && !event->metric_name) {
+				if (print)
+					pr_err("6  event->name=%s evsel->name=%s\n", 
+					event->name, evsel->name);
 				if (!strcmp(event->name, evsel->name)) {
+					if (print)
+						pr_err("7 found_event event->name=%s evsel->name=%s\n", 
+						event->name, evsel->name);
 					found_event = event;
 					break;
 				}
@@ -1137,18 +1202,19 @@ static int metricgroup__metric_event_iter(struct pmu_event *pe,
 
 		/* Go through the list PMUs and try to match */
 		while ((pmu = perf_pmu__scan(pmu)) != NULL) {
-			if (match_to_pmu(found_event, pmu, pe, evsel)) {
+			if (match_to_pmu(found_event, pmu, pe, evsel, print)) {
 				found_events++;
 				break;
 			}
 		}
 
-		if (fake_pmu && match_to_pmu(found_event, fake_pmu, pe, evsel))
+		if (fake_pmu && match_to_pmu(found_event, fake_pmu, pe, evsel, print))
 			found_events++;
 
 test:
 		if (found_events == events_count) {
-			pr_debug2("Adding metric %s to sys event table\n", pe->metric_name);
+			if (print)
+				pr_err("Adding metric %s to sys event table\n", pe->metric_name);
 
 			memcpy(event_table, pe, sizeof(*pe));
 			event_table++;
@@ -1172,19 +1238,19 @@ static void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
 	unsigned int event_count = 0;
 	struct pmu_event *table;
 	static int done;
-	printf("%s sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
+	pr_err("%s sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
 	if (sys_pmu_map || done)
 		return;
 
 	pmu_for_each_sys_event(metricgroup__metric_sys_event_count,
 			       &event_count);
 
-	printf("%s2 sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
+	pr_err("%s2 sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
 	if (event_count == 0) {
 		done = 1;
 		return;
 	}
-	printf("%s3 sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
+	pr_err("%s3 sys_pmu_map=%p done=%d event_count=%d\n", __func__, sys_pmu_map, done, event_count);
 	event_count++; // Add a sentinel
 	event_iter_data.event_count = 0;
 	event_iter_data.fake_pmu = fake_pmu;
@@ -1198,7 +1264,7 @@ static void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
 		free(table);
 		return;
 	}
-	printf("%s10 out sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
+	pr_err("%s10 out sys_pmu_map=%p done=%d\n", __func__, sys_pmu_map, done);
 	sys_pmu_map->table = table;
 }
 
@@ -1299,7 +1365,7 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 {
 	char *llist, *nlist, *p;
 	int ret = -EINVAL;
-	printf("%s not yet calling metricgroup_init_sys_pmu_list\n", __func__);
+	pr_err("%s not yet calling metricgroup_init_sys_pmu_list\n", __func__);
 
 	nlist = strdup(list);
 	if (!nlist)
@@ -1309,7 +1375,7 @@ static int metricgroup__add_metric_list(const char *list, bool metric_no_group,
 	strbuf_init(events, 100);
 	strbuf_addf(events, "%s", "");
 
-	printf("%s2 calling metricgroup_init_sys_pmu_list\n", __func__);
+	pr_err("%s2 calling metricgroup_init_sys_pmu_list\n", __func__);
 	metricgroup_init_sys_pmu_list(fake_pmu);
 
 	while ((p = strsep(&llist, ",")) != NULL) {
@@ -1340,7 +1406,7 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 	struct rblist groups;
 	struct rb_node *node, *next;
 	struct strlist *metriclist = NULL;
-	printf("%s not yet calling metricgroup_init_sys_pmu_list\n", __func__);
+	pr_err("%s not yet calling metricgroup_init_sys_pmu_list\n", __func__);
 	if (!metricgroups) {
 		metriclist = strlist__new(NULL, NULL);
 		if (!metriclist)
@@ -1351,7 +1417,7 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 	groups.node_new = mep_new;
 	groups.node_cmp = mep_cmp;
 	groups.node_delete = mep_delete;
-	printf("%s2 not yet calling metricgroup_init_sys_pmu_list\n", __func__);
+	pr_err("%s2 not yet calling metricgroup_init_sys_pmu_list\n", __func__);
 	for (i = 0; map; i++) {
 		pe = &map->table[i];
 
@@ -1365,27 +1431,27 @@ void metricgroup__print(bool metrics, bool metricgroups, char *filter,
 			return;
 	}
 
-	printf("%s3 calling metricgroup_init_sys_pmu_list\n", __func__);
+	pr_err("%s3 calling metricgroup_init_sys_pmu_list\n", __func__);
 	metricgroup_init_sys_pmu_list(NULL);
 
-	printf("%s3 sys_pmu_map=%p\n", __func__, sys_pmu_map);
+	pr_err("%s3 sys_pmu_map=%p\n", __func__, sys_pmu_map);
 	for (i = 0; sys_pmu_map; i++) {
 		pe = &sys_pmu_map->table[i];
-		printf("%s3.1 sys_pmu_map=%p pe=%p name=%s metric_name=%s\n",
+		pr_err("%s3.1 sys_pmu_map=%p pe=%p name=%s metric_name=%s\n",
 			__func__, sys_pmu_map, pe, pe->name, pe->metric_name);
 		if (!pe->metric_name)
 			break;
 		if (metricgroup__print_pmu_event(pe, metricgroups, filter,
 						 raw, details, &groups,
 						 metriclist) < 0) {
-			printf("%s3.2 error sys_pmu_map=%p pe=%p\n", __func__, sys_pmu_map, pe);
+			pr_err("%s3.2 error sys_pmu_map=%p pe=%p\n", __func__, sys_pmu_map, pe);
 			break;
 		}
-		printf("%s3.3 no sys_pmu_map=%p pe=%p name=%s metric_name=%s\n",
+		pr_err("%s3.3 no sys_pmu_map=%p pe=%p name=%s metric_name=%s\n",
 			__func__, sys_pmu_map, pe, pe->name, pe->metric_name);
 	}
 
-	printf("%s3.4 calling metricgroup_cleanup_sys_pmu_list\n", __func__);
+	pr_err("%s3.4 calling metricgroup_cleanup_sys_pmu_list\n", __func__);
 	metricgroup_cleanup_sys_pmu_list();
 
 	if (!filter || !rblist__empty(&groups)) {
