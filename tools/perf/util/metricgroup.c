@@ -521,34 +521,100 @@ static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
 	return metricgroup__add_to_mep_groups(pm, groups);
 }
 
+#include "stat.h"
+
 static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
 					const struct pmu_metrics_table *table __maybe_unused,
 					__maybe_unused void *vdata)
 {
+	int k;
+	struct evlist *evlist;
+	struct perf_cpu_map *cpus;
+	struct evsel *evsel;
+	struct rblist metric_events = {
+		.nr_entries = 0,
+	};
+	int err = 0;
+
+	if (!pm->metric_expr)
+		return 0;
+
+	pr_err("%s metric name=%s\n", __func__, pm->metric_name);
+
 	/*
+	 * We need to prepare evlist for stat mode running on CPU 0
+	 * because that's where all the stats are going to be created.
+	 */
+	evlist = evlist__new();
+	pr_err("%s2 evlist=%p\n", __func__, evlist);
+	if (!evlist)
+		return -ENOMEM;
 
-	const char *pmu;
-	const char *metric_name;
-	const char *metric_group;
-	const char *metric_expr;
-	const char *metric_threshold;
-	const char *unit;
-	const char *compat;
-	const char *desc;
-	const char *long_desc;
-	const char *metricgroup_no_group;
-	enum aggr_mode_class aggr_mode;
-
-	*/
-	bool print = !!strstr(pm->metric_name, "imx8mn_ddr_write.all");
-	if (print) {
-		pr_err("%s pm metric name=%s compat=%s table=%p\n", __func__, pm->metric_name, pm->compat, table);
-		if (table) {
-
-		}
+	cpus = perf_cpu_map__new("0");
+	pr_err("%s3 cpus=%p\n", __func__, cpus);
+	if (!cpus) {
+		evlist__delete(evlist);
+		return -ENOMEM;
 	}
 
-	return 0;
+	perf_evlist__set_maps(&evlist->core, cpus, NULL);
+
+	err = metricgroup__parse_groups_test(evlist, table, pm->metric_name, &metric_events);
+	pr_err("%s4 after metricgroup__parse_groups_test err=%d\n", __func__, err);
+	if (err) {
+		if (!strcmp(pm->metric_name, "M1") || !strcmp(pm->metric_name, "M2") ||
+		    !strcmp(pm->metric_name, "M3")) {
+			pr_debug("Expected broken metric %s skipping\n", pm->metric_name);
+			err = 0;
+		}
+		goto out_err;
+	}
+
+	err = evlist__alloc_stats(/*config=*/NULL, evlist, /*alloc_raw=*/false);
+	pr_err("%s5 after evlist__alloc_stats err=%d\n", __func__, err);
+	if (err)
+		goto out_err;
+	/*
+	 * Add all ids with a made up value. The value may trigger divide by
+	 * zero when subtracted and so try to make them unique.
+	 */
+	k = 1;
+	evlist__alloc_aggr_stats(evlist, 1);
+	evlist__for_each_entry(evlist, evsel) {
+		evsel->stats->aggr->counts.val = k;
+		if (evsel__name_is(evsel, "duration_time"))
+			update_stats(&walltime_nsecs_stats, k);
+		k++;
+	}
+	evlist__for_each_entry(evlist, evsel) {
+		struct metric_event *me = metricgroup__lookup(&metric_events, evsel, false);
+		pr_err("%s6 me=%p evsel=%p name=%s pmu_name=%s\n", __func__, me, evsel, evsel->name, evsel->pmu_name);
+
+		if (me != NULL) {
+			struct metric_expr *mexp;
+
+			list_for_each_entry (mexp, &me->head, nd) {
+				pr_err("%s7 me=%p pm->metric_name=%s mexp->metric_name=%s\n", __func__, me, mexp->metric_name, mexp->metric_name);
+			//	if (strcmp(mexp->metric_name, pm->metric_name))
+		//			continue;
+	//			pr_err("Result %f\n", test_generic_metric(mexp, 0));
+	//			err = 0;
+	//			goto out_err;
+			}
+		}
+	}
+	pr_err("Didn't find parsed metric %s", pm->metric_name);
+	err = 0;
+out_err:
+	if (err)
+		pr_err("Broken metric %s\n", pm->metric_name);
+
+	/* ... cleanup. */
+	metricgroup__rblist_exit(&metric_events);
+	evlist__free_stats(evlist);
+	perf_cpu_map__put(cpus);
+	evlist__delete(evlist);
+	return err;
 }
 
 void metricgroup__print(const struct print_callbacks *print_cb, void *print_state)

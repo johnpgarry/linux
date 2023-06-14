@@ -868,8 +868,7 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
                 int ret;
 
                 decompress_metric(table->entries[i].offset, &pm);
-//                pr_err(\"%s starter1 pm pmu=%s metric name=%s compat=%s ender1 \",
-  //                __func__, pm.pmu, pm.metric_name, pm.compat);
+                printf(" 333 pm name=%s333    ", pm.metric_name);
 
                 if (!pm.metric_expr)
                         continue;
