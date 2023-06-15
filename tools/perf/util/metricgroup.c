@@ -484,25 +484,27 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 				       void *data)
 {
 	struct metricgroup_iter_data *d = data;
-	struct perf_pmu *pmu = NULL;
 	bool print = !!strstr(pm->metric_name, "imx8mn_ddr_write.all");
+	int ret;
+	if (!print)
+		print = !!strstr(pm->metric_name, "pmcg");
+	if (!print)
+		print = !!strstr(pm->metric_name, "supermix");
 
-
-	if (!pm->metric_expr || !pm->compat)
+	if (!pm->metric_expr)
 		return 0;
 	if (print)
-		pr_err("%s pm metric name=%s compat=%s\n",
-			__func__, pm->metric_name, pm->compat);
-	while ((pmu = perf_pmus__scan(pmu))) {
+		pr_err("%s pm metric name=%s compat=%s pmu=%s\n",
+			__func__, pm->metric_name, pm->compat, pm->pmu);
 
-		if (!pmu->id || strcmp(pmu->id, pm->compat))
-			continue;
-		if (print)
-			pr_err("%s3 pmu=%p pmu->name=%s id=%s pm metric name=%s fn=%p\n",
-				__func__, pmu, pmu->name, pmu->id, pm->metric_name, d->fn);
-		return d->fn(pm, table, d->data);
+	ret = d->fn(pm, table, d->data);
+	if (ret) {
+		pr_err("%s9 FAIL ret=%d pm metric name=%s compat=%s\n",
+			__func__, ret, pm->metric_name, pm->compat);
+		return ret;
 	}
 	return 0;
+
 }
 
 static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
@@ -522,9 +524,30 @@ static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
 }
 
 #include "stat.h"
+struct metricgroup__test_event {
+	const struct pmu_event **found_event;
+	struct evsel *evsel;
+};
 
-static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
-					const struct pmu_metrics_table *table __maybe_unused,
+static int metricgroup__test_event(const struct pmu_event *pe,
+					const struct pmu_events_table *table __maybe_unused,
+					__maybe_unused void *vdata)
+{
+	struct metricgroup__test_event *data = vdata;
+	const struct pmu_event **found_event = data->found_event;
+	struct evsel *evsel = data->evsel;
+	pr_err("%s pe name=%s compat=%s pmu=%s data=%p\n", __func__, pe->name, pe->compat, pe->pmu, data);
+	if (!strcmp(pe->name, evsel->name)) {
+		pr_err("%s1 match evsel %s\n", __func__, evsel->name);
+		*found_event = pe;
+		return 1;
+	}
+
+	return 0;
+}
+
+static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *pm,
+					const struct pmu_metrics_table *table,
 					__maybe_unused void *vdata)
 {
 	int k;
@@ -534,12 +557,13 @@ static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
 	struct rblist metric_events = {
 		.nr_entries = 0,
 	};
+	int events_count = 0, found_events = 0;
 	int err = 0;
 
 	if (!pm->metric_expr)
 		return 0;
 
-	pr_err("%s metric name=%s\n", __func__, pm->metric_name);
+	pr_err("\n\n%s metric name=%s expr=%s\n", __func__, pm->metric_name, pm->metric_expr);
 
 	/*
 	 * We need to prepare evlist for stat mode running on CPU 0
@@ -587,6 +611,26 @@ static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
 		k++;
 	}
 	evlist__for_each_entry(evlist, evsel) {
+		events_count++;
+	}
+	pr_err("%s5.1 events_count=%d expr=%s\n", __func__, events_count, pm->metric_expr);
+	#if 1
+	evlist__for_each_entry(evlist, evsel) {
+		const struct pmu_event *found_event = NULL;
+		struct metricgroup__test_event metricgroup__test_event_data = {
+			.evsel = evsel,
+			.found_event = &found_event,
+		};
+		const struct pmu_events_table *events_table = sys_events_table_from_metric_table(table);
+		pr_err("%s5.2 evsel=%p name=%s pmu_name=%s metric_id=%s events_table=%p\n",
+			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table);
+
+		pmu_events_table_for_each_event(events_table,
+						 metricgroup__test_event,
+						 &metricgroup__test_event_data);
+	}
+	#else
+	evlist__for_each_entry(evlist, evsel) {
 		struct metric_event *me = metricgroup__lookup(&metric_events, evsel, false);
 		pr_err("%s6 me=%p evsel=%p name=%s pmu_name=%s\n", __func__, me, evsel, evsel->name, evsel->pmu_name);
 
@@ -603,7 +647,10 @@ static int metricgroup__add_to_mep_groups_callback2(const struct pmu_metric *pm,
 			}
 		}
 	}
-	pr_err("Didn't find parsed metric %s", pm->metric_name);
+	#endif
+
+
+	pr_err("%s9 events_count=%d found_events=%d\n", __func__, events_count, found_events);
 	err = 0;
 out_err:
 	if (err)
@@ -639,7 +686,7 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 
 		struct pmu_metrics_table *sys_events_table = pmu_metrics_sys_events_table();
 		pmu_metrics_table_for_each_metric(sys_events_table,
-			metricgroup__add_to_mep_groups_callback2,
+			metricgroup__add_to_mep_groups_callback_new,
 			NULL);
 
 	} else {
@@ -648,7 +695,7 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 			.data = &groups,
 		};
 		struct metricgroup_iter_data data2 = {
-			.fn = metricgroup__add_to_mep_groups_callback2,
+			.fn = metricgroup__add_to_mep_groups_callback_new,
 			.data = &groups,
 		};
 		pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data);
@@ -979,7 +1026,7 @@ static int resolve_metric(struct list_head *metric_list,
 		const char *key;
 	} *pending = NULL;
 	int i, ret = 0, pending_cnt = 0;
-
+	pr_err("%s pmu=%s \n", __func__, pmu);
 	/*
 	 * Iterate all the parsed IDs and if there's a matching metric and it to
 	 * the pending array.
@@ -987,6 +1034,7 @@ static int resolve_metric(struct list_head *metric_list,
 	hashmap__for_each_entry(root_metric->pctx->ids, cur, bkt) {
 		struct pmu_metric pm;
 
+		pr_err("%s2 pmu=%s calling metricgroup__find_metric\n", __func__, pmu);
 		if (metricgroup__find_metric(pmu, cur->pkey, table, &pm)) {
 			pending = realloc(pending,
 					(pending_cnt + 1) * sizeof(struct to_resolve));
@@ -1008,6 +1056,7 @@ static int resolve_metric(struct list_head *metric_list,
 	 * context.
 	 */
 	for (i = 0; i < pending_cnt; i++) {
+		pr_err("%s3 pmu=%s calling add_metric\n", __func__, pmu);
 		ret = add_metric(metric_list, &pending[i].pm, modifier, metric_no_group,
 				 metric_no_threshold, user_requested_cpu_list, system_wide,
 				 root_metric, visited, table);
@@ -1016,6 +1065,7 @@ static int resolve_metric(struct list_head *metric_list,
 	}
 
 	free(pending);
+	pr_err("%s10 out pmu=%s\n", __func__, pmu);
 	return ret;
 }
 
@@ -1060,6 +1110,7 @@ static int __add_metric(struct list_head *metric_list,
 		.parent = visited,
 	};
 
+	pr_err("%s metric expr %s for %s\n", __func__, pm->metric_expr, pm->metric_name);
 	for (vm = visited; vm; vm = vm->parent) {
 		if (!strcmp(pm->metric_name, vm->name)) {
 			pr_err("failed: recursion detected for %s\n", pm->metric_name);
@@ -1140,6 +1191,8 @@ static int __add_metric(struct list_head *metric_list,
 		/* Resolve referenced metrics. */
 		const char *pmu = pm->pmu ?: "cpu";
 
+		pr_err("%s4 metric expr %s for %s calling resolve_metric\n", __func__, pm ? pm->metric_expr : "?",
+			pm ? pm->metric_name : "?");
 		ret = resolve_metric(metric_list, pmu, modifier, metric_no_group,
 				     metric_no_threshold, user_requested_cpu_list,
 				     system_wide, root_metric, &visited_node,
@@ -1188,9 +1241,17 @@ static bool metricgroup__find_metric(const char *pmu,
 		.metric = metric,
 		.pm = pm,
 	};
-
-	return pmu_metrics_table_for_each_metric(table, metricgroup__find_metric_callback, &data)
+	bool res;
+	pr_err("%s pmu=%s metric=%s pm=%p\n", __func__,
+		pmu, metric, pm);
+	//pr_err("%s2 pmu=%s metric=%s pm metric_name=%s pmu=%s\n", __func__,
+	//	pmu, metric, pm ? pm->metric_name : "?", pm ? pm->pmu : "?");
+	res = pmu_metrics_table_for_each_metric(table, metricgroup__find_metric_callback, &data)
 		? true : false;
+
+	pr_err("%s10 res=%d pmu=%s metric=%s pm=%p\n", __func__, res,
+		pmu, metric, pm);
+	return res;
 }
 
 static int add_metric(struct list_head *metric_list,
@@ -1206,7 +1267,7 @@ static int add_metric(struct list_head *metric_list,
 {
 	int ret = 0;
 
-	pr_debug("metric expr %s for %s\n", pm->metric_expr, pm->metric_name);
+	pr_err("%s metric expr %s for %s\n", __func__, pm->metric_expr, pm->metric_name);
 
 	if (!strstr(pm->metric_expr, "?")) {
 		ret = __add_metric(metric_list, pm, modifier, metric_no_group,
@@ -1223,6 +1284,7 @@ static int add_metric(struct list_head *metric_list,
 		 */
 
 		for (j = 0; j < count && !ret; j++)
+			pr_err("%s3 j=%d metric expr %s for %s calling __add_metric\n", __func__, j, pm->metric_expr, pm->metric_name);
 			ret = __add_metric(metric_list, pm, modifier, metric_no_group,
 					   metric_no_threshold, j, user_requested_cpu_list,
 					   system_wide, root_metric, visited, table);
@@ -1238,12 +1300,18 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 	struct metricgroup_add_iter_data *d = data;
 	int ret;
 
+	pr_debug("%s pm name=%s pmu=%s calling match_pm_metric\n", __func__,
+			pm->metric_name, pm->pmu);
 	if (!match_pm_metric(pm, d->pmu, d->metric_name))
 		return 0;
+	pr_err("%s2 pm name=%s pmu=%s calling add_metric\n", __func__,
+			pm->metric_name, pm->pmu);
 
 	ret = add_metric(d->metric_list, pm, d->modifier, d->metric_no_group,
 			 d->metric_no_threshold, d->user_requested_cpu_list,
 			 d->system_wide, d->root_metric, d->visited, d->table);
+	pr_err("%s3 pm name=%s pmu=%s ret=%d from add_metric\n", __func__,
+			pm->metric_name, pm->pmu, ret);
 	if (ret)
 		goto out;
 
@@ -1379,7 +1447,8 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 				.table = table,
 			},
 		};
-
+		pr_err("%s pmu=%s metric_name=%s table=%p\n", __func__,
+			pmu, metric_name, table);
 		pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data);
 	}
 	/* End of pmu events. */
@@ -1426,7 +1495,7 @@ static int metricgroup__add_metric_list(const char *pmu, const char *list,
 		return -ENOMEM;
 	list_itr = list_copy;
 
-	pr_err("%s calling metricgroup_init_sys_pmu_list\n", __func__);
+	pr_err("%s calling metricgroup_init_sys_pmu_list pmu=%s list=%s\n", __func__, pmu, list);
 	metricgroup_init_sys_pmu_list(NULL);
 
 	while ((metric_name = strsep(&list_itr, ",")) != NULL) {
