@@ -868,10 +868,10 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
                 int ret;
 
                 decompress_metric(table->entries[i].offset, &pm);
-                printf(" 333 pm name=%s333    ", pm.metric_name);
 
                 if (!pm.metric_expr)
                         continue;
+                printf(" 333 pm name=%s 333    ", pm.metric_name);
                 ret = fn(&pm, table, data);
                 if (ret)
                         return ret;
