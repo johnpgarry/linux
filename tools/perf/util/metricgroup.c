@@ -529,7 +529,7 @@ struct metricgroup__test_event {
 	struct evsel *evsel;
 };
 
-static int metricgroup__test_event(const struct pmu_event *pe,
+static int metricgroup__test_event_iter(const struct pmu_event *pe,
 					const struct pmu_events_table *table __maybe_unused,
 					__maybe_unused void *vdata)
 {
@@ -546,7 +546,7 @@ static int metricgroup__test_event(const struct pmu_event *pe,
 	return 0;
 }
 
-static bool match_event_to_pmu(struct pmu_event *event, struct perf_pmu *pmu)
+static bool match_event_to_pmu(const struct pmu_event *event, struct perf_pmu *pmu)
 {
 	struct perf_pmu_alias *alias;
 
@@ -568,8 +568,8 @@ static bool match_event_to_pmu(struct pmu_event *event, struct perf_pmu *pmu)
  * a. If a matching event was found, match against all PMU aliases
  * b. Alternatively, try to match against PMU+ID for expression term not using an alias
  */
-static bool match_to_pmu(struct pmu_event *found_event, struct perf_pmu *pmu,
-			 struct pmu_event *pe, struct evsel *evsel, bool print)
+static bool match_to_pmu(const struct pmu_event *found_event, struct perf_pmu *pmu,
+			const struct pmu_metric *pm, struct evsel *evsel, bool print)
 {
 	if (print) {
 		pr_err("%s found_event name=%s pmu name=%s evsel->name=%s\n", 
@@ -587,19 +587,19 @@ static bool match_to_pmu(struct pmu_event *found_event, struct perf_pmu *pmu,
 			pmu,
 			pmu ? pmu->name : "?",
 			evsel ? evsel->pmu_name : "?");
-		pr_err("%s2.1 evsel->pmu_name=%s pmu->id=%s pe->compat=%s\n", 
+		pr_err("%s2.1 evsel->pmu_name=%s pmu->id=%s pm->compat=%s\n", 
 			__func__,
-			evsel->pmu_name, pmu->id, pe->compat);
+			evsel->pmu_name, pmu->id, pm->compat);
 	}
 	if (pmu->name && evsel->pmu_name &&
 	    !strcmp(pmu->name, evsel->pmu_name) &&
-	    pmu->id && pe->compat && !strcmp(pmu->id, pe->compat)) {
+	    pmu->id && pm->compat && !strcmp(pmu->id, pm->compat)) {
 		if (print)
-			pr_err("%s3 evsel->name=%s pmu->id=%s pe->compat=%s\n", 
+			pr_err("%s3 evsel->name=%s pmu->id=%s pm->compat=%s\n", 
 				__func__,
 				evsel ? evsel->name : "?",
 				pmu->id,
-				pe->compat);
+				pm->compat);
 		return true;
 	}
 	return false;
@@ -686,7 +686,7 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table);
 
 		pmu_events_table_for_each_event(events_table,
-						 metricgroup__test_event,
+						 metricgroup__test_event_iter,
 						 &metricgroup__test_event_data);
 		pr_err("%s5.3 found_event=%p\n",
 			__func__, found_event);
@@ -696,6 +696,8 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 					found_events++;
 					pr_err("%s5.4 found_event=%p pmu name=%s\n",
 						__func__, found_event, pmu->name);
+					if (events_count == found_events)
+						goto test;
 					break;
 				}
 			}
@@ -721,8 +723,8 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 	}
 	#endif
 
-
-	pr_err("%s9 events_count=%d found_events=%d\n", __func__, events_count, found_events);
+test:
+	pr_err("%s9 test pm name=%s events_count=%d found_events=%d\n", __func__, pm->metric_name, events_count, found_events);
 	err = 0;
 out_err:
 	if (err)
@@ -2124,57 +2126,6 @@ struct event_iter_data {
 	struct perf_pmu *fake_pmu;
 };
 
-static bool match_event_to_pmu(struct pmu_event *event, struct perf_pmu *pmu)
-{
-	struct perf_pmu_alias *alias;
-
-	if (!pmu->id || !event->compat)
-		return false;
-
-	list_for_each_entry(alias, &pmu->aliases, list) {
-		if (!strcmp(alias->name, event->name) &&
-		    !strcmp(event->compat, pmu->id)) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-
-static bool match_to_pmu(const struct pmu_event *found_event, struct perf_pmu *pmu,
-			 const struct pmu_metric *pm, struct evsel *evsel, bool print)
-{
-	if (print) {
-		pr_err("mtp found_event name=%s pmu name=%s pm->metric_name=%s evsel->name=%s\n", 
-			found_event ? found_event->name : "?",
-			pmu ? pmu->name : "?",
-			pm ? pm->metric_name : "?",
-			evsel ? evsel->name : "?");
-	}
-	if (found_event)
-		return match_event_to_pmu(found_event, pmu);
-
-	if (print) {
-		pr_err("mtp2 pmu=%p name=%s evsel->pmu_name=%s\n", 
-			pmu,
-			pmu ? pmu->name : "?",
-			evsel ? evsel->pmu_name : "?");
-		pr_err("mtp2.1 evsel->pmu_name=%s pmu->id=%s pm->compat=%s\n", 
-			evsel->pmu_name, pmu->id, pm->compat);
-	}
-	if (pmu->name && evsel->pmu_name &&
-	    !strcmp(pmu->name, evsel->pmu_name) &&
-	    pmu->id && pm->compat && !strcmp(pmu->id, pm->compat)) {
-		if (print)
-			pr_err("mtp3 evsel->name=%s pmu->id=%s pm->compat=%s\n", 
-				evsel ? evsel->name : "?",
-				pmu->id,
-				pm->compat);
-		return true;
-	}
-	return false;
-}
 
 
 /*

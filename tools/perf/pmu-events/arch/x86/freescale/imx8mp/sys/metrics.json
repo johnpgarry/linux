@@ -40,14 +40,14 @@
 	    "Compat": "i.MX8MP"
    },
    {
-	    "BriefDescription": "bytes all masters read from ddr based on read-cycles event",
+	    "BriefDescription": "bytes all masters rad from ddr based on read-cycles event",
 	    "MetricName": "imx8mp_ddr_read.all",
 	    "MetricExpr": "imx8mp_ddr.read_cycles * 4 * 2 + imx8mp_ddr.read",
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
 	    "BriefDescription": "bytes all masters write to ddr based on write-cycles event",
-	    "MetricName": "imx8mn_ddr_write.all",
+	    "MetricName": "imx8mp_ddr_write.all",
 	    "MetricExpr": "imx8mp_ddr.write_cycles * 4 * 2 + imx8mp_ddr.write",
 	    "ScaleUnit": "9.765625e-4KB"
    }
