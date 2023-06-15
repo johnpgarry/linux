@@ -546,6 +546,65 @@ static int metricgroup__test_event(const struct pmu_event *pe,
 	return 0;
 }
 
+static bool match_event_to_pmu(struct pmu_event *event, struct perf_pmu *pmu)
+{
+	struct perf_pmu_alias *alias;
+
+	if (!pmu->id || !event->compat)
+		return false;
+
+	list_for_each_entry(alias, &pmu->aliases, list) {
+		if (!strcmp(alias->name, event->name) &&
+		    !strcmp(event->compat, pmu->id)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+ * Try to match against an PMU event/alias:
+ * a. If a matching event was found, match against all PMU aliases
+ * b. Alternatively, try to match against PMU+ID for expression term not using an alias
+ */
+static bool match_to_pmu(struct pmu_event *found_event, struct perf_pmu *pmu,
+			 struct pmu_event *pe, struct evsel *evsel, bool print)
+{
+	if (print) {
+		pr_err("%s found_event name=%s pmu name=%s evsel->name=%s\n", 
+			__func__,
+			found_event ? found_event->name : "?",
+			pmu ? pmu->name : "?",
+			evsel ? evsel->name : "?");
+	}
+	if (found_event)
+		return match_event_to_pmu(found_event, pmu);
+
+	if (print) {
+		pr_err("%s2 pmu=%p name=%s evsel->pmu_name=%s\n", 
+			__func__,
+			pmu,
+			pmu ? pmu->name : "?",
+			evsel ? evsel->pmu_name : "?");
+		pr_err("%s2.1 evsel->pmu_name=%s pmu->id=%s pe->compat=%s\n", 
+			__func__,
+			evsel->pmu_name, pmu->id, pe->compat);
+	}
+	if (pmu->name && evsel->pmu_name &&
+	    !strcmp(pmu->name, evsel->pmu_name) &&
+	    pmu->id && pe->compat && !strcmp(pmu->id, pe->compat)) {
+		if (print)
+			pr_err("%s3 evsel->name=%s pmu->id=%s pe->compat=%s\n", 
+				__func__,
+				evsel ? evsel->name : "?",
+				pmu->id,
+				pe->compat);
+		return true;
+	}
+	return false;
+}
+
 static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *pm,
 					const struct pmu_metrics_table *table,
 					__maybe_unused void *vdata)
@@ -617,6 +676,7 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 	#if 1
 	evlist__for_each_entry(evlist, evsel) {
 		const struct pmu_event *found_event = NULL;
+		struct perf_pmu *pmu = NULL;
 		struct metricgroup__test_event metricgroup__test_event_data = {
 			.evsel = evsel,
 			.found_event = &found_event,
@@ -628,6 +688,18 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 		pmu_events_table_for_each_event(events_table,
 						 metricgroup__test_event,
 						 &metricgroup__test_event_data);
+		pr_err("%s5.3 found_event=%p\n",
+			__func__, found_event);
+		if (found_event) {
+			while ((pmu = perf_pmus__scan(pmu)) != NULL) {
+				if (match_to_pmu(found_event, pmu, pm, evsel, true)) {
+					found_events++;
+					pr_err("%s5.4 found_event=%p pmu name=%s\n",
+						__func__, found_event, pmu->name);
+					break;
+				}
+			}
+		}
 	}
 	#else
 	evlist__for_each_entry(evlist, evsel) {
@@ -2070,8 +2142,8 @@ static bool match_event_to_pmu(struct pmu_event *event, struct perf_pmu *pmu)
 }
 
 
-static bool match_to_pmu(struct pmu_event *found_event, struct perf_pmu *pmu,
-			 struct pmu_metric *pm, struct evsel *evsel, bool print)
+static bool match_to_pmu(const struct pmu_event *found_event, struct perf_pmu *pmu,
+			 const struct pmu_metric *pm, struct evsel *evsel, bool print)
 {
 	if (print) {
 		pr_err("mtp found_event name=%s pmu name=%s pm->metric_name=%s evsel->name=%s\n", 
@@ -2276,13 +2348,13 @@ int metricgroup__metric_event_iter(__maybe_unused const struct pmu_metric *pm,
 
 		/* Go through the list PMUs and try to match */
 		while ((pmu = perf_pmus__scan(pmu)) != NULL) {
-			if (match_to_pmu(found_event, pmu, (struct pmu_metric *)pm, evsel, print)) {
+			if (match_to_pmu(found_event, pmu, pm, evsel, print)) {
 				found_events++;
 				break;
 			}
 		}
 
-		if (fake_pmu && match_to_pmu(found_event, fake_pmu, (struct pmu_metric *)pm, evsel, print))
+		if (fake_pmu && match_to_pmu(found_event, fake_pmu, pm, evsel, print))
 			found_events++;
 
 test:
