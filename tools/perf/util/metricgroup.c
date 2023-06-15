@@ -690,16 +690,16 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 						 &metricgroup__test_event_data);
 		pr_err("%s5.3 found_event=%p\n",
 			__func__, found_event);
-		if (found_event) {
-			while ((pmu = perf_pmus__scan(pmu)) != NULL) {
-				if (match_to_pmu(found_event, pmu, pm, evsel, true)) {
-					found_events++;
-					pr_err("%s5.4 found_event=%p pmu name=%s\n",
-						__func__, found_event, pmu->name);
-					if (events_count == found_events)
-						goto test;
-					break;
-				}
+		while ((pmu = perf_pmus__scan(pmu)) != NULL) {
+			if (!pmu->is_uncore)
+				continue;
+			if (match_to_pmu(found_event, pmu, pm, evsel, true)) {
+				found_events++;
+				pr_err("%s5.4 found_event=%p pmu name=%s\n",
+					__func__, found_event, pmu->name);
+				if (events_count == found_events)
+					goto test;
+				break;
 			}
 		}
 	}
