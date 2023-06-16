@@ -536,7 +536,7 @@ static int metricgroup__test_event_iter(const struct pmu_event *pe,
 	struct metricgroup__test_event *data = vdata;
 	struct pmu_event *found_event = data->found_event;
 	struct evsel *evsel = data->evsel;
-	pr_err("%s pe name=%s compat=%s pmu=%s data=%p\n", __func__, pe->name, pe->compat, pe->pmu, data);
+	pr_err("%s match (pe name=%s vs evsel->name=%s) compat=%s pmu=%s \n", __func__, pe->name, evsel->name, pe->compat, pe->pmu);
 	if (!strcmp(pe->name, evsel->name)) {
 		pr_err("%s1 match evsel %s\n", __func__, evsel->name);
 		memcpy(found_event, pe, sizeof(*pe));
@@ -706,9 +706,10 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 	}
 
 
-	pr_err("%s9 test pm %s name=%s events_count=%d found_events=%d\n", __func__, 
+	pr_err("%s9 test pm %s name=%s events_count=%d found_events=%d description=%s\n", __func__, 
 		(events_count == found_events) ? "gotcha" : "",
-		pm->metric_name, events_count, found_events);
+		pm->metric_name, events_count, found_events,
+		pm->desc);
 	err = 0;
 out_err:
 	if (err)
@@ -718,6 +719,7 @@ out_err:
 	metricgroup__rblist_exit(&metric_events);
 	evlist__free_stats(evlist);
 	evlist__delete(evlist);
+	pr_err("%s10 out \n\n\n\n", __func__); 
 	return err;
 }
 

@@ -1,35 +1,35 @@
 [
    {
 	    "ArchStdEvent": "smmuv3_pmcg.CYCLES",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.TRANSACTION",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.TLB_MISS",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_CACHE_MISS",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.TRANS_TABLE_WALK_ACCESS",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_STRUCT_ACCESS",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_RQ",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_PASSED",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x80",
@@ -37,7 +37,7 @@
 	    "BriefDescription": "Write command received by the SP",
 	    "PublicDescription": "Write command received by the SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x81",
@@ -45,7 +45,7 @@
 	    "BriefDescription": "Read command received by the SP",
 	    "PublicDescription": "Read command received by the SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x82",
@@ -53,7 +53,7 @@
 	    "BriefDescription": "Write command received by the TP",
 	    "PublicDescription": "Write command received by the TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x83",
@@ -61,7 +61,7 @@
 	    "BriefDescription": "Read command received by the TP",
 	    "PublicDescription": "Read command received by the TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x84",
@@ -69,7 +69,7 @@
 	    "BriefDescription": "Command issued by the SP",
 	    "PublicDescription": "Command issued by the SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x85",
@@ -77,7 +77,7 @@
 	    "BriefDescription": "Command issued by the TP",
 	    "PublicDescription": "Command issued by the TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x86",
@@ -85,7 +85,7 @@
 	    "BriefDescription": "Write command sent by SP",
 	    "PublicDescription": "Write command sent by SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x87",
@@ -93,7 +93,7 @@
 	    "BriefDescription": "Read command sent by SP",
 	    "PublicDescription": "Read command sent by SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x88",
@@ -101,7 +101,7 @@
 	    "BriefDescription": "Write command sent by TP",
 	    "PublicDescription": "Write command sent by TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x89",
@@ -109,7 +109,7 @@
 	    "BriefDescription": "Read command sent by TP",
 	    "PublicDescription": "Read command sent by TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x8a",
@@ -117,7 +117,7 @@
 	    "BriefDescription": "Command received by L1 TLB",
 	    "PublicDescription": "Command received by L1 TLB",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x8B",
@@ -125,7 +125,7 @@
 	    "BriefDescription": "Command received by L2 TLB",
 	    "PublicDescription": "Command received by L2 TLB",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x8c",
@@ -133,7 +133,7 @@
 	    "BriefDescription": "L1 TLB HIT",
 	    "PublicDescription": "L1 TLB HIT",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x8d",
@@ -141,7 +141,7 @@
 	    "BriefDescription": "L2 TLB HIT",
 	    "PublicDescription": "L2 TLB HIT",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x8f",
@@ -149,7 +149,7 @@
 	    "BriefDescription": "Command retried on TP interface",
 	    "PublicDescription": "Command retried on TP interface",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x90",
@@ -157,7 +157,7 @@
 	    "BriefDescription": "Specific matched commands sent by SP",
 	    "PublicDescription": "Specific matched commands sent by SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x91",
@@ -165,7 +165,7 @@
 	    "BriefDescription": "Delayed commands sent by SP",
 	    "PublicDescription": "Delayed commands sent by SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x92",
@@ -173,7 +173,7 @@
 	    "BriefDescription": "Specific matched commands sent by TP",
 	    "PublicDescription": "Specific matched commands sent by TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0x93",
@@ -181,7 +181,7 @@
 	    "BriefDescription": "Delayed commands sent by TP",
 	    "PublicDescription": "Delayed commands sent by TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa0",
@@ -189,7 +189,7 @@
 	    "BriefDescription": "DVM TLBI",
 	    "PublicDescription": "DVM TLBI",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa1",
@@ -197,7 +197,7 @@
 	    "BriefDescription": "DVM SYNC",
 	    "PublicDescription": "DVM SYNC",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa2",
@@ -205,7 +205,7 @@
 	    "BriefDescription": "Delay page table read request",
 	    "PublicDescription": "Delay page table read request",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa3",
@@ -213,7 +213,7 @@
 	    "BriefDescription": "Page table read request",
 	    "PublicDescription": "Page table read request",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa4",
@@ -221,7 +221,7 @@
 	    "BriefDescription": "Delay of address translation requests",
 	    "PublicDescription": "Delay of address translation requests",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa5",
@@ -229,7 +229,7 @@
 	    "BriefDescription": "Address translation request",
 	    "PublicDescription": "Address translation request",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa6",
@@ -237,7 +237,7 @@
 	    "BriefDescription": "Sync request execution time",
 	    "PublicDescription": "Sync request execution time",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa7",
@@ -245,7 +245,7 @@
 	    "BriefDescription": "Sync request sent",
 	    "PublicDescription": "Sync request sent",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa8",
@@ -253,7 +253,7 @@
 	    "BriefDescription": "Clean unique request sent by SP",
 	    "PublicDescription": "Clean unique request sent by SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xa9",
@@ -261,7 +261,7 @@
 	    "BriefDescription": "Writeback sent by SP",
 	    "PublicDescription": "Writeback sent by SP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xaa",
@@ -269,7 +269,7 @@
 	    "BriefDescription": "Clean unique request sent by TP",
 	    "PublicDescription": "Clean unique request sent by TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    },
    {
 	    "EventCode": "0xab",
@@ -277,6 +277,6 @@
 	    "BriefDescription": "Writeback sent by TP",
 	    "PublicDescription": "Writeback sent by TP",
 	    "Unit": "smmuv3_pmcg",
-	    "Compat": "0x65000012"
+	    "Compat": "0x65000013"
    }
 ]
