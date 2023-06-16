@@ -636,7 +636,6 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 					const struct pmu_metrics_table *table,
 					__maybe_unused void *vdata)
 {
-	int k;
 	struct evlist *evlist;
 	struct evsel *evsel;
 	struct rblist metric_events = {
@@ -670,22 +669,6 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 		goto out_err;
 	}
 
-	err = evlist__alloc_stats(/*config=*/NULL, evlist, /*alloc_raw=*/false);
-	pr_err("%s5 after evlist__alloc_stats err=%d\n", __func__, err);
-	if (err)
-		goto out_err;
-	/*
-	 * Add all ids with a made up value. The value may trigger divide by
-	 * zero when subtracted and so try to make them unique.
-	 */
-	k = 1;
-	evlist__alloc_aggr_stats(evlist, 1);
-	evlist__for_each_entry(evlist, evsel) {
-		evsel->stats->aggr->counts.val = k;
-		if (evsel__name_is(evsel, "duration_time"))
-			update_stats(&walltime_nsecs_stats, k);
-		k++;
-	}
 	evlist__for_each_entry(evlist, evsel) {
 		events_count++;
 	}
@@ -743,7 +726,6 @@ out_err:
 
 	/* ... cleanup. */
 	metricgroup__rblist_exit(&metric_events);
-	evlist__free_stats(evlist);
 	evlist__delete(evlist);
 	pr_err("%s10 out \n\n\n\n", __func__); 
 	return err;
