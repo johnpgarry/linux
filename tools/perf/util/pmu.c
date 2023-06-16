@@ -873,7 +873,7 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	__u32 type;
 	char *name = pmu_find_real_name(lookup_name);
 	char *alias_name;
-	bool print = !!strstr(lookup_name, "imx");
+	bool print = !!strstr(lookup_name, "imx") || !!strstr(lookup_name, "pmcg");
 	bool special = print && !is_virt_env();
 
 	if (print)
@@ -952,9 +952,12 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	}
 	if (pmu->is_uncore) {
 		if (special) {
-			pmu->id = (char *)"i.MX8MN";
-			pr_err("%s4.3 pmu=%p id=%s\n", __func__,
-					pmu, pmu->id);
+			if (strstr(lookup_name, "imx"))
+				pmu->id = (char *)"i.MX8MN";
+			else if (strstr(lookup_name, "pmcg"))
+				pmu->id = (char *)"0x65000013";
+			pr_err("%s4.3 pmu=%p name=%s id=%s\n", __func__,
+					pmu, pmu->name, pmu->id);
 		} else
 			pmu->id = pmu_id(name);
 	}

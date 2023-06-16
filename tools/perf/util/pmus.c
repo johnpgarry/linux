@@ -87,7 +87,7 @@ static struct perf_pmu *perf_pmu__find2(int dirfd, const char *name)
 {
 	struct perf_pmu *pmu;
 	bool core_pmu;
-	bool print = !!strstr(name, "imx");
+	bool print = !!strstr(name, "imx") || !!strstr(name, "pmcg");
 	if (print)
 		pr_err("%s name=%s\n", __func__, name);
 	/*
@@ -155,8 +155,12 @@ static void pmu_read_sysfs(bool core_only)
 	} else if (!is_virt_env()) {
 		struct perf_pmu *imx8_ddr7 = perf_pmu__find2(-44, "imx8_ddr7");
 		struct perf_pmu *imx8_ddr8 = perf_pmu__find2(-44, "imx8_ddr8");
+		struct perf_pmu *pmcg123 = perf_pmu__find2(-44, "smmuv3_pmcg_123");
+		struct perf_pmu *pmcg456 = perf_pmu__find2(-44, "smmuv3_pmcg_456");
 		pr_err("%s5 created imx8_ddr7=%p id=%s\n", __func__, imx8_ddr7, imx8_ddr7 ? imx8_ddr7->id : "?");
 		pr_err("%s6 creating imx8_ddr8=%p id=%s\n", __func__, imx8_ddr8, imx8_ddr8 ? imx8_ddr8->id : "?");
+		pr_err("%s7 created pmcg123=%p id=%s\n", __func__, pmcg123, pmcg123 ? pmcg123->id : "?");
+		pr_err("%s8 creating pmcg456=%p id=%s\n", __func__, pmcg456, pmcg456 ? pmcg456->id : "?");
 		read_sysfs_core_pmus = true;
 		read_sysfs_all_pmus = true;
 	}
