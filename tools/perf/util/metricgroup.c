@@ -673,7 +673,7 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 		events_count++;
 	}
 	pr_err("%s5.1 events_count=%d expr=%s\n", __func__, events_count, pm->metric_expr);
-	#if 1
+
 	evlist__for_each_entry(evlist, evsel) {
 		const struct pmu_event *found_event = NULL;
 		struct perf_pmu *pmu = NULL;
@@ -684,6 +684,11 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 		const struct pmu_events_table *events_table = sys_events_table_from_metric_table(table);
 		pr_err("%s5.2 evsel=%p name=%s pmu_name=%s metric_id=%s events_table=%p\n",
 			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table);
+
+		if (!strcmp(evsel->name, "duration_time")) {
+			found_events++;
+			continue;
+		}
 
 		pmu_events_table_for_each_event(events_table,
 						 metricgroup__test_event_iter,
@@ -697,33 +702,15 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 				found_events++;
 				pr_err("%s5.4 found_event=%p pmu name=%s\n",
 					__func__, found_event, pmu->name);
-				if (events_count == found_events)
-					goto test;
 				break;
 			}
 		}
+
+		if (events_count == found_events)
+			break;
 	}
-	#else
-	evlist__for_each_entry(evlist, evsel) {
-		struct metric_event *me = metricgroup__lookup(&metric_events, evsel, false);
-		pr_err("%s6 me=%p evsel=%p name=%s pmu_name=%s\n", __func__, me, evsel, evsel->name, evsel->pmu_name);
 
-		if (me != NULL) {
-			struct metric_expr *mexp;
 
-			list_for_each_entry (mexp, &me->head, nd) {
-				pr_err("%s7 me=%p pm->metric_name=%s mexp->metric_name=%s\n", __func__, me, mexp->metric_name, mexp->metric_name);
-			//	if (strcmp(mexp->metric_name, pm->metric_name))
-		//			continue;
-	//			pr_err("Result %f\n", test_generic_metric(mexp, 0));
-	//			err = 0;
-	//			goto out_err;
-			}
-		}
-	}
-	#endif
-
-test:
 	pr_err("%s9 test pm name=%s events_count=%d found_events=%d\n", __func__, pm->metric_name, events_count, found_events);
 	err = 0;
 out_err:
