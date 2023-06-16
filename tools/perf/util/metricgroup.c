@@ -525,7 +525,7 @@ static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
 
 #include "stat.h"
 struct metricgroup__test_event {
-	const struct pmu_event **found_event;
+	struct pmu_event *found_event;
 	struct evsel *evsel;
 };
 
@@ -534,12 +534,13 @@ static int metricgroup__test_event_iter(const struct pmu_event *pe,
 					__maybe_unused void *vdata)
 {
 	struct metricgroup__test_event *data = vdata;
-	const struct pmu_event **found_event = data->found_event;
+	struct pmu_event *found_event = data->found_event;
 	struct evsel *evsel = data->evsel;
 	pr_err("%s pe name=%s compat=%s pmu=%s data=%p\n", __func__, pe->name, pe->compat, pe->pmu, data);
 	if (!strcmp(pe->name, evsel->name)) {
 		pr_err("%s1 match evsel %s\n", __func__, evsel->name);
-		*found_event = pe;
+		memcpy(found_event, pe, sizeof(*pe));
+
 		return 1;
 	}
 
@@ -549,7 +550,11 @@ static int metricgroup__test_event_iter(const struct pmu_event *pe,
 static bool match_event_to_pmu(const struct pmu_event *event, struct perf_pmu *pmu)
 {
 	struct perf_pmu_alias *alias;
-
+	pr_err("%s pmu name=%s id=%s event name=%s compat=%s\n", __func__,
+		pmu ? pmu->name : "?",
+		pmu ? pmu->id : "?",
+		event ? event->name : "?",
+		event ? event->compat : "?");
 	if (!pmu->id || !event->compat)
 		return false;
 
@@ -611,7 +616,6 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 {
 	int k;
 	struct evlist *evlist;
-	struct perf_cpu_map *cpus;
 	struct evsel *evsel;
 	struct rblist metric_events = {
 		.nr_entries = 0,
@@ -632,15 +636,6 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 	pr_err("%s2 evlist=%p\n", __func__, evlist);
 	if (!evlist)
 		return -ENOMEM;
-
-	cpus = perf_cpu_map__new("0");
-	pr_err("%s3 cpus=%p\n", __func__, cpus);
-	if (!cpus) {
-		evlist__delete(evlist);
-		return -ENOMEM;
-	}
-
-	perf_evlist__set_maps(&evlist->core, cpus, NULL);
 
 	err = metricgroup__parse_groups_test(evlist, table, pm->metric_name, &metric_events);
 	pr_err("%s4 after metricgroup__parse_groups_test err=%d\n", __func__, err);
@@ -675,7 +670,7 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 	pr_err("%s5.1 events_count=%d expr=%s\n", __func__, events_count, pm->metric_expr);
 
 	evlist__for_each_entry(evlist, evsel) {
-		const struct pmu_event *found_event = NULL;
+		struct pmu_event found_event = {};
 		struct perf_pmu *pmu = NULL;
 		struct metricgroup__test_event metricgroup__test_event_data = {
 			.evsel = evsel,
@@ -693,15 +688,15 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 		pmu_events_table_for_each_event(events_table,
 						 metricgroup__test_event_iter,
 						 &metricgroup__test_event_data);
-		pr_err("%s5.3 found_event=%p\n",
-			__func__, found_event);
+		pr_err("%s5.3 found_event name=%s\n",
+			__func__, found_event.name);
 		while ((pmu = perf_pmus__scan(pmu)) != NULL) {
 			if (!pmu->is_uncore)
 				continue;
-			if (match_to_pmu(found_event, pmu, pm, evsel, true)) {
+			if (match_to_pmu(&found_event, pmu, pm, evsel, true)) {
 				found_events++;
-				pr_err("%s5.4 found_event=%p pmu name=%s\n",
-					__func__, found_event, pmu->name);
+				pr_err("%s5.4 found_event name=%s pmu name=%s\n",
+					__func__, found_event.name, pmu->name);
 				break;
 			}
 		}
@@ -711,7 +706,9 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 	}
 
 
-	pr_err("%s9 test pm name=%s events_count=%d found_events=%d\n", __func__, pm->metric_name, events_count, found_events);
+	pr_err("%s9 test pm %s name=%s events_count=%d found_events=%d\n", __func__, 
+		(events_count == found_events) ? "gotcha" : "",
+		pm->metric_name, events_count, found_events);
 	err = 0;
 out_err:
 	if (err)
@@ -720,7 +717,6 @@ out_err:
 	/* ... cleanup. */
 	metricgroup__rblist_exit(&metric_events);
 	evlist__free_stats(evlist);
-	perf_cpu_map__put(cpus);
 	evlist__delete(evlist);
 	return err;
 }
