@@ -12,15 +12,15 @@
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
-	    "BriefDescription": "WR_RCVD_SP per RD_RCVD_SP  RD_RCVD_SP+MATCH_CMD_ISSUED_SP/RD_RCVD_SP+2 0x65000013",
-	    "MetricName": "pmcg_wr_rcvd_sp_miss_per_rd.all",
+	    "BriefDescription": "WR_RCVD_SP per RD_RCVD_SP  wr_sent_sp+MATCH_CMD_ISSUED_SP/RD_RCVD_SP+2 0x65000013",
+	    "MetricName": "pmcg_special1.all",
 	    "MetricExpr": "(smmuv3_pmcg.wr_sent_sp + smmuv3_pmcg.match_cmd_issued_sp) / (smmuv3_pmcg.rd_rcvd_sp  + 5)",
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
-	    "BriefDescription": "WR_SENT_SP per WR_RCVD_SP per RD_RCVD_SP  (WR_SENT_SP+12)/pmcg_wr_rcvd_sp_miss_per_rd.all 0x65000013",
-	    "MetricName": "pmcg_wr_send_sp_per_rcvd_sp_miss_per_rd.all",
-	    "MetricExpr": "(smmuv3_pmcg.wr_sent_sp + 12) / pmcg_wr_rcvd_sp_miss_per_rd.all",
+	    "BriefDescription": "L1_TLB per pmcg_special1  (L1_TLB+12)/pmcg_special1.all 0x65000013",
+	    "MetricName": "pmcg_special2.all",
+	    "MetricExpr": "(smmuv3_pmcg.L1_TLB + 12) / pmcg_special1.all",
 	    "ScaleUnit": "9.765625e-4KB"
    }
 ]
