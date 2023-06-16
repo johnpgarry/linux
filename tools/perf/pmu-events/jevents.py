@@ -794,7 +794,7 @@ void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
 {
 	unsigned int event_count = 0;
 	struct compact_pmu_event *entries;
-  struct event_iter_data event_iter_data;
+  __maybe_unused struct event_iter_data event_iter_data;
 	static int done;
 
 	if (sys_event_table || done)
@@ -820,8 +820,8 @@ void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
   event_iter_data.event_count = 0;
   event_iter_data.fake_pmu = fake_pmu;
 
-  if (done == 1541564)
-   pmu_for_each_sys_metric(metricgroup__metric_event_iter, &event_iter_data);
+  //if (done == 1541564)
+  // pmu_for_each_sys_metric(metricgroup__metric_event_iter, &event_iter_data);
 
   sys_event_table->entries = entries;
   sys_event_table->length = 12;
@@ -872,7 +872,6 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
 
                 if (!pm.metric_expr)
                         continue;
-                printf(" 333 pm name=%s 333    ", pm.metric_name);
                 ret = fn(&pm, table, data);
                 if (ret)
                         return ret;
@@ -1027,7 +1026,6 @@ int pmu_for_each_sys_metric(pmu_metric_iter_fn fn, void *data)
              tables++) {
                 int ret;
 
-                printf(\" 222 tables name=%s 222    \", tables->name);
                 ret = pmu_metrics_table_for_each_metric(&tables->metric_table, fn, data);
 
                 if (ret)

@@ -811,8 +811,8 @@ static int pmu_add_sys_aliases_iter_fn(const struct pmu_event *pe,
 	if (!pe->compat || !pe->pmu)
 		return 0;
 
-	pr_err("%s pmu->id=%s == pe->compat=%s\n", __func__, pmu->id, pe->compat);
-	pr_err("%s2 pe->pmu=%s pmu->name=%s pmu_uncore_alias_match=%d\n", __func__, pe->pmu, pmu->name, pmu_uncore_alias_match(pe->pmu, pmu->name));
+	//pr_err("%s pmu->id=%s == pe->compat=%s\n", __func__, pmu->id, pe->compat);
+	//pr_err("%s2 pe->pmu=%s pmu->name=%s pmu_uncore_alias_match=%d\n", __func__, pe->pmu, pmu->name, pmu_uncore_alias_match(pe->pmu, pmu->name));
 	if (!strcmp(pmu->id, pe->compat) &&
 	    pmu_uncore_alias_match(pe->pmu, pmu->name)) {
 		__perf_pmu__new_alias(idata->head, -1,
