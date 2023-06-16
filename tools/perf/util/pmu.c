@@ -113,8 +113,11 @@ int perf_pmu__format_parse(int dirfd, struct list_head *head)
 static int pmu_format(int dirfd, const char *name, struct list_head *format)
 {
 	int fd;
-
+	if (!is_virt_env()) {
+		
+	}
 	fd = perf_pmu__pathname_fd(dirfd, name, "format", O_DIRECTORY);
+	pr_err("%s name=%s fd=%d\n", __func__, name, fd);
 	if (fd < 0)
 		return 0;
 
@@ -871,11 +874,11 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	struct perf_pmu *pmu;
 	LIST_HEAD(format);
 	LIST_HEAD(aliases);
-	__u32 type;
+	__u32 type = -1;
 	char *name = pmu_find_real_name(lookup_name);
 	char *alias_name;
 	bool print = !!strstr(lookup_name, "imx") || !!strstr(lookup_name, "pmcg");
-	bool special = print && !is_virt_env();
+	bool special = print && !is_virt_env() && !strstr(lookup_name, ".");
 
 	if (print)
 		pr_err("%s lookup_name=%s dirfd=%d name=%s\n", __func__,
@@ -915,13 +918,14 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	/* Read type, and ensure that type value is successfully assigned (return 1) */
 	if (perf_pmu__scan_file_at(pmu, dirfd, "type", "%u", &type) != 1) {
 		if (print) {
-			pr_err("%s3 lookup_name=%s perf_pmu__scan_file_at error\n", __func__,
-				lookup_name);
+			pr_err("%s3 lookup_name=%s perf_pmu__scan_file_at error pmu=%s type=%d\n", __func__, lookup_name, pmu->name, type);
 		}
 		if (special) {
+			static int count;
 			pr_err("%s3.1 lookup_name=%s perf_pmu__scan_file_at error and continuing\n", __func__,
 				lookup_name);
-			type = 16;
+			type = 16 + count;
+			count++;
 		} else {
 			goto err;
 		}
@@ -973,6 +977,9 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	list_splice(&aliases, &pmu->aliases);
 	list_add_tail(&pmu->list, pmus);
 
+	if (print)
+		pr_err("%s5.1 pmu=%p name=%s is_core=%d is_uncore=%d type=%d\n", __func__,
+				pmu, pmu->name, pmu->is_core, pmu->is_uncore, pmu->type);
 	pmu->default_config = perf_pmu__get_default_config(pmu);
 	if (print)
 			pr_err("%s10 returning pmu=%p id=%s\n", __func__, pmu, pmu->id);
@@ -1191,6 +1198,7 @@ static int pmu_config_term(const char *pmu_name,
 		return 0;
 
 	format = pmu_find_format(formats, term->config);
+	pr_err("%s format=%p term->config=%p\n", __func__, format, term->config);
 	if (!format) {
 		char *pmu_term = pmu_formats_string(formats);
 		char *unknown_term;
@@ -1210,6 +1218,7 @@ static int pmu_config_term(const char *pmu_name,
 			free(unknown_term);
 		}
 		free(pmu_term);
+		pr_err("%s !format\n", __func__);
 		return -EINVAL;
 	}
 
@@ -1227,6 +1236,7 @@ static int pmu_config_term(const char *pmu_name,
 		vp = &attr->config3;
 		break;
 	default:
+		pr_err("%s2 format->value=%d\n", __func__, format->value);
 		return -EINVAL;
 	}
 
@@ -1242,6 +1252,7 @@ static int pmu_config_term(const char *pmu_name,
 					   strdup("no value assigned for term"),
 					   NULL);
 			}
+			pr_err("%s3 term->type_val=%d\n", __func__, term->type_val);
 			return -EINVAL;
 		}
 
@@ -1257,11 +1268,14 @@ static int pmu_config_term(const char *pmu_name,
 					strdup("expected numeric value"),
 					NULL);
 			}
+			pr_err("%s4 term->type_val=%d\n", __func__, term->type_val);
 			return -EINVAL;
 		}
 
-		if (pmu_resolve_param_term(term, head_terms, &val))
+		if (pmu_resolve_param_term(term, head_terms, &val)) {
+			pr_err("%s5 term->type_val=%d\n", __func__, term->type_val);
 			return -EINVAL;
+		}
 	} else
 		return -EINVAL;
 
@@ -1277,6 +1291,7 @@ static int pmu_config_term(const char *pmu_name,
 				    ? strdup("value too big for format")
 				    : err_str,
 				    NULL);
+			pr_err("%s6 term->type_val=%d\n", __func__, term->type_val);
 			return -EINVAL;
 		}
 		/*
@@ -1563,6 +1578,8 @@ int perf_pmu__scan_file_at(struct perf_pmu *pmu, int dirfd, const char *name,
 	if (file) {
 		ret = vfscanf(file, fmt, args);
 		fclose(file);
+	} else {
+		pr_err("%s pmu=%s dirfd=%d name=%s ERROR ret=%d\n", __func__, pmu->name, dirfd, name, ret);
 	}
 	va_end(args);
 	return ret;
@@ -1797,7 +1814,11 @@ int perf_pmu__pathname_scnprintf(char *buf, size_t size,
 int perf_pmu__pathname_fd(int dirfd, const char *pmu_name, const char *filename, int flags)
 {
 	char path[PATH_MAX];
+	if (!is_virt_env()) {
 
+		if (strstr(pmu_name, "pmcg"))
+			pr_err("%s error, looking up dir for %s filename=%s\n", __func__, pmu_name, filename);
+	}
 	scnprintf(path, sizeof(path), "%s/%s", pmu_name, filename);
 	return openat(dirfd, path, flags);
 }

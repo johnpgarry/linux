@@ -1582,6 +1582,8 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 				"Cannot find PMU `%s'. Missing kernel support?",
 				name) >= 0)
 			parse_events_error__handle(err, 0, err_str, NULL);
+		pr_err("%s2 name=%s pmu=NULL error\n", __func__, name);
+
 		return -EINVAL;
 	}
 	if (head_config)
@@ -1604,8 +1606,10 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 		return evsel ? 0 : -ENOMEM;
 	}
 
-	if (!parse_state->fake_pmu && perf_pmu__check_alias(pmu, head_config, &info))
+	if (!parse_state->fake_pmu && perf_pmu__check_alias(pmu, head_config, &info)) {
+		pr_err("%s3 name=%s fake_pmu error\n", __func__, name);
 		return -EINVAL;
+	}
 
 	if (verbose > 1) {
 		fprintf(stderr, "After aliases, add event pmu '%s' with '",
@@ -1627,18 +1631,23 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 	if (config_attr(&attr, head_config, parse_state->error, config_term_pmu))
 		return -EINVAL;
 
-	if (get_config_terms(head_config, &config_terms))
+	if (get_config_terms(head_config, &config_terms)) {
+		pr_err("%s4 name=%s get_config_terms error\n", __func__, name);
 		return -ENOMEM;
+	}
 
 	/*
 	 * When using default config, record which bits of attr->config were
 	 * changed by the user.
 	 */
-	if (pmu->default_config && get_config_chgs(pmu, head_config, &config_terms))
+	if (pmu->default_config && get_config_chgs(pmu, head_config, &config_terms)) {
+		pr_err("%s5 name=%s get_config_chgs error\n", __func__, name);
 		return -ENOMEM;
+	}
 
 	if (!parse_state->fake_pmu && perf_pmu__config(pmu, &attr, head_config, parse_state->error)) {
 		free_config_terms(&config_terms);
+		pr_err("%s6 name=%s perf_pmu__config error\n", __func__, name);
 		return -EINVAL;
 	}
 
@@ -1646,8 +1655,10 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 			    get_config_name(head_config),
 			    get_config_metric_id(head_config), pmu,
 			    &config_terms, auto_merge_stats, /*cpu_list=*/NULL);
-	if (!evsel)
+	if (!evsel) {
+		pr_err("%s7 name=%s !evsel error\n", __func__, name);
 		return -ENOMEM;
+	}
 
 	if (evsel->name)
 		evsel->use_config_name = true;
@@ -1715,7 +1726,11 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
 		auto_merge_stats = perf_pmu__auto_merge_stats(pmu);
 
 		list_for_each_entry(alias, &pmu->aliases, list) {
+			//pr_err("%s pmu name=%s str=%s alias->name=%s\n",
+			//	__func__, pmu->name, str, alias->name);
 			if (!strcasecmp(alias->name, str)) {
+				pr_err("%s2 pmu name=%s str=%s alias->name=%s\n",
+					__func__, pmu->name, str, alias->name);
 				parse_events_copy_term_list(head, &orig_head);
 				if (!parse_events_add_pmu(parse_state, list,
 							  pmu->name, orig_head,
@@ -1723,6 +1738,11 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
 					pr_debug("%s -> %s/%s/\n", str,
 						 pmu->name, alias->str);
 					ok++;
+				} else {
+
+
+					pr_err("%s3 fail parse_events_add_pmu pmu name=%s str=%s alias->name=%s\n",
+						__func__, pmu->name, str, alias->name);
 				}
 				parse_events_terms__delete(orig_head);
 			}
