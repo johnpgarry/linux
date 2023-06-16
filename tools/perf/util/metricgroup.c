@@ -537,7 +537,7 @@ static int metricgroup__test_event_iter(const struct pmu_event *pe,
 	struct pmu_event *found_event = data->found_event;
 	struct evsel *evsel = data->evsel;
 	pr_err("%s match (pe name=%s vs evsel->name=%s) compat=%s pmu=%s \n", __func__, pe->name, evsel->name, pe->compat, pe->pmu);
-	if (!strcmp(pe->name, evsel->name)) {
+	if (!strcasecmp(pe->name, evsel->name)) {
 		pr_err("%s1 match evsel %s\n", __func__, evsel->name);
 		memcpy(found_event, pe, sizeof(*pe));
 
@@ -573,7 +573,7 @@ static bool match_event_to_pmu(const struct pmu_event *event, struct perf_pmu *p
 				event->name,
 				event->compat,
 				pmu->id);
-		if (!strcmp(alias->name, event->name) &&
+		if (!strcasecmp(alias->name, event->name) &&
 		    !strcmp(event->compat, pmu->id)) {
 			if (print)
 				pr_err("%s4 match \n", __func__);
@@ -710,8 +710,12 @@ static int metricgroup__add_to_mep_groups_callback_new(const struct pmu_metric *
 		pmu_events_table_for_each_event(events_table,
 						 metricgroup__test_event_iter,
 						 &metricgroup__test_event_data);
-		pr_err("%s5.3 found_event name=%s\n",
-			__func__, found_event.name);
+		pr_err("%s5.3 evsel->name=%s found_event name=%s\n", __func__, evsel->name, found_event.name);
+		if (!found_event.name) {
+
+			pr_err("%s5.3.1 could not find for evsel->name=%s\n", __func__, evsel->name);
+			continue;
+		}
 		while ((pmu = perf_pmus__scan(pmu)) != NULL) {
 			if (!pmu->is_uncore)
 				continue;

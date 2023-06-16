@@ -14,13 +14,13 @@
    {
 	    "BriefDescription": "WR_RCVD_SP per RD_RCVD_SP  RD_RCVD_SP/RD_RCVD_SP+2 0x65000012",
 	    "MetricName": "pmcg_wr_rcvd_sp_miss_per_rd.all",
-	    "MetricExpr": "smmuv3_pmcg.RD_RCVD_SP / (smmuv3_pmcg.RD_RCVD_SP  + 2)",
+	    "MetricExpr": "smmuv3_pmcg.wr_rcvd_sp / (smmuv3_pmcg.rd_rcvd_sp  + 2)",
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
 	    "BriefDescription": "WR_SENT_SP per WR_RCVD_SP per RD_RCVD_SP  (WR_SENT_SP+7)/pmcg_wr_rcvd_sp_miss_per_rd.all 0x65000012",
 	    "MetricName": "pmcg_wr_send_sp_per_rcvd_sp_miss_per_rd.all",
-	    "MetricExpr": "(smmuv3_pmcg.WR_SENT_SP + 7) / pmcg_wr_rcvd_sp_miss_per_rd.all",
+	    "MetricExpr": "(smmuv3_pmcg.wr_sent_sp + 7) / pmcg_wr_rcvd_sp_miss_per_rd.all",
 	    "ScaleUnit": "9.765625e-4KB"
    }
 ]
