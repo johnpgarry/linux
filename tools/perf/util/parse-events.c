@@ -1729,8 +1729,8 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
 			//pr_err("%s pmu name=%s str=%s alias->name=%s\n",
 			//	__func__, pmu->name, str, alias->name);
 			if (!strcasecmp(alias->name, str)) {
-				pr_err("%s2 pmu name=%s str=%s alias->name=%s\n",
-					__func__, pmu->name, str, alias->name);
+			//	pr_err("%s2 pmu name=%s str=%s alias->name=%s\n",
+			//		__func__, pmu->name, str, alias->name);
 				parse_events_copy_term_list(head, &orig_head);
 				if (!parse_events_add_pmu(parse_state, list,
 							  pmu->name, orig_head,

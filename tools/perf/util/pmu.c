@@ -114,7 +114,7 @@ static int pmu_format(int dirfd, const char *name, struct list_head *format)
 {
 	int fd;
 	if (!is_virt_env()) {
-		
+
 	}
 	fd = perf_pmu__pathname_fd(dirfd, name, "format", O_DIRECTORY);
 	pr_err("%s name=%s fd=%d\n", __func__, name, fd);
@@ -879,7 +879,7 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 	char *alias_name;
 	bool print = !!strstr(lookup_name, "imx") || !!strstr(lookup_name, "pmcg");
 	bool special = print && !is_virt_env() && !strstr(lookup_name, ".");
-
+	print = false;
 	if (print)
 		pr_err("%s lookup_name=%s dirfd=%d name=%s\n", __func__,
 			lookup_name, dirfd, name);

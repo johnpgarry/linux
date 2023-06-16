@@ -18,6 +18,12 @@
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
+	    "BriefDescription": "wr_sent_sp + 7 0x65000012",
+	    "MetricName": "pmcg_wr_sent_sp_test.all",
+	    "MetricExpr": "smmuv3_pmcg.wr_sent_sp + 7",
+	    "ScaleUnit": "9.765625e-4KB"
+   },
+   {
 	    "BriefDescription": "WR_SENT_SP per pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all  (WR_SENT_SP+7)/pmcg_wr_rcvd_sp_per_rd_rcvd_sp 0x65000012",
 	    "MetricName": "pmcg_special1.all",
 	    "MetricExpr": "(smmuv3_pmcg.wr_sent_sp + 7) / pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all",

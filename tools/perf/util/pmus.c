@@ -90,7 +90,7 @@ static struct perf_pmu *perf_pmu__find2(int dirfd, const char *name)
 	struct perf_pmu *pmu;
 	bool core_pmu;
 	bool print = !!strstr(name, "imx") || !!strstr(name, "pmcg");
-
+	print = false;
 	if (print)
 		pr_err("%s name=%s\n", __func__, name);
 	/*
@@ -126,11 +126,12 @@ static void pmu_read_sysfs(bool core_only)
 	DIR *dir;
 	struct dirent *dent;
 
-	pr_err("%s read_sysfs_all_pmus=%d  ||  (core_only=%d && read_sysfs_core_pmus=%d)=%d\n",
-
-		__func__, read_sysfs_all_pmus, core_only, read_sysfs_core_pmus, (core_only && read_sysfs_core_pmus));
 	if (read_sysfs_all_pmus || (core_only && read_sysfs_core_pmus))
 		return;
+	else
+		pr_err("%s read_sysfs_all_pmus=%d  ||  (core_only=%d && read_sysfs_core_pmus=%d)=%d\n",
+			__func__, read_sysfs_all_pmus, core_only, read_sysfs_core_pmus, (core_only && read_sysfs_core_pmus));
+
 
 	//pr_err("%s2\n", __func__);
 	fd = perf_pmu__event_source_devices_fd();
@@ -149,7 +150,7 @@ static void pmu_read_sysfs(bool core_only)
 			continue;
 		/* add to static LIST_HEAD(core_pmus) or LIST_HEAD(other_pmus): */
 
-		pr_err("%s2 calling perf_pmu__find2 for %s\n", __func__, dent->d_name);
+		//pr_err("%s2 calling perf_pmu__find2 for %s\n", __func__, dent->d_name);
 		perf_pmu__find2(fd, dent->d_name);
 	}
 
