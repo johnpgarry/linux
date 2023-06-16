@@ -550,6 +550,7 @@ static int metricgroup__test_event_iter(const struct pmu_event *pe,
 static bool match_event_to_pmu(const struct pmu_event *event, struct perf_pmu *pmu)
 {
 	struct perf_pmu_alias *alias;
+	bool print = !!strstr(pmu->name, "pmcg");
 	pr_err("%s pmu name=%s id=%s event name=%s compat=%s\n", __func__,
 		pmu ? pmu->name : "?",
 		pmu ? pmu->id : "?",
@@ -557,14 +558,35 @@ static bool match_event_to_pmu(const struct pmu_event *event, struct perf_pmu *p
 		event ? event->compat : "?");
 	if (!pmu->id || !event->compat)
 		return false;
+	if (print)
+		pr_err("%s2 pmu name=%s id=%s event name=%s compat=%s\n", __func__,
+			pmu ? pmu->name : "?",
+			pmu ? pmu->id : "?",
+			event ? event->name : "?",
+			event ? event->compat : "?");
+
 
 	list_for_each_entry(alias, &pmu->aliases, list) {
+		if (print)
+			pr_err("%s3 match alias->name=%s vs event->name=%s && event->compat=%s vs pmu->id=%s\n", __func__,
+				alias->name,
+				event->name,
+				event->compat,
+				pmu->id);
 		if (!strcmp(alias->name, event->name) &&
 		    !strcmp(event->compat, pmu->id)) {
+			if (print)
+				pr_err("%s4 match \n", __func__);
 			return true;
 		}
 	}
 
+	if (print)
+		pr_err("%s10 no match pmu name=%s id=%s event name=%s compat=%s\n", __func__,
+			pmu ? pmu->name : "?",
+			pmu ? pmu->id : "?",
+			event ? event->name : "?",
+			event ? event->compat : "?");
 	return false;
 }
 

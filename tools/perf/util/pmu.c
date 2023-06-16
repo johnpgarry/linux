@@ -808,10 +808,11 @@ static int pmu_add_sys_aliases_iter_fn(const struct pmu_event *pe,
 {
 	struct pmu_sys_event_iter_data *idata = data;
 	struct perf_pmu *pmu = idata->pmu;
-
 	if (!pe->compat || !pe->pmu)
 		return 0;
 
+	pr_err("%s pmu->id=%s == pe->compat=%s\n", __func__, pmu->id, pe->compat);
+	pr_err("%s2 pe->pmu=%s pmu->name=%s pmu_uncore_alias_match=%d\n", __func__, pe->pmu, pmu->name, pmu_uncore_alias_match(pe->pmu, pmu->name));
 	if (!strcmp(pmu->id, pe->compat) &&
 	    pmu_uncore_alias_match(pe->pmu, pmu->name)) {
 		__perf_pmu__new_alias(idata->head, -1,
@@ -955,7 +956,7 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 			if (strstr(lookup_name, "imx"))
 				pmu->id = (char *)"i.MX8MN";
 			else if (strstr(lookup_name, "pmcg"))
-				pmu->id = (char *)"0x65000013";
+				pmu->id = (char *)"0x65000012";
 			pr_err("%s4.3 pmu=%p name=%s id=%s\n", __func__,
 					pmu, pmu->name, pmu->id);
 		} else
