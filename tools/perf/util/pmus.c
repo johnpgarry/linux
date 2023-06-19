@@ -160,7 +160,7 @@ static void pmu_read_sysfs(bool core_only)
 		read_sysfs_core_pmus = true;
 	} else {
 
-		 if (!is_virt_env()) {
+		 if (!is_virt_env() && 0) {
 			struct perf_pmu *imx8_ddr7;
 			struct perf_pmu *imx8_ddr8;
 			struct perf_pmu *pmcg123;

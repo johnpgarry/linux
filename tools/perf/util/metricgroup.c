@@ -502,8 +502,8 @@ static int metricgroup__sys_event_iter(__maybe_unused const struct pmu_metric *p
 	if (!pm->metric_expr)
 		return 0;
 	if (print)
-		pr_err("%s1 pm metric name=%s compat=%s pmu=%s fn=%p\n",
-			__func__, pm->metric_name, pm->compat, pm->pmu, d->fn);
+		pr_err("%s1 pm metric name=%s compat=%s pmu=%s fn=%p d->data=%p\n",
+			__func__, pm->metric_name, pm->compat, pm->pmu, d->fn, d->data);
 
 	ret = d->fn(pm, table, d->data);
 	if (ret) {
@@ -679,6 +679,9 @@ static int add_metric(struct list_head *metric_list,
 		      struct metric *root_metric,
 		      const struct visited_metric *visited,
 		      const struct pmu_metrics_table *table);
+static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
+					const struct pmu_metrics_table *table __maybe_unused,
+					void *data);
 
 static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const struct pmu_metric *pm,
 					__maybe_unused const struct pmu_metrics_table *table,
@@ -729,7 +732,7 @@ static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const stru
 
 	pr_err("%s10 ret=%d out\n\n", __func__, ret);
 	return 0;
-	#else //  NEW_METHOD
+	#elif defined OLD_METHOD //  NEW_METHOD
 
 	struct evlist *evlist;
 	struct evsel *evsel;
@@ -835,6 +838,21 @@ out_err:
 	pr_err("%s10 out err=%d\n\n\n\n", __func__, err); 
 
 	return err;
+	#else
+	struct rblist *groups = vdata;
+	int err;
+	pr_err("%s metric name=%s expr=%s desc=%s calling metricgroup__add_metric_sys_event_iter\n", __func__, pm->metric_name, pm->metric_expr, pm->desc);
+	err = 0;//metricgroup__add_metric_sys_event_iter(pm, table, vdata);
+	pr_err("%s2 metric name=%s expr=%s desc=%s called metricgroup__add_metric_sys_event_iter err=%d\n",
+		__func__, pm->metric_name, pm->metric_expr, pm->desc, err);
+	if (err)
+		return err;
+	err = metricgroup__add_to_mep_groups(pm, groups);
+	pr_err("%s10 metric name=%s expr=%s desc=%s err=%d\n",
+		__func__, pm->metric_name, pm->metric_expr, pm->desc, err);
+
+	return err;
+
 	#endif
 }
 
@@ -863,7 +881,8 @@ void metricgroup__print(const struct print_callbacks *print_cb, void *print_stat
 						 &groups);
 	}
 
-	pr_err("%s2 calling pmu_for_each_sys_metric with metricgroup__sys_event_iter\n", __func__);
+	pr_err("%s2 calling pmu_for_each_sys_metric with metricgroup__sys_event_iter metricgroup__add_to_mep_groups_callback_new=%p groups=%p\n",
+		__func__, metricgroup__add_to_mep_groups_callback_new, &groups);
 	pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data2);
 
 

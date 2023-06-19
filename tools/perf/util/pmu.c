@@ -811,11 +811,12 @@ static int pmu_add_sys_aliases_iter_fn(const struct pmu_event *pe,
 {
 	struct pmu_sys_event_iter_data *idata = data;
 	struct perf_pmu *pmu = idata->pmu;
+	pr_err("%s pe->compat=%s pe->pmu=%s\n", __func__, pe->compat, pe->pmu);
 	if (!pe->compat || !pe->pmu)
 		return 0;
 
-	//pr_err("%s pmu->id=%s == pe->compat=%s\n", __func__, pmu->id, pe->compat);
-	//pr_err("%s2 pe->pmu=%s pmu->name=%s pmu_uncore_alias_match=%d\n", __func__, pe->pmu, pmu->name, pmu_uncore_alias_match(pe->pmu, pmu->name));
+	pr_err("%s1 pmu->id=%s == pe->compat=%s\n", __func__, pmu->id, pe->compat);
+	pr_err("%s2 pe->pmu=%s pmu->name=%s pmu_uncore_alias_match=%d\n", __func__, pe->pmu, pmu->name, pmu_uncore_alias_match(pe->pmu, pmu->name));
 	if (!strcmp(pmu->id, pe->compat) &&
 	    pmu_uncore_alias_match(pe->pmu, pmu->name)) {
 		__perf_pmu__new_alias(idata->head, -1,
@@ -834,7 +835,7 @@ void pmu_add_sys_aliases(struct list_head *head, struct perf_pmu *pmu)
 		.head = head,
 		.pmu = pmu,
 	};
-
+	pr_err("%s pmu name=%s id=%s\n", __func__, pmu->name, pmu->id);
 	if (!pmu->id)
 		return;
 
@@ -961,10 +962,17 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 				pmu->id = (char *)"i.MX8MN";
 			else if (strstr(lookup_name, "pmcg"))
 				pmu->id = (char *)"0x65000012";
-			pr_err("%s4.3 pmu=%p name=%s id=%s\n", __func__,
+				pr_err("%s4.3 pmu=%p name=%s id=%s\n", __func__,
 					pmu, pmu->name, pmu->id);
-		} else
-			pmu->id = pmu_id(name);
+		} else {
+			if (strstr(lookup_name, "uncore_cbox")) {
+				pmu->id = (char *)"0x62000010";
+				pr_err("%s4.4 pmu=%p name=%s id=%s\n", __func__,
+					pmu, pmu->name, pmu->id);
+			} else {
+				pmu->id = pmu_id(name);
+			}
+		}
 	}
 	pmu->max_precise = pmu_max_precise(dirfd, pmu);
 	pmu_add_cpu_aliases(&aliases, pmu);
