@@ -1100,7 +1100,6 @@ struct metricgroup_add_iter_data {
 	bool system_wide;
 	struct metric *root_metric;
 	const struct visited_metric *visited;
-	const struct pmu_metrics_table *table;
 };
 
 static bool metricgroup__find_metric(const char *pmu,
@@ -1434,8 +1433,8 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 	struct metricgroup_add_iter_data *d = data;
 	int ret;
 
-	pr_debug("%s pm name=%s pmu=%s calling match_pm_metric\n", __func__,
-			pm->metric_name, pm->pmu);
+	pr_debug("%s pm name=%s pmu=%s calling match_pm_metric table=%p \n", __func__,
+			pm->metric_name, pm->pmu, table);
 	if (!match_pm_metric(pm, d->pmu, d->metric_name))
 		return 0;
 	pr_err("%s2 pm name=%s pmu=%s calling add_metric\n", __func__,
@@ -1443,7 +1442,7 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 
 	ret = add_metric(d->metric_list, pm, d->modifier, d->metric_no_group,
 			 d->metric_no_threshold, d->user_requested_cpu_list,
-			 d->system_wide, d->root_metric, d->visited, d->table);
+			 d->system_wide, d->root_metric, d->visited, table);
 	pr_err("%s3 pm name=%s pmu=%s ret=%d from add_metric\n", __func__,
 			pm->metric_name, pm->pmu, ret);
 	if (ret)
@@ -1542,7 +1541,7 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 	int ret;
 	bool has_match = false;
 
-	pr_err("%s pmu=%s metric_name=%s modifier=%s\n", __func__, pmu, metric_name, modifier);
+	pr_err("%s pmu=%s metric_name=%s modifier=%s table=%p\n", __func__, pmu, metric_name, modifier, table);
 	{
 		struct metricgroup__add_metric_data data = {
 			.list = &list,
@@ -1581,7 +1580,6 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 				.system_wide = system_wide,
 				.has_match = &has_match,
 				.ret = &ret,
-				.table = table,
 			},
 		};
 		pr_err("%s2 pmu=%s metric_name=%s table=%p calling pmu_for_each_sys_metric\n", __func__,
@@ -2018,7 +2016,8 @@ int metricgroup__parse_groups(struct evlist *perf_evlist,
 
 	if (!table)
 		return -EINVAL;
-	pr_err("%s calling parse_groups pmu=%s str=%s\n", __func__, pmu, str);
+	// str=pmcg_special1.all is an example
+	pr_err("%s calling parse_groups pmu=%s str=%s table=%p\n", __func__, pmu, str, table);
 	return parse_groups(perf_evlist, pmu, str, metric_no_group, metric_no_merge,
 			    metric_no_threshold, user_requested_cpu_list, system_wide,
 			    /*fake_pmu=*/NULL, metric_events, table);
