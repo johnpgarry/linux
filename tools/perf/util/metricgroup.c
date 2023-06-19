@@ -547,12 +547,27 @@ static __maybe_unused int metricgroup__test_event_iter(const struct pmu_event *p
 	struct metricgroup__test_event *data = vdata;
 	struct pmu_event *found_event = data->found_event;
 	struct evsel *evsel = data->evsel;
-	//pr_err("%s match (pe name=%s vs evsel->name=%s) compat=%s pmu=%s \n", __func__, pe->name, evsel->name, pe->compat, pe->pmu);
-	if (!strcasecmp(pe->name, evsel->name)) {
-		//pr_err("%s1 match evsel %s\n", __func__, evsel->name);
-		memcpy(found_event, pe, sizeof(*pe));
+	struct perf_pmu *pmu;
+	pr_err("%s match (pe name=%s vs evsel->name=%s) compat=%s pmu=%s evsel->pmu_name=%s\n", __func__, pe->name, evsel->name, pe->compat, pe->pmu, evsel->pmu_name);
+	if (strcasecmp(pe->name, evsel->name))
+		return 0;
 
+	if (!evsel->pmu_name)
+		return 0;
+
+	pmu = perf_pmus__find(evsel->pmu_name);
+	if (!pmu) {
+		pr_err("%s could not find pmu for %s\n", __func__, evsel->pmu_name);
+		exit(0);
 		return 1;
+	}
+
+	if (!strcmp(pmu->id, pe->compat)) {
+		memcpy(found_event, pe, sizeof(*pe));
+		pr_err("%s1 found event pmu id=%s pe name=%s\n", __func__, pmu->id, pe->name);
+		return 1;
+	} else {
+		pr_err("%s2 (pe name=%s vs evsel->name=%s) compat=%s pmu=%s \n", __func__, pe->name, evsel->name, pe->compat, pe->pmu);
 	}
 
 	return 0;
@@ -1483,13 +1498,30 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 			goto out;
 
 		evlist__for_each_entry(m->evlist, evsel) {
+			struct pmu_event found_event = {};
+			struct metricgroup__test_event metricgroup__test_event_data = {
+				.evsel = evsel,
+				.found_event = &found_event,
+			};
 			events_count++;
 			pr_err("%s5.2 evsel=%p name=%s pmu_name=%s metric_id=%s events_table=%p found_events=%d\n",
 			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table, found_events);
+
+
+			pmu_events_table_for_each_event(events_table,
+						 metricgroup__test_event_iter,
+						 &metricgroup__test_event_data);
+			pr_err("%s5.3 evsel=%p name=%s pmu_name=%s metric_id=%s events_table=%p found_events=%d found event name=%s\n",
+			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table, found_events, found_event.name);
+			if (!found_event.name) {
+				pr_err("%s5.4 could not find name desc=%s\n", __func__, pm->desc);
+				ret = 0;
+				goto out;
+			}
 		}
 	}
-	pr_err("%s6 expr=%s\n", __func__, pm->metric_expr);
-	exit(0);
+	pr_err("%s6 metric_name=%s desc=%s\n", __func__, pm->metric_name, pm->desc);
+	
 #if 0
 	evlist__for_each_entry(evlist, evsel) {
 		struct pmu_event found_event = {};
