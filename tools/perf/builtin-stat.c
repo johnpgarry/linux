@@ -2053,6 +2053,7 @@ static int add_default_attributes(void)
 			pr_err("Missing transaction metrics");
 			return -1;
 		}
+		pr_err("%s calling metricgroup__parse_groups\n", __func__);
 		return metricgroup__parse_groups(evsel_list, pmu, "transaction",
 						stat_config.metric_no_group,
 						stat_config.metric_no_merge,
@@ -2086,6 +2087,7 @@ static int add_default_attributes(void)
 		if (!force_metric_only)
 			stat_config.metric_only = true;
 
+		pr_err("%s2 calling metricgroup__parse_groups\n", __func__);
 		return metricgroup__parse_groups(evsel_list, pmu, "smi",
 						stat_config.metric_no_group,
 						stat_config.metric_no_merge,
@@ -2119,6 +2121,7 @@ static int add_default_attributes(void)
 				"Please print the result regularly, e.g. -I1000\n");
 		}
 		str[8] = stat_config.topdown_level + '0';
+		pr_err("%s3 calling metricgroup__parse_groups\n", __func__);
 		if (metricgroup__parse_groups(evsel_list,
 						pmu, str,
 						/*metric_no_group=*/false,
@@ -2161,6 +2164,7 @@ static int add_default_attributes(void)
 			if (!metric_evlist)
 				return -1;
 
+			pr_err("%s4 calling metricgroup__parse_groups\n", __func__);
 			if (metricgroup__parse_groups(metric_evlist, pmu, "TopdownL1",
 							/*metric_no_group=*/false,
 							/*metric_no_merge=*/false,
@@ -2693,6 +2697,7 @@ int cmd_stat(int argc, const char **argv)
 	if (metrics) {
 		const char *pmu = parse_events_option_args.pmu_filter ?: "all";
 
+		pr_err("%s5 calling metricgroup__parse_groups\n", __func__);
 		metricgroup__parse_groups(evsel_list, pmu, metrics,
 					stat_config.metric_no_group,
 					stat_config.metric_no_merge,

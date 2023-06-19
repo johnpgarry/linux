@@ -1998,7 +1998,7 @@ int metricgroup__parse_groups(struct evlist *perf_evlist,
 
 	if (!table)
 		return -EINVAL;
-	pr_err("%s calling parse_groups\n", __func__);
+	pr_err("%s calling parse_groups pmu=%s str=%s\n", __func__, pmu, str);
 	return parse_groups(perf_evlist, pmu, str, metric_no_group, metric_no_merge,
 			    metric_no_threshold, user_requested_cpu_list, system_wide,
 			    /*fake_pmu=*/NULL, metric_events, table);

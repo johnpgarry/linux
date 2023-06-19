@@ -1,0 +1,290 @@
+[
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.CYCLES",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.TRANSACTION",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.TLB_MISS",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_CACHE_MISS",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.TRANS_TABLE_WALK_ACCESS",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_STRUCT_ACCESS",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_RQ",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_PASSED",
+	    "Compat": "0x62000010",
+        "Unit": "uncore_cbox"
+   },
+   {
+	    "EventCode": "0x13080",
+	    "EventName": "smmuv3_pmcg.WR_RCVD_SP",
+	    "BriefDescription": "Write command received by the SP",
+	    "PublicDescription": "Write command received by the SP",
+        "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13081",
+	    "EventName": "smmuv3_pmcg.RD_RCVD_SP",
+	    "BriefDescription": "Read command received by the SP",
+	    "PublicDescription": "Read command received by the SP",
+        "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13082",
+	    "EventName": "smmuv3_pmcg.WR_RCVD_TP",
+	    "BriefDescription": "Write command received by the TP",
+	    "PublicDescription": "Write command received by the TP",
+        "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13083",
+	    "EventName": "smmuv3_pmcg.RD_RCVD_TP",
+	    "BriefDescription": "Read command received by the TP",
+	    "PublicDescription": "Read command received by the TP",
+        "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13084",
+	    "EventName": "smmuv3_pmcg.CMD_ISSUED_SP",
+	    "BriefDescription": "Command issued by the SP",
+	    "PublicDescription": "Command issued by the SP",
+        "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13085",
+	    "EventName": "smmuv3_pmcg.CMD_ISSUED_TP",
+	    "BriefDescription": "Command issued by the TP",
+	    "PublicDescription": "Command issued by the TP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13086",
+	    "EventName": "smmuv3_pmcg.WR_SENT_SP",
+	    "BriefDescription": "Write command sent by SP",
+	    "PublicDescription": "Write command sent by SP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13087",
+	    "EventName": "smmuv3_pmcg.RD_SENT_SP",
+	    "BriefDescription": "Read command sent by SP",
+	    "PublicDescription": "Read command sent by SP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13088",
+	    "EventName": "smmuv3_pmcg.WR_SENT_TP",
+	    "BriefDescription": "Write command sent by TP",
+	    "PublicDescription": "Write command sent by TP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13089",
+	    "EventName": "smmuv3_pmcg.RD_SENT_TP",
+	    "BriefDescription": "Read command sent by TP",
+	    "PublicDescription": "Read command sent by TP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x1308a",
+	    "EventName": "smmuv3_pmcg.L1_TLB",
+	    "BriefDescription": "Command received by L1 TLB",
+	    "PublicDescription": "Command received by L1 TLB",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x1308B",
+	    "EventName": "smmuv3_pmcg.L2_TLB",
+	    "BriefDescription": "Command received by L2 TLB",
+	    "PublicDescription": "Command received by L2 TLB",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x1308c",
+	    "EventName": "smmuv3_pmcg.L1_TLB_HIT",
+	    "BriefDescription": "L1 TLB HIT",
+	    "PublicDescription": "L1 TLB HIT",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x1308d",
+	    "EventName": "smmuv3_pmcg.L2_TLB_HIT",
+	    "BriefDescription": "L2 TLB HIT",
+	    "PublicDescription": "L2 TLB HIT",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x1308f",
+	    "EventName": "smmuv3_pmcg.RETRIED_TP",
+	    "BriefDescription": "Command retried on TP interface",
+	    "PublicDescription": "Command retried on TP interface",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13090",
+	    "EventName": "smmuv3_pmcg.MATCH_CMD_ISSUED_SP",
+	    "BriefDescription": "Specific matched commands sent by SP",
+	    "PublicDescription": "Specific matched commands sent by SP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13091",
+	    "EventName": "smmuv3_pmcg.DELAYED_CMD_ISSUED_SP",
+	    "BriefDescription": "Delayed commands sent by SP",
+	    "PublicDescription": "Delayed commands sent by SP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13092",
+	    "EventName": "smmuv3_pmcg.MATCH_CMD_ISSUED_TP",
+	    "BriefDescription": "Specific matched commands sent by TP",
+	    "PublicDescription": "Specific matched commands sent by TP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x13093",
+	    "EventName": "smmuv3_pmcg.DELAYED_CMD_ISSUED_TP",
+	    "BriefDescription": "Delayed commands sent by TP",
+	    "PublicDescription": "Delayed commands sent by TP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a0",
+	    "EventName": "smmuv3_pmcg.DVM_TLBI",
+	    "BriefDescription": "DVM TLBI",
+	    "PublicDescription": "DVM TLBI",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a1",
+	    "EventName": "smmuv3_pmcg.DVM_SYNC",
+	    "BriefDescription": "DVM SYNC",
+	    "PublicDescription": "DVM SYNC",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x1302",
+	    "EventName": "smmuv3_pmcg.DELAY_PAGE_TBL_READ",
+	    "BriefDescription": "Delay page table read request",
+	    "PublicDescription": "Delay page table read request",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a3",
+	    "EventName": "smmuv3_pmcg.PAGE_TBL_READ",
+	    "BriefDescription": "Page table read request",
+	    "PublicDescription": "Page table read request",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a4",
+	    "EventName": "smmuv3_pmcg.DELAY_ADDR_TRANSLATE_REQ",
+	    "BriefDescription": "Delay of address translation requests",
+	    "PublicDescription": "Delay of address translation requests",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a5",
+	    "EventName": "smmuv3_pmcg.ADDR_TRANSLATE_REQ",
+	    "BriefDescription": "Address translation request",
+	    "PublicDescription": "Address translation request",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a6",
+	    "EventName": "smmuv3_pmcg.SYNC_REQUEST_EXEC_TIME",
+	    "BriefDescription": "Sync request execution time",
+	    "PublicDescription": "Sync request execution time",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a7",
+	    "EventName": "smmuv3_pmcg.SYNC_REQUEST_SENT",
+	    "BriefDescription": "Sync request sent",
+	    "PublicDescription": "Sync request sent",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a8",
+	    "EventName": "smmuv3_pmcg.CLEAN_UNIQUE_REQUEST_SP",
+	    "BriefDescription": "Clean unique request sent by SP",
+	    "PublicDescription": "Clean unique request sent by SP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130a9",
+	    "EventName": "smmuv3_pmcg.WRITEBACK_SP",
+	    "BriefDescription": "Writeback sent by SP",
+	    "PublicDescription": "Writeback sent by SP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130aa",
+	    "EventName": "smmuv3_pmcg.CLEAN_UNIQUE_REQUEST_TP",
+	    "BriefDescription": "Clean unique request sent by TP",
+	    "PublicDescription": "Clean unique request sent by TP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   },
+   {
+	    "EventCode": "0x130ab",
+	    "EventName": "smmuv3_pmcg.WRITEBACK_TP",
+	    "BriefDescription": "Writeback sent by TP",
+	    "PublicDescription": "Writeback sent by TP",
+	    "Unit": "uncore_cbox",
+	    "Compat": "0x62000010"
+   }
+]

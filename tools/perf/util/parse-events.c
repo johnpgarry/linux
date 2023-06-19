@@ -1562,6 +1562,9 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 
 	pmu = parse_state->fake_pmu ?: perf_pmus__find(name);
 
+	if (strstr(name, "pmcg_wr_rcvd_sp_per_rd_rcvd_sp"))
+		pr_err("%s name=%s pmu=%p\n", __func__, name, pmu);
+
 	if (verbose > 1 && !(pmu && pmu->selectable)) {
 		fprintf(stderr, "Attempting to add event pmu '%s' with '",
 			name);

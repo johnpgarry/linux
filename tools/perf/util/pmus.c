@@ -502,6 +502,8 @@ void perf_pmus__print_pmu_events(const struct print_callbacks *print_cb, void *p
 bool perf_pmus__have_event(const char *pname, const char *name)
 {
 	struct perf_pmu *pmu = perf_pmus__find(pname);
+	if (strstr(name, "pmcg_wr_rcvd_sp_per_rd_rcvd_sp"))
+		pr_err("%s pname=%s name=%s pmu=%p\n", __func__, pname, name, pmu);
 
 	return pmu && perf_pmu__have_event(pmu, name);
 }
