@@ -2696,8 +2696,9 @@ int cmd_stat(int argc, const char **argv)
 	 */
 	if (metrics) {
 		const char *pmu = parse_events_option_args.pmu_filter ?: "all";
+		struct evsel *evselj;
 
-		pr_err("%s5 calling metricgroup__parse_groups\n", __func__);
+		pr_err("%s5 calling metricgroup__parse_groups metrics=%s\n", __func__, metrics);
 		metricgroup__parse_groups(evsel_list, pmu, metrics,
 					stat_config.metric_no_group,
 					stat_config.metric_no_merge,
@@ -2705,6 +2706,12 @@ int cmd_stat(int argc, const char **argv)
 					stat_config.user_requested_cpu_list,
 					stat_config.system_wide,
 					&stat_config.metric_events);
+		pr_err("%s5.1 called metricgroup__parse_groups metrics=%s\n", __func__, metrics);
+		evlist__for_each_entry(evsel_list, evselj) {
+			pr_err("%s6 metricgroup__parse_groups metrics=%s returned evsel->name=%s pmu_name=%s\n",
+				__func__, metrics, evselj->name, evselj->pmu_name);
+		}
+		pr_err("%s6.1 called metricgroup__parse_groups metrics=%s\n", __func__, metrics);
 		zfree(&metrics);
 	}
 

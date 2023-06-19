@@ -1,0 +1,29 @@
+[
+    {
+        "BriefDescription": "L3 Lookup any request that access cache and found line in E or S-state",
+        "EventCode": "0x34",
+        "EventName": "UNC_CBO_CACHE_LOOKUP.ANY_ES",
+        "PerPkg": "1",
+        "PublicDescription": "L3 Lookup any request that access cache and found line in E or S-state.",
+        "UMask": "0x86",
+        "Unit": "CBOX"
+    },
+    {
+        "BriefDescription": "L3 Lookup any request that access cache and found line in I-state",
+        "EventCode": "0x34",
+        "EventName": "UNC_CBO_CACHE_LOOKUP.ANY_I",
+        "PerPkg": "1",
+        "PublicDescription": "L3 Lookup any request that access cache and found line in I-state.",
+        "UMask": "0x88",
+        "Unit": "CBOX"
+    },
+    {
+        "BriefDescription": "L3 Lookup any request that access cache and found line in M-state",
+        "EventCode": "0x34",
+        "EventName": "UNC_CBO_CACHE_LOOKUP.ANY_M",
+        "PerPkg": "1",
+        "PublicDescription": "L3 Lookup any request that access cache and found line in M-state.",
+        "UMask": "0x81",
+        "Unit": "CBOX"
+    }
+]

@@ -1,0 +1,18 @@
+[
+    {
+        "BriefDescription": "rocky1",
+        "MetricExpr": "UNC_CBO_CACHE_LOOKUP.ANY_ES * UNC_CBO_CACHE_LOOKUP.ANY_I",
+        "MetricName": "rocky1",
+        "PublicDescription": "rocky1 with no metrics references",
+        "MetricGroup": "Mountain",
+        "ScaleUnit": "100%"
+    },
+    {
+        "BriefDescription": "rocky2",
+        "MetricExpr": "rocky1 + (UNC_CBO_CACHE_LOOKUP.ANY_M  * 5)",
+        "MetricName": "rocky2",
+        "PublicDescription": "rocky2 with metrics references",
+        "MetricGroup": "Mountain",
+        "ScaleUnit": "100%"
+    }
+]

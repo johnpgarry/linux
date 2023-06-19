@@ -1562,8 +1562,7 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 
 	pmu = parse_state->fake_pmu ?: perf_pmus__find(name);
 
-	if (strstr(name, "pmcg_wr_rcvd_sp_per_rd_rcvd_sp"))
-		pr_err("%s name=%s pmu=%p\n", __func__, name, pmu);
+	pr_err("%s name=%s pmu=%p\n", __func__, name, pmu);
 
 	if (verbose > 1 && !(pmu && pmu->selectable)) {
 		fprintf(stderr, "Attempting to add event pmu '%s' with '",
@@ -1689,7 +1688,7 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
 	struct perf_pmu *pmu = NULL;
 	int ok = 0;
 	char *config;
-
+	pr_err("%s str=%s\n", __func__, str);
 	*listp = NULL;
 
 	if (!head) {
@@ -1703,6 +1702,7 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
 	if (!config)
 		goto out_err;
 
+	pr_err("%s2 str=%s calling parse_events_term__num\n", __func__, str);
 	if (parse_events_term__num(&term,
 				   PARSE_EVENTS__TERM_TYPE_USER,
 				   config, 1, false, NULL,
@@ -1732,8 +1732,8 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
 			//pr_err("%s pmu name=%s str=%s alias->name=%s\n",
 			//	__func__, pmu->name, str, alias->name);
 			if (!strcasecmp(alias->name, str)) {
-			//	pr_err("%s2 pmu name=%s str=%s alias->name=%s\n",
-			//		__func__, pmu->name, str, alias->name);
+				pr_err("%s2 pmu name=%s str=%s alias->name=%s calling parse_events_add_pmu\n",
+					__func__, pmu->name, str, alias->name);
 				parse_events_copy_term_list(head, &orig_head);
 				if (!parse_events_add_pmu(parse_state, list,
 							  pmu->name, orig_head,
@@ -2000,6 +2000,7 @@ static int parse_events__scanner(const char *str,
 	YY_BUFFER_STATE buffer;
 	void *scanner;
 	int ret;
+	//pr_err("%s str=%s\n", __func__, str);
 
 	ret = parse_events_lex_init_extra(parse_state, &scanner);
 	if (ret)
@@ -2011,6 +2012,7 @@ static int parse_events__scanner(const char *str,
 	parse_events_debug = 1;
 	parse_events_set_debug(1, scanner);
 #endif
+	pr_err("%s2 calling parse_events_parse str=%s\n", __func__, str);
 	ret = parse_events_parse(parse_state, scanner);
 
 	parse_events__flush_buffer(buffer, scanner);
@@ -2029,7 +2031,7 @@ int parse_events_terms(struct list_head *terms, const char *str)
 		.stoken = PE_START_TERMS,
 	};
 	int ret;
-
+	pr_err("%s calling parse_events__scanner str=%s\n", __func__, str);
 	ret = parse_events__scanner(str, &parse_state);
 
 	if (!ret) {
@@ -2267,7 +2269,7 @@ int __parse_events(struct evlist *evlist, const char *str, const char *pmu_filte
 		.match_legacy_cache_terms = true,
 	};
 	int ret, ret2;
-
+	pr_err("%s str=%s calling parse_events__scanner\n", __func__, str);
 	ret = parse_events__scanner(str, &parse_state);
 
 	if (!ret && list_empty(&parse_state.list)) {

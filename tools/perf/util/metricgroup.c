@@ -447,7 +447,7 @@ static int metricgroup__add_to_mep_groups(const struct pmu_metric *pm,
 {
 	const char *g;
 	char *omg, *mg;
-
+	pr_err("%s pm metric name=%s desc=%s\n", __func__, pm->metric_name, pm->desc);
 	mg = strdup(pm->metric_group ?: "No_group");
 	if (!mg)
 		return -ENOMEM;
@@ -516,6 +516,9 @@ static int metricgroup__add_to_mep_groups_callback(const struct pmu_metric *pm,
 {
 	bool print = !!strstr(pm->metric_name, "imx8mn_ddr_write.all");
 	struct rblist *groups = vdata;
+	if (!print)
+		print = !!strstr(pm->metric_name, "pmcg");
+	print = true;
 	if (print) {
 		pr_err("%s pm metric name=%s compat=%s table=%p\n", __func__, pm->metric_name, pm->compat, table);
 		if (table) {
@@ -671,7 +674,7 @@ static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const stru
 	struct strbuf events;
 	int ret;
 
-	pr_err("%s metric name=%s expr=%s desc=%s\n", __func__, pm->metric_name, pm->metric_expr, pm->desc);
+	pr_err("%s metric name=%s expr=%s desc=%s calling add_metric\n", __func__, pm->metric_name, pm->metric_expr, pm->desc);
 	ret = add_metric(&metric_list, pm, NULL, false,
 				 false, false,
 				 false, NULL, 0, table);
@@ -731,6 +734,7 @@ static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const stru
 	if (!evlist)
 		return -ENOMEM;
 
+	pr_err("%s3 evlist=%p calling metricgroup__parse_groups_test\n", __func__, evlist);
 	err = metricgroup__parse_groups_test(evlist, table, pm->metric_name, &metric_events);
 	pr_err("%s4 after metricgroup__parse_groups_test err=%d\n", __func__, err);
 	if (err) {
@@ -1162,6 +1166,7 @@ static int resolve_metric(struct list_head *metric_list,
 			if (!pending)
 				return -ENOMEM;
 
+			pr_err("%s2.1 pmu=%s called metricgroup__find_metric and seemed to find\n", __func__, pmu);
 			memcpy(&pending[pending_cnt].pm, &pm, sizeof(pm));
 			pending[pending_cnt].key = cur->pkey;
 			pending_cnt++;
@@ -1341,13 +1346,21 @@ static int metricgroup__find_metric_callback(const struct pmu_metric *pm,
 {
 	struct metricgroup__find_metric_data *data = vdata;
 	const char *pm_pmu = pm->pmu ?: "cpu";
+	pr_err("%s pm_pmu=%s pm metric_name=%s expr=%s data->metric=%s pmu=%s\n", __func__, pm_pmu, pm->metric_name, pm->metric_expr, data->metric, data->pmu);
 
-	if (strcmp(data->pmu, "all") && strcmp(pm_pmu, data->pmu))
+	if (strcmp(data->pmu, "all") && strcmp(pm_pmu, data->pmu)) {
+		pr_err("%s1 pm_pmu=%s pm metric_name=%s expr=%s all returning\n", __func__, pm_pmu, pm->metric_name, pm->metric_expr);
 		return 0;
+	}
 
-	if (!match_metric(pm->metric_name, data->metric))
+	if (!match_metric(pm->metric_name, data->metric)) {
+		pr_err("%s2 pm_pmu=%s pm metric_name=%s expr=%s data->metric=%s match_metric bad returning\n",
+			__func__, pm_pmu, pm->metric_name, pm->metric_expr, data->metric);
 		return 0;
+	}
 
+		pr_err("%s10 matched pm_pmu=%s pm metric_name=%s expr=%s data->metric=%s\n",
+			__func__, pm_pmu, pm->metric_name, pm->metric_expr, data->metric);
 	memcpy(data->pm, pm, sizeof(*pm));
 	return 1;
 }
@@ -1363,8 +1376,8 @@ static bool metricgroup__find_metric(const char *pmu,
 		.pm = pm,
 	};
 	bool res;
-	pr_err("%s pmu=%s metric=%s pm=%p\n", __func__,
-		pmu, metric, pm);
+	pr_err("%s pmu=%s metric=%s pm=%p table=%p\n", __func__,
+		pmu, metric, pm, table);
 	//pr_err("%s2 pmu=%s metric=%s pm metric_name=%s pmu=%s\n", __func__,
 	//	pmu, metric, pm ? pm->metric_name : "?", pm ? pm->pmu : "?");
 	res = pmu_metrics_table_for_each_metric(table, metricgroup__find_metric_callback, &data)
@@ -1867,6 +1880,7 @@ static int parse_groups(struct evlist *perf_evlist,
 		ret = build_combined_expr_ctx(&metric_list, &combined);
 
 		if (!ret && combined && hashmap__size(combined->ids)) {
+			pr_err("%s4 str=%s calling parse_ids\n", __func__, str);
 			ret = parse_ids(metric_no_merge, fake_pmu, combined,
 					/*modifier=*/NULL,
 					/*group_events=*/false,
@@ -1922,6 +1936,7 @@ static int parse_groups(struct evlist *perf_evlist,
 			}
 		}
 		if (!metric_evlist) {
+			pr_err("%s5 str=%s calling parse_ids\n", __func__, str);
 			ret = parse_ids(metric_no_merge, fake_pmu, m->pctx, m->modifier,
 					m->group_events, tool_events, &m->evlist);
 			if (ret)
@@ -1984,6 +1999,8 @@ static int parse_groups(struct evlist *perf_evlist,
 
 out:
 	metricgroup__free_metrics(&metric_list);
+
+	pr_err("%s10 out ret=%d str=%s \n", __func__, ret, str);
 	return ret;
 }
 
