@@ -80,7 +80,7 @@
 	    "Compat": "0x65000013"
    },
    {
-	    "EventCode": "0x13086",
+	    "EventCode": "0x86",
 	    "EventName": "smmuv3_pmcg.WR_SENT_SP",
 	    "BriefDescription": "Write command sent by SP",
 	    "PublicDescription": "Write command sent by SP",

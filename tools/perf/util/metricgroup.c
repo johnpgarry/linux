@@ -1156,7 +1156,7 @@ static int resolve_metric(struct list_head *metric_list,
 	 * the pending array.
 	 */
 	hashmap__for_each_entry(root_metric->pctx->ids, cur, bkt) {
-		struct pmu_metric pm;
+		struct pmu_metric pm = {};
 
 		pr_err("%s2 pmu=%s calling metricgroup__find_metric\n", __func__, pmu);
 		if (metricgroup__find_metric(pmu, cur->pkey, table, &pm)) {
@@ -1382,8 +1382,17 @@ static bool metricgroup__find_metric(const char *pmu,
 	res = pmu_metrics_table_for_each_metric(table, metricgroup__find_metric_callback, &data)
 		? true : false;
 
-	pr_err("%s10 res=%d pmu=%s metric=%s pm=%p\n", __func__, res,
-		pmu, metric, pm);
+	if (res) {
+		pr_err("%s9 res=%d pmu=%s metric=%s pm=%p\n", __func__, res,
+			pmu, metric, pm);
+		pr_err("%s10 res=%d pmu=%s metric=%s pm=%p name=%s desc=%s\n", __func__, res,
+			pmu, metric, pm, pm ? pm->metric_name : "?", pm ? pm->desc : "?");
+	} else {
+		pr_err("%s9 res=%d pmu=%s metric=%s pm=%p\n", __func__, res,
+			pmu, metric, pm);
+		pr_err("%s10 res=%d pmu=%s metric=%s pm=%p name=%s\n", __func__, res,
+			pmu, metric, pm, pm ? pm->metric_name : "?");		
+	}
 	return res;
 }
 

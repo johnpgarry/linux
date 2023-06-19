@@ -312,7 +312,7 @@ PE_NAME opt_pmu_config
 	if (!list)
 		CLEANUP_YYABORT;
 	/* Attempt to add to list assuming $1 is a PMU name. */
-	pr_err("%s calling parse_events_add_pmu\n", __func__);
+	pr_err("%s calling parse_events_add_pmu 222\n", __func__);
 	if (parse_events_add_pmu(parse_state, list, $1, $2, /*auto_merge_stats=*/false)) {
 		struct perf_pmu *pmu = NULL;
 		int ok = 0;
@@ -336,7 +336,7 @@ PE_NAME opt_pmu_config
 
 				if (parse_events_copy_term_list(orig_terms, &terms))
 					CLEANUP_YYABORT;
-				pr_err("%s2 calling parse_events_add_pmu\n", __func__);
+				pr_err("%s2 calling parse_events_add_pmu 333\n", __func__);
 				if (!parse_events_add_pmu(parse_state, list, pmu->name, terms,
 							  auto_merge_stats)) {
 					ok++;
@@ -413,7 +413,7 @@ PE_PMU_EVENT_FAKE sep_dc
 	if (!list)
 		YYABORT;
 	
-	pr_err("%s calling parse_events_add_pmu\n", __func__);
+	pr_err("%s calling parse_events_add_pmu 444\n", __func__);
 	err = parse_events_add_pmu(_parse_state, list, $1, /*head_config=*/NULL,
 				   /*auto_merge_stats=*/false);
 	free($1);
@@ -433,7 +433,7 @@ PE_PMU_EVENT_FAKE opt_pmu_config
 	if (!list)
 		YYABORT;
 	
-	pr_err("%s calling parse_events_add_pmu\n", __func__);
+	pr_err("%s calling parse_events_add_pmu 555\n", __func__);
 	err = parse_events_add_pmu(_parse_state, list, $1, $2, /*auto_merge_stats=*/false);
 	free($1);
 	parse_events_terms__delete($2);
