@@ -32,7 +32,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120782",
+	    "EventCode": "0x782",
 	    "EventName": "smmuv3_pmcg.WR_RCVD_SP",
 	    "BriefDescription": "Write command received by the SP",
 	    "PublicDescription": "Write command received by the SP",
@@ -40,7 +40,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120802",
+	    "EventCode": "0x802",
 	    "EventName": "smmuv3_pmcg.RD_RCVD_SP",
 	    "BriefDescription": "Read command received by the SP",
 	    "PublicDescription": "Read command received by the SP",
@@ -48,7 +48,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12082",
+	    "EventCode": "0x82",
 	    "EventName": "smmuv3_pmcg.WR_RCVD_TP",
 	    "BriefDescription": "Write command received by the TP",
 	    "PublicDescription": "Write command received by the TP",
@@ -56,7 +56,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12083",
+	    "EventCode": "0x83",
 	    "EventName": "smmuv3_pmcg.RD_RCVD_TP",
 	    "BriefDescription": "Read command received by the TP",
 	    "PublicDescription": "Read command received by the TP",
@@ -64,7 +64,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12084",
+	    "EventCode": "0x84",
 	    "EventName": "smmuv3_pmcg.CMD_ISSUED_SP",
 	    "BriefDescription": "Command issued by the SP",
 	    "PublicDescription": "Command issued by the SP",
@@ -72,7 +72,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12085",
+	    "EventCode": "0x85",
 	    "EventName": "smmuv3_pmcg.CMD_ISSUED_TP",
 	    "BriefDescription": "Command issued by the TP",
 	    "PublicDescription": "Command issued by the TP",
@@ -88,7 +88,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12087",
+	    "EventCode": "0x87",
 	    "EventName": "smmuv3_pmcg.RD_SENT_SP",
 	    "BriefDescription": "Read command sent by SP",
 	    "PublicDescription": "Read command sent by SP",
@@ -96,7 +96,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12088",
+	    "EventCode": "0x88",
 	    "EventName": "smmuv3_pmcg.WR_SENT_TP",
 	    "BriefDescription": "Write command sent by TP",
 	    "PublicDescription": "Write command sent by TP",
@@ -104,7 +104,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12089",
+	    "EventCode": "0x89",
 	    "EventName": "smmuv3_pmcg.RD_SENT_TP",
 	    "BriefDescription": "Read command sent by TP",
 	    "PublicDescription": "Read command sent by TP",
@@ -112,7 +112,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x1208a",
+	    "EventCode": "0x8a",
 	    "EventName": "smmuv3_pmcg.L1_TLB",
 	    "BriefDescription": "Command received by L1 TLB",
 	    "PublicDescription": "Command received by L1 TLB",
@@ -120,7 +120,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x1208B",
+	    "EventCode": "0x8B",
 	    "EventName": "smmuv3_pmcg.L2_TLB",
 	    "BriefDescription": "Command received by L2 TLB",
 	    "PublicDescription": "Command received by L2 TLB",
@@ -128,7 +128,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x1208c",
+	    "EventCode": "0x8c",
 	    "EventName": "smmuv3_pmcg.L1_TLB_HIT",
 	    "BriefDescription": "L1 TLB HIT",
 	    "PublicDescription": "L1 TLB HIT",
@@ -136,7 +136,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x1208d",
+	    "EventCode": "0x8d",
 	    "EventName": "smmuv3_pmcg.L2_TLB_HIT",
 	    "BriefDescription": "L2 TLB HIT",
 	    "PublicDescription": "L2 TLB HIT",
@@ -144,7 +144,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x1208f",
+	    "EventCode": "0x8f",
 	    "EventName": "smmuv3_pmcg.RETRIED_TP",
 	    "BriefDescription": "Command retried on TP interface",
 	    "PublicDescription": "Command retried on TP interface",
@@ -152,7 +152,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12090",
+	    "EventCode": "0x90",
 	    "EventName": "smmuv3_pmcg.MATCH_CMD_ISSUED_SP",
 	    "BriefDescription": "Specific matched commands sent by SP",
 	    "PublicDescription": "Specific matched commands sent by SP",
@@ -160,7 +160,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12091",
+	    "EventCode": "0x91",
 	    "EventName": "smmuv3_pmcg.DELAYED_CMD_ISSUED_SP",
 	    "BriefDescription": "Delayed commands sent by SP",
 	    "PublicDescription": "Delayed commands sent by SP",
@@ -168,7 +168,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12092",
+	    "EventCode": "0x92",
 	    "EventName": "smmuv3_pmcg.MATCH_CMD_ISSUED_TP",
 	    "BriefDescription": "Specific matched commands sent by TP",
 	    "PublicDescription": "Specific matched commands sent by TP",
@@ -176,7 +176,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x12093",
+	    "EventCode": "0x93",
 	    "EventName": "smmuv3_pmcg.DELAYED_CMD_ISSUED_TP",
 	    "BriefDescription": "Delayed commands sent by TP",
 	    "PublicDescription": "Delayed commands sent by TP",
@@ -184,7 +184,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a0",
+	    "EventCode": "0xa0",
 	    "EventName": "smmuv3_pmcg.DVM_TLBI",
 	    "BriefDescription": "DVM TLBI",
 	    "PublicDescription": "DVM TLBI",
@@ -192,7 +192,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a1",
+	    "EventCode": "0xa1",
 	    "EventName": "smmuv3_pmcg.DVM_SYNC",
 	    "BriefDescription": "DVM SYNC",
 	    "PublicDescription": "DVM SYNC",
@@ -200,7 +200,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a2",
+	    "EventCode": "0xa2",
 	    "EventName": "smmuv3_pmcg.DELAY_PAGE_TBL_READ",
 	    "BriefDescription": "Delay page table read request",
 	    "PublicDescription": "Delay page table read request",
@@ -208,7 +208,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a3",
+	    "EventCode": "0xa3",
 	    "EventName": "smmuv3_pmcg.PAGE_TBL_READ",
 	    "BriefDescription": "Page table read request",
 	    "PublicDescription": "Page table read request",
@@ -216,7 +216,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a4",
+	    "EventCode": "0xa4",
 	    "EventName": "smmuv3_pmcg.DELAY_ADDR_TRANSLATE_REQ",
 	    "BriefDescription": "Delay of address translation requests",
 	    "PublicDescription": "Delay of address translation requests",
@@ -224,7 +224,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a5",
+	    "EventCode": "0xa5",
 	    "EventName": "smmuv3_pmcg.ADDR_TRANSLATE_REQ",
 	    "BriefDescription": "Address translation request",
 	    "PublicDescription": "Address translation request",
@@ -232,7 +232,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a6",
+	    "EventCode": "0xa6",
 	    "EventName": "smmuv3_pmcg.SYNC_REQUEST_EXEC_TIME",
 	    "BriefDescription": "Sync request execution time",
 	    "PublicDescription": "Sync request execution time",
@@ -240,7 +240,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a7",
+	    "EventCode": "0xa7",
 	    "EventName": "smmuv3_pmcg.SYNC_REQUEST_SENT",
 	    "BriefDescription": "Sync request sent",
 	    "PublicDescription": "Sync request sent",
@@ -248,7 +248,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a8",
+	    "EventCode": "0xa8",
 	    "EventName": "smmuv3_pmcg.CLEAN_UNIQUE_REQUEST_SP",
 	    "BriefDescription": "Clean unique request sent by SP",
 	    "PublicDescription": "Clean unique request sent by SP",
@@ -256,7 +256,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120a9",
+	    "EventCode": "0xa9",
 	    "EventName": "smmuv3_pmcg.WRITEBACK_SP",
 	    "BriefDescription": "Writeback sent by SP",
 	    "PublicDescription": "Writeback sent by SP",
@@ -264,7 +264,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120aa",
+	    "EventCode": "0xaa",
 	    "EventName": "smmuv3_pmcg.CLEAN_UNIQUE_REQUEST_TP",
 	    "BriefDescription": "Clean unique request sent by TP",
 	    "PublicDescription": "Clean unique request sent by TP",
@@ -272,7 +272,7 @@
 	    "Compat": "0x65000012"
    },
    {
-	    "EventCode": "0x120ab",
+	    "EventCode": "0xab",
 	    "EventName": "smmuv3_pmcg.WRITEBACK_TP",
 	    "BriefDescription": "Writeback sent by TP",
 	    "PublicDescription": "Writeback sent by TP",
