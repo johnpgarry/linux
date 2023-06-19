@@ -26,5 +26,27 @@
         "MetricGroup": "Power",
         "MetricName": "C6_Core_Residency",
         "ScaleUnit": "100%"
+    },
+    {
+        "BriefDescription": "Core cycles when the thread is not in halt state",
+        "EventName": "CPU_CLK_UNHALTED.THREAD",
+        "PublicDescription": "This event counts the number of core cycles while the thread is not in a halt state. The thread enters the halt state when it is running the HLT instruction. This event is a component in many key event ratios. The core frequency may change from time to time due to transitions associated with Enhanced Intel SpeedStep Technology or TM2. For this reason this event may have a changing ratio with regards to time. When the core frequency is constant, this event can approximate elapsed time while the core was not in the halt state. It is counted on a dedicated fixed counter, leaving the four (eight when Hyperthreading is disabled) programmable counters available for other events.",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x2"
+    },
+    {
+        "BriefDescription": "orca1",
+        "MetricExpr": "CYCLE_ACTIVITY.STALLS_TOTAL + UOPS_EXECUTED.CYCLES_GE_1_UOP_EXEC",
+        "MetricName": "orca1",
+        "PublicDescription": "orca1 with no metrics references",
+        "MetricGroup": "PortsUtil",
+        "ScaleUnit": "100%"
+    },
+    {
+        "BriefDescription": "orca2",
+        "MetricExpr": "orca1 + UOPS_EXECUTED.THREAD",
+        "MetricGroup": "PortsUtil",
+        "MetricName": "orca2",
+        "ScaleUnit": "100%"
     }
 ]

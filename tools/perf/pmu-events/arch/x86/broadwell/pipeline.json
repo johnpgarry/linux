@@ -1,0 +1,26 @@
+[
+    {
+        "BriefDescription": "Total execution stalls.",
+        "CounterMask": "4",
+        "EventCode": "0xA3",
+        "EventName": "CYCLE_ACTIVITY.STALLS_TOTAL",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x4"
+    },
+    {
+        "BriefDescription": "Cycles where at least 1 uop was executed per-thread.",
+        "CounterMask": "1",
+        "EventCode": "0xB1",
+        "EventName": "UOPS_EXECUTED.CYCLES_GE_1_UOP_EXEC",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x1"
+    },
+    {
+        "BriefDescription": "Counts the number of uops to be executed per-thread each cycle.",
+        "EventCode": "0xB1",
+        "EventName": "UOPS_EXECUTED.THREAD",
+        "PublicDescription": "Number of uops to be executed per-thread each cycle.",
+        "SampleAfterValue": "2000003",
+        "UMask": "0x1"
+    }
+]
