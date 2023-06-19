@@ -671,7 +671,7 @@ static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const stru
 	struct strbuf events;
 	int ret;
 
-	pr_err("%s metric name=%s expr=%s\n", __func__, pm->metric_name, pm->metric_expr);
+	pr_err("%s metric name=%s expr=%s desc=%s\n", __func__, pm->metric_name, pm->metric_expr, pm->desc);
 	ret = add_metric(&metric_list, pm, NULL, false,
 				 false, false,
 				 false, NULL, 0, table);
@@ -706,7 +706,7 @@ static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const stru
 
 	pr_err("%s10 ret=%d out\n\n", __func__, ret);
 	return 0;
-	#else
+	#else //  NEW_METHOD
 
 	struct evlist *evlist;
 	struct evsel *evsel;
@@ -715,8 +715,9 @@ static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const stru
 	};
 	int events_count = 0, found_events = 0;
 	int err = 0;
+	struct rblist *groups = vdata;
 
-	pr_err("\n\n%s metric name=%s expr=%s\n", __func__, pm->metric_name, pm->metric_expr);
+	pr_err("\n\n%s metric name=%s expr=%s desc=%s\n", __func__, pm->metric_name, pm->metric_expr, pm->desc);
 	if (!pm->metric_expr)
 		return 0;
 
@@ -793,6 +794,8 @@ static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const stru
 		pm->desc,
 		pm->metric_expr);
 	err = 0;
+	if (events_count == found_events)
+		err = metricgroup__add_to_mep_groups(pm, groups);
 out_err:
 	if (err)
 		pr_err("Broken metric %s\n", pm->metric_name);
