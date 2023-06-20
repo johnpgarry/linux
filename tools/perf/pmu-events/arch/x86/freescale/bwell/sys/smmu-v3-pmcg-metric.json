@@ -22,5 +22,13 @@
 	    "MetricName": "pmcg_special1.all",
 	    "MetricExpr": "(smmuv3_pmcg.wr_sent_sp + 7) / pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all",
 	    "ScaleUnit": "9.765625e-4KB"
+   },
+   {
+	    "BriefDescription": "bytes of all masters read from uncore_cbox_0 ...",
+	    "MetricName": "pmcg_special_uncore_cbox_0",
+	    "MetricExpr": "uncore_cbox_0@event\\=0x34\\,umask\\=0x88@",
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Unit": "cbox",
+	    "Compat": "0x62000010"
    }
 ]

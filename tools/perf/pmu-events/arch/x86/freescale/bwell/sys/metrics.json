@@ -16,13 +16,5 @@
 	    "MetricName": "imc_read_and_write.all",
 	    "MetricExpr": "imc.read_cycles + imc.write_cycles",
 	    "ScaleUnit": "9.765625e-4KB"
-   },
-   {
-	    "BriefDescription": "bytes of all masters read from ddr imx8_ddr0 at axid ...",
-	    "MetricName": "imx8mn_imx8_ddr0",
-	    "MetricExpr": "uncore_imc@axid\\-read\\,axi_mask\\=0xffff\\,axi_id\\=0x0000@",
-	    "ScaleUnit": "9.765625e-4KB",
-	    "Unit": "imc",
-	    "Compat": "0x24000008"
    }
 ]

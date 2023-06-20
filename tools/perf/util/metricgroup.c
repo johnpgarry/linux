@@ -540,39 +540,6 @@ struct metricgroup__test_event {
 	struct evsel *evsel;
 };
 
-static __maybe_unused int metricgroup__test_event_iter(const struct pmu_event *pe,
-					const struct pmu_events_table *table __maybe_unused,
-					__maybe_unused void *vdata)
-{
-	struct metricgroup__test_event *data = vdata;
-	struct pmu_event *found_event = data->found_event;
-	struct evsel *evsel = data->evsel;
-	struct perf_pmu *pmu;
-	pr_err("%s match (pe name=%s vs evsel->name=%s) compat=%s pmu=%s evsel->pmu_name=%s\n", __func__, pe->name, evsel->name, pe->compat, pe->pmu, evsel->pmu_name);
-	if (strcasecmp(pe->name, evsel->name))
-		return 0;
-
-	if (!evsel->pmu_name)
-		return 0;
-
-	pmu = perf_pmus__find(evsel->pmu_name);
-	if (!pmu) {
-		pr_err("%s could not find pmu for %s\n", __func__, evsel->pmu_name);
-		exit(0);
-		return 1;
-	}
-
-	if (!strcmp(pmu->id, pe->compat)) {
-		memcpy(found_event, pe, sizeof(*pe));
-		pr_err("%s1 found event pmu id=%s pe name=%s\n", __func__, pmu->id, pe->name);
-		return 1;
-	} else {
-		pr_err("%s2 (pe name=%s vs evsel->name=%s) compat=%s pmu=%s \n", __func__, pe->name, evsel->name, pe->compat, pe->pmu);
-	}
-
-	return 0;
-}
-
 static bool match_event_to_pmu(const struct pmu_event *event, struct perf_pmu *pmu)
 {
 	struct perf_pmu_alias *alias;
@@ -616,6 +583,42 @@ static bool match_event_to_pmu(const struct pmu_event *event, struct perf_pmu *p
 			event ? event->compat : "?");
 	return false;
 }
+
+static __maybe_unused int metricgroup__test_event_iter(const struct pmu_event *pe,
+					const struct pmu_events_table *table __maybe_unused,
+					__maybe_unused void *vdata)
+{
+	struct metricgroup__test_event *data = vdata;
+	struct pmu_event *found_event = data->found_event;
+	struct evsel *evsel = data->evsel;
+	struct perf_pmu *pmu = perf_pmus__find(evsel->pmu_name);
+	bool match_event_to_pmu_res = pmu ? match_event_to_pmu(pe, pmu) : false;
+	pr_err("%s match (pe name=%s vs evsel->name=%s) compat=%s pmu=%s evsel->pmu_name=%s pmu=%p match_event_to_pmu_res=%d\n",
+		__func__, pe->name, evsel->name, pe->compat, pe->pmu, evsel->pmu_name, pmu, match_event_to_pmu_res);
+	if (strcasecmp(pe->name, evsel->name))
+		return 0;
+
+	if (!evsel->pmu_name)
+		return 0;
+
+	
+	if (!pmu) {
+		pr_err("%s could not find pmu for %s calling exit(0)\n", __func__, evsel->pmu_name);
+		exit(0);
+		return 1;
+	}
+
+	if (!strcmp(pmu->id, pe->compat)) {
+		memcpy(found_event, pe, sizeof(*pe));
+		pr_err("%s1 found event pmu id=%s pe name=%s\n", __func__, pmu->id, pe->name);
+		return 1;
+	} else {
+		pr_err("%s2 (pe name=%s vs evsel->name=%s) compat=%s pmu=%s \n", __func__, pe->name, evsel->name, pe->compat, pe->pmu);
+	}
+
+	return 0;
+}
+
 
 /*
  * Try to match against an PMU event/alias:
@@ -848,6 +851,10 @@ out_err:
 	match = __metricgroup__add_metric_sys_event_iter(pm, table, NULL);
 	pr_err("%s2 metric name=%s expr=%s desc=%s called metricgroup__add_metric_sys_event_iter match=%d\n",
 		__func__, pm->metric_name, pm->metric_expr, pm->desc, match);
+	if (strstr(pm->metric_name, "pmcg_special_uncore_cbox_0")) {
+		pr_err("%s3 calling exit(0)\n", __func__);
+		//exit(0);
+	}
 	if (match == false)
 		return 0;
 	err = metricgroup__add_to_mep_groups(pm, groups);
@@ -1038,6 +1045,7 @@ static int metricgroup__build_event_string(struct strbuf *events,
 
 		/* Always move tool events outside of the group. */
 		ev = perf_tool_event__from_str(id);
+		pr_err("%s22 id=%s ev=%d\n", __func__, id, ev);
 		if (ev != PERF_TOOL_NONE) {
 			has_tool_events = true;
 			tool_events[ev] = true;
@@ -1063,12 +1071,17 @@ static int metricgroup__build_event_string(struct strbuf *events,
 		 */
 		sep = strchr(id, '@');
 		if (sep != NULL) {
+			pr_err("%s22 id=%s events=%s\n", __func__, id, events->buf);
 			ret = strbuf_add(events, id, sep - id);
+			pr_err("%s33 id=%s events=%s\n", __func__, id, events->buf);
 			RETURN_IF_NON_ZERO(ret);
 			ret = strbuf_addch(events, '/');
+			pr_err("%s44 id=%s events=%s\n", __func__, id, events->buf);
 			RETURN_IF_NON_ZERO(ret);
 			rsep = strrchr(sep, '@');
+			pr_err("%s55 id=%s events=%s\n", __func__, id, events->buf);
 			ret = strbuf_add(events, sep + 1, rsep - sep - 1);
+			pr_err("%s66 id=%s events=%s\n", __func__, id, events->buf);
 			RETURN_IF_NON_ZERO(ret);
 			ret = strbuf_addstr(events, ",metric-id=");
 			RETURN_IF_NON_ZERO(ret);
@@ -1509,7 +1522,9 @@ static bool __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm
 		int events_count = 0, found_events = 0;
 		struct evsel *evsel;
 
-		pr_err("%s4.1 pm->name=%s m=%p metric_name=%s expr=%s calling parse_ids\n", __func__, pm->metric_name, m, m->metric_name, m->metric_expr);
+
+		pr_err("%s4.1 pm->name=%s m=%p metric_name=%s expr=%s m->modifier=%s calling parse_ids\n",
+			__func__, pm->metric_name, m, m->metric_name, m->metric_expr, m->modifier);
 
 		err = parse_ids(false, NULL, m->pctx, m->modifier,
 					m->group_events, tool_events, &m->evlist);
@@ -1519,6 +1534,7 @@ static bool __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm
 
 		evlist__for_each_entry(m->evlist, evsel) {
 			struct pmu_event found_event = {};
+			
 			struct metricgroup__test_event metricgroup__test_event_data = {
 				.evsel = evsel,
 				.found_event = &found_event,
@@ -1533,8 +1549,23 @@ static bool __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm
 						 &metricgroup__test_event_data);
 			pr_err("%s5.3 evsel=%p name=%s pmu_name=%s metric_id=%s events_table=%p found_events=%d found event name=%s\n",
 			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table, found_events, found_event.name);
+
+			if (found_event.name) {
+				continue;
+			}
+
+			if (strchr(evsel->name, '/')) {
+				struct perf_pmu *pmu = perf_pmus__find(evsel->pmu_name);
+				pr_err("%s5.4 evsel=%p name=%s pmu_name=%s metric_id=%s pmu=%p name=%s\n",
+				__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, pmu, pmu ? pmu->name : "?");
+				if (!pmu)
+					goto out;
+				continue;
+			}
+			
+
 			if (!found_event.name) {
-				pr_err("%s5.4 could not find name desc=%s\n", __func__, pm->desc);
+				pr_err("%s5.5 could not find name desc=%s\n", __func__, pm->desc);
 				goto out;
 			}
 		}
@@ -1939,7 +1970,7 @@ static int parse_ids(bool metric_no_merge, struct perf_pmu *fake_pmu,
 	struct strbuf events = STRBUF_INIT;
 	int ret;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s modifier=%s\n", __func__, modifier);
 	*out_evlist = NULL;
 	if (!metric_no_merge || hashmap__size(ids->ids) == 0) {
 		bool added_event = false;
