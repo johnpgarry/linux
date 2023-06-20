@@ -35,7 +35,7 @@
         "UMask": "0x2"
     },
     {
-        "BriefDescription": "orca1",
+        "BriefDescription": "orca1 CYCLE_ACTIVITY.STALLS_TOTAL + UOPS_EXECUTED.CYCLES_GE_1_UOP_EXEC",
         "MetricExpr": "CYCLE_ACTIVITY.STALLS_TOTAL + UOPS_EXECUTED.CYCLES_GE_1_UOP_EXEC",
         "MetricName": "orca1",
         "PublicDescription": "orca1 with no metrics references",
@@ -43,7 +43,7 @@
         "ScaleUnit": "100%"
     },
     {
-        "BriefDescription": "orca2",
+        "BriefDescription": "orca2 orca1 + UOPS_EXECUTED.THREAD",
         "MetricExpr": "orca1 + UOPS_EXECUTED.THREAD",
         "MetricGroup": "PortsUtil",
         "MetricName": "orca2",
