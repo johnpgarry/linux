@@ -969,6 +969,10 @@ struct perf_pmu *perf_pmu__lookup(struct list_head *pmus, int dirfd, const char 
 				pmu->id = (char *)"0x62000010";
 				pr_err("%s4.4 pmu=%p name=%s id=%s\n", __func__,
 					pmu, pmu->name, pmu->id);
+			} else if (strstr(lookup_name, "imc")) {
+				pmu->id = (char *)"0x24000008";
+				pr_err("%s4.5 pmu=%p name=%s id=%s\n", __func__,
+					pmu, pmu->name, pmu->id);
 			} else {
 				pmu->id = pmu_id(name);
 			}
