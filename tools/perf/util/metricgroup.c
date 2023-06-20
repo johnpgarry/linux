@@ -682,8 +682,7 @@ static int add_metric(struct list_head *metric_list,
 static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 					const struct pmu_metrics_table *table __maybe_unused,
 					void *data);
-static int __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm, const struct pmu_metrics_table *table __maybe_unused,
-	const char *metric_name, const char *pmu_name);
+static bool __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm, const struct pmu_metrics_table *table __maybe_unused);
 
 static int metricgroup__add_to_mep_groups_callback_new(__maybe_unused const struct pmu_metric *pm,
 					__maybe_unused const struct pmu_metrics_table *table,
@@ -842,13 +841,14 @@ out_err:
 	return err;
 	#else
 	struct rblist *groups = vdata;
+	bool match;
 	int err;
 	pr_err("%s metric name=%s expr=%s desc=%s calling metricgroup__add_metric_sys_event_iter\n", __func__, pm->metric_name, pm->metric_expr, pm->desc);
-	err = __metricgroup__add_metric_sys_event_iter(pm, table, NULL /*fixme */, NULL/* fixme */);
-	pr_err("%s2 metric name=%s expr=%s desc=%s called metricgroup__add_metric_sys_event_iter err=%d\n",
-		__func__, pm->metric_name, pm->metric_expr, pm->desc, err);
-	if (err)
-		return err;
+	match = __metricgroup__add_metric_sys_event_iter(pm, table);
+	pr_err("%s2 metric name=%s expr=%s desc=%s called metricgroup__add_metric_sys_event_iter match=%d\n",
+		__func__, pm->metric_name, pm->metric_expr, pm->desc, match);
+	if (match == false)
+		return 0;
 	err = metricgroup__add_to_mep_groups(pm, groups);
 	pr_err("%s10 metric name=%s expr=%s desc=%s err=%d\n",
 		__func__, pm->metric_name, pm->metric_expr, pm->desc, err);
@@ -1478,22 +1478,22 @@ static int add_metric(struct list_head *metric_list,
 	return ret;
 }
 
-static int __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm, const struct pmu_metrics_table *table __maybe_unused,
-	const char *metric_name, const char *pmu_name)
+static bool __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm, const struct pmu_metrics_table *table __maybe_unused)
 {
 	__maybe_unused struct metric *m = NULL;
 	bool tool_events[PERF_TOOL_MAX] = {false};
 	const struct pmu_events_table *events_table = sys_events_table_from_metric_table(table);
-	int ret;
+	bool ret = false;
+	int err;
 	LIST_HEAD(list);
 
-	pr_err("%s pm name=%s pmu=%s desc=%s metric_name=%s pmu_name=%s\n", __func__,
-			pm->metric_name, pm->pmu, pm->desc, metric_name, pmu_name);
+	pr_err("%s pm name=%s pmu=%s desc=%s\n", __func__,
+			pm->metric_name, pm->pmu, pm->desc);
 
-	pr_err("%s2 matches name pm name=%s pmu=%s desc=%s metric_name=%s calling match_pm_metric table=%p\n", __func__,
-			pm->metric_name, pm->pmu, pm->desc, metric_name, table);
+	pr_err("%s2 matches name pm name=%s pmu=%s desc=%s calling match_pm_metric table=%p\n", __func__,
+			pm->metric_name, pm->pmu, pm->desc, table);
 
-	ret = add_metric(&list /* d->metric_list */, pm, NULL, false,
+	err = add_metric(&list /* d->metric_list */, pm, NULL, false,
 			 false, false,
 			 false, NULL, false, table);
 	pr_err("%s3 pm name=%s pmu=%s ret=%d from add_metric\n", __func__,
@@ -1509,10 +1509,10 @@ static int __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 
 		pr_err("%s4.1 pm->name=%s m=%p metric_name=%s expr=%s calling parse_ids\n", __func__, pm->metric_name, m, m->metric_name, m->metric_expr);
 
-		ret = parse_ids(false, NULL, m->pctx, m->modifier,
+		err = parse_ids(false, NULL, m->pctx, m->modifier,
 					m->group_events, tool_events, &m->evlist);
 		pr_err("%s5 pm->name=%s m=%p metric_name=%s expr=%s parse_ids returned ret=%d\n", __func__, pm->metric_name, m, m->metric_name, m->metric_expr, ret);
-		if (ret)
+		if (err)
 			goto out;
 
 		evlist__for_each_entry(m->evlist, evsel) {
@@ -1533,13 +1533,12 @@ static int __metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table, found_events, found_event.name);
 			if (!found_event.name) {
 				pr_err("%s5.4 could not find name desc=%s\n", __func__, pm->desc);
-				ret = 0;
 				goto out;
 			}
 		}
 	}
 	pr_err("%s6 metric_name=%s desc=%s\n", __func__, pm->metric_name, pm->desc);
-	
+	ret = true;
 #if 0
 	evlist__for_each_entry(evlist, evsel) {
 		struct pmu_event found_event = {};
@@ -1568,9 +1567,11 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 {
 	struct metricgroup_iter_data *vdata = data;
 	struct metricgroup_add_iter_data *vdata2 = vdata->data;
+
 	if (!match_pm_metric(pm, vdata2->pmu, vdata2->metric_name))
 		return 0;
-	return __metricgroup__add_metric_sys_event_iter(pm, table,vdata2->pmu, vdata2->pmu);
+	*(vdata2->has_match) = __metricgroup__add_metric_sys_event_iter(pm, table);
+	return 0;
 }
 
 
