@@ -2025,7 +2025,8 @@ static int parse_groups(struct evlist *perf_evlist,
 	pr_err("%s str=%s\n", __func__, str);
 	if (metric_events_list->nr_entries == 0)
 		metricgroup__rblist_init(metric_events_list);
-	pr_err("%s2 str=%s calling metricgroup__add_metric_list\n", __func__, str);
+	pr_err("%s2 str=%s calling metricgroup__add_metric_list system_wide=%d metric_no_group=%d user_requested_cpu_list=%s\n",
+		__func__, str, system_wide, metric_no_group, user_requested_cpu_list);
 	ret = metricgroup__add_metric_list(pmu, str, metric_no_group, metric_no_threshold,
 					   user_requested_cpu_list,
 					   system_wide, &metric_list, table);
@@ -2183,7 +2184,7 @@ int metricgroup__parse_groups(struct evlist *perf_evlist,
 	if (!table)
 		return -EINVAL;
 	// str=pmcg_special1.all is an example
-	pr_err("%s calling parse_groups pmu=%s str=%s table=%p\n", __func__, pmu, str, table);
+	pr_err("%s calling parse_groups pmu=%s str=%s table=%p system_wide=%d\n", __func__, pmu, str, table, system_wide);
 	return parse_groups(perf_evlist, pmu, str, metric_no_group, metric_no_merge,
 			    metric_no_threshold, user_requested_cpu_list, system_wide,
 			    /*fake_pmu=*/NULL, metric_events, table);

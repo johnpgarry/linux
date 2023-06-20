@@ -1,12 +1,12 @@
 [
    {
-	    "BriefDescription": "trans per cycle 0x62000010",
+	    "BriefDescription": "trans per cycle smmuv3_pmcg.transaction / (smmuv3_pmcg.cycles + 1) 0x62000010",
 	    "MetricName": "pmcg_trans_per_cycle.all",
 	    "MetricExpr": "smmuv3_pmcg.transaction / (smmuv3_pmcg.cycles + 1)",
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
-	    "BriefDescription": "trans per cycle  0x62000010",
+	    "BriefDescription": "trans per cycle smmuv3_pmcg.tlb_miss / (smmuv3_pmcg.cycles  + 1) 0x62000010",
 	    "MetricName": "pmcg_tlb_miss_per_cycle.all",
 	    "MetricExpr": "smmuv3_pmcg.tlb_miss / (smmuv3_pmcg.cycles  + 1)",
 	    "ScaleUnit": "9.765625e-4KB"

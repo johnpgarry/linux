@@ -2453,11 +2453,15 @@ static void setup_system_wide(int forks)
 	 *   - there is workload specified but all requested
 	 *     events are system wide events
 	 */
+	pr_err("%s forks=%d target.system_wide=%d\n", __func__, forks, target.system_wide);
 	if (!target__none(&target))
 		return;
 
-	if (!forks)
+	pr_err("%s2 forks=%d\n", __func__, forks);
+	if (!forks) {
+		pr_err("%s3 forks=%d setting system_wide\n", __func__, forks);
 		target.system_wide = true;
+	}
 	else {
 		struct evsel *counter;
 
@@ -2468,8 +2472,11 @@ static void setup_system_wide(int forks)
 			}
 		}
 
-		if (evsel_list->core.nr_entries)
+		pr_err("%s4 forks=%d\n", __func__, forks);
+		if (evsel_list->core.nr_entries) {
+			pr_err("%s5 forks=%d\n", __func__, forks);
 			target.system_wide = true;
+		}
 	}
 }
 
