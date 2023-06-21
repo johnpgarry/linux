@@ -256,7 +256,7 @@ class JsonEvent:
       # Comment brought over from jevents.c:
       # it's not realistic to keep adding these, we need something more scalable ...
       table = {
-          'CBO': 'cbox',
+          'CBO': 'uncore_cbox',
           'QPI LL': 'uncore_qpi',
           'SBO': 'uncore_sbox',
           'iMPH-U': 'uncore_arb',
