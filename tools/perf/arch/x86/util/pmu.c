@@ -10,46 +10,10 @@
 #include <api/fs/fs.h>
 #include <errno.h>
 
-#include <linux/list.h>
-#include <linux/zalloc.h>
-#include <subcmd/pager.h>
-#include <sys/types.h>
-#include <dirent.h>
-#include <string.h>
-#include <unistd.h>
-#include "debug.h"
-#include "pmus.h"
-#include "pmu.h"
-#include "print-events.h"
-
 #include "../../../util/intel-pt.h"
 #include "../../../util/intel-bts.h"
 #include "../../../util/pmu.h"
 #include "../../../util/fncache.h"
-
-bool is_virt_env(void)
-{
-	bool result = false;
-	FILE *cpuinfo;
-	char *line = NULL;
-	size_t len = 0;
-
-	cpuinfo = fopen("/proc/cpuinfo", "r");
-	if (!cpuinfo) {
-		pr_err("Failed to read /proc/cpuinfo for TSC frequency");
-		return false;
-	}
-	while (getline(&line, &len, cpuinfo) > 0) {
-		if (strstr(line, "hypervisor")) {
-			result = true;
-			break;
-		}
-	}
-
-	free(line);
-	fclose(cpuinfo);
-	return result;
-}
 
 struct pmu_alias {
 	char *name;

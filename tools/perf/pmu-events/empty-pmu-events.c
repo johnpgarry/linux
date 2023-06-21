@@ -327,7 +327,6 @@ const struct pmu_metrics_table *perf_pmu__find_metrics_table(struct perf_pmu *pm
 	/* on some platforms which uses cpus map, cpuid can be NULL for
 	 * PMUs other than CORE PMUs.
 	 */
-		printf("%s cpuid=%s\n", __func__, cpuid);
 	if (!cpuid)
 		return NULL;
 

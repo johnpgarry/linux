@@ -59,14 +59,12 @@ struct perf_pmu *perf_pmus__find(const char *name)
 	int dirfd;
 	bool core_pmu;
 
-	pr_err("%s name=%s\n", __func__, name);
 	/*
 	 * Once PMU is loaded it stays in the list,
 	 * so we keep us from multiple reading/parsing
 	 * the pmu format definitions.
 	 */
 	pmu = pmu_find(name);
-	pr_err("%s1 name=%s pmu=%p read_sysfs_all_pmus=%d\n", __func__, name, pmu, read_sysfs_all_pmus);
 	if (pmu)
 		return pmu;
 
@@ -78,7 +76,6 @@ struct perf_pmu *perf_pmus__find(const char *name)
 		return NULL;
 
 	dirfd = perf_pmu__event_source_devices_fd();
-	pr_err("%s2 name=%s calling perf_pmu__lookup\n", __func__, name);
 	pmu = perf_pmu__lookup(core_pmu ? &core_pmus : &other_pmus, dirfd, name);
 	close(dirfd);
 
@@ -89,10 +86,7 @@ static struct perf_pmu *perf_pmu__find2(int dirfd, const char *name)
 {
 	struct perf_pmu *pmu;
 	bool core_pmu;
-	bool print = !!strstr(name, "imx") || !!strstr(name, "pmcg");
-	print = false;
-	if (print)
-		pr_err("%s name=%s\n", __func__, name);
+
 	/*
 	 * Once PMU is loaded it stays in the list,
 	 * so we keep us from multiple reading/parsing
@@ -102,20 +96,13 @@ static struct perf_pmu *perf_pmu__find2(int dirfd, const char *name)
 	if (pmu)
 		return pmu;
 
-	if (print)
-		pr_err("%s2 name=%s read_sysfs_all_pmus=%d\n", __func__, name, read_sysfs_all_pmus);
 	if (read_sysfs_all_pmus)
 		return NULL;
 
 	core_pmu = is_pmu_core(name);
-	if (core_pmu && read_sysfs_core_pmus) {
-		if (print)
-				pr_err("%s3 name=%s returning NULL\n", __func__, name);
+	if (core_pmu && read_sysfs_core_pmus)
 		return NULL;
-	}
 
-	if (print)
-		pr_err("%s4 name=%s calling perf_pmu__lookup\n", __func__, name);
 	return perf_pmu__lookup(core_pmu ? &core_pmus : &other_pmus, dirfd, name);
 }
 
@@ -128,17 +115,11 @@ static void pmu_read_sysfs(bool core_only)
 
 	if (read_sysfs_all_pmus || (core_only && read_sysfs_core_pmus))
 		return;
-	else
-		pr_err("%s read_sysfs_all_pmus=%d  ||  (core_only=%d && read_sysfs_core_pmus=%d)=%d\n",
-			__func__, read_sysfs_all_pmus, core_only, read_sysfs_core_pmus, (core_only && read_sysfs_core_pmus));
 
-
-	//pr_err("%s2\n", __func__);
 	fd = perf_pmu__event_source_devices_fd();
 	if (fd < 0)
 		return;
 
-	//pr_err("%s3\n", __func__);
 	dir = fdopendir(fd);
 	if (!dir)
 		return;
@@ -149,36 +130,13 @@ static void pmu_read_sysfs(bool core_only)
 		if (core_only && !is_pmu_core(dent->d_name))
 			continue;
 		/* add to static LIST_HEAD(core_pmus) or LIST_HEAD(other_pmus): */
-
-		//pr_err("%s2 calling perf_pmu__find2 for %s\n", __func__, dent->d_name);
 		perf_pmu__find2(fd, dent->d_name);
 	}
 
 	closedir(dir);
 	if (core_only) {
-		//pr_err("%s4\n", __func__);
 		read_sysfs_core_pmus = true;
 	} else {
-
-		 if (!is_virt_env() && 0) {
-			struct perf_pmu *imx8_ddr7;
-			struct perf_pmu *imx8_ddr8;
-			struct perf_pmu *pmcg123;
-			struct perf_pmu *pmcg456;
-			
-			pr_err("%s5 going to create imx8_ddr7\n", __func__);
-			imx8_ddr7 = perf_pmu__find2(-44, "imx8_ddr7");
-			pr_err("%s5.1 created imx8_ddr7=%p id=%s\n", __func__, imx8_ddr7, imx8_ddr7 ? imx8_ddr7->id : "?");
-			pr_err("%s6 going to create imx8_ddr7\n", __func__);
-			imx8_ddr8 = perf_pmu__find2(-44, "imx8_ddr8");
-			pr_err("%s6.1 created imx8_ddr8=%p id=%s\n", __func__, imx8_ddr8, imx8_ddr8 ? imx8_ddr8->id : "?");
-			pr_err("%s7 going to create smmuv3_pmcg_123\n", __func__);
-			pmcg123 = perf_pmu__find2(-44, "smmuv3_pmcg_123");
-			pr_err("%s7.1 created pmcg123=%p id=%s\n", __func__, pmcg123, pmcg123 ? pmcg123->id : "?");
-			pr_err("%s8 going to create smmuv3_pmcg_456\n", __func__);
-			pmcg456 = perf_pmu__find2(-44, "smmuv3_pmcg_456");
-			pr_err("%s8.1 created pmcg456=%p id=%s\n", __func__, pmcg456, pmcg456 ? pmcg456->id : "?");
-		 }
 		read_sysfs_core_pmus = true;
 		read_sysfs_all_pmus = true;
 	}
@@ -502,8 +460,6 @@ void perf_pmus__print_pmu_events(const struct print_callbacks *print_cb, void *p
 bool perf_pmus__have_event(const char *pname, const char *name)
 {
 	struct perf_pmu *pmu = perf_pmus__find(pname);
-	if (strstr(name, "pmcg_wr_rcvd_sp_per_rd_rcvd_sp"))
-		pr_err("%s pname=%s name=%s pmu=%p\n", __func__, pname, name, pmu);
 
 	return pmu && perf_pmu__have_event(pmu, name);
 }

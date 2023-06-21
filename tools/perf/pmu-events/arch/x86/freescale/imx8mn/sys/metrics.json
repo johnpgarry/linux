@@ -1,18 +1,18 @@
 [
    {
-	    "BriefDescription": "bytes all masters read from ddr based on read-cycles event imx8mn_ddr.read_cycles * 4 * 2",
+	    "BriefDescription": "bytes all masters read from ddr based on read-cycles event imx8mn_ddr.read_cycles * 4 * 2 from x86/freescal/imx8mn",
 	    "MetricName": "imx8mn_ddr_read.all",
 	    "MetricExpr": "imx8mn_ddr.read_cycles * 4 * 2",
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
-	    "BriefDescription": "bytes all masters write to ddr based on write-cycles event imx8mn_ddr.write_cycles * 4 * 2",
+	    "BriefDescription": "bytes all masters write to ddr based on write-cycles event imx8mn_ddr.write_cycles * 4 * 2 from x86/freescal/imx8mn",
 	    "MetricName": "imx8mn_ddr_write.all",
 	    "MetricExpr": "imx8mn_ddr.write_cycles * 4 * 2",
 	    "ScaleUnit": "9.765625e-4KB"
    },
    {
-	    "BriefDescription": "bytes of all masters read from ddr imx8_ddr0 at axid ...",
+	    "BriefDescription": "bytes of all masters read from ddr imx8_ddr0 at axid ... from x86/freescal/imx8mn",
 	    "MetricName": "imx8mn_imx8_ddr0",
 	    "MetricExpr": "imx8_ddr0@axid\\-read\\,axi_mask\\=0xffff\\,axi_id\\=0x0000@",
 	    "ScaleUnit": "9.765625e-4KB"

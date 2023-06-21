@@ -2053,7 +2053,6 @@ static int add_default_attributes(void)
 			pr_err("Missing transaction metrics");
 			return -1;
 		}
-		pr_err("%s calling metricgroup__parse_groups\n", __func__);
 		return metricgroup__parse_groups(evsel_list, pmu, "transaction",
 						stat_config.metric_no_group,
 						stat_config.metric_no_merge,
@@ -2087,7 +2086,6 @@ static int add_default_attributes(void)
 		if (!force_metric_only)
 			stat_config.metric_only = true;
 
-		pr_err("%s2 calling metricgroup__parse_groups\n", __func__);
 		return metricgroup__parse_groups(evsel_list, pmu, "smi",
 						stat_config.metric_no_group,
 						stat_config.metric_no_merge,
@@ -2121,7 +2119,6 @@ static int add_default_attributes(void)
 				"Please print the result regularly, e.g. -I1000\n");
 		}
 		str[8] = stat_config.topdown_level + '0';
-		pr_err("%s3 calling metricgroup__parse_groups\n", __func__);
 		if (metricgroup__parse_groups(evsel_list,
 						pmu, str,
 						/*metric_no_group=*/false,
@@ -2164,7 +2161,6 @@ static int add_default_attributes(void)
 			if (!metric_evlist)
 				return -1;
 
-			pr_err("%s4 calling metricgroup__parse_groups\n", __func__);
 			if (metricgroup__parse_groups(metric_evlist, pmu, "TopdownL1",
 							/*metric_no_group=*/false,
 							/*metric_no_merge=*/false,
@@ -2453,15 +2449,11 @@ static void setup_system_wide(int forks)
 	 *   - there is workload specified but all requested
 	 *     events are system wide events
 	 */
-	pr_err("%s forks=%d target.system_wide=%d\n", __func__, forks, target.system_wide);
 	if (!target__none(&target))
 		return;
 
-	pr_err("%s2 forks=%d\n", __func__, forks);
-	if (!forks) {
-		pr_err("%s3 forks=%d setting system_wide\n", __func__, forks);
+	if (!forks)
 		target.system_wide = true;
-	}
 	else {
 		struct evsel *counter;
 
@@ -2472,11 +2464,8 @@ static void setup_system_wide(int forks)
 			}
 		}
 
-		pr_err("%s4 forks=%d\n", __func__, forks);
-		if (evsel_list->core.nr_entries) {
-			pr_err("%s5 forks=%d\n", __func__, forks);
+		if (evsel_list->core.nr_entries)
 			target.system_wide = true;
-		}
 	}
 }
 
@@ -2703,9 +2692,7 @@ int cmd_stat(int argc, const char **argv)
 	 */
 	if (metrics) {
 		const char *pmu = parse_events_option_args.pmu_filter ?: "all";
-		struct evsel *evselj;
 
-		pr_err("%s5 calling metricgroup__parse_groups metrics=%s\n", __func__, metrics);
 		metricgroup__parse_groups(evsel_list, pmu, metrics,
 					stat_config.metric_no_group,
 					stat_config.metric_no_merge,
@@ -2713,12 +2700,6 @@ int cmd_stat(int argc, const char **argv)
 					stat_config.user_requested_cpu_list,
 					stat_config.system_wide,
 					&stat_config.metric_events);
-		pr_err("%s5.1 called metricgroup__parse_groups metrics=%s\n", __func__, metrics);
-		evlist__for_each_entry(evsel_list, evselj) {
-			pr_err("%s6 metricgroup__parse_groups metrics=%s returned evsel->name=%s pmu_name=%s\n",
-				__func__, metrics, evselj->name, evselj->pmu_name);
-		}
-		pr_err("%s6.1 called metricgroup__parse_groups metrics=%s\n", __func__, metrics);
 		zfree(&metrics);
 	}
 

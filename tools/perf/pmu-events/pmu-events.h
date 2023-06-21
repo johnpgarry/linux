@@ -76,8 +76,6 @@ typedef int (*pmu_metric_iter_fn)(const struct pmu_metric *pm,
 				  const struct pmu_metrics_table *table,
 				  void *data);
 
-const struct pmu_events_table *sys_events_table_from_metric_table(const struct pmu_metrics_table *); 
-
 int pmu_events_table_for_each_event(const struct pmu_events_table *table, pmu_event_iter_fn fn,
 				    void *data);
 int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table, pmu_metric_iter_fn fn,
@@ -96,13 +94,5 @@ int pmu_for_each_sys_event(pmu_event_iter_fn fn, void *data);
 int pmu_for_each_sys_metric(pmu_metric_iter_fn fn, void *data);
 
 const char *describe_metricgroup(const char *group);
-
-void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu);
-void metricgroup_cleanup_sys_pmu_list(void);
-int metricgroup__metric_event_iter(const struct pmu_metric *pm,
-           const struct pmu_metrics_table *table,
-           void *data);
-
-struct pmu_metrics_table *pmu_metrics_sys_events_table(void);
 
 #endif

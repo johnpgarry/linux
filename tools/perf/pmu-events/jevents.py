@@ -274,7 +274,6 @@ class JsonEvent:
           'DFPMC': 'amd_df',
           'cpu_core': 'cpu_core',
           'cpu_atom': 'cpu_atom',
-          'smmuv3_pmcg': 'smmuv3_pmcg',
       }
       return table[unit] if unit in table else f'uncore_{unit.lower()}'
 
@@ -749,99 +748,6 @@ static void decompress_metric(int offset, struct pmu_metric *pm)
       _args.output_file.write('\twhile (*p++);')
   _args.output_file.write("""}
 
-
-#include <linux/zalloc.h>
-
-
-static int
-metricgroup__metric_sys_event_count(__maybe_unused const struct pmu_event *pe,
-           __maybe_unused const struct pmu_events_table *table,
-           void *data)
-{
-  unsigned int *count = data;
-
-  (*count)++;
-  return 0;
-}
-
-/*
-struct pmu_sys_events {
-  const char *name;
-  struct pmu_events_table event_table;
-  struct pmu_metrics_table metric_table;
-};
-
-struct pmu_metrics_table {
-        const struct compact_pmu_event *entries;
-        size_t length;
-};
-*/
-
-static struct pmu_metrics_table *sys_event_table;
-
-
-struct event_iter_data {
-  struct pmu_metric *table;
-  unsigned int event_count;
-  struct perf_pmu *fake_pmu;
-};
-
-/*
- * fake_pmu argument is to avoid adding a fake_pmu to the list of PMUs in
- * pmu.c::pmus
- */
-void metricgroup_init_sys_pmu_list(struct perf_pmu *fake_pmu)
-{
-	unsigned int event_count = 0;
-	struct compact_pmu_event *entries;
-  __maybe_unused struct event_iter_data event_iter_data;
-	static int done;
-
-	if (sys_event_table || done)
-		return;
-
-	pmu_for_each_sys_event(metricgroup__metric_sys_event_count,
-         &event_count);
-
-	if (event_count == 0) {
-		done = 1;
-		return;
-	}
-
-	entries = zalloc(event_count * sizeof(struct compact_pmu_event));
-	if (!entries)
-		return;
-
-	sys_event_table = malloc(sizeof(*sys_event_table));
-	if (!sys_event_table) {
-		free(entries);
-		return;
-	} 
-  event_iter_data.event_count = 0;
-  event_iter_data.fake_pmu = fake_pmu;
-
-  //if (done == 1541564)
-  // pmu_for_each_sys_metric(metricgroup__metric_event_iter, &event_iter_data);
-
-  sys_event_table->entries = entries;
-  sys_event_table->length = 12;
-}
-
-struct pmu_metrics_table *pmu_metrics_sys_events_table(void)
-{
-  return sys_event_table;
-}
-
-void metricgroup_cleanup_sys_pmu_list(void)
-{
-	/* Test for sys events found */
-	if (sys_event_table) {
-		//free(sys_event_table->entries);
-		free(sys_event_table);
-	}
-	sys_event_table = NULL;
-}
-
 int pmu_events_table_for_each_event(const struct pmu_events_table *table,
                                     pmu_event_iter_fn fn,
                                     void *data)
@@ -869,7 +775,6 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
                 int ret;
 
                 decompress_metric(table->entries[i].offset, &pm);
-
                 if (!pm.metric_expr)
                         continue;
                 ret = fn(&pm, table, data);
@@ -877,19 +782,6 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
                         return ret;
         }
         return 0;
-}
-/*
-struct pmu_sys_events {
-  const char *name;
-  struct pmu_events_table event_table;
-  struct pmu_metrics_table metric_table;
-};
-*/
-
-const struct pmu_events_table *sys_events_table_from_metric_table(const struct pmu_metrics_table *metrics)
-{
-  struct pmu_sys_events *sys = container_of(metrics ,struct pmu_sys_events, metric_table);
-  return &sys->event_table;
 }
 
 const struct pmu_events_table *perf_pmu__find_events_table(struct perf_pmu *pmu)
@@ -999,7 +891,6 @@ const struct pmu_events_table *find_sys_events_table(const char *name)
         for (const struct pmu_sys_events *tables = &pmu_sys_event_tables[0];
              tables->name;
              tables++) {
-                printf(\" 111 tables name=%s   name=%s 111    \", tables->name, name);
                 if (!strcmp(tables->name, name))
                         return &tables->event_table;
         }
@@ -1024,9 +915,7 @@ int pmu_for_each_sys_metric(pmu_metric_iter_fn fn, void *data)
         for (const struct pmu_sys_events *tables = &pmu_sys_event_tables[0];
              tables->name;
              tables++) {
-                int ret;
-
-                ret = pmu_metrics_table_for_each_metric(&tables->metric_table, fn, data);
+                int ret = pmu_metrics_table_for_each_metric(&tables->metric_table, fn, data);
 
                 if (ret)
                         return ret;

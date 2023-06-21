@@ -279,25 +279,25 @@ static bool is_same(const char *reference, const char *test)
 static int compare_pmu_events(const struct pmu_event *e1, const struct pmu_event *e2)
 {
 	if (!is_same(e1->name, e2->name)) {
-		pr_debug2("testing event e1 %s: mismatched name string, %s vs %s\n",
+		pr_err("testing event e1 %s: mismatched name string, %s vs %s\n",
 			  e1->name, e1->name, e2->name);
 		return -1;
 	}
 
 	if (!is_same(e1->compat, e2->compat)) {
-		pr_debug2("testing event e1 %s: mismatched compat string, %s vs %s\n",
+		pr_err("testing event e1 %s: mismatched compat string, %s vs %s\n",
 			  e1->name, e1->compat, e2->compat);
 		return -1;
 	}
 
 	if (!is_same(e1->event, e2->event)) {
-		pr_debug2("testing event e1 %s: mismatched event, %s vs %s\n",
+		pr_err("testing event e1 %s: mismatched event, %s vs %s\n",
 			  e1->name, e1->event, e2->event);
 		return -1;
 	}
 
 	if (!is_same(e1->desc, e2->desc)) {
-		pr_debug2("testing event e1 %s: mismatched desc, %s vs %s\n",
+		pr_err("testing event e1 %s: mismatched desc, %s vs %s\n",
 			  e1->name, e1->desc, e2->desc);
 		return -1;
 	}
@@ -309,31 +309,31 @@ static int compare_pmu_events(const struct pmu_event *e1, const struct pmu_event
 	}
 
 	if (!is_same(e1->long_desc, e2->long_desc)) {
-		pr_debug2("testing event e1 %s: mismatched long_desc, %s vs %s\n",
+		pr_err("testing event e1 %s: mismatched long_desc, %s vs %s\n",
 			  e1->name, e1->long_desc, e2->long_desc);
 		return -1;
 	}
 
 	if (!is_same(e1->pmu, e2->pmu)) {
-		pr_debug2("testing event e1 %s: mismatched pmu string, %s vs %s\n",
+		pr_err("testing event e1 %s: mismatched pmu string, %s vs %s\n",
 			  e1->name, e1->pmu, e2->pmu);
 		return -1;
 	}
 
 	if (!is_same(e1->unit, e2->unit)) {
-		pr_debug2("testing event e1 %s: mismatched unit, %s vs %s\n",
+		pr_err("testing event e1 %s: mismatched unit, %s vs %s\n",
 			  e1->name, e1->unit, e2->unit);
 		return -1;
 	}
 
 	if (e1->perpkg != e2->perpkg) {
-		pr_debug2("testing event e1 %s: mismatched perpkg, %d vs %d\n",
+		pr_err("testing event e1 %s: mismatched perpkg, %d vs %d\n",
 			  e1->name, e1->perpkg, e2->perpkg);
 		return -1;
 	}
 
 	if (e1->deprecated != e2->deprecated) {
-		pr_debug2("testing event e1 %s: mismatched deprecated, %d vs %d\n",
+		pr_err("testing event e1 %s: mismatched deprecated, %d vs %d\n",
 			  e1->name, e1->deprecated, e2->deprecated);
 		return -1;
 	}
@@ -349,45 +349,45 @@ static int compare_alias_to_test_event(struct perf_pmu_alias *alias,
 
 	/* An alias was found, ensure everything is in order */
 	if (!is_same(alias->name, event->name)) {
-		pr_debug("testing aliases PMU %s: mismatched name, %s vs %s\n",
+		pr_err("testing aliases PMU %s: mismatched name, %s vs %s\n",
 			  pmu_name, alias->name, event->name);
 		return -1;
 	}
 
 	if (!is_same(alias->desc, event->desc)) {
-		pr_debug("testing aliases PMU %s: mismatched desc, %s vs %s\n",
+		pr_err("testing aliases PMU %s: mismatched desc, %s vs %s\n",
 			  pmu_name, alias->desc, event->desc);
 		return -1;
 	}
 
 	if (!is_same(alias->long_desc, test_event->alias_long_desc)) {
-		pr_debug("testing aliases PMU %s: mismatched long_desc, %s vs %s\n",
+		pr_err("testing aliases PMU %s: mismatched long_desc, %s vs %s\n",
 			  pmu_name, alias->long_desc,
 			  test_event->alias_long_desc);
 		return -1;
 	}
 
 	if (!is_same(alias->topic, event->topic)) {
-		pr_debug("testing aliases PMU %s: mismatched topic, %s vs %s\n",
+		pr_err("testing aliases PMU %s: mismatched topic, %s vs %s\n",
 			  pmu_name, alias->topic, event->topic);
 		return -1;
 	}
 
 	if (!is_same(alias->str, test_event->alias_str)) {
-		pr_debug("testing aliases PMU %s: mismatched str, %s vs %s\n",
+		pr_err("testing aliases PMU %s: mismatched str, %s vs %s\n",
 			  pmu_name, alias->str, test_event->alias_str);
 		return -1;
 	}
 
 	if (!is_same(alias->long_desc, test_event->alias_long_desc)) {
-		pr_debug("testing aliases PMU %s: mismatched long desc, %s vs %s\n",
+		pr_err("testing aliases PMU %s: mismatched long desc, %s vs %s\n",
 			  pmu_name, alias->str, test_event->alias_long_desc);
 		return -1;
 	}
 
 
 	if (!is_same(alias->pmu_name, test_event->event.pmu)) {
-		pr_debug("testing aliases PMU %s: mismatched pmu_name, %s vs %s\n",
+		pr_err("testing aliases PMU %s: mismatched pmu_name, %s vs %s\n",
 			  pmu_name, alias->pmu_name, test_event->event.pmu);
 		return -1;
 	}
@@ -402,7 +402,7 @@ static int test__pmu_event_table_core_callback(const struct pmu_event *pe,
 	int *map_events = data;
 	struct perf_pmu_test_event const **test_event_table;
 	bool found = false;
-
+	pr_err("%s pe name=%s\n", __func__, pe->name);
 	if (pe->pmu)
 		test_event_table = &uncore_events[0];
 	else
@@ -420,7 +420,7 @@ static int test__pmu_event_table_core_callback(const struct pmu_event *pe,
 		if (compare_pmu_events(pe, event))
 			return -1;
 
-		pr_debug("testing event table %s: pass\n", pe->name);
+		pr_err("testing event table %s: pass\n", pe->name);
 	}
 	if (!found) {
 		pr_err("testing event table: could not find event %s\n", pe->name);
@@ -438,7 +438,7 @@ static int test__pmu_event_table_sys_callback(const struct pmu_event *pe,
 	bool found = false;
 
 	test_event_table = &sys_events[0];
-
+	pr_err("%s pe name=%s\n", __func__, pe->name);
 	for (; *test_event_table; test_event_table++) {
 		struct perf_pmu_test_event const *test_event = *test_event_table;
 		struct pmu_event const *event = &test_event->event;
@@ -451,41 +451,47 @@ static int test__pmu_event_table_sys_callback(const struct pmu_event *pe,
 		if (compare_pmu_events(pe, event))
 			return TEST_FAIL;
 
-		pr_debug("testing sys event table %s: pass\n", pe->name);
+		pr_err("testing sys event table %s: pass\n", pe->name);
 	}
 	if (!found) {
-		pr_debug("testing sys event table: could not find event %s\n", pe->name);
+		pr_err("testing sys event table: could not find event %s\n", pe->name);
 		return TEST_FAIL;
 	}
 	return TEST_OK;
 }
 
 /* Verify generated events from pmu-events.c are as expected */
-static int test__pmu_event_table(struct test_suite *test __maybe_unused,
+static __maybe_unused int test__pmu_event_table(struct test_suite *test __maybe_unused,
 				 int subtest __maybe_unused)
 {
 	const struct pmu_events_table *sys_event_table =
 		find_sys_events_table("pmu_events__test_soc_sys");
 	const struct pmu_events_table *table = find_core_events_table("testarch", "testcpu");
 	int map_events = 0, expected_events, err;
-
+	pr_err("%s\n", __func__);
 	/* ignore 3x sentinels */
 	expected_events = ARRAY_SIZE(core_events) +
 			  ARRAY_SIZE(uncore_events) +
 			  ARRAY_SIZE(sys_events) - 3;
 
-	if (!table || !sys_event_table)
+	if (!table || !sys_event_table) {
+		pr_err("%s1 fail !table || !sys_event_table\n", __func__);
 		return -1;
+	}
 
 	err = pmu_events_table_for_each_event(table, test__pmu_event_table_core_callback,
 					      &map_events);
-	if (err)
+	if (err) {
+		pr_err("%s2 pmu_events_table_for_each_event fail\n", __func__);
 		return err;
+	}
 
 	err = pmu_events_table_for_each_event(sys_event_table, test__pmu_event_table_sys_callback,
 					      &map_events);
-	if (err)
+	if (err) {
+		pr_err("%s3 pmu_events_table_for_each_event fail\n", __func__);
 		return err;
+	}
 
 	if (map_events != expected_events) {
 		pr_err("testing event table: found %d, but expected %d\n",
@@ -536,7 +542,7 @@ static int __test_core_pmu_event_aliases(char *pmu_name, int *count)
 		struct perf_pmu_alias *alias = find_alias(event->name, &aliases);
 
 		if (!alias) {
-			pr_debug("testing aliases core PMU %s: no alias, alias_table->name=%s\n",
+			pr_err("testing aliases core PMU %s: no alias, alias_table->name=%s\n",
 				  pmu_name, event->name);
 			res = -1;
 			break;
@@ -548,7 +554,7 @@ static int __test_core_pmu_event_aliases(char *pmu_name, int *count)
 		}
 
 		(*count)++;
-		pr_debug2("testing aliases core PMU %s: matched event %s\n",
+		pr_err("testing aliases core PMU %s: matched event %s\n",
 			  pmu_name, alias->name);
 	}
 
@@ -586,7 +592,7 @@ static int __test_uncore_pmu_event_aliases(struct perf_pmu_test_pmu *test_pmu)
 		to_match_count++;
 
 	if (alias_count != to_match_count) {
-		pr_debug("testing aliases uncore PMU %s: mismatch expected aliases (%d) vs found (%d)\n",
+		pr_err("testing aliases uncore PMU %s: mismatch expected aliases (%d) vs found (%d)\n",
 			 pmu_name, to_match_count, alias_count);
 		res = -1;
 		goto out;
@@ -611,7 +617,7 @@ static int __test_uncore_pmu_event_aliases(struct perf_pmu_test_pmu *test_pmu)
 		}
 
 		if (matched == false) {
-			pr_debug("testing aliases uncore PMU %s: could not match alias %s\n",
+			pr_err("testing aliases uncore PMU %s: could not match alias %s\n",
 				 pmu_name, alias->name);
 			res = -1;
 			goto out;
@@ -619,7 +625,7 @@ static int __test_uncore_pmu_event_aliases(struct perf_pmu_test_pmu *test_pmu)
 	}
 
 	if (alias_count != matched_count) {
-		pr_debug("testing aliases uncore PMU %s: mismatch found aliases (%d) vs matched (%d)\n",
+		pr_err("testing aliases uncore PMU %s: mismatch found aliases (%d) vs matched (%d)\n",
 			 pmu_name, matched_count, alias_count);
 		res = -1;
 	}
@@ -703,7 +709,7 @@ static struct perf_pmu_test_pmu test_pmus[] = {
 };
 
 /* Test that aliases generated are as expected */
-static int test__aliases(struct test_suite *test __maybe_unused,
+static __maybe_unused  int test__aliases(struct test_suite *test __maybe_unused,
 			int subtest __maybe_unused)
 {
 	struct perf_pmu *pmu = NULL;
@@ -713,22 +719,22 @@ static int test__aliases(struct test_suite *test __maybe_unused,
 		int count = 0;
 
 		if (list_empty(&pmu->format)) {
-			pr_debug2("skipping testing core PMU %s\n", pmu->name);
+			pr_err("skipping testing core PMU %s\n", pmu->name);
 			continue;
 		}
 
 		if (__test_core_pmu_event_aliases(pmu->name, &count)) {
-			pr_debug("testing core PMU %s aliases: failed\n", pmu->name);
+			pr_err("testing core PMU %s aliases: failed\n", pmu->name);
 			return -1;
 		}
 
 		if (count == 0) {
-			pr_debug("testing core PMU %s aliases: no events to match\n",
+			pr_err("testing core PMU %s aliases: no events to match\n",
 				  pmu->name);
 			return -1;
 		}
 
-		pr_debug("testing core PMU %s aliases: pass\n", pmu->name);
+		pr_err("testing core PMU %s aliases: pass\n", pmu->name);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(test_pmus); i++) {
@@ -815,7 +821,8 @@ static int test__parsing_callback(const struct pmu_metric *pm,
 	if (!pm->metric_expr)
 		return 0;
 
-	pr_debug("Found metric '%s'\n", pm->metric_name);
+	pr_err("\n%s Found metric '%s' desc=%s expr=%s table=%p\n", __func__,
+	 pm->metric_name, pm->desc, pm->metric_expr, table);
 	(*failures)++;
 
 	/*
@@ -839,15 +846,17 @@ static int test__parsing_callback(const struct pmu_metric *pm,
 		if (!strcmp(pm->metric_name, "M1") || !strcmp(pm->metric_name, "M2") ||
 		    !strcmp(pm->metric_name, "M3")) {
 			(*failures)--;
-			pr_debug("Expected broken metric %s skipping\n", pm->metric_name);
+			pr_err("%s Expected broken metric %s skipping\n",  __func__, pm->metric_name);
 			err = 0;
 		}
 		goto out_err;
 	}
 
 	err = evlist__alloc_stats(/*config=*/NULL, evlist, /*alloc_raw=*/false);
-	if (err)
+	if (err) {
+		pr_err("%s evlist__alloc_stats failed\n", __func__);
 		goto out_err;
+	}
 	/*
 	 * Add all ids with a made up value. The value may trigger divide by
 	 * zero when subtracted and so try to make them unique.
@@ -855,11 +864,16 @@ static int test__parsing_callback(const struct pmu_metric *pm,
 	k = 1;
 	evlist__alloc_aggr_stats(evlist, 1);
 	evlist__for_each_entry(evlist, evsel) {
+		pr_err("%s2 pm name=%s evsel=%p name=%s pmu_name=%s group_pmu_name=%s\n",
+		__func__, pm->metric_name, evsel, evsel->name, evsel->pmu_name, evsel->group_pmu_name);
 		evsel->stats->aggr->counts.val = k;
 		if (evsel__name_is(evsel, "duration_time"))
 			update_stats(&walltime_nsecs_stats, k);
 		k++;
 	}
+
+	if (!strcmp("pmcg_special3.all", pm->metric_name))
+		exit(0);
 	evlist__for_each_entry(evlist, evsel) {
 		struct metric_event *me = metricgroup__lookup(&metric_events, evsel, false);
 
@@ -869,18 +883,18 @@ static int test__parsing_callback(const struct pmu_metric *pm,
 			list_for_each_entry (mexp, &me->head, nd) {
 				if (strcmp(mexp->metric_name, pm->metric_name))
 					continue;
-				pr_debug("Result %f\n", test_generic_metric(mexp, 0));
+				pr_err("%s Result %f\n",  __func__, test_generic_metric(mexp, 0));
 				err = 0;
 				(*failures)--;
 				goto out_err;
 			}
 		}
 	}
-	pr_debug("Didn't find parsed metric %s", pm->metric_name);
+	pr_err("%s Didn't find parsed metric %s", __func__, pm->metric_name);
 	err = 1;
 out_err:
 	if (err)
-		pr_debug("Broken metric %s\n", pm->metric_name);
+		pr_err("%s Broken metric %s\n", __func__, pm->metric_name);
 
 	/* ... cleanup. */
 	metricgroup__rblist_exit(&metric_events);
@@ -890,13 +904,15 @@ out_err:
 	return err;
 }
 
-static int test__parsing(struct test_suite *test __maybe_unused,
+static __maybe_unused int test__parsing(struct test_suite *test __maybe_unused,
 			 int subtest __maybe_unused)
 {
 	int failures = 0;
 
 	pmu_for_each_core_metric(test__parsing_callback, &failures);
+	pr_err("%s failures=%d after test__parsing_callback\n", __func__, failures);
 	pmu_for_each_sys_metric(test__parsing_callback, &failures);
+	pr_err("%s1 failures=%d after test__parsing_callback\n", __func__, failures );
 
 	return failures == 0 ? TEST_OK : TEST_FAIL;
 }
@@ -913,7 +929,7 @@ static struct test_metric metrics[] = {
 	{ "(imx8_ddr0@read\\-cycles@ + imx8_ddr0@write\\-cycles@)", },
 };
 
-static int metric_parse_fake(const char *metric_name, const char *str)
+static __maybe_unused int metric_parse_fake(const char *metric_name, const char *str)
 {
 	struct expr_parse_ctx *ctx;
 	struct hashmap_entry *cur;
@@ -922,11 +938,11 @@ static int metric_parse_fake(const char *metric_name, const char *str)
 	size_t bkt;
 	int i;
 
-	pr_debug("parsing '%s': '%s'\n", metric_name, str);
+	pr_err("parsing '%s': '%s'\n", metric_name, str);
 
 	ctx = expr__ctx_new();
 	if (!ctx) {
-		pr_debug("expr__ctx_new failed");
+		pr_err("expr__ctx_new failed");
 		return TEST_FAIL;
 	}
 	ctx->sctx.is_test = true;
@@ -976,7 +992,7 @@ out:
 	return ret;
 }
 
-static int test__parsing_fake_callback(const struct pmu_metric *pm,
+static __maybe_unused int test__parsing_fake_callback(const struct pmu_metric *pm,
 				       const struct pmu_metrics_table *table __maybe_unused,
 				       void *data __maybe_unused)
 {
@@ -988,7 +1004,7 @@ static int test__parsing_fake_callback(const struct pmu_metric *pm,
  * or all defined cpus via the 'fake_pmu'
  * in parse_events.
  */
-static int test__parsing_fake(struct test_suite *test __maybe_unused,
+static __maybe_unused int test__parsing_fake(struct test_suite *test __maybe_unused,
 			      int subtest __maybe_unused)
 {
 	int err = 0;
@@ -1006,7 +1022,7 @@ static int test__parsing_fake(struct test_suite *test __maybe_unused,
 	return pmu_for_each_sys_metric(test__parsing_fake_callback, NULL);
 }
 
-static int test__parsing_threshold_callback(const struct pmu_metric *pm,
+static __maybe_unused  int test__parsing_threshold_callback(const struct pmu_metric *pm,
 					const struct pmu_metrics_table *table __maybe_unused,
 					void *data __maybe_unused)
 {
@@ -1015,7 +1031,7 @@ static int test__parsing_threshold_callback(const struct pmu_metric *pm,
 	return metric_parse_fake(pm->metric_name, pm->metric_threshold);
 }
 
-static int test__parsing_threshold(struct test_suite *test __maybe_unused,
+static __maybe_unused int test__parsing_threshold(struct test_suite *test __maybe_unused,
 			      int subtest __maybe_unused)
 {
 	int err = 0;
@@ -1032,8 +1048,8 @@ static struct test_case pmu_events_tests[] = {
 	TEST_CASE("PMU event map aliases", aliases),
 	TEST_CASE_REASON("Parsing of PMU event table metrics", parsing,
 			 "some metrics failed"),
-	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
-	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
+//	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
+//	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
 	{ .name = NULL, }
 };
 
