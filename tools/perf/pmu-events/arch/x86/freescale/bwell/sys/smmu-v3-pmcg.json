@@ -1,56 +1,56 @@
 [
    {
 	    "ArchStdEvent": "smmuv3_pmcg.CYCLES",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.CYCLES 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.CYCLES SP 0x62000010"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.TRANSACTION",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.TRANSACTION 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.TRANSACTION SP 0x62000010"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.TLB_MISS",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.TLB_MISS 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.TLB_MISS SP 0x62000010"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_CACHE_MISS",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.CONFIG_CACHE_MISS 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.CONFIG_CACHE_MISS SP 0x62000010"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.TRANS_TABLE_WALK_ACCESS",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.TRANS_TABLE_WALK_ACCESS 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.TRANS_TABLE_WALK_ACCESS SP 0x62000010"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.CONFIG_STRUCT_ACCESS",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.CONFIG_STRUCT_ACCESS 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.CONFIG_STRUCT_ACCESS SP 0x62000010"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_RQ",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.PCIE_ATS_TRANS_RQ 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.PCIE_ATS_TRANS_RQ SP 0x62000010"
    },
    {
 	    "ArchStdEvent": "smmuv3_pmcg.PCIE_ATS_TRANS_PASSED",
-	    "Compat": "0x62000010",
+	    "Compat": "0x65000010",
 	    "Unit": "cbox",
 	    "BriefDescription": "smmuv3_pmcg.PCIE_ATS_TRANS_PASSED 0x62000010",
 	    "PublicDescription": "smmuv3_pmcg.PCIE_ATS_TRANS_PASSED SP 0x62000010"
@@ -61,7 +61,7 @@
 	    "BriefDescription": "Write command received by the SP 0x62000010",
 	    "PublicDescription": "Write command received by the SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x81",
@@ -69,7 +69,7 @@
 	    "BriefDescription": "Read command received by the SP 0x62000010",
 	    "PublicDescription": "Read command received by the SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x82",
@@ -77,7 +77,7 @@
 	    "BriefDescription": "Write command received by the TP 0x62000010",
 	    "PublicDescription": "Write command received by the TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x83",
@@ -85,7 +85,7 @@
 	    "BriefDescription": "Read command received by the TP 0x62000010",
 	    "PublicDescription": "Read command received by the TP 0x62000010",
         "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x84",
@@ -93,7 +93,7 @@
 	    "BriefDescription": "Command issued by the SP 0x62000010",
 	    "PublicDescription": "Command issued by the SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x85",
@@ -101,7 +101,7 @@
 	    "BriefDescription": "Command issued by the TP 0x62000010",
 	    "PublicDescription": "Command issued by the TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x86",
@@ -109,7 +109,7 @@
 	    "BriefDescription": "Write command sent by SP 0x62000010",
 	    "PublicDescription": "Write command sent by SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x87",
@@ -117,7 +117,7 @@
 	    "BriefDescription": "Read command sent by SP 0x62000010",
 	    "PublicDescription": "Read command sent by SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x88",
@@ -125,7 +125,7 @@
 	    "BriefDescription": "Write command sent by TP 0x62000010",
 	    "PublicDescription": "Write command sent by TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x89",
@@ -133,7 +133,7 @@
 	    "BriefDescription": "Read command sent by TP 0x62000010",
 	    "PublicDescription": "Read command sent by TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x8a",
@@ -141,7 +141,7 @@
 	    "BriefDescription": "Command received by L1 TLB 0x62000010",
 	    "PublicDescription": "Command received by L1 TLB 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x8B",
@@ -149,7 +149,7 @@
 	    "BriefDescription": "Command received by L2 TLB 0x62000010",
 	    "PublicDescription": "Command received by L2 TLB 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x8c",
@@ -157,7 +157,7 @@
 	    "BriefDescription": "L1 TLB HIT 0x62000010",
 	    "PublicDescription": "L1 TLB HIT 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x8d",
@@ -165,7 +165,7 @@
 	    "BriefDescription": "L2 TLB HIT 0x62000010",
 	    "PublicDescription": "L2 TLB HIT 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x8f",
@@ -173,7 +173,7 @@
 	    "BriefDescription": "Command retried on TP interface 0x62000010",
 	    "PublicDescription": "Command retried on TP interface 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x90",
@@ -181,7 +181,7 @@
 	    "BriefDescription": "Specific matched commands sent by SP 0x62000010",
 	    "PublicDescription": "Specific matched commands sent by SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x91",
@@ -189,7 +189,7 @@
 	    "BriefDescription": "Delayed commands sent by SP 0x62000010",
 	    "PublicDescription": "Delayed commands sent by SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x92",
@@ -197,7 +197,7 @@
 	    "BriefDescription": "Specific matched commands sent by TP 0x62000010",
 	    "PublicDescription": "Specific matched commands sent by TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x93",
@@ -205,7 +205,7 @@
 	    "BriefDescription": "Delayed commands sent by TP 0x62000010",
 	    "PublicDescription": "Delayed commands sent by TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa0",
@@ -213,7 +213,7 @@
 	    "BriefDescription": "DVM TLBI 0x62000010",
 	    "PublicDescription": "DVM TLBI 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa1",
@@ -221,7 +221,7 @@
 	    "BriefDescription": "DVM SYNC 0x62000010",
 	    "PublicDescription": "DVM SYNC 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0x2",
@@ -229,7 +229,7 @@
 	    "BriefDescription": "Delay page table read request 0x62000010",
 	    "PublicDescription": "Delay page table read request 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa3",
@@ -237,7 +237,7 @@
 	    "BriefDescription": "Page table read request  0x62000010",
 	    "PublicDescription": "Page table read request  0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa4",
@@ -245,7 +245,7 @@
 	    "BriefDescription": "Delay of address translation requests ",
 	    "PublicDescription": "Delay of address translation requests 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa5",
@@ -253,7 +253,7 @@
 	    "BriefDescription": "Address translation request 0x62000010",
 	    "PublicDescription": "Address translation request 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa6",
@@ -261,7 +261,7 @@
 	    "BriefDescription": "Sync request execution time 0x62000010",
 	    "PublicDescription": "Sync request execution time 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa7",
@@ -269,7 +269,7 @@
 	    "BriefDescription": "Sync request sent 0x62000010",
 	    "PublicDescription": "Sync request sent 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa8",
@@ -277,7 +277,7 @@
 	    "BriefDescription": "Clean unique request sent by SP 0x62000010",
 	    "PublicDescription": "Clean unique request sent by SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xa9",
@@ -285,7 +285,7 @@
 	    "BriefDescription": "Writeback sent by SP 0x62000010",
 	    "PublicDescription": "Writeback sent by SP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xaa",
@@ -293,7 +293,7 @@
 	    "BriefDescription": "Clean unique request sent by TP 0x62000010",
 	    "PublicDescription": "Clean unique request sent by TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    },
    {
 	    "EventCode": "0xab",
@@ -301,6 +301,6 @@
 	    "BriefDescription": "Writeback sent by TP 0x62000010",
 	    "PublicDescription": "Writeback sent by TP 0x62000010",
 	    "Unit": "cbox",
-	    "Compat": "0x62000010"
+	    "Compat": "0x65000010"
    }
 ]

@@ -3,42 +3,56 @@
 	    "BriefDescription": "trans per cycle smmuv3_pmcg.transaction / (smmuv3_pmcg.cycles + 1) 0x65000012",
 	    "MetricName": "pmcg_trans_per_cycle.all",
 	    "MetricExpr": "smmuv3_pmcg.transaction / (smmuv3_pmcg.cycles + 1)",
-	    "ScaleUnit": "9.765625e-4KB"
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Compat": "0x65000012",
+	    "Unit": "smmuv3_pmcg"
    },
    {
 	    "BriefDescription": "trans per cycle smmuv3_pmcg.tlb_miss / (smmuv3_pmcg.cycles  + 1) 0x65000012",
 	    "MetricName": "pmcg_tlb_miss_per_cycle.all",
 	    "MetricExpr": "smmuv3_pmcg.tlb_miss / (smmuv3_pmcg.cycles  + 1)",
-	    "ScaleUnit": "9.765625e-4KB"
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Compat": "0x65000012",
+	    "Unit": "smmuv3_pmcg"
    },
    {
 	    "BriefDescription": "WR_RCVD_SP per RD_RCVD_SP  wr_rcvd_sp/rd_rcvd_sp+2 0x65000012",
 	    "MetricName": "pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all",
 	    "MetricExpr": "smmuv3_pmcg.wr_rcvd_sp / (smmuv3_pmcg.rd_rcvd_sp  + 2)",
-	    "ScaleUnit": "9.765625e-4KB"
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Compat": "0x65000012",
+	    "Unit": "smmuv3_pmcg"
    },
    {
 	    "BriefDescription": "wr_sent_sp + 7 0x65000012",
 	    "MetricName": "pmcg_wr_sent_sp_test.all",
 	    "MetricExpr": "smmuv3_pmcg.wr_sent_sp + 7",
-	    "ScaleUnit": "9.765625e-4KB"
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Compat": "0x65000012",
+	    "Unit": "smmuv3_pmcg"
    },
    {
 	    "BriefDescription": "WR_SENT_SP per pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all  (WR_SENT_SP+7)/pmcg_wr_rcvd_sp_per_rd_rcvd_sp 0x65000012",
 	    "MetricName": "pmcg_special1.all",
 	    "MetricExpr": "(smmuv3_pmcg.wr_sent_sp + 7) / pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all",
-	    "ScaleUnit": "9.765625e-4KB"
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Compat": "0x65000012",
+	    "Unit": "smmuv3_pmcg"
    },
    {
 	    "BriefDescription": "pmcg_special2.all   pmcg_special1.all + smmuv3_pmcg.DELAYED_CMD_ISSUED_SP 0x65000012",
 	    "MetricName": "pmcg_special2.all",
 	    "MetricExpr": "pmcg_special1.all + smmuv3_pmcg.DELAYED_CMD_ISSUED_SP",
-	    "ScaleUnit": "9.765625e-4KB"
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Compat": "0x65000012",
+	    "Unit": "smmuv3_pmcg"
    },
    {
 	    "BriefDescription": "pmcg_special3.all   pmcg_special2.all * smmuv3_pmcg.DVM_TLBI 0x65000012",
 	    "MetricName": "pmcg_special3.all",
 	    "MetricExpr": "pmcg_special2.all * smmuv3_pmcg.DELAYED_CMD_ISSUED_SP",
-	    "ScaleUnit": "9.765625e-4KB"
+	    "ScaleUnit": "9.765625e-4KB",
+	    "Compat": "0x65000012",
+	    "Unit": "smmuv3_pmcg"
    }
 ]

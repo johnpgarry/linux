@@ -1059,8 +1059,8 @@ static struct test_case pmu_events_tests[] = {
 	TEST_CASE("PMU event map aliases", aliases),
 	TEST_CASE_REASON("Parsing of PMU event table metrics", parsing,
 			 "some metrics failed"),
-//	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
-//	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
+	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
+	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
 	{ .name = NULL, }
 };
 
