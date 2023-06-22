@@ -489,7 +489,7 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 	bool res;
 
 	if (!pm->metric_expr) {
-		pr_err("%s pm metric_name=%s but no expr\n", __func__, pm->metric_name);
+		pr_err("%s pm metric_name=%s but no expr calling exit\n", __func__, pm->metric_name);
 		exit(0);
 		return 0;
 	}
@@ -504,8 +504,10 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 		//if (!strcmp("imx8mp_imx8_ddr0", pm->metric_name))
 		//	exit(0);
 	}
-	if (!strcmp("imx8mn_ddr_write.all", pm->metric_name))
-		exit(0);
+	if (!strcmp("imx8mn_ddr_write.all", pm->metric_name)) {
+		pr_err("%s4 not calling exit\n", __func__);
+		// exit(0);
+	}
 
 	return 0;
 }
@@ -769,7 +771,7 @@ static __maybe_unused int metricgroup__add_to_mep_groups_callback_new(__maybe_un
 	pr_err("%s2 metric name=%s expr=%s desc=%s called metricgroup__add_metric_sys_event_iter match=%d\n",
 		__func__, pm->metric_name, pm->metric_expr, pm->desc, match);
 	if (strstr(pm->metric_name, "pmcg_special_uncore_cbox_0")) {
-		pr_err("%s3 calling exit(0)\n", __func__);
+		pr_err("%s3 not calling exit(0)\n", __func__);
 		//exit(0);
 	}
 	if (match == false)
