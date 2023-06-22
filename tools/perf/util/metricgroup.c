@@ -1371,6 +1371,7 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 {
 	struct metricgroup_add_iter_data *d = data;
 	int ret;
+
 	pr_err("%s pm metric_name=%s d->pmu=%s d->metric_name=%s\n", __func__, pm->metric_name, d->pmu, d->metric_name);
 	if (!match_pm_metric(pm, d->pmu, d->metric_name))
 		return 0;
@@ -1505,7 +1506,6 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 	}
 	pr_err("%s2 pmu=%s metric_name=%s\n", __func__, pmu, metric_name);
 	{
-
 		pr_err("%s3 pmu=%s metric_name=%s modifier=%s sys_table=%p has_match=%d\n", __func__, pmu, metric_name, modifier, sys_table, has_match);
 		/* We assume that if fake_pmu then it is a test, and we don't need to match versus PMU existing on host */
 		if (sys_table) {
@@ -1520,7 +1520,6 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 				.has_match = &has_match,
 				.ret = &ret,
 			};
-			has_match = data.has_match;
 			pr_err("%s3.1 pmu=%s metric_name=%s modifier=%s sys_table=%p has_match=%d\n", __func__, pmu, metric_name, modifier, sys_table, has_match);
 			pmu_metrics_table_for_each_metric(sys_table, metricgroup__add_metric_sys_event_iter, &data);
 		} else {
@@ -1541,8 +1540,9 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 			pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data);
 		}
 	
-		pr_err("%s4 pmu=%s metric_name=%s modifier=%s has_match=%d\n",
+		pr_err("%s4 pmu=%s metric_name=%s modifier=%s has_match=%d not calling exit(0)\n",
 			__func__, pmu, metric_name, modifier, has_match);
+		//exit(0);
 
 	}
 	/* End of pmu events. */
