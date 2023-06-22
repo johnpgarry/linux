@@ -785,6 +785,12 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
         return 0;
 }
 
+const struct pmu_events_table *sys_events_table_from_metric_table(const struct pmu_metrics_table *metrics)
+{
+  struct pmu_sys_events *sys = container_of(metrics ,struct pmu_sys_events, metric_table);
+  return &sys->event_table;
+}
+
 const struct pmu_events_table *perf_pmu__find_events_table(struct perf_pmu *pmu)
 {
         const struct pmu_events_table *table = NULL;
