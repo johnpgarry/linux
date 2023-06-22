@@ -94,6 +94,7 @@ const struct pmu_events_table *find_sys_events_table(const char *name);
 const struct pmu_metrics_table *find_sys_metrics_table(const char *name);
 int pmu_for_each_sys_event(pmu_event_iter_fn fn, void *data);
 int pmu_for_each_sys_metric(pmu_metric_iter_fn fn, void *data);
+const char *sys_events_table_upper_name(const struct pmu_metrics_table *metrics);
 
 const char *describe_metricgroup(const char *group);
 

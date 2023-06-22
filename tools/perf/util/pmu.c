@@ -801,6 +801,21 @@ struct pmu_sys_event_iter_data {
 	struct perf_pmu *pmu;
 };
 
+bool pmu_event_match_pmu(const char *event_unit, const char *event_compat, struct perf_pmu *pmu)
+{
+	if (!event_unit || !event_compat)
+		return false;
+
+	if (strcmp(pmu->id, event_compat))
+		return false;
+
+	if (!pmu_uncore_alias_match(event_unit, pmu->name))
+		return false;
+
+	return true;
+}
+
+
 static int pmu_add_sys_aliases_iter_fn(const struct pmu_event *pe,
 				       const struct pmu_events_table *table __maybe_unused,
 				       void *data)
@@ -808,11 +823,7 @@ static int pmu_add_sys_aliases_iter_fn(const struct pmu_event *pe,
 	struct pmu_sys_event_iter_data *idata = data;
 	struct perf_pmu *pmu = idata->pmu;
 
-	if (!pe->compat || !pe->pmu)
-		return 0;
-
-	if (!strcmp(pmu->id, pe->compat) &&
-	    pmu_uncore_alias_match(pe->pmu, pmu->name)) {
+	if (pmu_event_match_pmu(pe->pmu, pe->compat, pmu)) {
 		__perf_pmu__new_alias(idata->head, -1,
 				      (char *)pe->name,
 				      (char *)pe->desc,
