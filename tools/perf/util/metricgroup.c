@@ -721,7 +721,6 @@ static int parse_ids(bool metric_no_merge, struct perf_pmu *fake_pmu,
 
 			if (strchr(evsel->name, '/')) {
 				int pmu_event_match_pmu_res;
-				struct perf_pmu *pmu = perf_pmus__find(evsel->pmu_name);
 				pr_err("%s5.4 evsel=%p name=%s pmu_name=%s metric_id=%s pmu=%p name=%s\n",
 				__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, pmu, pmu ? pmu->name : "?");
 				if (!pmu)
@@ -1534,7 +1533,7 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 		has_match = data.has_match;
 	}
 	pr_err("%s2 pmu=%s metric_name=%s\n", __func__, pmu, metric_name);
-	{
+	if (!has_match) {
 		pr_err("%s3 pmu=%s metric_name=%s modifier=%s sys_table=%p has_match=%d\n", __func__, pmu, metric_name, modifier, sys_table, has_match);
 		/* We assume that if fake_pmu then it is a test, and we don't need to match versus PMU existing on host */
 		if (sys_table) {
