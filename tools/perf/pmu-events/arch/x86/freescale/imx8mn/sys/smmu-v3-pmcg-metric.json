@@ -40,5 +40,17 @@
 	    "MetricName": "pmcg_special3.all",
 	    "MetricExpr": "pmcg_special2.all * smmuv3_pmcg.DELAYED_CMD_ISSUED_SP",
 	    "ScaleUnit": "9.765625e-4KB"
+   },
+   {
+	    "BriefDescription": "WR_RCVD_SP per RD_RCVD_SP  wr_rcvd_sp/rd_rcvd_sp+2 0x65000012",
+	    "MetricName": "pmcg_wr_rcvd_broken1_mn.all",
+	    "MetricExpr": "smmuv3_pmcg.wr_rcvd_sp / (smmuv3_pmcg.rd_rcvd_mp  + 2)",
+	    "ScaleUnit": "9.765625e-4KB"
+   },
+   {
+	    "BriefDescription": "WR_RCVD_SP per RD_RCVD_SP  wr_rcvd_sp/rd_rcvd_sp+2 0x65000012",
+	    "MetricName": "pmcg_wr_rcvd_broken_mn.all",
+	    "MetricExpr": "smmuv3_pmcg.wr_rcvd_sp / (smmuv3_pmcg.rd_rcvd_2sp  + 2)",
+	    "ScaleUnit": "9.765625e-4KB"
    }
 ]

@@ -278,5 +278,13 @@
 	    "PublicDescription": "Writeback sent by TP",
 	    "Unit": "smmuv3_pmcg",
 	    "Compat": "0x65000013"
+   },
+   {
+	    "EventCode": "0xab",
+	    "EventName": "smmuv3_pmcg.rd_rcvd_mp",
+	    "BriefDescription": "Writeback sent by TP",
+	    "PublicDescription": "Writeback sent by TP",
+	    "Unit": "smmuv3_pmcg",
+	    "Compat": "0x65000013"
    }
 ]
