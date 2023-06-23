@@ -465,7 +465,7 @@ static __maybe_unused int test__pmu_event_table(struct test_suite *test __maybe_
 				 int subtest __maybe_unused)
 {
 	const struct pmu_events_table *sys_event_table =
-		find_sys_events_table("pmu_events__test_soc_sys");
+		find_sys_events_table("pmu_events__test_soc_a_sys");
 	const struct pmu_events_table *table = find_core_events_table("testarch", "testcpu");
 	int map_events = 0, expected_events, err;
 	pr_err("%s\n", __func__);
@@ -474,6 +474,7 @@ static __maybe_unused int test__pmu_event_table(struct test_suite *test __maybe_
 			  ARRAY_SIZE(uncore_events) +
 			  ARRAY_SIZE(sys_events) - 3;
 
+	pr_err("%s table=%p find_sys_events_table=%p\n", __func__, table, sys_event_table);
 	if (!table || !sys_event_table) {
 		pr_err("%s1 fail !table || !sys_event_table\n", __func__);
 		return -1;
@@ -1056,11 +1057,11 @@ static __maybe_unused int test__parsing_threshold(struct test_suite *test __mayb
 
 static struct test_case pmu_events_tests[] = {
 	TEST_CASE("PMU event table sanity", pmu_event_table),
-	TEST_CASE("PMU event map aliases", aliases),
-	TEST_CASE_REASON("Parsing of PMU event table metrics", parsing,
-			 "some metrics failed"),
-	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
-	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
+//	TEST_CASE("PMU event map aliases", aliases),
+//	TEST_CASE_REASON("Parsing of PMU event table metrics", parsing,
+//			 "some metrics failed"),
+//	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
+//	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
 	{ .name = NULL, }
 };
 

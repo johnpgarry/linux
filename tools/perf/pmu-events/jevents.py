@@ -610,12 +610,12 @@ const struct pmu_events_map pmu_events_map[] = {
 \t.arch = "testarch",
 \t.cpuid = "testcpu",
 \t.event_table = {
-\t\t.entries = pmu_events__test_soc_cpu,
-\t\t.length = ARRAY_SIZE(pmu_events__test_soc_cpu),
+\t\t.entries = pmu_events__test_soc_a_cpu,
+\t\t.length = ARRAY_SIZE(pmu_events__test_soc_a_cpu),
 \t},
 \t.metric_table = {
-\t\t.entries = pmu_metrics__test_soc_cpu,
-\t\t.length = ARRAY_SIZE(pmu_metrics__test_soc_cpu),
+\t\t.entries = pmu_metrics__test_soc_a_cpu,
+\t\t.length = ARRAY_SIZE(pmu_metrics__test_soc_a_cpu),
 \t}
 },
 """)
