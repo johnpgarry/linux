@@ -860,6 +860,7 @@ static int _test__parsing_callback(const struct pmu_metric *pm,
 	 * zero when subtracted and so try to make them unique.
 	 */
 	k = 1;
+
 	evlist__alloc_aggr_stats(evlist, 1);
 	evlist__for_each_entry(evlist, evsel) {
 		pr_err("%s2 pm name=%s evsel=%p name=%s pmu_name=%s group_pmu_name=%s\n",
@@ -870,8 +871,8 @@ static int _test__parsing_callback(const struct pmu_metric *pm,
 		k++;
 	}
 
-	if (!strcmp("pmcgw_special3.all", pm->metric_name))
-		exit(0);
+	//if (!strcmp("pmcgw_special3.all", pm->metric_name))
+	//	exit(0);
 	evlist__for_each_entry(evlist, evsel) {
 		struct metric_event *me = metricgroup__lookup(&metric_events, evsel, false);
 
@@ -881,7 +882,7 @@ static int _test__parsing_callback(const struct pmu_metric *pm,
 			list_for_each_entry (mexp, &me->head, nd) {
 				if (strcmp(mexp->metric_name, pm->metric_name))
 					continue;
-				pr_err("%s Result %f\n",  __func__, test_generic_metric(mexp, 0));
+				pr_err("%s3 Result %f\n",  __func__, test_generic_metric(mexp, 0));
 				err = 0;
 				(*failures)--;
 				goto out_err;
@@ -906,14 +907,29 @@ static int test__parsing_callback_cpu(const struct pmu_metric *pm,
 				  const struct pmu_metrics_table *table,
 				  void *data)
 {
+	pr_err("%s pm metric_name=%s expr=%s desc=%s\n", __func__, pm->metric_name, pm->metric_expr, pm->desc);
 	return _test__parsing_callback(pm, table, data, true);
+}
+
+static int test__parsing_callback_cpu_dummy(__maybe_unused const struct pmu_metric *pm,
+				  __maybe_unused const struct pmu_metrics_table *table,
+				  __maybe_unused void *data)
+{
+	//pr_err("%s pm metric_name=%s expr=%s desc=%s\n",__func__, pm->metric_name, pm->metric_expr, pm->desc);
+	return 0;
 }
 
 static int test__parsing_callback_sys(const struct pmu_metric *pm,
 				  const struct pmu_metrics_table *table,
 				  void *data)
 {
-	return _test__parsing_callback(pm, table, data, false);
+	int ret;
+	pr_err("%s pm metric_name=%s expr=%s desc=%s table=%p\n", __func__, pm->metric_name, pm->metric_expr, pm->desc, table);
+	ret = _test__parsing_callback(pm, table, data, false);
+
+	pr_err("%s1 pm metric_name=%s expr=%s desc=%s ret=%d, not exiting\n", __func__, pm->metric_name, pm->metric_expr, pm->desc, ret);
+	//exit(0);
+	return ret;
 }
 
 static __maybe_unused int test__parsing(struct test_suite *test __maybe_unused,
@@ -921,10 +937,12 @@ static __maybe_unused int test__parsing(struct test_suite *test __maybe_unused,
 {
 	int failures = 0;
 
+	pr_err("%s calling pmu_for_each_core_metric -> test__parsing_callback_cpu\n", __func__);
+	pmu_for_each_core_metric(test__parsing_callback_cpu_dummy, &failures);
 	pmu_for_each_core_metric(test__parsing_callback_cpu, &failures);
-	pr_err("%s failures=%d after test__parsing_callback\n", __func__, failures);
+	pr_err("%s1 failures=%d after test__parsing_callback pmu_for_each_core_metric -> test__parsing_callback_sys\n", __func__, failures);
 	pmu_for_each_sys_metric(test__parsing_callback_sys, &failures);
-	pr_err("%s1 failures=%d after test__parsing_callback\n", __func__, failures );
+	pr_err("%s2 failures=%d after test__parsing_callback\n", __func__, failures );
 
 	return failures == 0 ? TEST_OK : TEST_FAIL;
 }
@@ -1056,10 +1074,10 @@ static __maybe_unused int test__parsing_threshold(struct test_suite *test __mayb
 }
 
 static struct test_case pmu_events_tests[] = {
-	TEST_CASE("PMU event table sanity", pmu_event_table),
+//	TEST_CASE("PMU event table sanity", pmu_event_table),
 //	TEST_CASE("PMU event map aliases", aliases),
-//	TEST_CASE_REASON("Parsing of PMU event table metrics", parsing,
-//			 "some metrics failed"),
+	TEST_CASE_REASON("Parsing of PMU event table metrics", parsing,
+			 "some metrics failed"),
 //	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
 //	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
 	{ .name = NULL, }

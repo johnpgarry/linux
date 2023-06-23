@@ -1562,6 +1562,7 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 
 	pmu = parse_state->fake_pmu ?: perf_pmus__find(name);
 
+	pr_err("%s entry name=%s pmu=%p name=%s\n", __func__, name, pmu, pmu ? pmu->name : "?");
 	if (verbose > 1 && !(pmu && pmu->selectable)) {
 		fprintf(stderr, "Attempting to add event pmu '%s' with '",
 			name);
@@ -1579,8 +1580,8 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 		char *err_str;
 
 		if (asprintf(&err_str,
-				"Cannot find PMU `%s'. Missing kernel support?",
-				name) >= 0)
+				"%s Cannot find PMU `%s'. Missing kernel support? fake_pmu=%p", __func__,
+				name, parse_state->fake_pmu) >= 0)
 			parse_events_error__handle(err, 0, err_str, NULL);
 		return -EINVAL;
 	}
@@ -1604,8 +1605,11 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 		return evsel ? 0 : -ENOMEM;
 	}
 
-	if (!parse_state->fake_pmu && perf_pmu__check_alias(pmu, head_config, &info))
+	pr_err("%s11 checking perf_pmu__check_alias pmu name=%s\n", __func__, name);
+	if (!parse_state->fake_pmu && perf_pmu__check_alias(pmu, head_config, &info)) {
+		pr_err("%s12 returning from perf_pmu__check_alias and no fake pmu name=%s\n", __func__, name);
 		return -EINVAL;
+	}
 
 	if (verbose > 1) {
 		fprintf(stderr, "After aliases, add event pmu '%s' with '",
@@ -1637,7 +1641,9 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 	if (pmu->default_config && get_config_chgs(pmu, head_config, &config_terms))
 		return -ENOMEM;
 
+	pr_err("%s22 checking perf_pmu__config pmu name=%s\n", __func__, name);
 	if (!parse_state->fake_pmu && perf_pmu__config(pmu, &attr, head_config, parse_state->error)) {
+		pr_err("%s23 returning from perf_pmu__config and no fake pmu name=%s\n", __func__, name);
 		free_config_terms(&config_terms);
 		return -EINVAL;
 	}

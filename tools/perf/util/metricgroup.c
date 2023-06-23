@@ -284,8 +284,12 @@ static int setup_metric_events(const char *pmu, struct hashmap *ids,
 		return -ENOMEM;
 
 	matched_events = 0;
+	pr_err("%s pmu=%s metric_evlist=%p ids_size=%zd\n", __func__, pmu, metric_evlist, ids_size);
 	evlist__for_each_entry(metric_evlist, ev) {
 		struct expr_id_data *val_ptr;
+
+		pr_err("%s1 pmu=%s metric_evlist=%p evsel name=%s pmu_name=%s\n",
+			__func__, pmu, metric_evlist, ev->name, ev->pmu_name);
 
 		/* Don't match events for the wrong hybrid PMU. */
 		if (!all_pmus && ev->pmu_name && evsel__is_hybrid(ev) &&
@@ -306,9 +310,11 @@ static int setup_metric_events(const char *pmu, struct hashmap *ids,
 		 * about this event.
 		 */
 		if (hashmap__find(ids, metric_id, &val_ptr)) {
-			pr_debug("Matched metric-id %s to %s\n", metric_id, evsel__name(ev));
+			pr_err("Matched metric-id %s to %s\n", metric_id, evsel__name(ev));
 			metric_events[matched_events++] = ev;
 
+			pr_err("%s4 pmu=%s metric_evlist=%p ids_size=%zd matched_events=%zd\n",
+				__func__, pmu, metric_evlist, ids_size, matched_events);
 			if (matched_events >= ids_size)
 				break;
 		}
@@ -488,14 +494,15 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 	__maybe_unused struct metricgroup_iter_data *d = data;
 	bool res;
 
+	pr_err("%s pm metric_name=%s desc=%s table=%p upper name=%s\n",
+		__func__, pm->metric_name, pm->desc, table, sys_events_table_upper_name(table));
+
 	if (!pm->metric_expr) {
-		pr_err("%s pm metric_name=%s but no expr calling exit\n", __func__, pm->metric_name);
+		pr_err("%s1 pm metric_name=%s but no expr calling exit\n", __func__, pm->metric_name);
 		exit(0);
 		return 0;
 	}
 
-	pr_err("%s1 pm metric_name=%s desc=%s table=%p upper name=%s\n",
-		__func__, pm->metric_name, pm->desc, table, sys_events_table_upper_name(table));
 	res = __metricgroup__add_metric_sys_event_iter(pm, table, NULL);
 	pr_err("%s2 res=%d pm metric_name=%s desc=%s\n", __func__, res, pm->metric_name, pm->desc);
 	if (res) {
@@ -506,12 +513,20 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 	}
 	if (!strcmp("imx8mn_ddr_write.all", pm->metric_name)) {
 		//pr_err("%s4 calling exit\n", __func__);
-		// exit(0);
+		//exit(0);
+	}
+	if (!strcmp("imx8mp_ddr_write.all", pm->metric_name)) {
+		pr_err("%s4 calling exit\n", __func__);
+		exit(0);
 	}
 
 	if (!strcmp("pmcg_wr_rcvd_broken_mn.all", pm->metric_name)) {
-		pr_err("%s4 calling exit\n", __func__);
-		exit(0);
+	//	pr_err("%s4 calling exit\n", __func__);
+	//	exit(0);
+	}
+	if (!strcmp("pmcg_wr_rcvd_broken_m1p.all", pm->metric_name)) {
+	//	pr_err("%s4 calling exit\n", __func__);
+	//	exit(0);
 	}
 
 	return 0;
@@ -680,6 +695,7 @@ static int add_metric(struct list_head *metric_list,
 	list_for_each_entry(m, &list, nd) {
 		int events_count = 0, found_events = 0;
 		struct evsel *evsel;
+		int evsel_count = 0;
 
 /*
 static int parse_ids(bool metric_no_merge, struct perf_pmu *fake_pmu,
@@ -692,13 +708,19 @@ static int parse_ids(bool metric_no_merge, struct perf_pmu *fake_pmu,
 
 		err = parse_ids(false, NULL, m->pctx, m->modifier,
 					m->group_events, tool_events, &m->evlist);
-		pr_err("%s5 pm->name=%s parse_ids returned ret=%d\n", __func__, pm->metric_name, ret);
+		if (m->evlist) {
+			evlist__for_each_entry(m->evlist, evsel) {
+				evsel_count++;
+			}
+		}
+		pr_err("%s5 pm->name=%s parse_ids returned ret=%d evsel_count=%d m->evlist=%p\n", __func__, pm->metric_name, ret, evsel_count, m->evlist);
 		if (err)
 			goto out;
 		pr_err("%s5.1 pm->name=%s m=%p metric_name=%s expr=%s\n", __func__, pm->metric_name, m, m->metric_name, m->metric_expr);
 
 		evlist__for_each_entry(m->evlist, evsel) {
 			struct pmu_event found_event = {};
+			struct perf_pmu *pmu = perf_pmus__find(evsel->pmu_name);
 			
 			struct metricgroup__test_event metricgroup__test_event_data = {
 				.evsel = evsel,
@@ -709,11 +731,23 @@ static int parse_ids(bool metric_no_merge, struct perf_pmu *fake_pmu,
 			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table, found_events);
 
 
+
 			pmu_events_table_for_each_event(events_table,
 						 metricgroup__test_event_iter,
 						 &metricgroup__test_event_data);
-			pr_err("%s5.3 evsel=%p name=%s pmu_name=%s metric_id=%s events_table=%p found_events=%d found event name=%s\n",
-			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table, found_events, found_event.name);
+			pr_err("%s5.3 evsel=%p name=%s pmu_name=%s metric_id=%s events_table=%p found_events=%d found event name=%s pmu=%p\n",
+			__func__, evsel, evsel->name, evsel->pmu_name, evsel->metric_id, events_table, found_events, found_event.name, pmu);
+
+			if (pmu) {
+					struct perf_pmu_alias *alias;
+					list_for_each_entry(alias, &pmu->aliases, list) {
+						if (!strcasecmp(alias->name, evsel->name)) {
+							pr_err("%s5.3.1 evsel=%p name=%s pmu_name=%s alias->name=%s\n",
+							__func__, evsel, evsel->name, evsel->pmu_name, alias->name);
+							/* this is not proper to do, as we might find an alias for another SoC */
+						}
+					}
+			}
 
 			if (found_event.name) {
 				continue;
@@ -979,7 +1013,7 @@ static int metricgroup__build_event_string(struct strbuf *events,
 		const char *sep, *rsep, *id = cur->pkey;
 		enum perf_tool_event ev;
 
-		pr_debug("found event %s\n", id);
+		pr_debug("%s found event %s\n", __func__, id);
 
 		/* Always move tool events outside of the group. */
 		ev = perf_tool_event__from_str(id);
@@ -1535,7 +1569,7 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 	pr_err("%s2 pmu=%s metric_name=%s\n", __func__, pmu, metric_name);
 	if (!has_match) {
 		pr_err("%s3 pmu=%s metric_name=%s modifier=%s sys_table=%p has_match=%d\n", __func__, pmu, metric_name, modifier, sys_table, has_match);
-		/* We assume that if fake_pmu then it is a test, and we don't need to match versus PMU existing on host */
+		/* We assume that if sys_table then it is a test, and we don't need to match versus PMU existing on host */
 		if (sys_table) {
 			struct metricgroup_add_iter_data data = {
 				.metric_list = &list,
@@ -1748,6 +1782,7 @@ static int parse_ids(bool metric_no_merge, struct perf_pmu *fake_pmu,
 	struct strbuf events = STRBUF_INIT;
 	int ret;
 
+	pr_err("%s fake_pmu=%p\n", __func__, fake_pmu);
 	*out_evlist = NULL;
 	if (!metric_no_merge || hashmap__size(ids->ids) == 0) {
 		bool added_event = false;
@@ -1793,7 +1828,7 @@ static int parse_ids(bool metric_no_merge, struct perf_pmu *fake_pmu,
 		ret = -ENOMEM;
 		goto err_out;
 	}
-	pr_err("Parsing metric events '%s'\n", events.buf);
+	pr_err("%s2 Parsing metric events '%s', passing fake_pmu=%p\n", __func__, events.buf, fake_pmu);
 	parse_events_error__init(&parse_error);
 	ret = __parse_events(parsed_evlist, events.buf, /*pmu_filter=*/NULL,
 			     &parse_error, fake_pmu, /*warn_if_reordered=*/false);
