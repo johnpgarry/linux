@@ -242,6 +242,34 @@ static const struct perf_pmu_test_event sys_ddr_pmu_write_cycles = {
 	.matching_pmu = "uncore_sys_ddr_pmu",
 };
 
+static const struct perf_pmu_test_event sys_ddr_pmu_read_cycles = {
+	.event = {
+		.name = "sys_ddr_pmu.read_cycles",
+		.event = "event=0x2e",
+		.desc = "ddr read-cycles event. Unit: uncore_sys_ddr_pmu ",
+		.topic = "uncore",
+		.pmu = "uncore_sys_ddr_pmu",
+		.compat = "v8",
+	},
+	.alias_str = "event=0x2e",
+	.alias_long_desc = "ddr read-cycles event. Unit: uncore_sys_ddr_pmu ",
+	.matching_pmu = "uncore_sys_ddr_pmu",
+};
+
+static const struct perf_pmu_test_event sys_ddr_pmu_stalls = {
+	.event = {
+		.name = "sys_ddr_pmu.stalls",
+		.event = "event=0x2d",
+		.desc = "ddr stall event. Unit: uncore_sys_ddr_pmu ",
+		.topic = "uncore",
+		.pmu = "uncore_sys_ddr_pmu",
+		.compat = "v8",
+	},
+	.alias_str = "event=0x2d",
+	.alias_long_desc = "ddr stall event. Unit: uncore_sys_ddr_pmu ",
+	.matching_pmu = "uncore_sys_ddr_pmu",
+};
+
 static const struct perf_pmu_test_event sys_ccn_pmu_read_cycles = {
 	.event = {
 		.name = "sys_ccn_pmu.read_cycles",
@@ -258,6 +286,8 @@ static const struct perf_pmu_test_event sys_ccn_pmu_read_cycles = {
 
 static const struct perf_pmu_test_event *sys_events[] = {
 	&sys_ddr_pmu_write_cycles,
+	&sys_ddr_pmu_read_cycles,
+	&sys_ddr_pmu_stalls,
 	&sys_ccn_pmu_read_cycles,
 	NULL
 };
@@ -443,6 +473,7 @@ static int test__pmu_event_table_sys_callback(const struct pmu_event *pe,
 		struct perf_pmu_test_event const *test_event = *test_event_table;
 		struct pmu_event const *event = &test_event->event;
 
+		pr_err("%s2 pe name=%s event->name=%s\n", __func__, pe->name, event->name);
 		if (strcmp(pe->name, event->name))
 			continue;
 		found = true;
@@ -543,7 +574,8 @@ static int __test_core_pmu_event_aliases(char *pmu_name, int *count)
 		struct perf_pmu_alias *alias = find_alias(event->name, &aliases);
 
 		if (!alias) {
-			pr_err("testing aliases core PMU %s: no alias, alias_table->name=%s\n",
+			pr_err("%s error testing aliases core PMU %s: no alias, alias_table->name=%s\n",
+				__func__,
 				  pmu_name, event->name);
 			res = -1;
 			break;
@@ -551,6 +583,9 @@ static int __test_core_pmu_event_aliases(char *pmu_name, int *count)
 
 		if (compare_alias_to_test_event(alias, test_event, pmu_name)) {
 			res = -1;
+			pr_err("%s2 error compare_alias_to_test_event alias pmu.name=%s event.name=%s\n",
+				__func__,
+				  pmu_name, event->name);
 			break;
 		}
 
@@ -583,18 +618,22 @@ static int __test_uncore_pmu_event_aliases(struct perf_pmu_test_pmu *test_pmu)
 		return -1;
 	pmu_add_cpu_aliases_table(&aliases, pmu, events_table);
 	pmu_add_sys_aliases(&aliases, pmu);
-
+	pr_err("%s test_pmu name=%s\n", __func__, test_pmu->pmu.name);
 	/* Count how many aliases we generated */
-	list_for_each_entry(alias, &aliases, list)
+	list_for_each_entry(alias, &aliases, list) {
+		pr_err("%s1 alias name=%s alias_count++\n", __func__, alias->name);
 		alias_count++;
+	}
 
 	/* Count how many aliases we expect from the known table */
-	for (table = &test_pmu->aliases[0]; *table; table++)
+	for (table = &test_pmu->aliases[0]; *table; table++) {
+		pr_err("%s2 *table=%p name=%s to_match_count++\n", __func__, *table, *table ? (*table)->alias_str : "?");
 		to_match_count++;
+	}
 
 	if (alias_count != to_match_count) {
-		pr_err("testing aliases uncore PMU %s: mismatch expected aliases (%d) vs found (%d)\n",
-			 pmu_name, to_match_count, alias_count);
+		pr_err("testing aliases uncore PMU %s: mismatch expected aliases (%d) vs found (%d) test_pmu name=%s\n",
+			 pmu_name, to_match_count, alias_count, test_pmu->pmu.name);
 		res = -1;
 		goto out;
 	}
@@ -695,6 +734,8 @@ static struct perf_pmu_test_pmu test_pmus[] = {
 		},
 		.aliases = {
 			&sys_ddr_pmu_write_cycles,
+			&sys_ddr_pmu_read_cycles,
+			&sys_ddr_pmu_stalls,
 		},
 	},
 	{
@@ -840,6 +881,8 @@ static int _test__parsing_callback(const struct pmu_metric *pm,
 	perf_evlist__set_maps(&evlist->core, cpus, NULL);
 
 	err = metricgroup__parse_groups_test(evlist, cpu_table, sys_table, pm->metric_name, &metric_events);
+	pr_err("%s1 after metricgroup__parse_groups_test '%s' desc=%s expr=%s err=%d\n", __func__,
+	 pm->metric_name, pm->desc, pm->metric_expr, err);
 	if (err) {
 		if (!strcmp(pm->metric_name, "M1") || !strcmp(pm->metric_name, "M2") ||
 		    !strcmp(pm->metric_name, "M3")) {
@@ -1074,12 +1117,12 @@ static __maybe_unused int test__parsing_threshold(struct test_suite *test __mayb
 }
 
 static struct test_case pmu_events_tests[] = {
-//	TEST_CASE("PMU event table sanity", pmu_event_table),
-//	TEST_CASE("PMU event map aliases", aliases),
+	TEST_CASE("PMU event table sanity", pmu_event_table),
+	TEST_CASE("PMU event map aliases", aliases),
 	TEST_CASE_REASON("Parsing of PMU event table metrics", parsing,
 			 "some metrics failed"),
-//	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
-//	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
+	TEST_CASE("Parsing of PMU event table metrics with fake PMUs", parsing_fake),
+	TEST_CASE("Parsing of metric thresholds with fake PMUs", parsing_threshold),
 	{ .name = NULL, }
 };
 

@@ -50,6 +50,10 @@
     "MetricName": "M1"
   },
   {
+    "MetricExpr": "icache_miss_cycles + eererer",
+    "MetricName": "Mx"
+  },
+  {
     "MetricExpr": "ipc + M1",
     "MetricName": "M2"
   },

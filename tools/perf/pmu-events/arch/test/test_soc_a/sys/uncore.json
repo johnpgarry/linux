@@ -8,7 +8,7 @@
    },
    {
            "BriefDescription": "ddr read-cycles event",
-           "EventCode": "0x2c",
+           "EventCode": "0x2e",
            "EventName": "sys_ddr_pmu.read_cycles",
            "Unit": "sys_ddr_pmu",
            "Compat": "v8"
@@ -40,6 +40,6 @@
    {
            "BriefDescription": "ddr total rw cycles per stall for soc a (resolvable metric)",
            "MetricName": "sys_ddr_pmu.rw_cycles_per_stall",
-           "MetricExpr": "sys_ddr_pmu.rw_cycles / sys_ddr_pmu.stalls"
+           "MetricExpr": "sys_ddr_pmu.rw_cydcles / sys_ddr_pmu.stalls"
    }
 ]
