@@ -7,10 +7,39 @@
            "Compat": "v8"
    },
    {
+           "BriefDescription": "ddr read-cycles event",
+           "EventCode": "0x2c",
+           "EventName": "sys_ddr_pmu.read_cycles",
+           "Unit": "sys_ddr_pmu",
+           "Compat": "v8"
+   },
+   {
+           "BriefDescription": "ddr stall event",
+           "EventCode": "0x2d",
+           "EventName": "sys_ddr_pmu.stalls",
+           "Unit": "sys_ddr_pmu",
+           "Compat": "v8"
+   },
+   {
            "BriefDescription": "ccn read-cycles event",
            "ConfigCode": "0x2c",
            "EventName": "sys_ccn_pmu.read_cycles",
            "Unit": "sys_ccn_pmu",
            "Compat": "0x01"
+   },
+   {
+           "BriefDescription": "ddr total rw cycles soc a",
+           "MetricName": "sys_ddr_pmu.rw_cycles",
+           "MetricExpr": "sys_ddr_pmu.write_cycles + sys_ddr_pmu.read_cycles"
+   },
+   {
+           "BriefDescription": "ddr rw rate soc a (resolvable metric)",
+           "MetricName": "sys_ddr_pmu.rw_rate",
+           "MetricExpr": "sys_ddr_pmu.rw_cycles / duration_time"
+   },
+   {
+           "BriefDescription": "ddr total rw cycles per stall for soc a (resolvable metric)",
+           "MetricName": "sys_ddr_pmu.rw_cycles_per_stall",
+           "MetricExpr": "sys_ddr_pmu.rw_cycles / sys_ddr_pmu.stalls"
    }
 ]

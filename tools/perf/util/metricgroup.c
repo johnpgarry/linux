@@ -1175,6 +1175,7 @@ static int resolve_metric(struct list_head *metric_list,
 		const char *key;
 	} *pending = NULL;
 	int i, ret = 0, pending_cnt = 0;
+	pr_err("%s pmu=%s\n", __func__, pmu);
 
 	/*
 	 * Iterate all the parsed IDs and if there's a matching metric and it to
@@ -1204,6 +1205,8 @@ static int resolve_metric(struct list_head *metric_list,
 	 * context.
 	 */
 	for (i = 0; i < pending_cnt; i++) {
+		struct pmu_metric *_pm = &pending[i].pm;
+		pr_err("%s2 pmu=%s calling add_metric for pm metric name=%s \n", __func__, pmu, _pm->metric_name);
 		ret = add_metric(metric_list, &pending[i].pm, modifier, metric_no_group,
 				 metric_no_threshold, user_requested_cpu_list, system_wide,
 				 root_metric, visited, table);
