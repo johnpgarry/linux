@@ -798,7 +798,6 @@ struct metricgroup_add_iter_data {
 	bool system_wide;
 	struct metric *root_metric;
 	const struct visited_metric *visited;
-	const struct pmu_metrics_table *table;
 };
 
 static bool metricgroup__find_metric(const char *pmu,
@@ -1112,7 +1111,7 @@ static int add_metric(struct list_head *metric_list,
 }
 
 static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
-					const struct pmu_metrics_table *table __maybe_unused,
+					const struct pmu_metrics_table *table,
 					void *data)
 {
 	struct metricgroup_add_iter_data *d = data;
@@ -1123,7 +1122,7 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 
 	ret = add_metric(d->metric_list, pm, d->modifier, d->metric_no_group,
 			 d->metric_no_threshold, d->user_requested_cpu_list,
-			 d->system_wide, d->root_metric, d->visited, d->table);
+			 d->system_wide, d->root_metric, d->visited, table);
 	if (ret)
 		goto out;
 
@@ -1275,7 +1274,6 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 				.system_wide = system_wide,
 				.has_match = &has_match,
 				.ret = &ret,
-				.table = table,
 			},
 		};
 
