@@ -787,8 +787,20 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
 
 const struct pmu_events_table *sys_events_table_from_metric_table(const struct pmu_metrics_table *metrics)
 {
-  struct pmu_sys_events *sys = container_of(metrics ,struct pmu_sys_events, metric_table);
-  return &sys->event_table;
+  struct pmu_sys_events *sys = container_of(metrics, struct pmu_sys_events, metric_table);
+  struct pmu_events_table *first = &sys->event_table;
+   for (const struct pmu_sys_events *tables = &pmu_sys_event_tables[0];
+             tables->name;
+             tables++) {
+   	if (&tables->metric_table == metrics) {
+   	  if (first == &tables->event_table) 
+        printf(\"good from sys_events_table_from_metric_table\");
+      else
+        printf(\"bad from sys_events_table_from_metric_table\");
+      return first;
+   	}
+   }
+  return NULL;
 }
 
 const char *sys_events_table_upper_name(const struct pmu_metrics_table *metrics)
