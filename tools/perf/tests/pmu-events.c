@@ -798,9 +798,9 @@ struct metric {
 	struct metric_ref metric_ref;
 };
 
-static int test__parsing_callback(const struct pmu_metric *pm,
+static int _test__parsing_callback(const struct pmu_metric *pm,
 				  const struct pmu_metrics_table *table,
-				  void *data)
+				  void *data, bool is_cpu_table)
 {
 	int *failures = data;
 	int k;
@@ -811,6 +811,8 @@ static int test__parsing_callback(const struct pmu_metric *pm,
 		.nr_entries = 0,
 	};
 	int err = 0;
+	const struct pmu_metrics_table *cpu_table = is_cpu_table ? table : NULL;
+	const struct pmu_metrics_table *sys_table = is_cpu_table ? NULL : table;
 
 	if (!pm->metric_expr)
 		return 0;
@@ -834,7 +836,7 @@ static int test__parsing_callback(const struct pmu_metric *pm,
 
 	perf_evlist__set_maps(&evlist->core, cpus, NULL);
 
-	err = metricgroup__parse_groups_test(evlist, table, pm->metric_name, &metric_events);
+	err = metricgroup__parse_groups_test(evlist, cpu_table, sys_table, pm->metric_name, &metric_events);
 	if (err) {
 		if (!strcmp(pm->metric_name, "M1") || !strcmp(pm->metric_name, "M2") ||
 		    !strcmp(pm->metric_name, "M3")) {
@@ -890,13 +892,27 @@ out_err:
 	return err;
 }
 
-static int test__parsing(struct test_suite *test __maybe_unused,
+static int test__parsing_callback_cpu(const struct pmu_metric *pm,
+				  const struct pmu_metrics_table *table,
+				  void *data)
+{
+	return _test__parsing_callback(pm, table, data, true);
+}
+
+static int test__parsing_callback_sys(const struct pmu_metric *pm,
+				  const struct pmu_metrics_table *table,
+				  void *data)
+{
+	return _test__parsing_callback(pm, table, data, false);;
+}
+
+static __maybe_unused int test__parsing(struct test_suite *test __maybe_unused,
 			 int subtest __maybe_unused)
 {
 	int failures = 0;
 
-	pmu_for_each_core_metric(test__parsing_callback, &failures);
-	pmu_for_each_sys_metric(test__parsing_callback, &failures);
+	pmu_for_each_core_metric(test__parsing_callback_cpu, &failures);
+	pmu_for_each_sys_metric(test__parsing_callback_sys, &failures);
 
 	return failures == 0 ? TEST_OK : TEST_FAIL;
 }
