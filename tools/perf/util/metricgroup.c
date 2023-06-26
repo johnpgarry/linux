@@ -486,23 +486,18 @@ struct metricgroup_iter_data {
 	void *data;
 };
 
+static bool metricgroup_sys_metric_supported(const struct pmu_metric *pm,
+			const struct pmu_metrics_table *table);
+
 static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 				       const struct pmu_metrics_table *table,
 				       void *data)
 {
 	struct metricgroup_iter_data *d = data;
-	struct perf_pmu *pmu = NULL;
 
-	if (!pm->metric_expr || !pm->compat)
-		return 0;
-
-	while ((pmu = perf_pmus__scan(pmu))) {
-
-		if (!pmu->id || strcmp(pmu->id, pm->compat))
-			continue;
-
+	if (metricgroup_sys_metric_supported(pm, table))
 		return d->fn(pm, table, d->data);
-	}
+
 	return 0;
 }
 
@@ -1703,6 +1698,106 @@ static int parse_groups(struct evlist *perf_evlist,
 out:
 	metricgroup__free_metrics(&metric_list);
 	return ret;
+}
+
+struct metricgroup__test_event {
+	struct pmu_event *found_event;
+	struct perf_pmu *pmu;
+	char *evsel_name;
+};
+
+static int metricgroup__test_event_iter(const struct pmu_event *pe,
+		const struct pmu_events_table *table __maybe_unused,
+		void *vdata)
+{
+	struct metricgroup__test_event *data = vdata;
+	struct pmu_event *found_event = data->found_event;
+	char *evsel_name = data->evsel_name;
+	struct perf_pmu *pmu = data->pmu;
+
+	if (strcasecmp(pe->name, evsel_name))
+		return 0;
+
+	if (!strcmp(pmu->id, pe->compat)) {
+		/* Copy, as pe is only valid in the iter */
+		memcpy(found_event, pe, sizeof(*pe));
+		/* Stop iter'ing */
+		return 1;
+	}
+
+	return 0;
+}
+
+static bool metricgroup_sys_metric_supported(const struct pmu_metric *pm,
+				const struct pmu_metrics_table *table)
+{
+	const struct pmu_events_table *events_table;
+	bool tool_events[PERF_TOOL_MAX] = {false};
+	struct metric *m = NULL;
+	bool ret = false;
+	int err;
+	LIST_HEAD(list);
+
+	events_table = sys_events_find_events_table(table);
+	if (!events_table)
+		return false;
+
+	err = add_metric(&list /* d->metric_list */, pm,
+			 NULL /* modifier */, false /* metric_no_group */,
+			 false /* metric_no_threshold */, false /* user_requested_cpu_list */,
+			 false /*system wide */, NULL /* root metric */,
+			 NULL /* visited */, table);
+	if (ret)
+		return false;
+
+	/*
+	 * We have a list of metrics. Now generate an evlist per metric, and
+	 * match each evsel. We match evsel by findings its corresponding PMU
+	 * and then ensuring the we can find it in either a. the event list
+	 * associated with the metric or b. if it is a metric referencing an
+	 * explicit PMU. In both cases we match the pmu->id against the event
+	 * compat.
+	 */
+	list_for_each_entry(m, &list, nd) {
+		struct evsel *evsel;
+
+		err = parse_ids(false, NULL, m->pctx, m->modifier,
+				m->group_events, tool_events, &m->evlist);
+		if (err)
+			return false;
+
+		evlist__for_each_entry(m->evlist, evsel) {
+			struct perf_pmu *pmu = perf_pmus__find(evsel->pmu_name);
+			struct pmu_event found_event = {};
+			struct metricgroup__test_event data = {
+				.evsel_name = evsel->name,
+				.found_event = &found_event,
+				.pmu = pmu,
+			};
+
+			if (!pmu)
+				return false;
+
+			pmu_events_table_for_each_event(events_table,
+					metricgroup__test_event_iter,
+					&data);
+			if (found_event.name)
+				continue;
+
+			/*
+			 * We dould not find alias event, so maybe our evsel
+			 * is for a specific PMU.
+			 */
+			if (strchr(evsel->name, '/')) {
+				if (pmu_event_match_pmu(pm->pmu, pm->compat, pmu))
+					continue;
+			}
+
+			return false;
+		}
+	}
+
+	return true;
 }
 
 int metricgroup__parse_groups(struct evlist *perf_evlist,
