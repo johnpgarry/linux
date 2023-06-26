@@ -1261,6 +1261,12 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 
 		has_match = data.has_match;
 	}
+
+	if (has_match) {
+		ret = 0;
+		goto out;
+	}
+
 	{
 		struct metricgroup_iter_data data = {
 			.fn = metricgroup__add_metric_sys_event_iter,
@@ -1279,6 +1285,7 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 
 		pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data);
 	}
+
 	/* End of pmu events. */
 	if (!has_match)
 		ret = -EINVAL;
