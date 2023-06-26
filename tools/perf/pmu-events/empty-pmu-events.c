@@ -290,6 +290,12 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table, pmu
 	return 0;
 }
 
+const struct pmu_events_table *
+sys_events_find_events_table(__maybe_unused const struct pmu_metrics_table *metrics)
+{
+	return NULL;
+}
+
 const struct pmu_events_table *perf_pmu__find_events_table(struct perf_pmu *pmu)
 {
 	const struct pmu_events_table *table = NULL;

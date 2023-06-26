@@ -786,6 +786,17 @@ int pmu_metrics_table_for_each_metric(const struct pmu_metrics_table *table,
         return 0;
 }
 
+const struct pmu_events_table *
+sys_events_find_events_table(const struct pmu_metrics_table *metrics)
+{
+	for (const struct pmu_sys_events *tables = &pmu_sys_event_tables[0];
+             tables->name; tables++) {
+		if (&tables->metric_table == metrics)
+			return &tables->event_table;
+	}
+	return NULL;
+}
+
 const struct pmu_events_table *perf_pmu__find_events_table(struct perf_pmu *pmu)
 {
         const struct pmu_events_table *table = NULL;
