@@ -483,6 +483,7 @@ static int metricgroup__add_to_mep_groups(const struct pmu_metric *pm,
 
 struct metricgroup_iter_data {
 	pmu_metric_iter_fn fn;
+	const char *metric_name;
 	void *data;
 };
 
@@ -494,6 +495,10 @@ static int metricgroup__sys_event_iter(const struct pmu_metric *pm,
 				       void *data)
 {
 	struct metricgroup_iter_data *d = data;
+
+	/* We may be only interested in a specific metric */
+	if (d->metric_name && strcasecmp(d->metric_name, pm->metric_name))
+		return 0;
 
 	if (metricgroup_sys_metric_supported(pm, table))
 		return d->fn(pm, table, d->data);
@@ -1291,6 +1296,7 @@ static int metricgroup__add_metric(const char *pmu, const char *metric_name, con
 				.has_match = &has_match,
 				.ret = &ret,
 			},
+			.metric_name = metric_name,
 		};
 
 		pmu_for_each_sys_metric(metricgroup__sys_event_iter, &data);
