@@ -1,0 +1,26 @@
+[
+   {
+	    "BriefDescription": "trans per cycle smmuv3_pmcg.transaction / (smmuv3_pmcg.cycles + 1) 0x65000013",
+	    "MetricName": "pmcg_trans_per_cycle.all",
+	    "MetricExpr": "smmuv3_pmcg.transaction / (smmuv3_pmcg.cycles + 1)",
+	    "ScaleUnit": "9.765625e-4KB"
+   },
+   {
+	    "BriefDescription": "trans per cycle smmuv3_pmcg.tlb_miss / (smmuv3_pmcg.cycles  + 1) 0x65000013",
+	    "MetricName": "pmcg_tlb_miss_per_cycle.all",
+	    "MetricExpr": "smmuv3_pmcg.tlb_miss / (smmuv3_pmcg.cycles  + 1)",
+	    "ScaleUnit": "9.765625e-4KB"
+   },
+   {
+	    "BriefDescription": "WR_RCVD_SP per RD_RCVD_SP  wr_rcvd_sp + L2_TLB /rd_rcvd_sp+2 0x65000013",
+	    "MetricName": "pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all",
+	    "MetricExpr": "smmuv3_pmcg.wr_rcvd_sp + smmuv3_pmcg.L2_TLB / (smmuv3_pmcg.rd_rcvd_sp  + 2)",
+	    "ScaleUnit": "9.765625e-4KB"
+   },
+   {
+	    "BriefDescription": "WR_SENT_SP per pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all  (WR_SENT_SP+7)/pmcg_wr_rcvd_sp_per_rd_rcvd_sp 0x65000013",
+	    "MetricName": "pmcg_special1.all",
+	    "MetricExpr": "(smmuv3_pmcg.wr_sent_sp + 7) / pmcg_wr_rcvd_sp_per_rd_rcvd_sp.all",
+	    "ScaleUnit": "9.765625e-4KB"
+   }
+]
