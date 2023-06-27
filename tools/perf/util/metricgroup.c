@@ -1130,7 +1130,12 @@ static int metricgroup__add_metric_sys_event_iter(const struct pmu_metric *pm,
 
 out:
 	*(d->ret) = ret;
-	return ret;
+	/*
+	 * Return 1 as we don't want to iter any more, as either:
+	 * a. We found a match
+	 * b. We tried to add a metric, which errored
+	 */
+	return 1;
 }
 
 /**
