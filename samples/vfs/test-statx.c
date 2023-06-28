@@ -34,6 +34,8 @@ struct statx_timestamp;
 #define AT_STATX_FORCE_SYNC	0x2000
 #define AT_STATX_DONT_SYNC	0x4000
 
+#define STATX_WRITE_ATOMIC  0x00004000U /* Want/got atomic_write_* fields */
+
 #ifndef __NR_statx
 #define __NR_statx -1
 #endif
@@ -218,7 +220,7 @@ int main(int argc, char **argv)
 	struct statx stx;
 	int ret, raw = 0, atflag = AT_SYMLINK_NOFOLLOW;
 
-	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
+	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME | STATX_WRITE_ATOMIC;
 
 	for (argv++; *argv; argv++) {
 		if (strcmp(*argv, "-F") == 0) {
