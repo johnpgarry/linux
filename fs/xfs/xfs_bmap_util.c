@@ -87,6 +87,7 @@ xfs_bmap_rtalloc(
 	bool			ignore_locality = false;
 	int			error;
 
+	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	align = xfs_get_extsz_hint(ap->ip);
 retry:
 	prod = align / mp->m_sb.sb_rextsize;
@@ -476,7 +477,7 @@ xfs_getbmap(
 			 * ip->i_delayed_blks == 0.
 			 */
 		}
-
+		pr_err("%s XFS_DATA_FORK calling xfs_get_extsz_hint\n", __func__);
 		if (xfs_get_extsz_hint(ip) ||
 		    (ip->i_diflags &
 		     (XFS_DIFLAG_PREALLOC | XFS_DIFLAG_APPEND)))
@@ -790,20 +791,27 @@ xfs_alloc_file_space(
 	xfs_trans_t		*tp;
 	xfs_bmbt_irec_t		imaps[1], *imapp;
 	int			error;
-
+	pr_err("%s offset=%lld len=%lld\n", __func__,
+		offset, len);
 	trace_xfs_alloc_file_space(ip);
 
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
 	error = xfs_qm_dqattach(ip);
-	if (error)
+	if (error) {
+		pr_err("%s error from xfs_qm_dqattach\n", __func__);
 		return error;
+	}
 
-	if (len <= 0)
+	if (len <= 0) {
+		pr_err("%s error from len\n", __func__);
 		return -EINVAL;
+	}
 
 	rt = XFS_IS_REALTIME_INODE(ip);
+	pr_err("%s2 offset=%lld len=%lld calling xfs_get_extsz_hint\n", __func__,
+		offset, len);
 	extsz = xfs_get_extsz_hint(ip);
 
 	count = len;
@@ -859,35 +867,46 @@ xfs_alloc_file_space(
 
 		error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write,
 				dblocks, rblocks, false, &tp);
-		if (error)
+		if (error) {
+			pr_err("%s error from xfs_trans_alloc_inode\n", __func__);
 			break;
+		}
 
 		error = xfs_iext_count_may_overflow(ip, XFS_DATA_FORK,
 				XFS_IEXT_ADD_NOSPLIT_CNT);
-		if (error == -EFBIG)
+		if (error == -EFBIG) {
+			pr_err("%s EFBIG error from xfs_iext_count_may_overflow\n", __func__);
 			error = xfs_iext_count_upgrade(tp, ip,
 					XFS_IEXT_ADD_NOSPLIT_CNT);
-		if (error)
+		}
+		if (error) {
+			pr_err("%s error from xfs_iext_count_may_overflow/xfs_iext_count_upgrade\n", __func__);
 			goto error;
+		}
 
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
 				&nimaps);
-		if (error)
+		if (error) {
+			pr_err("%s error from xfs_bmapi_write\n", __func__);
 			goto error;
+		}
 
 		ip->i_diflags |= XFS_DIFLAG_PREALLOC;
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 		error = xfs_trans_commit(tp);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		if (error)
+		if (error) {
+			pr_err("%s error from xfs_iunlock\n", __func__);
 			break;
+		}
 
 		allocated_fsb = imapp->br_blockcount;
 
 		if (nimaps == 0) {
 			error = -ENOSPC;
+			pr_err("%s ENOSPC error from nimaps==0\n", __func__);
 			break;
 		}
 
@@ -898,6 +917,7 @@ xfs_alloc_file_space(
 	return error;
 
 error:
+	pr_err("%s11 error=%d\n", __func__, error);
 	xfs_trans_cancel(tp);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
