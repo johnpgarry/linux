@@ -173,15 +173,15 @@ static inline unsigned get_max_io_size(struct bio *bio,
 	unsigned lbs = lim->logical_block_size >> SECTOR_SHIFT;
 	unsigned max_sectors, start, end;
 
-	/*
-	 * We ignore lim->max_sectors for atomic writes simply because
-	 * it may less than bio->write_atomic_unit, which we cannot
-	 * tolerate.
-	 */
-	if (bio->bi_opf & REQ_ATOMIC)
-		max_sectors = lim->atomic_write_max_bytes >> SECTOR_SHIFT;
-	else
-		max_sectors = lim->max_sectors;
+	max_sectors = lim->max_sectors;
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s1 max_sectors=%d from lim->max_sectors bio atomic_write_unit=%d\n",
+			__func__, max_sectors, bio->atomic_write_unit);
+		max_sectors = min(lim->atomic_write_max_bytes >> SECTOR_SHIFT,
+				  max_sectors);
+		pr_err("%s2 REQ_ATOMIC max_sectors=%d from atomic_write_max_bytes=%d\n",
+			__func__, max_sectors, lim->atomic_write_max_bytes);
+	}
 
 	if (lim->chunk_sectors) {
 		max_sectors = min(max_sectors,
