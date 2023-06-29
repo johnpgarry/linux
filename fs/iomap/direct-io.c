@@ -266,10 +266,14 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 
 	if (atomic_write && !iocb_is_dsync(dio->iocb)) {
-		if (iomap->flags & IOMAP_F_DIRTY)
+		if (iomap->flags & IOMAP_F_DIRTY) {
+			pr_err("%s error IOMAP_F_DIRTY\n", __func__);
 			return -EIO;
-		if (iomap->type != IOMAP_MAPPED)
+		}
+		if (iomap->type != IOMAP_MAPPED) {
+			pr_err("%s error IOMAP_MAPPED\n", __func__);
 			return -EIO;
+		}
 	}
 
 	if (iomap->type == IOMAP_UNWRITTEN) {
@@ -655,11 +659,17 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 			if ((iomap_sector(_iomap, iomi.pos) << SECTOR_SHIFT) %
 			    dio->atomic_write_unit) {
 				ret = -EIO;
+				pr_err("%s error atomic_write_unit=%d iomap pos=%lld\n",
+					__func__, dio->atomic_write_unit,
+					iomap_sector(_iomap, iomi.pos) << SECTOR_SHIFT);
 				break;
 			}
 
 			if (iomi_length % dio->atomic_write_unit) {
 				ret = -EIO;
+				pr_err("%s error atomic_write_unit=%d iomap len=%lld\n",
+					__func__, dio->atomic_write_unit,
+					iomi_length);
 				break;
 			}
 		}
