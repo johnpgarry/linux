@@ -520,8 +520,10 @@ xfs_stat_blksize(
 	 * If the file blocks are being allocated from a realtime volume, then
 	 * always return the realtime extent size.
 	 */
-	if (XFS_IS_REALTIME_INODE(ip))
+	if (XFS_IS_REALTIME_INODE(ip)) {
+		pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 		return XFS_FSB_TO_B(mp, xfs_get_extsz_hint(ip));
+	}
 
 	/*
 	 * Allow large block sizes to be reported to userspace programs if the
@@ -537,12 +539,18 @@ xfs_stat_blksize(
 	 * default.
 	 */
 	if (xfs_has_large_iosize(mp)) {
-		if (mp->m_swidth)
+		if (mp->m_swidth) {
+
+			pr_err("%s2 xfs_has_large_iosize m_swidth set returning XFS_FSB_TO_B\n", __func__);
 			return XFS_FSB_TO_B(mp, mp->m_swidth);
-		if (xfs_has_allocsize(mp))
+		}
+		if (xfs_has_allocsize(mp)) {
+			pr_err("%s3 xfs_has_allocsize returning m_allocsize_log\n", __func__);
 			return 1U << mp->m_allocsize_log;
+		}
 	}
 
+	pr_err("%s10 returning PAGE_SIZE\n", __func__);
 	return PAGE_SIZE;
 }
 
@@ -626,7 +634,9 @@ xfs_vn_getattr(
 		}
 		fallthrough;
 	default:
+		pr_err("%s1 calling xfs_stat_blksize\n", __func__);
 		stat->blksize = xfs_stat_blksize(ip);
+		pr_err("%s2 called xfs_stat_blksize blksize=%d\n", __func__, stat->blksize);
 		stat->rdev = 0;
 		break;
 	}
@@ -809,6 +819,7 @@ xfs_setattr_size(
 
 	oldsize = inode->i_size;
 	newsize = iattr->ia_size;
+	pr_err("%s oldsize=%lld newsize=%lld\n", __func__, oldsize, newsize);
 
 	/*
 	 * Short circuit the truncate case for zero length files.
@@ -888,6 +899,7 @@ xfs_setattr_size(
 	 * before writeback the [i_disk_size, newsize] range, so we're
 	 * guaranteed not to write stale data past the new EOF on truncate down.
 	 */
+	pr_err("%s2 calling truncate_setsize newsize=%lld\n", __func__, newsize);
 	truncate_setsize(inode, newsize);
 
 	/*
@@ -906,6 +918,7 @@ xfs_setattr_size(
 			return error;
 	}
 
+	pr_err("%s3 calling xfs_trans_alloc\n", __func__);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate, 0, 0, 0, &tp);
 	if (error)
 		return error;
@@ -947,6 +960,7 @@ xfs_setattr_size(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 	if (newsize <= oldsize) {
+		pr_err("%s4 calling xfs_itruncate_extents\n", __func__);
 		error = xfs_itruncate_extents(&tp, ip, XFS_DATA_FORK, newsize);
 		if (error)
 			goto out_trans_cancel;

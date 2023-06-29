@@ -1238,6 +1238,7 @@ iomap_truncate_page(struct inode *inode, loff_t pos, bool *did_zero,
 	/* Block boundary? Nothing to do */
 	if (!off)
 		return 0;
+	pr_err("%s pos=%lld blocksize(%d) - off(%d)=%d\n", __func__, pos, blocksize, off, blocksize - off);
 	return iomap_zero_range(inode, pos, blocksize - off, did_zero, ops);
 }
 EXPORT_SYMBOL_GPL(iomap_truncate_page);

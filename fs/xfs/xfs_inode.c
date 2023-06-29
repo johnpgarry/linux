@@ -61,12 +61,18 @@ xfs_get_extsz_hint(
 	 * No point in aligning allocations if we need to COW to actually
 	 * write to them.
 	 */
-	if (xfs_is_always_cow_inode(ip))
+	if (xfs_is_always_cow_inode(ip)) {
+		pr_err("%s xfs_is_always_cow_inode, returning 0\n", __func__);
 		return 0;
-	if ((ip->i_diflags & XFS_DIFLAG_EXTSIZE) && ip->i_extsize)
+	}
+	if ((ip->i_diflags & XFS_DIFLAG_EXTSIZE) && ip->i_extsize) {
+		pr_err("%s XFS_DIFLAG_EXTSIZE, returning %d\n", __func__, ip->i_extsize);
 		return ip->i_extsize;
-	if (XFS_IS_REALTIME_INODE(ip))
+	}
+	if (XFS_IS_REALTIME_INODE(ip)) {
+		pr_err("%s XFS_IS_REALTIME_INODE, returning %d\n", __func__, ip->i_mount->m_sb.sb_rextsize);
 		return ip->i_mount->m_sb.sb_rextsize;
+	}
 	return 0;
 }
 
@@ -85,6 +91,7 @@ xfs_get_cowextsz_hint(
 	a = 0;
 	if (ip->i_diflags2 & XFS_DIFLAG2_COWEXTSIZE)
 		a = ip->i_cowextsize;
+	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	b = xfs_get_extsz_hint(ip);
 
 	a = max(a, b);
@@ -1335,6 +1342,7 @@ xfs_itruncate_extents_flags(
 	xfs_fileoff_t		first_unmap_block;
 	xfs_filblks_t		unmap_len;
 	int			error = 0;
+	pr_err("%s new_size=%lld\n", __func__, new_size);
 
 	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL));
 	ASSERT(!atomic_read(&VFS_I(ip)->i_count) ||
@@ -1366,8 +1374,10 @@ xfs_itruncate_extents_flags(
 	}
 
 	unmap_len = XFS_MAX_FILEOFF - first_unmap_block + 1;
+	pr_err("%s2 new_size=%lld unmap_len=%lld\n", __func__, new_size, unmap_len);
 	while (unmap_len > 0) {
 		ASSERT(tp->t_highest_agno == NULLAGNUMBER);
+		pr_err("%s3 calling __xfs_bunmapi unmap_len=%lld\n", __func__, unmap_len);
 		error = __xfs_bunmapi(tp, ip, first_unmap_block, &unmap_len,
 				flags, XFS_ITRUNC_MAX_EXTENTS);
 		if (error)

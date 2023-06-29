@@ -3326,13 +3326,23 @@ xfs_bmap_compute_alignments(
 
 	if (ap->flags & XFS_BMAPI_COWFORK)
 		align = xfs_get_cowextsz_hint(ap->ip);
-	else if (ap->datatype & XFS_ALLOC_USERDATA)
+	else if (ap->datatype & XFS_ALLOC_USERDATA) {
+		pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 		align = xfs_get_extsz_hint(ap->ip);
+		pr_err("%s0 align=%d\n", __func__, align);
+	}
+
 	if (align) {
+		static int count;
+		count++;
+		if (count == 1000)
+			WARN_ON_ONCE(1);
+		pr_err("%s1 before xfs_bmap_extsize_align align=%d before off=%lld length=%d count=%d\n", __func__, align, ap->offset, ap->length, count);
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
 					&ap->length))
 			ASSERT(0);
+		pr_err("%s2 after xfs_bmap_extsize_align align=%d before off=%lld length=%d\n", __func__, align, ap->offset, ap->length);
 		ASSERT(ap->length);
 	}
 
@@ -4349,6 +4359,7 @@ xfs_bmapi_write(
 	orig_nmap = *nmap;
 #endif
 
+	pr_err("%s len=%lld total=%d\n", __func__, len, total);
 	ASSERT(*nmap >= 1);
 	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP);
 	ASSERT(tp != NULL);
