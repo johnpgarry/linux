@@ -214,18 +214,6 @@ void blk_queue_atomic_write_boundary(struct request_queue *q,
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_boundary);
 
-static unsigned int blk_queue_max_guaranteed_bio_size(struct queue_limits *limits)
-{
-	unsigned int max_segments = limits->max_segments;
-	unsigned int atomic_write_max_segments =
-				min(BIO_MAX_VECS, max_segments);
-	/* subtract 1 to assume PAGE-misaligned IOV start address */
-	unsigned int size = (atomic_write_max_segments - 1) *
-				(PAGE_SIZE / SECTOR_SIZE);
-
-	return rounddown_pow_of_two(size);
-}
-
 /**
  * blk_queue_atomic_write_unit_min - smallest unit that can be written
  *				     atomically to the device.
@@ -235,10 +223,7 @@ static unsigned int blk_queue_max_guaranteed_bio_size(struct queue_limits *limit
 void blk_queue_atomic_write_unit_min(struct request_queue *q,
 				     unsigned int sectors)
 {
-	struct queue_limits *limits= &q->limits;
-	unsigned int guaranteed = blk_queue_max_guaranteed_bio_size(limits);
-
-	limits->atomic_write_unit_min = min(guaranteed, sectors);
+	q->limits.atomic_write_unit_min = sectors;
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_unit_min);
 
@@ -251,10 +236,7 @@ EXPORT_SYMBOL(blk_queue_atomic_write_unit_min);
 void blk_queue_atomic_write_unit_max(struct request_queue *q,
 				     unsigned int sectors)
 {
-	struct queue_limits *limits= &q->limits;
-	unsigned int guaranteed = blk_queue_max_guaranteed_bio_size(limits);
-
-	limits->atomic_write_unit_max = min(guaranteed, sectors);
+	q->limits.atomic_write_unit_max = sectors;
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_unit_max);
 
