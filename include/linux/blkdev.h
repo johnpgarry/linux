@@ -1329,36 +1329,14 @@ static inline int queue_dma_alignment(const struct request_queue *q)
 	return q ? q->limits.dma_alignment : 511;
 }
 
-static inline unsigned int blk_queue_max_guaranteed_bio_sectors(const struct queue_limits *limits)
-{
-	unsigned int max_segments = limits->max_segments;
-	unsigned int atomic_write_max_segments =
-				min(BIO_MAX_VECS, max_segments);
-	/* subtract 1 to assume PAGE-misaligned IOV start address */
-	unsigned int sectors = (atomic_write_max_segments - 1) *
-				(PAGE_SIZE / SECTOR_SIZE);
-
-	return sectors;
-}
-
 static inline unsigned int queue_atomic_write_unit_max(const struct request_queue *q)
 {
-	const struct queue_limits *limits = &q->limits;
-	unsigned int atomic_write_unit_max = q->limits.atomic_write_unit_max;
-
-	atomic_write_unit_max = min(atomic_write_unit_max, blk_queue_max_guaranteed_bio_sectors(limits));
-	atomic_write_unit_max = min(atomic_write_unit_max, queue_max_sectors(q));
-	return rounddown_pow_of_two(atomic_write_unit_max << SECTOR_SHIFT);
+	return q->limits.atomic_write_unit_max << SECTOR_SHIFT;
 }
 
 static inline unsigned int queue_atomic_write_unit_min(const struct request_queue *q)
 {
-	const struct queue_limits *limits = &q->limits;
-	unsigned int atomic_write_unit_min = q->limits.atomic_write_unit_min;
-
-	atomic_write_unit_min = min(atomic_write_unit_min, blk_queue_max_guaranteed_bio_sectors(limits));
-	atomic_write_unit_min = min(atomic_write_unit_min, queue_max_sectors(q));
-	return rounddown_pow_of_two(atomic_write_unit_min << SECTOR_SHIFT);
+	return q->limits.atomic_write_unit_min << SECTOR_SHIFT;
 }
 
 static inline unsigned int bdev_dma_alignment(struct block_device *bdev)

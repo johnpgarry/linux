@@ -50,8 +50,9 @@ unsigned int bdev_find_max_atomic_write_alignment(struct block_device *bdev,
 					loff_t pos, unsigned int len)
 {
 	struct request_queue *bd_queue = bdev->bd_queue;
-	unsigned int atomic_write_unit_min = queue_atomic_write_unit_min(bd_queue) >> SECTOR_SHIFT;
-	unsigned int atomic_write_unit_max = queue_atomic_write_unit_max(bd_queue) >> SECTOR_SHIFT;
+	struct queue_limits *limits = &bd_queue->limits;
+	unsigned int atomic_write_unit_min = limits->atomic_write_unit_min;
+	unsigned int atomic_write_unit_max = limits->atomic_write_unit_max;
 	unsigned int max_align;
 
 	pos /= SECTOR_SIZE;
@@ -59,18 +60,15 @@ unsigned int bdev_find_max_atomic_write_alignment(struct block_device *bdev,
 
 	max_align = min_not_zero(len, atomic_write_unit_max);
 
-
-	if (len <= 1) {
+	if (len <= 1)
 		return atomic_write_unit_min * SECTOR_SIZE;
-	}
 
 	max_align = rounddown_pow_of_two(max_align);
 	while (1) {
 		unsigned int mod1, mod2;
 
-		if (max_align == 0) {
+		if (max_align == 0)
 			return atomic_write_unit_min * SECTOR_SIZE;
-		}
 
 		/* This should not happen */
 		if (!is_power_of_2(max_align))
