@@ -1130,7 +1130,7 @@ xfs_iread_bmbt_block(
 	struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, whichfork);
 
 	block = xfs_btree_get_block(cur, level, &bp);
-
+	pr_err("%s cur=%pS block=%pS\n", __func__, cur, block);
 	/* Abort if we find more records than nextents. */
 	num_recs = xfs_btree_get_numrecs(block);
 	if (unlikely(ir->loaded + num_recs > ifp->if_nextents)) {
@@ -1140,12 +1140,18 @@ xfs_iread_bmbt_block(
 				sizeof(*block), __this_address);
 		return -EFSCORRUPTED;
 	}
-
+#if 0
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+#endif
 	/* Copy records into the incore cache. */
 	frp = XFS_BMBT_REC_ADDR(mp, block, 1);
 	for (j = 0; j < num_recs; j++, frp++, ir->loaded++) {
 		struct xfs_bmbt_irec	new;
 		xfs_failaddr_t		fa;
+		pr_err("%s2 cur=%pS block=%pS num_recs=%lld j=%lld\n", __func__, cur, block, num_recs, j);
 
 		xfs_bmbt_disk_get_all(frp, &new);
 		fa = xfs_bmap_validate_extent(ip, whichfork, &new);
@@ -1153,9 +1159,12 @@ xfs_iread_bmbt_block(
 			xfs_inode_verifier_error(ip, -EFSCORRUPTED,
 					"xfs_iread_extents(2)", frp,
 					sizeof(*frp), fa);
+			pr_err("%s2.2 calling xfs_bmap_complain_bad_rec cur=%pS block=%pS num_recs=%lld j=%lld\n", __func__, cur, block, num_recs, j);
 			return xfs_bmap_complain_bad_rec(ip, whichfork, fa,
 					&new);
 		}
+		pr_err("%s2.3 called xfs_bmap_complain_bad_rec new.br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+			__func__, new.br_startoff, new.br_startblock, new.br_blockcount);
 		xfs_iext_insert(ip, &ir->icur, &new,
 				xfs_bmap_fork_to_state(whichfork));
 		trace_xfs_read_extent(ip, &ir->icur,
@@ -1180,9 +1189,12 @@ xfs_iread_extents(
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_btree_cur	*cur;
 	int			error;
+	pr_err("%s\n", __func__);
 
-	if (!xfs_need_iread_extents(ifp))
+	if (!xfs_need_iread_extents(ifp)) {
+		pr_err("%s !xfs_need_iread_extents, returning as fork has extents which were read\n", __func__);
 		return 0;
+	}
 
 	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL));
 
@@ -1239,7 +1251,7 @@ xfs_bmap_first_unused(
 	}
 
 	ASSERT(xfs_ifork_has_extents(ifp));
-
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
@@ -1290,6 +1302,7 @@ xfs_bmap_last_before(
 		return -EFSCORRUPTED;
 	}
 
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
@@ -1311,6 +1324,7 @@ xfs_bmap_last_extent(
 	struct xfs_iext_cursor	icur;
 	int			error;
 
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
@@ -1342,6 +1356,7 @@ xfs_bmap_isaeof(
 	int			error;
 
 	bma->aeof = false;
+	pr_err("%s calling xfs_bmap_last_extent\n", __func__);
 	error = xfs_bmap_last_extent(NULL, bma->ip, whichfork, &rec,
 				     &is_empty);
 	if (error)
@@ -1386,6 +1401,7 @@ xfs_bmap_last_offset(
 	if (XFS_IS_CORRUPT(ip->i_mount, !xfs_ifork_has_extents(ifp)))
 		return -EFSCORRUPTED;
 
+	pr_err("%s calling xfs_bmap_last_extent\n", __func__);
 	error = xfs_bmap_last_extent(NULL, ip, whichfork, &rec, &is_empty);
 	if (error || is_empty)
 		return error;
@@ -3708,6 +3724,8 @@ xfs_bmap_btalloc(
 	orig_length = ap->length;
 
 	stripe_align = xfs_bmap_compute_alignments(ap, &args);
+	pr_err("%s orig_offset=%lld orig_length=%d stripe_align=%d args.alignment=%d (orig=1)\n",
+		__func__, orig_offset, orig_length, stripe_align, args.alignment);
 
 	/* Trim the allocation back to the maximum an AG can fit. */
 	args.maxlen = min(ap->length, mp->m_ag_max_usable);
@@ -3902,6 +3920,7 @@ xfs_bmapi_read(
 
 	XFS_STATS_INC(mp, xs_blk_mapr);
 
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(NULL, ip, whichfork);
 	if (error)
 		return error;
@@ -4385,6 +4404,7 @@ xfs_bmapi_write(
 
 	XFS_STATS_INC(mp, xs_blk_mapw);
 
+	pr_err("%s2 calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		goto error0;
@@ -4671,6 +4691,7 @@ xfs_bmapi_remap(
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
@@ -5312,6 +5333,7 @@ __xfs_bunmapi(
 	ASSERT(len > 0);
 	ASSERT(nexts >= 0);
 
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
@@ -5324,14 +5346,30 @@ __xfs_bunmapi(
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
 	end = start + len;
 
+	pr_err("%s2 end=%lld start=%lld len=%lld\n", __func__, end, start, len);
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
+		pr_err("%s2.1 end=%lld start=%lld len=%lld\n", __func__, end, start, len);
 		*rlen = 0;
 		return 0;
 	}
+	pr_err("%s2.2 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+		__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 	end--;
+#if 0
 
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+
+#endif
 	logflags = 0;
 	if (ifp->if_format == XFS_DINODE_FMT_BTREE) {
+
+
 		ASSERT(ifp->if_format == XFS_DINODE_FMT_BTREE);
 		cur = xfs_bmbt_init_cursor(mp, tp, ip, whichfork);
 		cur->bc_ino.flags = 0;
@@ -5348,9 +5386,14 @@ __xfs_bunmapi(
 		xfs_trans_ijoin(tp, mp->m_rsumip, XFS_ILOCK_EXCL);
 	}
 
+	pr_err("%s2.3 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+		__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 	extno = 0;
 	while (end != (xfs_fileoff_t)-1 && end >= start &&
 	       (nexts == 0 || extno < nexts)) {
+
+		pr_err("%s2.4 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+			__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 		/*
 		 * Is the found extent after a hole in which end lives?
 		 * Just back up to the previous extent, if so.
@@ -5375,6 +5418,8 @@ __xfs_bunmapi(
 		del = got;
 		wasdel = isnullstartblock(del.br_startblock);
 
+		pr_err("%s2.5 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+			__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 		if (got.br_startoff < start) {
 			del.br_startoff = start;
 			del.br_blockcount -= start - got.br_startoff;
@@ -5384,12 +5429,20 @@ __xfs_bunmapi(
 		if (del.br_startoff + del.br_blockcount > end + 1)
 			del.br_blockcount = end + 1 - del.br_startoff;
 
-		if (!isrt)
+		if (!isrt) {
+			pr_err("%s2.5.1 goto delete end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+				__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 			goto delete;
+		}
 
 		sum = del.br_startblock + del.br_blockcount;
 		div_u64_rem(sum, mp->m_sb.sb_rextsize, &mod);
+		pr_err("%s2.6 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld mod=%d\n",
+			__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, mod);
 		if (mod) {
+
+			pr_err("%s2.7 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+				__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 			/*
 			 * Realtime extent not lined up at the end.
 			 * The extent could have been split into written
@@ -5398,6 +5451,8 @@ __xfs_bunmapi(
 			 * get rid of part of a realtime extent.
 			 */
 			if (del.br_state == XFS_EXT_UNWRITTEN) {
+				pr_err("%s2.8 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+					__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 				/*
 				 * This piece is unwritten, or we're not
 				 * using unwritten extents.  Skip over it.
@@ -5436,9 +5491,14 @@ __xfs_bunmapi(
 			goto nodelete;
 		}
 		div_u64_rem(del.br_startblock, mp->m_sb.sb_rextsize, &mod);
+
+		pr_err("%s2.9 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld mod=%d\n",
+			__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, mod);
 		if (mod) {
 			xfs_extlen_t off = mp->m_sb.sb_rextsize - mod;
 
+			pr_err("%s2.9.1 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld mod=%d\n",
+				__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, mod);
 			/*
 			 * Realtime extent is lined up at the end but not
 			 * at the front.  We'll get rid of full extents if
@@ -5460,8 +5520,12 @@ __xfs_bunmapi(
 				if (got.br_startoff > end &&
 				    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 					done = true;
+					pr_err("%s2.9.2 break end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld mod=%d\n",
+						__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, mod);
 					break;
 				}
+				pr_err("%s2.9.3 continue end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld mod=%d\n",
+						__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, mod);
 				continue;
 			} else if (del.br_state == XFS_EXT_UNWRITTEN) {
 				struct xfs_bmbt_irec	prev;
@@ -5492,6 +5556,8 @@ __xfs_bunmapi(
 						&prev, &logflags);
 				if (error)
 					goto error0;
+				pr_err("%s2.9.4 goto nodelete break end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld mod=%d\n",
+						__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, mod);
 				goto nodelete;
 			} else {
 				ASSERT(del.br_state == XFS_EXT_NORM);
@@ -5501,11 +5567,17 @@ __xfs_bunmapi(
 						&del, &logflags);
 				if (error)
 					goto error0;
+				pr_err("%s2.9.5 goto nodelete break end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld mod=%d\n",
+						__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, mod);
 				goto nodelete;
 			}
 		}
 
+		pr_err("%s2.9.1 before delete end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld wasdel=%d\n",
+				__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, wasdel);
 delete:
+		pr_err("%s2.10 delete end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld wasdel=%d\n",
+				__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount, wasdel);
 		if (wasdel) {
 			error = xfs_bmap_del_extent_delay(ip, whichfork, &icur,
 					&got, &del);
@@ -5521,6 +5593,8 @@ delete:
 
 		end = del.br_startoff - 1;
 nodelete:
+		pr_err("%s2.11 nodelete end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+				__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 		/*
 		 * If not done go on to the next (previous) record.
 		 */
@@ -5542,7 +5616,11 @@ nodelete:
 	/*
 	 * Convert to a btree if necessary.
 	 */
+	pr_err("%s3 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+			__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 	if (xfs_bmap_needs_btree(ip, whichfork)) {
+		pr_err("%s3.1 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+				__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 		ASSERT(cur == NULL);
 		error = xfs_bmap_extents_to_btree(tp, ip, &cur, 0,
 				&tmp_logflags, whichfork);
@@ -5553,6 +5631,8 @@ nodelete:
 	}
 
 error0:
+	pr_err("%s4 error0 end=%lld start=%lld len=%lld got br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n",
+			__func__, end, start, len, got.br_startoff, got.br_startblock, got.br_blockcount);
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent records if we've converted to btree format.
@@ -5782,6 +5862,7 @@ xfs_bmap_collapse_extents(
 
 	ASSERT(xfs_isilocked(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL));
 
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
@@ -5859,6 +5940,7 @@ xfs_bmap_can_insert_extents(
 		return -EIO;
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	pr_err("%s calling xfs_bmap_last_extent\n", __func__);
 	error = xfs_bmap_last_extent(NULL, ip, XFS_DATA_FORK, &got, &is_empty);
 	if (!error && !is_empty && got.br_startoff >= off &&
 	    ((got.br_startoff + shift) & BMBT_STARTOFF_MASK) < got.br_startoff)
@@ -5897,6 +5979,7 @@ xfs_bmap_insert_extents(
 
 	ASSERT(xfs_isilocked(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL));
 
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
@@ -5999,6 +6082,7 @@ xfs_bmap_split_extent(
 		return -EIO;
 
 	/* Read in all the extents */
+	pr_err("%s calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(tp, ip, whichfork);
 	if (error)
 		return error;
