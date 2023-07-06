@@ -2549,7 +2549,6 @@ int security_file_permission(struct file *file, int mask)
 
 	return fsnotify_perm(file, mask);
 }
-EXPORT_SYMBOL(security_file_permission);
 
 /**
  * security_file_alloc() - Allocate and init a file's LSM blob

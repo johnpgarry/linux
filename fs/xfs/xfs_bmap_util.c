@@ -776,12 +776,10 @@ int
 xfs_alloc_file_space(
 	struct xfs_inode	*ip,
 	xfs_off_t		offset,
-	xfs_off_t		len,
-	xfs_off_t		align)
+	xfs_off_t		len)
 {
 	xfs_mount_t		*mp = ip->i_mount;
 	xfs_off_t		count;
-	xfs_filblks_t		align_fsb;
 	xfs_filblks_t		allocated_fsb;
 	xfs_filblks_t		allocatesize_fsb;
 	xfs_extlen_t		extsz, temp;
@@ -813,7 +811,6 @@ xfs_alloc_file_space(
 	nimaps = 1;
 	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	endoffset_fsb = XFS_B_TO_FSB(mp, offset + count);
-	align_fsb = XFS_B_TO_FSB(mp, align);
 	allocatesize_fsb = endoffset_fsb - startoffset_fsb;
 
 	/*
@@ -875,7 +872,7 @@ xfs_alloc_file_space(
 
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
-				&nimaps, align_fsb);
+				&nimaps);
 		if (error)
 			goto error;
 

@@ -93,7 +93,6 @@ xfs-y				+= xfs_aops.o \
 				   xfs_sysfs.o \
 				   xfs_trans.o \
 				   xfs_xattr.o \
-				   xfs_fs_staging.o \
 				   kmem.o
 
 # low-level transaction/log code

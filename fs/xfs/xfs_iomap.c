@@ -306,7 +306,7 @@ xfs_iomap_write_direct(
 	 */
 	nimaps = 1;
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb, bmapi_flags, 0,
-				imap, &nimaps, 0);
+				imap, &nimaps);
 	if (error)
 		goto out_trans_cancel;
 
@@ -614,7 +614,7 @@ xfs_iomap_write_unwritten(
 		nimaps = 1;
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
-					&nimaps, 0);
+					&nimaps);
 		if (error)
 			goto error_on_bmapi_transaction;
 
