@@ -3605,7 +3605,9 @@ xfs_bmap_btalloc_low_space(
 	struct xfs_alloc_arg	*args)
 {
 	int			error;
-
+	pr_err("%s *********************\n", __func__);
+	//BUG();
+	WARN_ON_ONCE(1);
 	if (args->minlen > ap->minlen) {
 		args->minlen = ap->minlen;
 		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
@@ -3745,7 +3747,7 @@ xfs_bmap_btalloc(
 		.wasdel		= ap->wasdel,
 		.resv		= XFS_AG_RESV_NONE,
 		.datatype	= ap->datatype,
-		.alignment	= 1,
+		.alignment	= 16,
 		.minalignslop	= 0,
 	};
 	xfs_fileoff_t		orig_offset;
