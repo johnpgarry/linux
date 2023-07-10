@@ -46,6 +46,45 @@ struct block_device *I_BDEV(struct inode *inode)
 }
 EXPORT_SYMBOL(I_BDEV);
 
+unsigned int bdev_find_max_atomic_write_alignment(struct block_device *bdev,
+					loff_t pos, unsigned int len)
+{
+	struct request_queue *bd_queue = bdev->bd_queue;
+	struct queue_limits *limits = &bd_queue->limits;
+	unsigned int atomic_write_unit_min = limits->atomic_write_unit_min;
+	unsigned int atomic_write_unit_max = limits->atomic_write_unit_max;
+	unsigned int max_align;
+
+	pos /= SECTOR_SIZE;
+	len /= SECTOR_SIZE;
+
+	max_align = min_not_zero(len, atomic_write_unit_max);
+
+	if (len <= 1)
+		return atomic_write_unit_min * SECTOR_SIZE;
+
+	max_align = rounddown_pow_of_two(max_align);
+	while (1) {
+		unsigned int mod1, mod2;
+
+		if (max_align == 0)
+			return atomic_write_unit_min * SECTOR_SIZE;
+
+		/* This should not happen */
+		if (!is_power_of_2(max_align))
+			goto end;
+
+		mod1 = len % max_align;
+		mod2 = pos % max_align;
+		if (!mod1 && !mod2)
+			break;
+end:
+		max_align /= 2;
+	}
+
+	return max_align * SECTOR_SIZE;
+}
+
 static void bdev_write_inode(struct block_device *bdev)
 {
 	struct inode *inode = bdev->bd_inode;
