@@ -3738,6 +3738,7 @@ xfs_bmap_btalloc(
 	struct xfs_bmalloca	*ap)
 {
 	struct xfs_mount	*mp = ap->ip->i_mount;
+	xfs_extlen_t extsz_hint = xfs_get_extsz_hint(ap->ip) ? : 1;
 	struct xfs_alloc_arg	args = {
 		.tp		= ap->tp,
 		.mp		= mp,
@@ -3747,7 +3748,7 @@ xfs_bmap_btalloc(
 		.wasdel		= ap->wasdel,
 		.resv		= XFS_AG_RESV_NONE,
 		.datatype	= ap->datatype,
-		.alignment	= 16,
+		.alignment	= (ap->ip->i_diflags2 & XFS_DIFLAG2_DAX) ? extsz_hint : 1,
 		.minalignslop	= 0,
 	};
 	xfs_fileoff_t		orig_offset;
@@ -3759,10 +3760,10 @@ xfs_bmap_btalloc(
 	orig_offset = ap->offset;
 	orig_length = ap->length;
 
-	pr_err("%s orig_offset=%lld orig_length=%d args.alignmsent=%d (orig=1) calling xfs_bmap_compute_alignments\n",
-		__func__, orig_offset, orig_length, args.alignment);
+	pr_err("%s orig_offset=%lld orig_length=%d args.alignment=%d (orig=1) calling xfs_bmap_compute_alignments XFS_DIFLAG2_DAX=%d extsz_hint=%d\n",
+		__func__, orig_offset, orig_length, args.alignment, !!(ap->ip->i_diflags2 & XFS_DIFLAG2_DAX), extsz_hint);
 	stripe_align = xfs_bmap_compute_alignments(ap, &args);
-	pr_err("%s0 orig_offset=%lld orig_length=%d stripe_align=%d args.alignmsent=%d fsbno=%lld (orig=1) called xfs_bmap_compute_alignments ap->blkno=%lld\n",
+	pr_err("%s0 orig_offset=%lld orig_length=%d stripe_align=%d args.alignment=%d fsbno=%lld (orig=1) called xfs_bmap_compute_alignments ap->blkno=%lld\n",
 		__func__, orig_offset, orig_length, stripe_align, args.alignment, args.fsbno, ap->blkno);
 
 	/* Trim the allocation back to the maximum an AG can fit. */
