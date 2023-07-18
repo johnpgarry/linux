@@ -1864,7 +1864,7 @@ static void nvme_set_queue_limits(struct nvme_ctrl *ctrl,
 		struct request_queue *q)
 {
 	bool vwc = ctrl->vwc & NVME_CTRL_VWC_PRESENT;
-
+	pr_err("%s q=%pS\n", __func__, q);
 	if (ctrl->max_hw_sectors) {
 		u32 max_segments =
 			(ctrl->max_hw_sectors / (NVME_CTRL_PAGE_SIZE >> 9)) + 1;

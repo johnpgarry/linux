@@ -826,6 +826,7 @@ int blk_register_queue(struct gendisk *disk)
 {
 	struct request_queue *q = disk->queue;
 	int ret;
+	pr_err("%s q=%pS q->elevator=%pS\n", __func__, q, q->elevator);
 
 	mutex_lock(&q->sysfs_dir_lock);
 	kobject_init(&disk->queue_kobj, &blk_queue_ktype);
@@ -842,6 +843,7 @@ int blk_register_queue(struct gendisk *disk)
 
 	mutex_lock(&q->debugfs_mutex);
 	q->debugfs_dir = debugfs_create_dir(disk->disk_name, blk_debugfs_root);
+	pr_err("%s2 q=%pS q->elevator=%pS\n", __func__, q, q->elevator);
 	if (queue_is_mq(q))
 		blk_mq_debugfs_register(q);
 	mutex_unlock(&q->debugfs_mutex);
@@ -850,6 +852,7 @@ int blk_register_queue(struct gendisk *disk)
 	if (ret)
 		goto out_debugfs_remove;
 
+	pr_err("%s3 q=%pS q->elevator=%pS\n", __func__, q, q->elevator);
 	if (q->elevator) {
 		ret = elv_register_queue(q, false);
 		if (ret)

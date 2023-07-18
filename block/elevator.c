@@ -459,14 +459,15 @@ static const struct kobj_type elv_ktype = {
 	.sysfs_ops	= &elv_sysfs_ops,
 	.release	= elevator_release,
 };
-
+extern struct request_queue *special_request_q;
 int elv_register_queue(struct request_queue *q, bool uevent)
 {
 	struct elevator_queue *e = q->elevator;
 	int error;
 
 	lockdep_assert_held(&q->sysfs_lock);
-
+	pr_err("%s q=%pS calling kobject_add for iosched\n", __func__, q);
+	WARN_ON_ONCE(q == special_request_q);
 	error = kobject_add(&e->kobj, &q->disk->queue_kobj, "iosched");
 	if (!error) {
 		struct elv_fs_entry *attr = e->type->elevator_attrs;
@@ -566,6 +567,8 @@ static inline bool elv_support_iosched(struct request_queue *q)
  */
 static struct elevator_type *elevator_get_default(struct request_queue *q)
 {
+	pr_err("%s q=%pS BLK_MQ_F_NO_SCHED_BY_DEFAULT=%d\n", __func__, q,
+		!!(q->tag_set && q->tag_set->flags & BLK_MQ_F_NO_SCHED_BY_DEFAULT));
 	if (q->tag_set && q->tag_set->flags & BLK_MQ_F_NO_SCHED_BY_DEFAULT)
 		return NULL;
 
@@ -611,6 +614,7 @@ void elevator_init_mq(struct request_queue *q)
 	struct elevator_type *e;
 	int err;
 
+	pr_err("%s q=%pS elv_support_iosched=%d\n", __func__, q, elv_support_iosched(q));
 	if (!elv_support_iosched(q))
 		return;
 
@@ -731,6 +735,7 @@ static int elevator_change(struct request_queue *q, const char *elevator_name)
 		return 0;
 
 	e = elevator_find_get(q, elevator_name);
+	pr_err("%s q=%pS e=%pS\n", __func__, q, e);
 	if (!e) {
 		request_module("%s-iosched", elevator_name);
 		e = elevator_find_get(q, elevator_name);

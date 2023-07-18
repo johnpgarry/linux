@@ -5454,12 +5454,15 @@ static int scsi_debug_slave_alloc(struct scsi_device *sdp)
 		       sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
 	return 0;
 }
-
+struct request_queue *special_request_q;
 static int scsi_debug_slave_configure(struct scsi_device *sdp)
 {
 	struct sdebug_dev_info *devip =
 			(struct sdebug_dev_info *)sdp->hostdata;
 
+	pr_err("%s request_queue=%pS\n", __func__, sdp->request_queue);
+	if (!special_request_q)
+		special_request_q = sdp->request_queue;
 	if (sdebug_verbose)
 		pr_info("slave_configure <%u %u %u %llu>\n",
 		       sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);

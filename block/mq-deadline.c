@@ -688,12 +688,15 @@ static void dd_exit_sched(struct elevator_queue *e)
 /*
  * initialize elevator private data (deadline_data).
  */
+extern struct request_queue *special_request_q;
 static int dd_init_sched(struct request_queue *q, struct elevator_type *e)
 {
 	struct deadline_data *dd;
 	struct elevator_queue *eq;
 	enum dd_prio prio;
 	int ret = -ENOMEM;
+	pr_err("%s q=%pS e=%pS\n", __func__, q, e);
+	WARN_ON_ONCE(special_request_q == q);
 
 	eq = elevator_alloc(q, e);
 	if (!eq)
