@@ -243,6 +243,8 @@ static void print_extent_info(struct fiemap_extent *fm_extent, int cur_ex,
 	if (alignment && physical_blk % alignment) {
 		if (fm_extent->fe_flags & FIEMAP_EXTENT_UNWRITTEN) {
 			printf("%s warning physical_blk=%lld alignment=%d UNWRITTEN\n", __func__, physical_blk, alignment);
+		} else if (fm_extent->fe_flags & FIEMAP_EXTENT_SHARED) {
+			printf("%s warning physical_blk=%lld alignment=%d SHARED\n", __func__, physical_blk, alignment);
 		} else {
 			printf("%s error physical_blk=%lld alignment=%d WRITTEN\n", __func__, physical_blk, alignment);
 			exit(0);
