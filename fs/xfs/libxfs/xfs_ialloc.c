@@ -703,7 +703,7 @@ xfs_ialloc_ag_alloc(
 		 * indicate that extra blocks might be required for alignment,
 		 * but not to use them in the actual exact allocation.
 		 */
-		args.alignment = 1;
+		args.alignments = 1;
 		args.minalignslop = igeo->cluster_align - 1;
 
 		/* Allow space for the inode btree to split. */
@@ -739,10 +739,10 @@ xfs_ialloc_ag_alloc(
 		isaligned = 0;
 		if (igeo->ialloc_align) {
 			ASSERT(!xfs_has_noalign(args.mp));
-			args.alignment = args.mp->m_dalign;
+			args.alignments = args.mp->m_dalign;
 			isaligned = 1;
 		} else
-			args.alignment = igeo->cluster_align;
+			args.alignments = igeo->cluster_align;
 		/*
 		 * Allocate a fixed-size extent of inodes.
 		 */
@@ -763,7 +763,7 @@ xfs_ialloc_ag_alloc(
 	 * alignment.
 	 */
 	if (isaligned && args.fsbno == NULLFSBLOCK) {
-		args.alignment = igeo->cluster_align;
+		args.alignments = igeo->cluster_align;
 		error = xfs_alloc_vextent_near_bno(&args,
 				XFS_AGB_TO_FSB(args.mp, pag->pag_agno,
 						be32_to_cpu(agi->agi_root)));
@@ -779,7 +779,7 @@ xfs_ialloc_ag_alloc(
 	    igeo->ialloc_min_blks < igeo->ialloc_blks &&
 	    args.fsbno == NULLFSBLOCK) {
 sparse_alloc:
-		args.alignment = args.mp->m_sb.sb_spino_align;
+		args.alignments = args.mp->m_sb.sb_spino_align;
 		args.prod = 1;
 
 		args.minlen = igeo->ialloc_min_blks;

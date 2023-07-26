@@ -1818,7 +1818,7 @@ DECLARE_EVENT_CLASS(xfs_alloc_class,
 		__entry->prod = args->prod;
 		__entry->minleft = args->minleft;
 		__entry->total = args->total;
-		__entry->alignment = args->alignment;
+		__entry->alignment = args->alignments;
 		__entry->minalignslop = args->minalignslop;
 		__entry->len = args->len;
 		__entry->wasdel = args->wasdel;

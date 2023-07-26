@@ -45,7 +45,7 @@ typedef struct xfs_alloc_arg {
 	xfs_extlen_t	prod;		/* prod value for extent size */
 	xfs_extlen_t	minleft;	/* min blocks must be left after us */
 	xfs_extlen_t	total;		/* total blocks needed in xaction */
-	xfs_extlen_t	alignment;	/* align answer to multiple of this */
+	xfs_extlen_t	alignments;	/* align answer to multiple of this */
 	xfs_extlen_t	minalignslop;	/* slop for minlen+alignment calcs */
 	xfs_agblock_t	min_agbno;	/* set an agbno range for NEAR allocs */
 	xfs_agblock_t	max_agbno;	/* ... */
