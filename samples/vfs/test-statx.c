@@ -44,7 +44,12 @@ static __attribute__((unused))
 ssize_t statx(int dfd, const char *filename, unsigned flags,
 	      unsigned int mask, struct statx *buffer)
 {
-	return syscall(__NR_statx, dfd, filename, flags, mask, buffer);
+	int rc;
+    printf("%s dfd=%d filename=%s flags=%d mask=%d __NR_statx=%d\n", __func__, dfd, filename, flags, mask, __NR_statx);
+	rc= syscall(__NR_statx, dfd, filename, flags, mask, buffer);
+	printf("%s2 dfd=%d filename=%s flags=%d mask=%d rc=%d\n", __func__, dfd, filename, flags, mask, rc);
+	
+	return rc;
 }
 
 static void print_time(const char *field, struct statx_timestamp *ts)

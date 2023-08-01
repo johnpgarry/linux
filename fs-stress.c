@@ -21,6 +21,7 @@
 #include <time.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
 #define statx foo
@@ -42,12 +43,12 @@ struct statx_timestamp;
 #define __NR_statx -1
 #endif
 
-
+extern int open(char *, int);
 
 enum ACTION {
     ACTION_CREATE = 0,
-    ACTION_DELETE = 5,
-    ACTION_WRITE = 10,
+    ACTION_DELETE = 2,
+    ACTION_WRITE = 4,
     ACTION_TRUNCATE = 11,
     ACTION_COUNT
 };
@@ -182,7 +183,8 @@ ssize_t statx(int dfd, const char *filename, unsigned flags,
     return rc;
 }
 
-int write_to_file(char * const * dir_path, char **file_to_write_to, unsigned long file_count)
+
+int write_to_file(char * const * dir_path, char **file_to_write_to, unsigned long file_count, unsigned long average_file_size)
 {
     unsigned long file_index = rand() % file_count;
     int fd;
@@ -195,6 +197,12 @@ int write_to_file(char * const * dir_path, char **file_to_write_to, unsigned lon
     int stx_atflag = AT_SYMLINK_NOFOLLOW;
     int rc;
     unsigned int stx_mask = STATX_ALL;
+    ssize_t size_written;
+    struct iovec iov[1];
+    int type_of_write;
+    ssize_t size_of_write;
+    int offset_of_write;
+    unsigned long average_file_size_sectors = average_file_size / 512;
 
     printf("%s *dir_path=%s file_index=%ld file_count=%ld dir_name=%s\n", __func__, *dir_path, file_index, file_count, dir_name);
 
@@ -264,7 +272,84 @@ found_file:
         return fd;
     }
 
+    type_of_write = rand() % 50;
+
+    printf("%s1 type_of_write=%d stx_blocks=%d\n", __func__,
+        type_of_write, stx_buffer.stx_blocks);
+    switch (type_of_write) {
+    case 21 ... 30:
+        // Re-write all current data
+        size_of_write = stx_buffer.stx_blocks;
+        offset_of_write = 0;
+        break;
+    case 31 ... 38:
+        // write from end of data
+        while (1) {
+            size_of_write = rand() % stx_buffer.stx_blocks;
+            size_of_write /= 10;
+            size_of_write++;
+            if (size_of_write > 0)
+                break;
+        }
+        offset_of_write = stx_buffer.stx_blocks;
+        break;
+    case 39 ... 49:
+        // Extend file with a hole
+        // write from end of data
+        while (1) {
+            size_of_write = rand() % stx_buffer.stx_blocks;
+            size_of_write /= 10;
+            size_of_write++;
+            break;
+        }
+        while (1) {
+            offset_of_write = rand() % stx_buffer.stx_blocks;
+            offset_of_write /= 10;
+            offset_of_write++;
+            offset_of_write += stx_buffer.stx_blocks;
+            break;
+        }
+        break;
+    case 0 ... 20:
+    default:
+        // Just write a subset of current data
+        while (1) {
+            size_of_write = rand() % stx_buffer.stx_blocks;
+            if (size_of_write > 0)
+                break;
+        }
+        
+        while (1) {
+            offset_of_write = rand() % stx_buffer.stx_blocks;
+            if (size_of_write + offset_of_write <= stx_buffer.stx_blocks)
+                break;
+        }
+        break;
+    }
+
+    printf("%s2 writing size_of_write=%d offset_of_write=%d stx_blocks=%d\n", __func__,
+        size_of_write, offset_of_write, stx_buffer.stx_blocks);
+
+    size_of_write *= 512;
+    offset_of_write *= 512;
+
+    iov[0].iov_len = size_of_write;
+
+    iov[0].iov_base = malloc(iov[0].iov_len);
+    if (!iov[0].iov_base) {
+        close(fd);
+        printf("%s5 could not alloc buffer of size %d \n", __func__, iov[0].iov_len);
+        return -1;
+    }
+
+    size_written = pwritev2(fd, iov, 1, offset_of_write, 0);
+    free(iov[0].iov_base);
+
     close(fd);
+    if (size_written != iov[0].iov_len) {
+        printf("%s6 wrote %zd, but should have written \n", __func__, size_written, iov[0].iov_len);
+        return -1;
+    }
 
     return 0;
 }
@@ -370,7 +455,7 @@ int main(int argc, char* const argv[])
                 char *file_to_write_to = NULL;
                 if (file_count == 0)
                     continue;
-                int rc = write_to_file(argv, &file_to_write_to, file_count);
+                int rc = write_to_file(argv, &file_to_write_to, file_count, average_file_size);
                 if (rc < 0) {
                     printf("could not write to file %s, rc=%d\n", file_to_write_to, rc);
                     exit(0);
