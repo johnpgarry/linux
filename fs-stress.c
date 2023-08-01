@@ -517,7 +517,10 @@ int main(int argc, char* const argv[])
     printf("7 average_file_size_bytes=%ld \n", average_file_size_bytes);
 
     while (1) {
-        enum ACTION action = get_random_action();
+        enum ACTION action;
+        if (file_count > 5)
+            usleep(500000);
+        action = get_random_action();
         if (action < 0)
             break;
 
