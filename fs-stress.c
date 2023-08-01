@@ -38,6 +38,7 @@ int main(int argc, char* const argv[])
     unsigned long size;
     char read_buffer[PAGE_SIZE];
     int file_count;
+    unsigned long average_file_size;
 
     if (argc < 4) {
         printf("Usage: mount_dev dir_absolute_path file_count\n", argv[0]);
@@ -73,6 +74,9 @@ int main(int argc, char* const argv[])
         return read_size;
     size = atol(read_buffer);
     printf("6 size=%ld sectors or %ld bytes\n", size, size * 512);
+    size *= 512;
+
+    average_file_size = size / file_count;
 
     fd = mkdir(dir_path, 0666);
     if (fd < 0) {
@@ -87,5 +91,6 @@ int main(int argc, char* const argv[])
 
     close(fd);
 
+    printf("7 average_file_size=%ld \n", average_file_size);
     return 0;
 }
