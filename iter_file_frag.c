@@ -54,6 +54,8 @@ int main(int argc, char* const argv[])
     FTS* file_system = NULL;
     FTSENT *node    = NULL;
     int alignment;
+    struct statx stx;
+    
 
     if (argc < 3) {
         printf("Usage: %s <path-spec> alignment\n", argv[0]);

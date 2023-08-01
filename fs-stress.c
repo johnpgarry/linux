@@ -1,3 +1,7 @@
+
+#define _GNU_SOURCE
+#define _ATFILE_SOURCE
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -7,23 +11,38 @@
 
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <stdio.h>
 
+
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <errno.h>
+#include <time.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
 #include <linux/stat.h>
+#include <linux/fcntl.h>
+#define statx foo
+#define statx_timestamp foo_timestamp
+struct statx;
+struct statx_timestamp;
 #include <sys/stat.h>
-#include <fcntl.h>
-#define __NR_statx 291
+#undef statx
+#undef statx_timestamp
+
+#define AT_STATX_SYNC_TYPE  0x6000
+#define AT_STATX_SYNC_AS_STAT   0x0000
+#define AT_STATX_FORCE_SYNC 0x2000
+#define AT_STATX_DONT_SYNC  0x4000
+
+#define STATX_WRITE_ATOMIC  0x00004000U /* Want/got atomic_write_* fields */
+
+#ifndef __NR_statx
+#define __NR_statx -1
+#endif
 
 
-unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
-
-static ssize_t statx(int fd, const char *filename, unsigned flags,
-    unsigned mask, struct statx *buffer)
-{
-    return syscall(__NR_statx, fd, filename, flags, mask, buffer);
-
-}
 
 enum ACTION {
     ACTION_CREATE = 0,
@@ -55,9 +74,16 @@ enum ACTION get_random_action(void)
 
 int create_file(char *dir_path, unsigned long long file_name_create_index)
 {
-    int rc = 0;
     char file_name[256];
     int fd;
+    unsigned char buffer[8192];
+    ssize_t size_written;
+    char mode[] = "0777";
+    int i = strtol(mode, 0, 8);
+    int rc;
+    
+    for (fd=0;fd<8192;fd++)
+        buffer[fd] = (char)fd;
    
     sprintf(file_name, "%s/file_%lld", dir_path, file_name_create_index);
 
@@ -67,9 +93,21 @@ int create_file(char *dir_path, unsigned long long file_name_create_index)
         printf("%s could not open filename=%s fd=%d\n", __func__, file_name, fd);
         return fd;
     }
+    size_written = write(fd, &buffer[0], 8192);
     close(fd);
 
-    return rc;
+    if (size_written != 8192) {
+        printf("%s only wrote %zd byte(s) for %s\n", __func__, size_written, file_name);
+        return -1;
+    }
+
+    rc = chmod (file_name, i);
+    if (rc < 0) {
+        printf("%s could not change mode for %s rc=%d i=%d\n", __func__, file_name, rc, i);
+        return -1;
+    }
+
+    return 0;
 }
 
 int compare(const FTSENT** one, const FTSENT** two)
@@ -129,6 +167,106 @@ void delete_all_files(char * const * dir_path)
             }
     }
     fts_close(file_system);
+}
+
+
+static __attribute__((unused))
+ssize_t statx(int dfd, const char *filename, unsigned flags,
+          unsigned int mask, struct statx *buffer)
+{
+    int rc;
+    printf("%s dfd=%d filename=%s flags=%d mask=%d __NR_statx=%d\n", __func__, dfd, filename, flags, mask, __NR_statx);
+    rc= syscall(__NR_statx, dfd, filename, flags, mask, buffer);
+    printf("%s2 dfd=%d filename=%s flags=%d mask=%d rc=%d\n", __func__, dfd, filename, flags, mask, rc);
+    
+    return rc;
+}
+
+int write_to_file(char * const * dir_path, char **file_to_write_to, unsigned long file_count)
+{
+    unsigned long file_index = rand() % file_count;
+    int fd;
+    FTS* file_system = NULL;
+    FTSENT *node    = NULL;
+    char *dir_name = *dir_path;
+    char           *fts_accpath = NULL;
+    unsigned long count = 0;
+    struct statx stx_buffer;
+    int stx_atflag = AT_SYMLINK_NOFOLLOW;
+    int rc;
+    unsigned int stx_mask = STATX_ALL;
+
+    printf("%s *dir_path=%s file_index=%ld file_count=%ld dir_name=%s\n", __func__, *dir_path, file_index, file_count, dir_name);
+
+    while (1) {
+        char *tmp;
+        dir_name++;
+       // printf("%s00 dir_name=%s tmp=%s\n", __func__, dir_name, tmp);
+        tmp = strstr(dir_name, "/");
+       // printf("%s01 dir_name=%s tmp=%s\n", __func__, dir_name, tmp);
+        if (!tmp)
+            break;
+    }
+
+    file_system = fts_open(dir_path, FTS_COMFOLLOW | FTS_NOCHDIR, &compare);
+    if (!file_system) {
+        printf("Could not open %s\n", *dir_path);
+    }
+
+    while( (node = fts_read(file_system)) != NULL) 
+    {
+            switch (node->fts_info) 
+            {
+                case FTS_D :
+                case FTS_F :
+                case FTS_SL:
+                    {
+                        //printf("%s3 node->fts_name=%s fts_path=%s fts_accpath=%s\n",
+                        //    __func__, node->fts_name, node->fts_path, node->fts_accpath);
+                        if (!strcmp(node->fts_name, "."))
+                            continue;
+                        if (!strcmp(node->fts_name, ".."))
+                            continue;
+                        if (!strcmp(node->fts_name, dir_name))
+                            continue;
+                        if (count == file_index) {
+                            fts_accpath = strdup(node->fts_accpath);
+                            goto found_file;
+                        }
+                        count++;
+                    }
+                    break;
+                default:
+                    break;
+            }
+    }
+found_file:
+    fts_close(file_system);
+    
+    if (fts_accpath == NULL) {
+        printf("%s3 fts_accpath=%s\n", __func__, fts_accpath);
+        return -1;
+    }
+
+    *file_to_write_to = fts_accpath;
+    //flags=256 mask=20479
+    rc = statx(-100, fts_accpath, 256, 20479, &stx_buffer);
+    if (rc) {
+      printf("statx(%s) = %d\n", fts_accpath, rc);
+      return -1;
+    }
+
+    printf("statx(%s) stx_size = %lld stx_blocks=%lld\n", fts_accpath, stx_buffer.stx_size, stx_buffer.stx_blocks);
+
+    fd = open(fts_accpath, O_WRONLY);
+    if (fd < 0) {
+        printf("%s4 could not open fts_accpath=%s fd=%d\n", __func__, fts_accpath, fd);
+        return fd;
+    }
+
+    close(fd);
+
+    return 0;
 }
 
 #define PAGE_SIZE 4096
@@ -215,7 +353,7 @@ int main(int argc, char* const argv[])
                 int rc = create_file(dir_path, file_name_create_index);
                 if (rc < 0) {
                     printf("could not create file %lld, rc=%d\n", file_name_create_index, rc);
-                    break;
+                    exit(0);
                 }
                 file_name_create_index++;
                 file_count++;
@@ -229,8 +367,14 @@ int main(int argc, char* const argv[])
             }
             case ACTION_WRITE:
             {
+                char *file_to_write_to = NULL;
                 if (file_count == 0)
                     continue;
+                int rc = write_to_file(argv, &file_to_write_to, file_count);
+                if (rc < 0) {
+                    printf("could not write to file %s, rc=%d\n", file_to_write_to, rc);
+                    exit(0);
+                }
                 continue;
             }
             case ACTION_TRUNCATE:
