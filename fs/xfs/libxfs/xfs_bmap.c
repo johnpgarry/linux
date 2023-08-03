@@ -2889,6 +2889,14 @@ done:
 /*
  * Adjust the size of the new extent based on i_extsize and rt extsize.
  */
+#if 0
+
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* ext */
+
+#endif
 int
 xfs_bmap_extsize_align(
 	xfs_mount_t	*mp,
@@ -2910,6 +2918,13 @@ xfs_bmap_extsize_align(
 	xfs_fileoff_t	align_off;	/* temp for offset */
 	xfs_extlen_t	align_alen;	/* temp for length */
 	xfs_extlen_t	temp;		/* temp for calculations */
+
+	if (gotp)
+		pr_err("%s01 gotp br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld prevp=%pS *offp=%lld *lenp=%d\n",
+			__func__, gotp->br_startoff, gotp->br_startblock, gotp->br_blockcount, prevp, *offp, *lenp);
+	if (prevp)
+		pr_err("%s02 prevp br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld gotp=%pS *offp=%lld *lenp=%d\n",
+			__func__, prevp->br_startoff, prevp->br_startblock, prevp->br_blockcount, gotp, *offp, *lenp);
 
 	if (convert)
 		return 0;
@@ -3335,22 +3350,31 @@ xfs_bmap_compute_alignments(
 	struct xfs_bmalloca	*ap,
 	struct xfs_alloc_arg	*args)
 {
+	xfs_extlen_t extsz_hint = xfs_get_extsz_hint(ap->ip);
 	struct xfs_mount	*mp = args->mp;
 	xfs_extlen_t		align = 0; /* minimum allocation alignment */
 	int			stripe_align = 0;
 
-	/* stripe alignment for allocation is determined by mount parameters */
-	if (mp->m_swidth && xfs_has_swalloc(mp))
-		stripe_align = mp->m_swidth;
-	else if (mp->m_dalign)
-		stripe_align = mp->m_dalign;
+	if ((ap->ip->i_diflags2 & XFS_DIFLAG2_DAX) && extsz_hint) {
+		pr_err("%s XFS_DIFLAG2_DAX=1 extsz_hint=%d\n", __func__, extsz_hint);
+		stripe_align = args->alignments = extsz_hint;
+	} else {
+			/* stripe alignment for allocation is determined by mount parameters */
+		if (mp->m_swidth && xfs_has_swalloc(mp))
+			stripe_align = mp->m_swidth;
+		else if (mp->m_dalign)
+			stripe_align = mp->m_dalign;
+
+		args->alignments = 1;
+		pr_err("%s1 XFS_DIFLAG2_DAX=0 extsz_hint=%d stripe_align=%d\n", __func__, extsz_hint, stripe_align);
+	}
 
 	if (ap->flags & XFS_BMAPI_COWFORK)
 		align = xfs_get_cowextsz_hint(ap->ip);
 	else if (ap->datatype & XFS_ALLOC_USERDATA) {
-		pr_err("%s calling xfs_get_extsz_hint XFS_ALLOC_USERDATA\n", __func__);
-		align = xfs_get_extsz_hint(ap->ip);
-		pr_err("%s0 align=%d\n", __func__, align);
+		pr_err("%s2 calling xfs_get_extsz_hint XFS_ALLOC_USERDATA\n", __func__);
+		align = extsz_hint;
+		pr_err("%s3 align=%d\n", __func__, align);
 	}
 
 	if (align) {
@@ -3358,34 +3382,40 @@ xfs_bmap_compute_alignments(
 		count++;
 		if (count == 1000)
 			WARN_ON_ONCE(1);
-		pr_err("%s1 before xfs_bmap_extsize_align align=%d before off=%lld length=%d count=%d\n", __func__, align, ap->offset, ap->length, count);
+		pr_err("%s4 before xfs_bmap_extsize_align align=%d before ap->offset=%lld, length=%d, eof=%d\n",
+			__func__, align, ap->offset, ap->length, ap->eof);
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
 					&ap->length))
 			ASSERT(0);
-		pr_err("%s2 after xfs_bmap_extsize_align align=%d before off=%lld length=%d\n", __func__, align, ap->offset, ap->length);
+		pr_err("%s5 after xfs_bmap_extsize_align align=%d before offset=%lld, length=%d, ap->eof=%d\n",
+			__func__, align, ap->offset, ap->length, ap->eof);
 		ASSERT(ap->length);
 	}
 
 	/* apply extent size hints if obtained earlier */
-	pr_err("%s3 align=%d\n", __func__, align);
+	pr_err("%s6 align=%d\n", __func__, align);
 	
 	if (align) {
 		args->prod = align;
+		pr_err("%s7.0 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
 		div_u64_rem(ap->offset, args->prod, &args->mod);
+		pr_err("%s7.1 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
 		if (args->mod)
 			args->mod = args->prod - args->mod;
-		pr_err("%s4 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
+		pr_err("%s7.2 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
 	} else if (mp->m_sb.sb_blocksize >= PAGE_SIZE) {
 		args->prod = 1;
 		args->mod = 0;
-		pr_err("%s5 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
+		pr_err("%s8 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
 	} else {
 		args->prod = PAGE_SIZE >> mp->m_sb.sb_blocklog;
+		pr_err("%s9.0 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
 		div_u64_rem(ap->offset, args->prod, &args->mod);
+		pr_err("%s9.1 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
 		if (args->mod)
 			args->mod = args->prod - args->mod;
-		pr_err("%s6 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
+		pr_err("%s9.2 align=%d args->mod=%d prod=%d\n", __func__, align, args->mod, args->prod);
 	}
 
 	pr_err("%s10 returning stripe_align=%d\n", __func__, stripe_align);
@@ -3680,15 +3710,15 @@ xfs_bmap_btalloc_best_length(
 {
 	xfs_extlen_t		blen = 0;
 	int			error;
-	pr_err("%s ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+	pr_err("%s ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 		ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 
 	ap->blkno = XFS_INO_TO_FSB(args->mp, ap->ip->i_ino);
-	pr_err("%s1 after XFS_INO_TO_FSB ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+	pr_err("%s1 after XFS_INO_TO_FSB ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 		ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 	xfs_bmap_adjacent(ap);
 
-	pr_err("%s2 after XFS_INO_TO_FSB ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+	pr_err("%s2 after XFS_INO_TO_FSB ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 		ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 	/*
 	 * Search for an allocation group with a single extent large enough for
@@ -3696,7 +3726,7 @@ xfs_bmap_btalloc_best_length(
 	 * size to the largest space found.
 	 */
 	error = xfs_bmap_btalloc_select_lengths(ap, args, &blen);
-	pr_err("%s3 after xfs_bmap_btalloc_select_lengths ap total=%d minlen=%d minleft=%d length=%d blkno=%lld aeof=%d args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+	pr_err("%s3 after xfs_bmap_btalloc_select_lengths ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld, aeof=%d args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 		ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, ap->aeof, args->fsbno, args->alignments, args->mod, args->prod);
 	if (error)
 		return error;
@@ -3708,25 +3738,25 @@ xfs_bmap_btalloc_best_length(
 	 * trying.
 	 */
 	if (ap->aeof && !(ap->tp->t_flags & XFS_TRANS_LOWMODE)) {
-		pr_err("%s4 calling xfs_bmap_btalloc_at_eof ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+		pr_err("%s4 calling xfs_bmap_btalloc_at_eof ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 			ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 		error = xfs_bmap_btalloc_at_eof(ap, args, blen, stripe_align,
 				false);
-		pr_err("%s4.1 after xfs_bmap_btalloc_at_eof ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+		pr_err("%s4.1 after xfs_bmap_btalloc_at_eof ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 			ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 		if (error || args->fsbno != NULLFSBLOCK)
 			return error;
 	}
 
-	pr_err("%s5 calling xfs_alloc_vextent_start_ag ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+	pr_err("%s5 calling xfs_alloc_vextent_start_ag ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 			ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 	error = xfs_alloc_vextent_start_ag(args, ap->blkno);
-	pr_err("%s5.1 called xfs_alloc_vextent_start_ag ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+	pr_err("%s5.1 called xfs_alloc_vextent_start_ag ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 			ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 	if (error || args->fsbno != NULLFSBLOCK)
 		return error;
 
-	pr_err("%s6 calling xfs_alloc_vextent_start_ag ap total=%d minlen=%d minleft=%d length=%d blkno=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", __func__,
+	pr_err("%s6 calling xfs_alloc_vextent_start_ag ap total=%d, minlen=%d, minleft=%d, length=%d, blkno=%lld args fsbno=%lld, alignment=%d, mod=%d, prod=%d\n", __func__,
 			ap->total, ap->minlen, ap->minleft, ap->length, ap->blkno, args->fsbno, args->alignments, args->mod, args->prod);
 	return xfs_bmap_btalloc_low_space(ap, args);
 }
@@ -3745,7 +3775,6 @@ xfs_bmap_btalloc(
 		.wasdel		= ap->wasdel,
 		.resv		= XFS_AG_RESV_NONE,
 		.datatype	= ap->datatype,
-		.alignments	= 1,
 		.minalignslop	= 0,
 	};
 	xfs_fileoff_t		orig_offset;
@@ -3757,10 +3786,10 @@ xfs_bmap_btalloc(
 	orig_offset = ap->offset;
 	orig_length = ap->length;
 
-	pr_err("%s orig_offset=%lld orig_length=%d args.alignmsent=%d (orig=1) calling xfs_bmap_compute_alignments\n",
-		__func__, orig_offset, orig_length, args.alignments);
+	pr_err("%s orig_offset=%lld orig_length=%d calling xfs_bmap_compute_alignments ap->blkno=%lld\n",
+		__func__, orig_offset, orig_length, ap->blkno);
 	stripe_align = xfs_bmap_compute_alignments(ap, &args);
-	pr_err("%s0 orig_offset=%lld orig_length=%d stripe_align=%d args.alignmsent=%d fsbno=%lld (orig=1) called xfs_bmap_compute_alignments ap->blkno=%lld\n",
+	pr_err("%s0 orig_offset=%lld orig_length=%d stripe_align=%d, args.alignmsent=%d, fsbno=%lld (orig=1) called xfs_bmap_compute_alignments ap->blkno=%lld\n",
 		__func__, orig_offset, orig_length, stripe_align, args.alignments, args.fsbno, ap->blkno);
 
 	/* Trim the allocation back to the maximum an AG can fit. */
@@ -3772,10 +3801,10 @@ xfs_bmap_btalloc(
 		error = xfs_bmap_btalloc_filestreams(ap, &args, stripe_align);
 		pr_err("%s1.1 called xfs_bmap_btalloc_filestreams ap->blkno=%lld\n", __func__, ap->blkno);
 	} else {
-		pr_err("%s2 calling xfs_bmap_btalloc_best_length ap->blkno=%lld args.alignment=%d fsbno=%lld ap->blkno=%lld\n", 
+		pr_err("%s2 calling xfs_bmap_btalloc_best_length ap->blkno=%lld args.alignment=%d, fsbno=%lld ap->blkno=%lld\n", 
 			__func__, ap->blkno, args.alignments, args.fsbno, ap->blkno);
 		error = xfs_bmap_btalloc_best_length(ap, &args, stripe_align);
-		pr_err("%s2.1 called xfs_bmap_btalloc_best_length ap->blkno=%lld args.alignment=%d fsbno=%lld ap->blkno=%lld\n",
+		pr_err("%s2.1 called xfs_bmap_btalloc_best_length ap->blkno=%lld args.alignment=%d, fsbno=%lld ap->blkno=%lld\n",
 			__func__, ap->blkno, args.alignments, args.fsbno, ap->blkno);
 	}
 	if (error)
