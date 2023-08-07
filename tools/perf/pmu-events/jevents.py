@@ -10,7 +10,6 @@ import os
 import sys
 from typing import (Callable, Dict, Optional, Sequence, Set, Tuple)
 import collections
-import logging, sys
 
 # Global command line arguments.
 _args = None
@@ -319,8 +318,6 @@ class JsonEvent:
     self.metric_threshold = jd.get('MetricThreshold')
 
     arch_std = jd.get('ArchStdEvent')
-    logging.debug('A debug message self=%r', self)
-    logging.debug('A debug message2 arch_std=%r', arch_std)
     if precise and self.desc and '(Precise Event)' not in self.desc:
       extra_desc += ' (Must be precise)' if precise == '2' else (' (Precise '
                                                                  'event)')
@@ -350,17 +347,12 @@ class JsonEvent:
       if self.desc and not self.desc.endswith('. '):
         self.desc += '. '
       self.desc = (self.desc if self.desc else '') + ('Unit: ' + self.pmu + ' ')
-    if arch_std:
-      logging.debug('A debug message3 arch_std=%r', arch_std)
-      if arch_std.lower() in _arch_std_events:
-        event = _arch_std_events[arch_std.lower()].event
-        logging.debug('A debug message4 event=%r', event)
-        # Copy from the architecture standard event to self for undefined fields.
-        for attr, value in _arch_std_events[arch_std.lower()].__dict__.items():
-          if hasattr(self, attr) and not getattr(self, attr):
-            setattr(self, attr, value)
-      else:
-        raise argparse.ArgumentTypeError('Cannot find std arch event:', arch_std)
+    if arch_std and arch_std.lower() in _arch_std_events:
+      event = _arch_std_events[arch_std.lower()].event
+      # Copy from the architecture standard event to self for undefined fields.
+      for attr, value in _arch_std_events[arch_std.lower()].__dict__.items():
+        if hasattr(self, attr) and not getattr(self, attr):
+          setattr(self, attr, value)
 
     self.event = real_event(self.name, event)
 
@@ -969,7 +961,6 @@ const char *describe_metricgroup(const char *group)
 
 def main() -> None:
   global _args
-  logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
   def dir_path(path: str) -> str:
     """Validate path is a directory for argparse."""
