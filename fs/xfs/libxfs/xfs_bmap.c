@@ -2920,11 +2920,11 @@ xfs_bmap_extsize_align(
 	xfs_extlen_t	temp;		/* temp for calculations */
 
 	if (gotp)
-		pr_err("%s01 gotp br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld prevp=%pS *offp=%lld *lenp=%d\n",
-			__func__, gotp->br_startoff, gotp->br_startblock, gotp->br_blockcount, prevp, *offp, *lenp);
+		pr_err("%s01 gotp br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld prevp=%pS *offp=%lld *lenp=%d extsz=%d\n",
+			__func__, gotp->br_startoff, gotp->br_startblock, gotp->br_blockcount, prevp, *offp, *lenp, extsz);
 	if (prevp)
-		pr_err("%s02 prevp br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld gotp=%pS *offp=%lld *lenp=%d\n",
-			__func__, prevp->br_startoff, prevp->br_startblock, prevp->br_blockcount, gotp, *offp, *lenp);
+		pr_err("%s02 prevp br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld gotp=%pS *offp=%lld *lenp=%d extsz=%d\n",
+			__func__, prevp->br_startoff, prevp->br_startblock, prevp->br_blockcount, gotp, *offp, *lenp, extsz);
 
 	if (convert)
 		return 0;

@@ -459,29 +459,46 @@ xfs_alloc_fix_len(
 {
 	xfs_extlen_t	k;
 	xfs_extlen_t	rlen;
-
 	ASSERT(args->mod < args->prod);
 	rlen = args->len;
 	ASSERT(rlen >= args->minlen);
 	ASSERT(rlen <= args->maxlen);
+	pr_err("%s rlen = args->len=%d, mod=%d, prod=%d, maxlen=%d\n",
+		__func__, args->len, args->mod, args->prod, args->maxlen);
 	if (args->prod <= 1 || rlen < args->mod || rlen == args->maxlen ||
-	    (args->mod == 0 && rlen < args->prod))
+	    (args->mod == 0 && rlen < args->prod)) {
+		pr_err("%s1 return from args values check rlen = args->len=%d, mod=%d, prod=%d, maxlen=%d\n",
+			__func__, args->len, args->mod, args->prod, args->maxlen);
 		return;
+	}
 	k = rlen % args->prod;
-	if (k == args->mod)
+	pr_err("%s2 rlen = args->len=%d, mod=%d, prod=%d, maxlen=%d k=%d\n",
+		__func__, args->len, args->mod, args->prod, args->maxlen, k);
+	if (k == args->mod) {
+		pr_err("%s2.1 return as k == ->mod rlen = args->len=%d, mod=%d, prod=%d, maxlen=%d k=%d\n",
+			__func__, args->len, args->mod, args->prod, args->maxlen, k);
 		return;
+	}
 	if (k > args->mod)
 		rlen = rlen - (k - args->mod);
 	else
 		rlen = rlen - args->prod + (args->mod - k);
+	pr_err("%s3 recalc relen from mod and prod rlen = args->len=%d, mod=%d, prod=%d, maxlen=%d k=%d\n",
+		__func__, args->len, args->mod, args->prod, args->maxlen, k);
 	/* casts to (int) catch length underflows */
-	if ((int)rlen < (int)args->minlen)
+	if ((int)rlen < (int)args->minlen) {
+
+		pr_err("%s4 return as rlen < minlen rlen = args->len=%d, mod=%d, prod=%d, maxlen=%d k=%d\n",
+			__func__, args->len, args->mod, args->prod, args->maxlen, k);
 		return;
+	}
 	ASSERT(rlen >= args->minlen && rlen <= args->maxlen);
 	ASSERT(rlen % args->prod == args->mod);
 	ASSERT(args->pag->pagf_freeblks + args->pag->pagf_flcount >=
 		rlen + args->minleft);
 	args->len = rlen;
+	pr_err("%s10 rlen = args->len=%d, mod=%d, prod=%d, maxlen=%d k=%d\n",
+			__func__, args->len, args->mod, args->prod, args->maxlen, k);
 }
 
 /*
@@ -965,6 +982,7 @@ xfs_alloc_cur_check(
 		goto out;
 
 	args->len = XFS_EXTLEN_MIN(lena, args->maxlen);
+	pr_err("%s2.2 calling xfs_alloc_fix_len\n", __func__);
 	xfs_alloc_fix_len(args);
 	ASSERT(args->len >= args->minlen);
 	if (args->len < acur->len)
@@ -1336,6 +1354,7 @@ xfs_alloc_ag_vextent_exact(
 	 */
 	args->len = XFS_AGBLOCK_MIN(tend, args->agbno + args->maxlen)
 						- args->agbno;
+	pr_err("%s45 calling xfs_alloc_fix_len\n", __func__);
 	xfs_alloc_fix_len(args);
 	ASSERT(args->agbno + args->len <= tend);
 
@@ -2050,6 +2069,7 @@ restart:
 		}
 		goto out_nominleft;
 	}
+	pr_err("%s45 calling xfs_alloc_fix_len\n", __func__);
 	xfs_alloc_fix_len(args);
 
 	rlen = args->len;
