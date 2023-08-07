@@ -1,5 +1,8 @@
 [
     {
         "ArchStdEvent": "FOO_EVENT"
+    },
+    {
+        "ArchStdEvent": "BAR_EVENT"
     }
 ]
