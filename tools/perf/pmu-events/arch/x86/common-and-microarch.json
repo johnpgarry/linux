@@ -1,0 +1,8 @@
+[
+    {
+        "PublicDescription": "This is fake arch event foo PublicDescription",
+        "EventCode": "0x00",
+        "EventName": "FOO_EVENT",
+        "BriefDescription": "This is fake arch event foo BriefDescription"
+    }
+]
