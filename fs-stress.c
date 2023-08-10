@@ -43,6 +43,7 @@ struct statx_timestamp;
 #define __NR_statx -1
 #endif
 
+extern int frag_report(const char *filename, int alignment);
 extern int open(char *, int);
 
 enum ACTION {
@@ -73,9 +74,8 @@ enum ACTION get_random_action(void)
     return -1;
 }
 
-int create_file(char *dir_path, unsigned long long file_name_create_index)
+int create_file(char *dir_path, unsigned long long file_name_create_index, char **file_name)
 {
-    char file_name[256];
     int fd;
     unsigned char buffer[8192];
     ssize_t size_written;
@@ -83,15 +83,18 @@ int create_file(char *dir_path, unsigned long long file_name_create_index)
     int i = strtol(mode, 0, 8);
     int rc;
     
+    *file_name = malloc(256);
+    if (!*file_name)
+        return -1;
+
     for (fd=0;fd<8192;fd++)
         buffer[fd] = (char)fd;
    
-    sprintf(file_name, "%s/file_%lld", dir_path, file_name_create_index);
+    sprintf(*file_name, "%s/file_%lld", dir_path, file_name_create_index);
 
     printf("%s create file %s\n", __func__, file_name);
-    fd = open(file_name, O_CREAT | O_WRONLY);
+    fd = open(*file_name, O_CREAT | O_WRONLY);
     if (fd < 0) {
-
         printf("%s could not open filename=%s fd=%d\n", __func__, file_name, fd);
         return fd;
     }
@@ -103,7 +106,7 @@ int create_file(char *dir_path, unsigned long long file_name_create_index)
         return -1;
     }
 
-    rc = chmod (file_name, i);
+    rc = chmod(*file_name, i);
     if (rc < 0) {
         printf("%s could not change mode for %s rc=%d i=%d\n", __func__, file_name, rc, i);
         return -1;
@@ -518,6 +521,7 @@ int main(int argc, char* const argv[])
 
     while (1) {
         enum ACTION action;
+        char *file_name = NULL;
         if (file_count > 5)
             usleep(500000);
         action = get_random_action();
@@ -527,21 +531,23 @@ int main(int argc, char* const argv[])
         switch (action) {
             case ACTION_CREATE:
             {
-                int rc = create_file(dir_path, file_name_create_index);
+                int rc = create_file(dir_path, file_name_create_index, &file_name);
                 if (rc < 0) {
+                    free(file_name);
                     printf("could not create file %lld, rc=%d\n", file_name_create_index, rc);
                     exit(0);
                 }
+                frag_report(file_name, 4);
                 file_name_create_index++;
                 file_count++;
-                continue;
+                break;
             }
             case ACTION_DELETE:
             { 
                 int rc;
                 char *file_to_delete = NULL;
                 if (file_count == 0)
-                    continue;
+                    break;
                 rc = delete_file(argv, &file_to_delete, file_count);
                 if (rc < 0) {
                     printf("could not delete file %s, rc=%d\n", file_to_delete, rc);
@@ -550,13 +556,13 @@ int main(int argc, char* const argv[])
                 }
                 file_count--;
                 free(file_to_delete);
-                continue;
+                break;
             }
             case ACTION_WRITE:
             {
                 char *file_to_write_to = NULL;
                 if (file_count == 0)
-                    continue;
+                    break;
                 int rc = write_to_file(argv, &file_to_write_to, file_count, average_file_size_bytes);
                 if (rc < 0) {
                     printf("could not write to file %s, rc=%d\n", file_to_write_to, rc);
@@ -564,13 +570,13 @@ int main(int argc, char* const argv[])
                     exit(0);
                 }
                 free(file_to_write_to);
-                continue;
+                break;
             }
             case ACTION_TRUNCATE:
             {
                 char *file_to_truncate = NULL;
                 if (file_count == 0)
-                    continue;
+                   break;
                 int rc = truncate_file(argv, &file_to_truncate, file_count);
                 if (rc < 0) {
                     printf("could not %s, rc=%d\n", file_to_truncate, rc);
@@ -578,13 +584,15 @@ int main(int argc, char* const argv[])
                     exit(0);
                 }
                 free(file_to_truncate);
-                continue;
+                break;
             }
             default: {
                 printf("unknown action %d", action);
                 return -1;
             }
         }
+
+        free(file_name);
     }
 
 
