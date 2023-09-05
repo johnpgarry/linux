@@ -696,7 +696,7 @@ static int dd_init_sched(struct request_queue *q, struct elevator_type *e)
 	enum dd_prio prio;
 	int ret = -ENOMEM;
 	pr_err("%s q=%pS e=%pS\n", __func__, q, e);
-	WARN_ON_ONCE(special_request_q == q);
+	//WARN_ON_ONCE(special_request_q == q);
 
 	eq = elevator_alloc(q, e);
 	if (!eq)

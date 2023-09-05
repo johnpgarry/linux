@@ -126,6 +126,7 @@ xfs_bmbt_to_iomap(
 		iomap->dax_dev = target->bt_daxdev;
 	else
 		iomap->bdev = target->bt_bdev;
+	pr_err("%s iomap->bdev=%pS target->bt_bdev=%pS\n", __func__, iomap->bdev, target->bt_bdev);
 	iomap->flags = iomap_flags;
 
 	if (xfs_ipincount(ip) &&

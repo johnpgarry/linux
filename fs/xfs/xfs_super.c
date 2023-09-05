@@ -479,6 +479,7 @@ xfs_open_devices(
 	 */
 	error = -ENOMEM;
 	mp->m_ddev_targp = xfs_alloc_buftarg(mp, ddev);
+	pr_err("%s ddev=%pS\n", __func__, ddev);
 	if (!mp->m_ddev_targp)
 		goto out_close_rtdev;
 

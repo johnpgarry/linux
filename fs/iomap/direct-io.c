@@ -538,6 +538,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		dio->atomic_write_unit =
 			bdev_find_max_atomic_write_alignment(bdev,
 					iomi.pos, iomi.len);
+		pr_err("%s atomic_write i_sb->s_bdev=%pS atomic_write_unit=%d\n",
+			__func__, i_sb->s_bdev, dio->atomic_write_unit);
 	}
 
 	dio->iocb = iocb;
@@ -621,6 +623,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		if (atomic_write) {
 			const struct iomap *_iomap = &iomi.iomap;
 			loff_t iomi_length = iomap_length(&iomi);
+			sector_t _iomap_sector = iomap_sector(_iomap, iomi.pos);
+			pr_err("%s2 _iomap->bdev=%pS _iomap_sector=%lld (byte=%lld) iomi_length=%lld\n",
+				__func__, _iomap->bdev, _iomap_sector, _iomap_sector << SECTOR_SHIFT, iomi_length);
 
 			/*
 			 * Ensure length and start address is a multiple of

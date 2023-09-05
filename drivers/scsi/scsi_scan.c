@@ -342,6 +342,7 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	}
 	kref_get(&sdev->host->tagset_refcnt);
 	sdev->request_queue = q;
+	pr_err("%s sdev->request_queue=%pS\n", __func__, sdev->request_queue);
 	q->queuedata = sdev;
 	__scsi_init_queue(sdev->host, q);
 

@@ -2002,6 +2002,7 @@ xfs_alloc_buftarg(
 	btp->bt_mount = mp;
 	btp->bt_dev =  bdev->bd_dev;
 	btp->bt_bdev = bdev;
+	pr_err("%s btp=%pS btp->bt_bdev=%pS\n", __func__, btp, btp->bt_bdev);
 	btp->bt_daxdev = fs_dax_get_by_bdev(bdev, &btp->bt_dax_part_off,
 					    mp, ops);
 

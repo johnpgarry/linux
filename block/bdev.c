@@ -55,6 +55,8 @@ unsigned int bdev_find_max_atomic_write_alignment(struct block_device *bdev,
 	unsigned int atomic_write_unit_max = limits->atomic_write_unit_max;
 	unsigned int max_align;
 
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
+
 	pos /= SECTOR_SIZE;
 	len /= SECTOR_SIZE;
 
@@ -458,6 +460,7 @@ struct block_device *bdev_alloc(struct gendisk *disk, u8 partno)
 	bdev->bd_partno = partno;
 	bdev->bd_inode = inode;
 	bdev->bd_queue = disk->queue;
+	pr_err("%s bdev=%pS bd_queue=%pS\n", __func__, bdev, bdev->bd_queue);
 	if (partno)
 		bdev->bd_has_submit_bio = disk->part0->bd_has_submit_bio;
 	else

@@ -1231,6 +1231,7 @@ static int set_bdev_super(struct super_block *s, void *data)
 	s->s_bdev = data;
 	s->s_dev = s->s_bdev->bd_dev;
 	s->s_bdi = bdi_get(s->s_bdev->bd_disk->bdi);
+	pr_err("%s s=%pS s_bdev=%pS\n", __func__, s, data);
 
 	if (bdev_stable_writes(s->s_bdev))
 		s->s_iflags |= SB_I_STABLE_WRITES;
@@ -1285,6 +1286,7 @@ int get_tree_bdev(struct fs_context *fc,
 	fc->sb_flags |= SB_NOSEC;
 	fc->sget_key = bdev;
 	s = sget_fc(fc, test_bdev_super_fc, set_bdev_super_fc);
+	pr_err("%s s=%pS bdev=%pS fc->source=%s\n", __func__, s, bdev, fc->source);
 	mutex_unlock(&bdev->bd_fsfreeze_mutex);
 	if (IS_ERR(s)) {
 		blkdev_put(bdev, fc->fs_type);
@@ -1343,6 +1345,7 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 	struct block_device *bdev;
 	struct super_block *s;
 	int error = 0;
+	pr_err("%s dev_name=%pS\n", __func__, dev_name);
 
 	bdev = blkdev_get_by_path(dev_name, sb_open_mode(flags), fs_type,
 				  &fs_holder_ops);
