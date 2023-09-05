@@ -305,7 +305,6 @@ xfs_alloc_get_rec(
 
 	*bno = irec.ar_startblock;
 	*len = irec.ar_blockcount;
-	pr_err("%s bno=%d len=%d\n", __func__, *bno, *len);
 	return 0;
 }
 
@@ -327,18 +326,9 @@ xfs_alloc_compute_aligned(
 	xfs_extlen_t	diff;
 	bool		busy;
 
-	pr_err("%s fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d foundbno=%d foundlen=%d bno=%d len=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 foundbno, foundlen, bno, len);
-
 	/* Trim busy sections out of found extent */
 	busy = xfs_extent_busy_trim(args, &bno, &len, busy_gen);
 
-	pr_err("%s1 fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d foundbno=%d foundlen=%d bno=%d len=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 foundbno, foundlen, bno, len);
 	/*
 	 * If we have a largish extent that happens to start before min_agbno,
 	 * see if we can shift it into range...
@@ -351,26 +341,14 @@ xfs_alloc_compute_aligned(
 		}
 	}
 
-	pr_err("%s2 fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d foundbno=%d foundlen=%d bno=%d len=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 foundbno, foundlen, bno, len);
 	if (args->alignment > 1 && len >= args->minlen) {
 		xfs_agblock_t	aligned_bno = roundup(bno, args->alignment);
 
-		pr_err("%s3 fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d foundbno=%d foundlen=%d bno=%d len=%d\n",
-				 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-				 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-				 foundbno, foundlen, bno, len);
 		diff = aligned_bno - bno;
 
 		*resbno = aligned_bno;
 		*reslen = diff >= len ? 0 : len - diff;
 	} else {
-		pr_err("%s4 fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d foundbno=%d foundlen=%d bno=%d len=%d\n",
-				 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-				 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-				 foundbno, foundlen, bno, len);
 		*resbno = bno;
 		*reslen = len;
 	}
@@ -910,18 +888,9 @@ xfs_alloc_cur_check(
 	bool			deactivate = false;
 	bool			isbnobt = cur->bc_btnum == XFS_BTNUM_BNO;
 
-	pr_err("%s calling xfs_alloc_get_rec fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS bno=?\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 	*new = 0;
 
 	error = xfs_alloc_get_rec(cur, &bno, &len, &i);
-	pr_err("%s1 called xfs_alloc_get_rec fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt,
-			 bno);
 	if (error)
 		return error;
 	if (XFS_IS_CORRUPT(args->mp, i != 1))
@@ -936,18 +905,8 @@ xfs_alloc_cur_check(
 		goto out;
 	}
 
-	pr_err("%s2 calling xfs_alloc_compute_aligned fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 	busy = xfs_alloc_compute_aligned(args, bno, len, &bnoa, &lena,
 					 &busy_gen);
-	pr_err("%s2.1 called xfs_alloc_compute_aligned fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
-	pr_err("%s2.1.1 called xfs_alloc_compute_aligned bno=%d bnoa=%d bnew=%d busy=%d\n",
-			 __func__, bno, bnoa, bnew, busy);
 	acur->busy |= busy;
 	if (busy)
 		acur->busy_gen = busy_gen;
@@ -969,21 +928,9 @@ xfs_alloc_cur_check(
 	 * We have an aligned record that satisfies minlen and beats or matches
 	 * the candidate extent size. Compare locality for near allocation mode.
 	 */
-	pr_err("%s3 calling xfs_alloc_compute_diff fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
-	pr_err("%s3.0.1 called xfs_alloc_compute_aligned bno=%d bnoa=%d bnew=%d busy=%d\n",
-			 __func__, bno, bnoa, bnew, busy);
 	diff = xfs_alloc_compute_diff(args->agbno, args->len,
 				      args->alignment, args->datatype,
 				      bnoa, lena, &bnew);
-	pr_err("%s4 called xfs_alloc_compute_diff fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
-	pr_err("%s4.1 called xfs_alloc_compute_aligned bno=%d bnoa=%d bnew=%d busy=%d\n",
-			 __func__, bno, bnoa, bnew, busy);
 	if (bnew == NULLAGBLOCK)
 		goto out;
 
@@ -1023,26 +970,6 @@ out:
  * Complete an allocation of a candidate extent. Remove the extent from both
  * trees and update the args structure.
  */
-#if 0
-
-struct xfs_alloc_cur {
-	struct xfs_btree_cur		*cnt;	/* btree cursors */
-	struct xfs_btree_cur		*bnolt;
-	struct xfs_btree_cur		*bnogt;
-	xfs_extlen_t			cur_len;/* current search length */
-	xfs_agblock_t			rec_bno;/* extent startblock */
-	xfs_extlen_t			rec_len;/* extent length */
-	xfs_agblock_t			bno;	/* alloc bno */
-	xfs_extlen_t			len;	/* alloc len */
-	xfs_extlen_t			diff;	/* diff from search bno */
-	unsigned int			busy_gen;/* busy state */
-	bool				busy;
-};
-
-#endif
-
-
-
 STATIC int
 xfs_alloc_cur_finish(
 	struct xfs_alloc_arg	*args,
@@ -1051,10 +978,6 @@ xfs_alloc_cur_finish(
 	struct xfs_agf __maybe_unused *agf = args->agbp->b_addr;
 	int			error;
 
-	pr_err("%s args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno);
 	ASSERT(acur->cnt && acur->bnolt);
 	ASSERT(acur->bno >= acur->rec_bno);
 	ASSERT(acur->bno + acur->len <= acur->rec_bno + acur->rec_len);
@@ -1383,10 +1306,6 @@ xfs_alloc_walk_iter(
 	int			error;
 	int			i;
 
-	pr_err("%s args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 	*stat = 0;
 
 	/*
@@ -1395,15 +1314,7 @@ xfs_alloc_walk_iter(
 	 * current allocation candidate.
 	 */
 	while (xfs_alloc_cur_active(cur) && count) {
-	pr_err("%s1 args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 		error = xfs_alloc_cur_check(args, acur, cur, &i);
-	pr_err("%s1.1 args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 		if (error)
 			return error;
 		if (i == 1) {
@@ -1411,16 +1322,8 @@ xfs_alloc_walk_iter(
 			if (find_one)
 				break;
 		}
-	pr_err("%s2 calling xfs_alloc_cur_active args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 		if (!xfs_alloc_cur_active(cur))
 			break;
-	pr_err("%s2.1 called xfs_alloc_cur_active args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 
 		if (increment)
 			error = xfs_btree_increment(cur, 0, &i);
@@ -1435,10 +1338,6 @@ xfs_alloc_walk_iter(
 			count--;
 	}
 
-	pr_err("%s10 out xfs_alloc_cur_active args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 	return 0;
 }
 
@@ -1582,10 +1481,6 @@ xfs_alloc_ag_vextent_lastblock(
 	int			error;
 	int			i;
 
-	pr_err("%s args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno);
 #ifdef DEBUG
 	/* Randomly don't execute the first algorithm. */
 	if (get_random_u32_below(2))
@@ -1601,27 +1496,13 @@ xfs_alloc_ag_vextent_lastblock(
 	if (*len || args->alignment > 1) {
 		acur->cnt->bc_levels[0].ptr = 1;
 		do {
-	pr_err("%s1 calling xfs_alloc_get_rec args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno);
 			error = xfs_alloc_get_rec(acur->cnt, bno, len, &i);
-	pr_err("%s1.1 called xfs_alloc_get_rec args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno);
 			if (error)
 				return error;
 			if (XFS_IS_CORRUPT(args->mp, i != 1))
 				return -EFSCORRUPTED;
-			if (*len >= args->minlen) {
-
-			pr_err("%s1.1 called xfs_alloc_get_rec args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-					 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-					 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-					 acur->bno, acur->len, acur->diff, acur->rec_bno);
+			if (*len >= args->minlen)
 				break;
-			}
 			error = xfs_btree_increment(acur->cnt, 0, &i);
 			if (error)
 				return error;
@@ -1631,15 +1512,7 @@ xfs_alloc_ag_vextent_lastblock(
 			return 0;
 	}
 
-	pr_err("%s2 calling xfs_alloc_walk_iter args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d cnt=%pS\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno, acur->cnt);
 	error = xfs_alloc_walk_iter(args, acur, acur->cnt, true, false, -1, &i);
-	pr_err("%s2.1 called xfs_alloc_walk_iter args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno);
 	if (error)
 		return error;
 
@@ -1652,26 +1525,9 @@ xfs_alloc_ag_vextent_lastblock(
 
 	trace_xfs_alloc_near_first(args);
 	*allocated = true;
-	pr_err("%s10 out args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur->bno, acur->len, acur->diff, acur->rec_bno);
 	return 0;
 }
-#if 0
 
-xfs_extlen_t	minlen;		/* minimum size of extent */
-	xfs_extlen_t	maxlen;		/* maximum size of extent */
-	xfs_extlen_t	mod;		/* mod value for extent size */
-	xfs_extlen_t	prod;		/* prod value for extent size */
-	xfs_extlen_t	minleft;	/* min blocks must be left after us */
-	xfs_extlen_t	total;		/* total blocks needed in xaction */
-	xfs_extlen_t	alignment;	/* align answer to multiple of this */
-	xfs_extlen_t	minalignslop;	/* slop for minlen+alignment calcs */
-	xfs_agblock_t	min_agbno;	/* set an agbno range for NEAR allocs */
-	xfs_agblock_t	max_agbno;	/* ... */
-
-#endif
 /*
  * Allocate a variable extent near bno in the allocation group agno.
  * Extent's length (returned in len) will be between minlen and maxlen,
@@ -1689,9 +1545,6 @@ xfs_alloc_ag_vextent_near(
 	xfs_agblock_t		bno;
 	xfs_extlen_t		len;
 
-	pr_err("%s args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno);
 	/* handle uninitialized agbno range so caller doesn't have to */
 	if (!args->min_agbno && !args->max_agbno)
 		args->max_agbno = args->mp->m_sb.sb_agblocks - 1;
@@ -1708,9 +1561,6 @@ xfs_alloc_ag_vextent_near(
 restart:
 	len = 0;
 
-	pr_err("%s1 restart args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno);
 	/*
 	 * Set up cursors and see if there are any free extents as big as
 	 * maxlen. If not, pick the last entry in the tree unless the tree is
@@ -1718,14 +1568,8 @@ restart:
 	 */
 	error = xfs_alloc_cur_setup(args, &acur);
 	if (error == -ENOSPC) {
-		pr_err("%s2 calling xfs_alloc_ag_vextent_small args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno);
 		error = xfs_alloc_ag_vextent_small(args, acur.cnt, &bno,
 				&len, &i);
-		pr_err("%s2.1 called xfs_alloc_ag_vextent_small args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno);
 		if (error)
 			goto out;
 		if (i == 0 || len == 0) {
@@ -1748,16 +1592,8 @@ restart:
 	if (xfs_btree_islastblock(acur.cnt, 0)) {
 		bool		allocated = false;
 
-	pr_err("%s3 calling xfs_alloc_ag_vextent_lastblock args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur.bno, acur.len, acur.diff, acur.rec_bno);
-	error = xfs_alloc_ag_vextent_lastblock(args, &acur, &bno, &len,
+		error = xfs_alloc_ag_vextent_lastblock(args, &acur, &bno, &len,
 				&allocated);
-	pr_err("%s3.1 called xfs_alloc_ag_vextent_lastblock args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur.bno, acur.len, acur.diff, acur.rec_bno);
 		if (error)
 			goto out;
 		if (allocated)
@@ -1768,15 +1604,7 @@ restart:
 	 * Second algorithm. Combined cntbt and bnobt search to find ideal
 	 * locality.
 	 */
-	pr_err("%s4 calling xfs_alloc_ag_vextent_locality args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur.bno, acur.len, acur.diff, acur.rec_bno);
 	error = xfs_alloc_ag_vextent_locality(args, &acur, &i);
-	pr_err("%s4.1 called xfs_alloc_ag_vextent_locality args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d acur bno=%d len=%d diff=%d rec_bno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno,
-			 acur.bno, acur.len, acur.diff, acur.rec_bno);
 	if (error)
 		goto out;
 
@@ -1807,17 +1635,11 @@ restart:
 	}
 
 alloc_finish:
-	pr_err("%s9 calling alloc_finish out args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno);
 	/* fix up btrees on a successful allocation */
 	error = xfs_alloc_cur_finish(args, &acur);
 
 out:
 	xfs_alloc_cur_close(&acur, error);
-	pr_err("%s10 out args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minlen=%d maxlen=%d minleft=%d minalignslop=%d min_agbno=%d max_agbno=%d\n",
-			 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, args->minlen, 
-			 args->maxlen, args->minleft, args->minalignslop, args->min_agbno, args->max_agbno);
 	return error;
 }
 
@@ -3531,8 +3353,6 @@ xfs_alloc_vextent_finish(
 	struct xfs_mount	*mp = args->mp;
 	int			error = 0;
 
-	pr_err("%s args fsbno=%lld alignment=%d mod=%d prod=%d agno=%d agbno=%d\n",
-	 __func__, args->fsbno, args->alignment, args->mod, args->prod, args->agno, args->agbno);
 	/*
 	 * We can end up here with a locked AGF. If we failed, the caller is
 	 * likely going to try to allocate again with different parameters, and
@@ -3567,8 +3387,6 @@ xfs_alloc_vextent_finish(
 	}
 
 	args->fsbno = XFS_AGB_TO_FSB(mp, args->agno, args->agbno);
-	pr_err("%s4 error=%d args fsbno=%lld alignment=%d mod=%d prod=%d\n",
-	 __func__, error, args->fsbno, args->alignment, args->mod, args->prod);
 
 	ASSERT(args->len >= args->minlen);
 	ASSERT(args->len <= args->maxlen);
@@ -3605,8 +3423,6 @@ out_drop_perag:
 		xfs_perag_rele(args->pag);
 		args->pag = NULL;
 	}
-	pr_err("%s10 out error=%d args fsbno=%lld alignment=%d mod=%d prod=%d\n",
-	 __func__, error, args->fsbno, args->alignment, args->mod, args->prod);
 	return error;
 }
 
@@ -3683,17 +3499,11 @@ xfs_alloc_vextent_iterate_ags(
 
 	if (alloc_flags & XFS_ALLOC_FLAG_TRYLOCK)
 		restart_agno = 0;
-	pr_err("%s target_agbno=%d args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-	 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 restart:
 	for_each_perag_wrap_range(mp, start_agno, restart_agno,
 			mp->m_sb.sb_agcount, agno, args->pag) {
 		args->agno = agno;
-		pr_err("%s1 target_agbno=%d calling xfs_alloc_vextent_prepare_ag args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-		 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 		error = xfs_alloc_vextent_prepare_ag(args, alloc_flags);
-		pr_err("%s1.1 target_agbno=%d called xfs_alloc_vextent_prepare_ag args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-		 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 		if (error)
 			break;
 		if (!args->agbp) {
@@ -3706,24 +3516,14 @@ restart:
 		 * loop regardless of whether we succeed or not.
 		 */
 		if (args->agno == start_agno && target_agbno) {
-				args->agbno = target_agbno;
-			pr_err("%s2 target_agbno=%d calling xfs_alloc_ag_vextent_near args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-			 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
+			args->agbno = target_agbno;
 			error = xfs_alloc_ag_vextent_near(args, alloc_flags);
-			pr_err("%s2.1 target_agbno=%d called xfs_alloc_ag_vextent_near args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-			 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 		} else {
 			args->agbno = 0;
-			pr_err("%s3 target_agbno=%d calling xfs_alloc_ag_vextent_size args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-			 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 			error = xfs_alloc_ag_vextent_size(args, alloc_flags);
-			pr_err("%s3.1 target_agbno=%d called xfs_alloc_ag_vextent_size args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-			 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 		}
 		break;
 	}
-	pr_err("%s4 target_agbno=%d args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-			 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 	if (error) {
 		xfs_perag_rele(args->pag);
 		args->pag = NULL;
@@ -3745,8 +3545,6 @@ restart:
 
 	ASSERT(args->pag == NULL);
 	trace_xfs_alloc_vextent_allfailed(args);
-	pr_err("%s10 out target_agbno=%d args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-	 __func__, target_agbno, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 	return 0;
 }
 
@@ -3771,8 +3569,6 @@ xfs_alloc_vextent_start_ag(
 	uint32_t		alloc_flags = XFS_ALLOC_FLAG_TRYLOCK;
 	int			error;
 
-	pr_err("%s target=%lld args fsbno=%lld alignment=%d mod=%d prod=%d\n", 
-		__func__, target, args->fsbno, args->alignment, args->mod, args->prod);
 	ASSERT(args->pag == NULL);
 
 	args->agno = NULLAGNUMBER;
@@ -3780,8 +3576,6 @@ xfs_alloc_vextent_start_ag(
 
 	trace_xfs_alloc_vextent_start_ag(args);
 
-	pr_err("%s1 calling xfs_alloc_vextent_check_args target=%lld args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d\n", 
-		__func__, target, args->fsbno, args->alignment, args->mod, args->prod, args->agbno);
 	error = xfs_alloc_vextent_check_args(args, target, &minimum_agno);
 	if (error) {
 		if (error == -ENOSPC)
@@ -3798,12 +3592,8 @@ xfs_alloc_vextent_start_ag(
 	}
 
 	start_agno = max(minimum_agno, XFS_FSB_TO_AGNO(mp, target));
-	pr_err("%s2 calling xfs_alloc_vextent_iterate_ags target=%lld args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d start_agno=%d\n",
-	 __func__, target, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, start_agno);
 	error = xfs_alloc_vextent_iterate_ags(args, minimum_agno, start_agno,
 			XFS_FSB_TO_AGBNO(mp, target), alloc_flags);
-	pr_err("%s2.1 called xfs_alloc_vextent_iterate_ags target=%lld args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d\n",
-	 __func__, target, args->fsbno, args->alignment, args->mod, args->prod, args->agbno);
 
 	if (bump_rotor) {
 		if (args->agno == start_agno)
@@ -3814,8 +3604,6 @@ xfs_alloc_vextent_start_ag(
 				(mp->m_sb.sb_agcount * rotorstep);
 	}
 
-	pr_err("%s3 calling xfs_alloc_vextent_finish target=%lld args fsbno=%lld alignment=%d mod=%d prod=%d agbno=%d minimum_agno=%d\n",
-	 __func__, target, args->fsbno, args->alignment, args->mod, args->prod, args->agbno, minimum_agno);
 	return xfs_alloc_vextent_finish(args, minimum_agno, error, true);
 }
 

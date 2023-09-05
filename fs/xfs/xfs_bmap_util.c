@@ -668,7 +668,6 @@ xfs_bmap_punch_delalloc_range(
 
 		error = xfs_bmap_del_extent_delay(ip, XFS_DATA_FORK, &icur,
 						  &got, &del);
-		pr_err("%s calling xfs_iext_get_extent\n", __func__);
 		if (error || !xfs_iext_get_extent(ifp, &icur, &got))
 			break;
 	}
@@ -927,14 +926,9 @@ xfs_alloc_file_space(
 			goto error;
 		}
 
-		pr_err("%s3 offset=%lld len=%lld calling xfs_bmapi_write\n", __func__,
-			offset, len);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
 				&nimaps);
-		pr_err("%s3.1 offset=%lld len=%lld called xfs_bmapi_write\n", __func__,
-			offset, len);
-
 		if (error) {
 			pr_err("%s error from xfs_bmapi_write\n", __func__);
 			goto error;

@@ -210,7 +210,6 @@ static inline bool xfs_iext_next_extent(struct xfs_ifork *ifp,
 		struct xfs_iext_cursor *cur, struct xfs_bmbt_irec *gotp)
 {
 	xfs_iext_next(ifp, cur);
-	pr_err("%s calling xfs_iext_get_extent\n", __func__);
 	return xfs_iext_get_extent(ifp, cur, gotp);
 }
 
@@ -235,7 +234,6 @@ static inline bool xfs_iext_peek_next_extent(struct xfs_ifork *ifp,
 	struct xfs_iext_cursor ncur = *cur;
 
 	xfs_iext_next(ifp, &ncur);
-	pr_err("%s calling xfs_iext_get_extent\n", __func__);
 	return xfs_iext_get_extent(ifp, &ncur, gotp);
 }
 
@@ -248,7 +246,6 @@ static inline bool xfs_iext_peek_prev_extent(struct xfs_ifork *ifp,
 	struct xfs_iext_cursor ncur = *cur;
 
 	xfs_iext_prev(ifp, &ncur);
-	pr_err("%s calling xfs_iext_get_extent\n", __func__);
 	return xfs_iext_get_extent(ifp, &ncur, gotp);
 }
 
