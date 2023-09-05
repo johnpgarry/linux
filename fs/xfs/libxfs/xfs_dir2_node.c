@@ -1839,7 +1839,6 @@ xfs_dir2_node_find_freeblk(
 	 * If we don't have a data block yet, we're going to scan the freespace
 	 * data for a data block with enough free space in it.
 	 */
-	pr_err("%s calling xfs_bmap_last_offset\n", __func__);
 	error = xfs_bmap_last_offset(dp, &fo, XFS_DATA_FORK);
 	if (error)
 		return error;

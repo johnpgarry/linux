@@ -4395,7 +4395,6 @@ xfs_btree_visit_blocks(
 
 	cur->bc_ops->init_ptr_from_cur(cur, &lptr);
 
-	pr_err("%s\n", __func__);
 	/* for each level */
 	for (level = cur->bc_nlevels - 1; level >= 0; level--) {
 		/* grab the left hand block */
@@ -4421,7 +4420,6 @@ xfs_btree_visit_blocks(
 
 		/* for each buffer in the level */
 		do {
-			pr_err("%s3 calling xfs_btree_visit_block for fn=%pS\n", __func__, fn);
 			error = xfs_btree_visit_block(cur, level, fn, data);
 		} while (!error);
 

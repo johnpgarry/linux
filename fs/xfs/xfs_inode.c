@@ -1342,7 +1342,7 @@ xfs_itruncate_extents_flags(
 	xfs_fileoff_t		first_unmap_block;
 	xfs_filblks_t		unmap_len;
 	int			error = 0;
-	pr_err("%s new_size=%lld flags=0x%x\n", __func__, new_size, flags);
+	pr_err("%s new_size=%lld\n", __func__, new_size);
 
 	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL));
 	ASSERT(!atomic_read(&VFS_I(ip)->i_count) ||
@@ -1374,17 +1374,16 @@ xfs_itruncate_extents_flags(
 	}
 
 	unmap_len = XFS_MAX_FILEOFF - first_unmap_block + 1;
-	pr_err("%s2 new_size=%lld unmap_len=0x%llx flags=0x%x\n", __func__, new_size, unmap_len, flags);
+	pr_err("%s2 new_size=%lld unmap_len=%lld\n", __func__, new_size, unmap_len);
 	while (unmap_len > 0) {
 		ASSERT(tp->t_highest_agno == NULLAGNUMBER);
-		pr_err("%s3 calling __xfs_bunmapi unmap_len=0x%llx first_unmap_block=%lld\n", __func__, unmap_len, first_unmap_block);
+		pr_err("%s3 calling __xfs_bunmapi unmap_len=%lld\n", __func__, unmap_len);
 		error = __xfs_bunmapi(tp, ip, first_unmap_block, &unmap_len,
 				flags, XFS_ITRUNC_MAX_EXTENTS);
 		if (error)
 			goto out;
 
 		/* free the just unmapped extents */
-		pr_err("%s4 calling xfs_defer_finish unmap_len=0x%llx\n", __func__, unmap_len);
 		error = xfs_defer_finish(&tp);
 		if (error)
 			goto out;

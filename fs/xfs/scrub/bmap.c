@@ -898,7 +898,6 @@ xchk_bmap(
 		goto out;
 
 	/* Find the offset of the last extent in the mapping. */
-	pr_err("%s calling xfs_bmap_last_offset\n", __func__);
 	error = xfs_bmap_last_offset(ip, &endoff, whichfork);
 	if (!xchk_fblock_process_error(sc, whichfork, 0, &error))
 		goto out;

@@ -532,8 +532,6 @@ xfs_readdir(
 		return xfs_dir2_sf_getdents(&args, ctx);
 
 	lock_mode = xfs_ilock_data_map_shared(dp);
-	
-	pr_err("%s calling xfs_dir2_isblock\n", __func__);
 	error = xfs_dir2_isblock(&args, &isblock);
 	if (error)
 		goto out_unlock;

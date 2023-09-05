@@ -960,9 +960,8 @@ xfs_setattr_size(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 	if (newsize <= oldsize) {
-		pr_err("%s4 calling xfs_itruncate_extents newsize=%lld oldsize=%lld\n", __func__, newsize, oldsize);
+		pr_err("%s4 calling xfs_itruncate_extents\n", __func__);
 		error = xfs_itruncate_extents(&tp, ip, XFS_DATA_FORK, newsize);
-		pr_err("%s4.1 called xfs_itruncate_extents error=%d\n", __func__, error);
 		if (error)
 			goto out_trans_cancel;
 

@@ -1710,7 +1710,6 @@ xfs_dir2_node_to_leaf(
 	/*
 	 * Get the last offset in the file.
 	 */
-	pr_err("%s calling xfs_bmap_last_offset\n", __func__);
 	if ((error = xfs_bmap_last_offset(dp, &fo, XFS_DATA_FORK))) {
 		return error;
 	}

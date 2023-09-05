@@ -216,13 +216,8 @@ static inline bool xfs_iext_next_extent(struct xfs_ifork *ifp,
 static inline bool xfs_iext_prev_extent(struct xfs_ifork *ifp,
 		struct xfs_iext_cursor *cur, struct xfs_bmbt_irec *gotp)
 {
-	bool res;
-	pr_err("%s br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
 	xfs_iext_prev(ifp, cur);
-	pr_err("%s2 br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
-	res = xfs_iext_get_extent(ifp, cur, gotp);
-	pr_err("%s10 out br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
-	return res;
+	return xfs_iext_get_extent(ifp, cur, gotp);
 }
 
 /*

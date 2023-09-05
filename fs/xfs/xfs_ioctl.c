@@ -1453,16 +1453,13 @@ xfs_ioc_getbmap(
 
 	switch (cmd) {
 	case XFS_IOC_GETBMAPA:
-		pr_err("%s XFS_IOC_GETBMAPA\n", __func__);
 		bmx.bmv_iflags = BMV_IF_ATTRFORK;
 		fallthrough;
 	case XFS_IOC_GETBMAP:
-		pr_err("%s XFS_IOC_GETBMAP\n", __func__);
 		/* struct getbmap is a strict subset of struct getbmapx. */
 		recsize = sizeof(struct getbmap);
 		break;
 	case XFS_IOC_GETBMAPX:
-		pr_err("%s XFS_IOC_GETBMAPX\n", __func__);
 		recsize = sizeof(struct getbmapx);
 		break;
 	default:

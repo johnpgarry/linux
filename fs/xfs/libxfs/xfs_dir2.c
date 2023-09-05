@@ -295,7 +295,7 @@ xfs_dir_createname(
 		rval = xfs_dir2_sf_addname(args);
 		goto out_free;
 	}
-	pr_err("%s calling xfs_dir2_isblock\n", __func__);
+
 	rval = xfs_dir2_isblock(args, &v);
 	if (rval)
 		goto out_free;
@@ -360,21 +360,6 @@ xfs_dir_lookup(
 	int			rval;
 	bool			v;
 	int			lock_mode;
-	const char *n1, *n2;
-	bool special;
-
-	if (name)
-		n1 = name->name;
-	else
-		n1 = "?";
-
-	special = !strcmp("test", n1);
-	WARN_ON_ONCE(special);
-
-	if (ci_name)
-		n2 = ci_name->name;
-	else
-		n2 = "?";
 
 	ASSERT(S_ISDIR(VFS_I(dp)->i_mode));
 	XFS_STATS_INC(dp->i_mount, xs_dir_lookup);
@@ -403,39 +388,24 @@ xfs_dir_lookup(
 	lock_mode = xfs_ilock_data_map_shared(dp);
 	if (dp->i_df.if_format == XFS_DINODE_FMT_LOCAL) {
 		rval = xfs_dir2_sf_lookup(args);
-		if (special)
-			pr_err("%s rval=%d from xfs_dir2_sf_lookup\n", __func__, rval);
 		goto out_check_rval;
 	}
 
-	pr_err("%s2 calling xfs_dir2_isblock %s %s\n", __func__,
-		n1, n2);
 	rval = xfs_dir2_isblock(args, &v);
-	if (rval) {
-		if (special)
-			pr_err("%s3 rval=%d from xfs_dir2_isblock\n", __func__, rval);
+	if (rval)
 		goto out_free;
-	}
 	if (v) {
 		rval = xfs_dir2_block_lookup(args);
-		if (special)
-			pr_err("%s4 rval=%d from xfs_dir2_block_lookup\n", __func__, rval);
 		goto out_check_rval;
 	}
 
 	rval = xfs_dir2_isleaf(args, &v);
-	if (rval) {
-		if (special)
-			pr_err("%s5 rval=%d from xfs_dir2_isleaf\n", __func__, rval);
+	if (rval)
 		goto out_free;
-	}
 	if (v)
 		rval = xfs_dir2_leaf_lookup(args);
 	else
 		rval = xfs_dir2_node_lookup(args);
-
-	if (special)
-		pr_err("%s5 rval=%d from xfs_dir2_leaf_lookup or xfs_dir2_node_lookup\n", __func__, rval);
 
 out_check_rval:
 	if (rval == -EEXIST)
@@ -491,7 +461,6 @@ xfs_dir_removename(
 		goto out_free;
 	}
 
-	pr_err("%s calling xfs_dir2_isblock\n", __func__);
 	rval = xfs_dir2_isblock(args, &v);
 	if (rval)
 		goto out_free;
@@ -553,7 +522,6 @@ xfs_dir_replace(
 		goto out_free;
 	}
 
-	pr_err("%s calling xfs_dir2_isblock\n", __func__);
 	rval = xfs_dir2_isblock(args, &v);
 	if (rval)
 		goto out_free;
@@ -649,13 +617,9 @@ xfs_dir2_isblock(
 	xfs_fileoff_t		eof;
 	int			error;
 
-	pr_err("%s calling xfs_bmap_last_offset\n", __func__);
 	error = xfs_bmap_last_offset(args->dp, &eof, XFS_DATA_FORK);
-	pr_err("%s2 called xfs_bmap_last_offset error=%d\n", __func__, error);
-	if (error) {
-		WARN_ON_ONCE(1);
+	if (error)
 		return error;
-	}
 
 	*isblock = false;
 	if (XFS_FSB_TO_B(mp, eof) != args->geo->blksize)
@@ -678,7 +642,6 @@ xfs_dir2_isleaf(
 	xfs_fileoff_t		eof;
 	int			error;
 
-	pr_err("%s calling xfs_bmap_last_offset\n", __func__);
 	error = xfs_bmap_last_offset(args->dp, &eof, XFS_DATA_FORK);
 	if (error)
 		return error;

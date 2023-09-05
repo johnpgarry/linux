@@ -77,9 +77,7 @@ xfs_iext_get(
 	irec->br_blockcount = rec->hi & XFS_IEXT_LENGTH_MASK;
 
 	irec->br_startblock = rec->lo >> 54;
-	pr_err("%s br_startoff=%lld br_blockcount=%lld br_startblock=%lld rec->lo=0x%llx\n", __func__, irec->br_startoff, irec->br_blockcount, irec->br_startblock, rec->lo);
 	irec->br_startblock |= (rec->hi & xfs_mask64hi(42)) >> (22 - 10);
-	pr_err("%s2 br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, irec->br_startoff, irec->br_blockcount, irec->br_startblock);
 
 	if (rec->hi & (1 << 21))
 		irec->br_state = XFS_EXT_UNWRITTEN;
@@ -966,20 +964,13 @@ xfs_iext_lookup_extent_before(
 	struct xfs_iext_cursor	*cur,
 	struct xfs_bmbt_irec	*gotp)
 {
-	pr_err("%s br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
 	/* could be optimized to not even look up the next on a match.. */
 	if (xfs_iext_lookup_extent(ip, ifp, *end - 1, cur, gotp) &&
-	    gotp->br_startoff <= *end - 1) {
-		pr_err("%s1 returning\n", __func__);
+	    gotp->br_startoff <= *end - 1)
 		return true;
-	}
-	pr_err("%s1.1 br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
-	if (!xfs_iext_prev_extent(ifp, cur, gotp)) {
-		pr_err("%s2 returning\n", __func__);
+	if (!xfs_iext_prev_extent(ifp, cur, gotp))
 		return false;
-	}
 	*end = gotp->br_startoff + gotp->br_blockcount;
-	pr_err("%s10 out br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
 	return true;
 }
 
@@ -1019,11 +1010,9 @@ xfs_iext_get_extent(
 	struct xfs_iext_cursor	*cur,
 	struct xfs_bmbt_irec	*gotp)
 {
-	pr_err("%s br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
 	if (!xfs_iext_valid(ifp, cur))
 		return false;
 	xfs_iext_get(gotp, cur_rec(cur));
-	pr_err("%s2 br_startoff=%lld br_blockcount=%lld br_startblock=%lld\n", __func__, gotp->br_startoff, gotp->br_blockcount, gotp->br_startblock);
 	return true;
 }
 

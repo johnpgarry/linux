@@ -270,7 +270,6 @@ xfs_bmap_count_blocks(
 
 	switch (ifp->if_format) {
 	case XFS_DINODE_FMT_BTREE:
-		pr_err("%s XFS_DINODE_FMT_BTREE calling xfs_iread_extents\n", __func__);
 		error = xfs_iread_extents(tp, ip, whichfork);
 		if (error)
 			return error;
@@ -296,14 +295,6 @@ xfs_bmap_count_blocks(
 
 	return 0;
 }
-#if 0
-{
-	xfs_fileoff_t	br_startoff;	/* starting file offset */
-	xfs_fsblock_t	br_startblock;	/* starting block number */
-	xfs_filblks_t	br_blockcount;	/* number of blocks */
-	xfs_exntst_t	br_state;	/* extent state */
-} xfs_bmbt_irec_t;
-#endif
 
 static int
 xfs_getbmap_report_one(
@@ -316,9 +307,6 @@ xfs_getbmap_report_one(
 	struct kgetbmap		*p = out + bmv->bmv_entries;
 	bool			shared = false;
 	int			error;
-
-	pr_err("%s bmv->bmv_offset=%lld length=%lld block=%lld got->br_startoff=%lld br_startblock=%lld br_blockcount=%lld\n", __func__,
-		bmv->bmv_offset, bmv->bmv_length, bmv->bmv_block, got->br_startoff, got->br_startblock, got->br_blockcount);
 
 	error = xfs_reflink_trim_around_shared(ip, got, &shared);
 	if (error)
@@ -350,14 +338,10 @@ xfs_getbmap_report_one(
 
 	p->bmv_offset = XFS_FSB_TO_BB(ip->i_mount, got->br_startoff);
 	p->bmv_length = XFS_FSB_TO_BB(ip->i_mount, got->br_blockcount);
-	pr_err("%s2 p->bmv_offset=%lld length=%lld block=%lld\n", __func__,
-		p->bmv_offset, p->bmv_length, p->bmv_block);
 
 	bmv->bmv_offset = p->bmv_offset + p->bmv_length;
 	bmv->bmv_length = max(0LL, bmv_end - bmv->bmv_offset);
 	bmv->bmv_entries++;
-	pr_err("%s3 bmv->bmv_offset=%lld length=%lld block=%lld\n", __func__,
-		bmv->bmv_offset, bmv->bmv_length, bmv->bmv_block);
 	return 0;
 }
 
@@ -431,7 +415,6 @@ xfs_getbmap(
 	struct xfs_bmbt_irec	got, rec;
 	xfs_filblks_t		len;
 	struct xfs_iext_cursor	icur;
-	pr_err("%s ip=%pS\n", __func__, ip);
 
 	if (bmv->bmv_iflags & ~BMV_IF_VALID)
 		return -EINVAL;
@@ -459,7 +442,6 @@ xfs_getbmap(
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	switch (whichfork) {
 	case XFS_ATTR_FORK:
-		pr_err("%s2 ip=%pS XFS_ATTR_FORK\n", __func__, ip);
 		lock = xfs_ilock_attr_map_shared(ip);
 		if (!xfs_inode_has_attr_fork(ip))
 			goto out_unlock_ilock;
@@ -467,7 +449,6 @@ xfs_getbmap(
 		max_len = 1LL << 32;
 		break;
 	case XFS_COW_FORK:
-		pr_err("%s2 ip=%pS XFS_COW_FORK\n", __func__, ip);
 		lock = XFS_ILOCK_SHARED;
 		xfs_ilock(ip, lock);
 
@@ -481,7 +462,6 @@ xfs_getbmap(
 			max_len = XFS_ISIZE(ip);
 		break;
 	case XFS_DATA_FORK:
-		pr_err("%s2 ip=%pS XFS_DATA_FORK\n", __func__, ip);
 		if (!(iflags & BMV_IF_DELALLOC) &&
 		    (ip->i_delayed_blks || XFS_ISIZE(ip) > ip->i_disk_size)) {
 			error = filemap_write_and_wait(VFS_I(ip)->i_mapping);
@@ -497,7 +477,7 @@ xfs_getbmap(
 			 * ip->i_delayed_blks == 0.
 			 */
 		}
-		pr_err("%s3 XFS_DATA_FORK calling xfs_get_extsz_hint\n", __func__);
+		pr_err("%s XFS_DATA_FORK calling xfs_get_extsz_hint\n", __func__);
 		if (xfs_get_extsz_hint(ip) ||
 		    (ip->i_diflags &
 		     (XFS_DIFLAG_PREALLOC | XFS_DIFLAG_APPEND)))
@@ -533,12 +513,10 @@ xfs_getbmap(
 	first_bno = bno = XFS_BB_TO_FSBT(mp, bmv->bmv_offset);
 	len = XFS_BB_TO_FSB(mp, bmv->bmv_length);
 
-	pr_err("%s4 calling xfs_iread_extents\n", __func__);
 	error = xfs_iread_extents(NULL, ip, whichfork);
 	if (error)
 		goto out_unlock_ilock;
 
-	pr_err("%s5 calling xfs_iext_lookup_extent bno=%lld\n", __func__, bno);
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &icur, &got)) {
 		/*
 		 * Report a whole-file hole if the delalloc flag is set to
@@ -549,24 +527,8 @@ xfs_getbmap(
 					XFS_B_TO_FSB(mp, XFS_ISIZE(ip)));
 		goto out_unlock_ilock;
 	}
-#if 0
-struct getbmapx {
-	__s64		bmv_offset;	/* file offset of segment in blocks */
-	__s64		bmv_block;	/* starting block (64-bit daddr_t)  */
-	__s64		bmv_length;	/* length of segment, blocks	    */
-	__s32		bmv_count;	/* # of entries in array incl. 1st  */
-	__s32		bmv_entries;	/* # of entries filled in (output). */
-	__s32		bmv_iflags;	/* input flags (1st structure)	    */
-	__s32		bmv_oflags;	/* output flags (after 1st structure)*/
-	__s32		bmv_unused1;	/* future use			    */
-	__s32		bmv_unused2;	/* future use			    */
 
-#endif
-	pr_err("%s6 calling xfs_getbmap_full bmv=%pS length=%lld entries=%d count=%d\n",
-		__func__, bmv, bmv->bmv_length, bmv->bmv_entries, bmv->bmv_count);
 	while (!xfs_getbmap_full(bmv)) {
-		pr_err("%s7 looping called xfs_getbmap_full bmv=%pS length=%lld entries=%d count=%d\n", __func__,
-			bmv, bmv->bmv_length, bmv->bmv_entries, bmv->bmv_count);
 		xfs_trim_extent(&got, first_bno, len);
 
 		/*
@@ -588,11 +550,8 @@ struct getbmapx {
 		bno = got.br_startoff + got.br_blockcount;
 		rec = got;
 		do {
-			pr_err("%s8 calling xfs_getbmap_report_one\n", __func__);
 			error = xfs_getbmap_report_one(ip, bmv, out, bmv_end,
 					&rec);
-			pr_err("%s8.1 called xfs_getbmap_report_one length=%lld entries=%d count=%d offset=%lld\n", __func__,
-				bmv->bmv_length, bmv->bmv_entries, bmv->bmv_count, bmv->bmv_offset);
 			if (error || xfs_getbmap_full(bmv))
 				goto out_unlock_ilock;
 		} while (xfs_getbmap_next_rec(&rec, bno));
@@ -615,7 +574,6 @@ struct getbmapx {
 		if (bno >= first_bno + len)
 			break;
 	}
-	pr_err("%s9 outside xfs_getbmap_full loop\n", __func__);
 
 out_unlock_ilock:
 	xfs_iunlock(ip, lock);
