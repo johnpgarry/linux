@@ -87,7 +87,7 @@ xfs_bmap_rtalloc(
 	bool			ignore_locality = false;
 	int			error;
 
-	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
+	//pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	align = xfs_get_extsz_hint(ap->ip);
 retry:
 	prod = align / mp->m_sb.sb_rextsize;

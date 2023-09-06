@@ -55,7 +55,7 @@ unsigned int bdev_find_max_atomic_write_alignment(struct block_device *bdev,
 	unsigned int atomic_write_unit_max = limits->atomic_write_unit_max;
 	unsigned int max_align;
 
-	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
+	//pr_err("%s pos=%lld (sector=%lld, fsb=%lld) len=%d\n", __func__, pos, pos / SECTOR_SIZE, pos / 4096, len);
 
 	pos /= SECTOR_SIZE;
 	len /= SECTOR_SIZE;

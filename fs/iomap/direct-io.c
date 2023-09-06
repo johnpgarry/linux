@@ -624,8 +624,17 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 			const struct iomap *_iomap = &iomi.iomap;
 			loff_t iomi_length = iomap_length(&iomi);
 			sector_t _iomap_sector = iomap_sector(_iomap, iomi.pos);
-			pr_err("%s2 _iomap->bdev=%pS _iomap_sector=%lld (byte=%lld) iomi_length=%lld\n",
-				__func__, _iomap->bdev, _iomap_sector, _iomap_sector << SECTOR_SHIFT, iomi_length);
+			unsigned int _align = bdev_find_max_atomic_write_alignment(_iomap->bdev,
+					_iomap_sector << SECTOR_SHIFT, iomi_length);
+			pr_err("%s2 _iomap->bdev=%pS _iomap_sector=%lld (byte=%lld, fsb=%lld) iomi_length=%lld _align=%d\n",
+				__func__, _iomap->bdev, _iomap_sector, _iomap_sector << SECTOR_SHIFT, _iomap_sector / 8, iomi_length,
+				_align);
+			pr_err("%s2.1 _iomap->addr=%lld (sector=%lld, fsb=%lld), offset=%lld (sector=%lld, fsb=%lld), length=%lld (sector=%lld, fsb=%lld)\n",
+				__func__,
+				_iomap->addr, _iomap->addr / 512, _iomap->addr / 4096,
+				_iomap->offset, _iomap->offset / 512, _iomap->offset / 4096,
+				_iomap->length, _iomap->length / 512, _iomap->length / 4096);
+			WARN(_align < dio->atomic_write_unit, "align(%d) < dio->atomic_write_unit(%d)\n", _align, dio->atomic_write_unit);
 
 			/*
 			 * Ensure length and start address is a multiple of

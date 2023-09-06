@@ -4362,7 +4362,7 @@ xfs_bmapi_write(
 	orig_nmap = *nmap;
 #endif
 
-	pr_err("%s len=%lld total=%d\n", __func__, len, total);
+	//pr_err("%s len=%lld total=%d\n", __func__, len, total);
 	ASSERT(*nmap >= 1);
 	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP);
 	ASSERT(tp != NULL);

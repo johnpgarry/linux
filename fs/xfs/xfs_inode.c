@@ -62,15 +62,15 @@ xfs_get_extsz_hint(
 	 * write to them.
 	 */
 	if (xfs_is_always_cow_inode(ip)) {
-		pr_err("%s xfs_is_always_cow_inode, returning 0\n", __func__);
+		//pr_err("%s xfs_is_always_cow_inode, returning 0\n", __func__);
 		return 0;
 	}
 	if ((ip->i_diflags & XFS_DIFLAG_EXTSIZE) && ip->i_extsize) {
-		pr_err("%s XFS_DIFLAG_EXTSIZE, returning %d\n", __func__, ip->i_extsize);
+		//pr_err("%s XFS_DIFLAG_EXTSIZE, returning %d\n", __func__, ip->i_extsize);
 		return ip->i_extsize;
 	}
 	if (XFS_IS_REALTIME_INODE(ip)) {
-		pr_err("%s XFS_IS_REALTIME_INODE, returning %d\n", __func__, ip->i_mount->m_sb.sb_rextsize);
+		//pr_err("%s XFS_IS_REALTIME_INODE, returning %d\n", __func__, ip->i_mount->m_sb.sb_rextsize);
 		return ip->i_mount->m_sb.sb_rextsize;
 	}
 	return 0;

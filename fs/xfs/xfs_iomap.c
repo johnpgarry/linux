@@ -126,7 +126,7 @@ xfs_bmbt_to_iomap(
 		iomap->dax_dev = target->bt_daxdev;
 	else
 		iomap->bdev = target->bt_bdev;
-	pr_err("%s iomap->bdev=%pS target->bt_bdev=%pS\n", __func__, iomap->bdev, target->bt_bdev);
+	//pr_err("%s iomap->bdev=%pS target->bt_bdev=%pS\n", __func__, iomap->bdev, target->bt_bdev);
 	iomap->flags = iomap_flags;
 
 	if (xfs_ipincount(ip) &&
@@ -208,7 +208,7 @@ xfs_iomap_eof_align_last_fsb(
 	xfs_extlen_t		align = xfs_eof_alignment(ip);
 	struct xfs_bmbt_irec	irec;
 	struct xfs_iext_cursor	icur;
-	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
+	//pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	extsz = xfs_get_extsz_hint(ip);
 
 	ASSERT(!xfs_need_iread_extents(ifp));
@@ -256,7 +256,7 @@ xfs_iomap_write_direct(
 
 	ASSERT(count_fsb > 0);
 
-	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
+	//pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
 					   xfs_get_extsz_hint(ip));
 	if (unlikely(XFS_IS_REALTIME_INODE(ip))) {
@@ -795,7 +795,8 @@ xfs_direct_write_iomap_begin(
 	u64			seq;
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
-
+	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld\n",
+			__func__, offset, length, offset_fsb, end_fsb);
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -931,7 +932,7 @@ xfs_dax_write_iomap_end(
 	struct iomap		*iomap)
 {
 	struct xfs_inode	*ip = XFS_I(inode);
-
+	pr_err("%s pos=%lld length=%lld\n", __func__, pos, length);
 	if (!xfs_is_cow_inode(ip))
 		return 0;
 
@@ -974,10 +975,10 @@ xfs_buffered_write_iomap_begin(
 		return -EIO;
 
 	/* we can't use delayed allocations when using extent size hints */
-	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
+//	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	if (xfs_get_extsz_hint(ip)) {
-		pr_err("%s2 calling xfs_direct_write_iomap_begin after xfs_get_extsz_hint offset=%lld count=%lld\n", __func__,
-			offset, count);
+	//	pr_err("%s2 calling xfs_direct_write_iomap_begin after xfs_get_extsz_hint offset=%lld count=%lld\n", __func__,
+	//		offset, count);
 		return xfs_direct_write_iomap_begin(inode, offset, count,
 				flags, iomap, srcmap);
 	}

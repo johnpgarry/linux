@@ -521,7 +521,7 @@ xfs_stat_blksize(
 	 * always return the realtime extent size.
 	 */
 	if (XFS_IS_REALTIME_INODE(ip)) {
-		pr_err("%s calling xfs_get_extsz_hint\n", __func__);
+		//pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 		return XFS_FSB_TO_B(mp, xfs_get_extsz_hint(ip));
 	}
 
@@ -541,16 +541,16 @@ xfs_stat_blksize(
 	if (xfs_has_large_iosize(mp)) {
 		if (mp->m_swidth) {
 
-			pr_err("%s2 xfs_has_large_iosize m_swidth set returning XFS_FSB_TO_B\n", __func__);
+			//pr_err("%s2 xfs_has_large_iosize m_swidth set returning XFS_FSB_TO_B\n", __func__);
 			return XFS_FSB_TO_B(mp, mp->m_swidth);
 		}
 		if (xfs_has_allocsize(mp)) {
-			pr_err("%s3 xfs_has_allocsize returning m_allocsize_log\n", __func__);
+			//pr_err("%s3 xfs_has_allocsize returning m_allocsize_log\n", __func__);
 			return 1U << mp->m_allocsize_log;
 		}
 	}
 
-	pr_err("%s10 returning PAGE_SIZE\n", __func__);
+	//pr_err("%s10 returning PAGE_SIZE\n", __func__);
 	return PAGE_SIZE;
 }
 
@@ -634,9 +634,9 @@ xfs_vn_getattr(
 		}
 		fallthrough;
 	default:
-		pr_err("%s1 calling xfs_stat_blksize\n", __func__);
+		//pr_err("%s1 calling xfs_stat_blksize\n", __func__);
 		stat->blksize = xfs_stat_blksize(ip);
-		pr_err("%s2 called xfs_stat_blksize blksize=%d\n", __func__, stat->blksize);
+	//	pr_err("%s2 called xfs_stat_blksize blksize=%d\n", __func__, stat->blksize);
 		stat->rdev = 0;
 		break;
 	}
