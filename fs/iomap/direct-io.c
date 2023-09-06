@@ -555,6 +555,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	dio->submit.waiter = current;
 	dio->submit.poll_bio = NULL;
 
+	if (atomic_write)
+		iomi.flags |= IOMAP_ATOMIC_WRITE;
+
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iomi.flags |= IOMAP_NOWAIT;
 
@@ -634,6 +637,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 				_iomap->addr, _iomap->addr / 512, _iomap->addr / 4096,
 				_iomap->offset, _iomap->offset / 512, _iomap->offset / 4096,
 				_iomap->length, _iomap->length / 512, _iomap->length / 4096);
+			pr_err("%s2.2 iomi.pos=%lld (sector=%lld, fsb=%lld), len=%lld (sector=%lld, fsb=%lld)\n",
+				__func__,
+				iomi.pos, iomi.pos / 512, iomi.pos / 4096,
+				iomi.len, iomi.len / 512, iomi.len / 4096);
 			WARN(_align < dio->atomic_write_unit, "align(%d) < dio->atomic_write_unit(%d)\n", _align, dio->atomic_write_unit);
 
 			/*

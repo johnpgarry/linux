@@ -74,8 +74,11 @@ static inline void iomap_iter_done(struct iomap_iter *iter)
 int iomap_iter(struct iomap_iter *iter, const struct iomap_ops *ops)
 {
 	int ret;
-
+	pr_err("%s iter->iomap.length=%lld ops->iomap_end=%pS\n", __func__, iter->iomap.length, ops->iomap_end);
+	pr_err("%s0 iter->pos=%lld, len=%lld, processed=%lld\n",
+		__func__, iter->pos, iter->len, iter->processed);
 	if (iter->iomap.length && ops->iomap_end) {
+		pr_err("%s1 iter->pos=%lld, processed=%lld\n", __func__, iter->pos, iter->processed);
 		ret = ops->iomap_end(iter->inode, iter->pos, iomap_length(iter),
 				iter->processed > 0 ? iter->processed : 0,
 				iter->flags, &iter->iomap);
@@ -88,6 +91,8 @@ int iomap_iter(struct iomap_iter *iter, const struct iomap_ops *ops)
 	if (ret <= 0)
 		return ret;
 
+	pr_err("%s2 iter->iomap.length=%lld iter->pos=%lld, len=%lld, processed=%lld\n",
+		__func__, iter->iomap.length, iter->pos, iter->len, iter->processed);
 	ret = ops->iomap_begin(iter->inode, iter->pos, iter->len, iter->flags,
 			       &iter->iomap, &iter->srcmap);
 	if (ret < 0)

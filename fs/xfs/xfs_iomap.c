@@ -800,6 +800,10 @@ xfs_direct_write_iomap_begin(
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
+	if (flags & IOMAP_ATOMIC_WRITE)
+		pr_err("%s1 IOMAP_ATOMIC_WRITE\n", __func__);
+
+
 	/*
 	 * Writes that span EOF might trigger an IO size update on completion,
 	 * so consider them to be dirty for the purposes of O_DSYNC even if
@@ -817,6 +821,8 @@ xfs_direct_write_iomap_begin(
 	if (error)
 		goto out_unlock;
 
+	pr_err("%s5 imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld offset_fsb=%lld end_fsb=%lld nimaps=%d\n",
+			__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, offset_fsb, end_fsb, nimaps);
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;
 		if (flags & IOMAP_NOWAIT)
@@ -865,6 +871,9 @@ xfs_direct_write_iomap_begin(
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
 	trace_xfs_iomap_found(ip, offset, length, XFS_DATA_FORK, &imap);
+
+	pr_err("%s9 imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 allocate_blocks:
