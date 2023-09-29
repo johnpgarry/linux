@@ -525,6 +525,8 @@ xfs_flags2diflags2(
 		di_flags2 |= XFS_DIFLAG2_DAX;
 	if (xflags & FS_XFLAG_COWEXTSIZE)
 		di_flags2 |= XFS_DIFLAG2_COWEXTSIZE;
+	if (xflags & FS_XFLAG_FORCEALIGN)
+		di_flags2 |= XFS_DIFLAG2_FORCEALIGN;
 
 	return di_flags2;
 }
@@ -560,6 +562,22 @@ xfs_ioctl_setattr_xflags(
 	i_flags2 = xfs_flags2diflags2(ip, fa->fsx_xflags);
 	if (i_flags2 && !xfs_has_v3inodes(mp))
 		return -EINVAL;
+
+	/*
+	 * Forcealign requires a nonzero extent size hint and a zero cow
+	 * extent size hint.  It doesn't apply to realtime files.
+	 */
+	if (fa->fsx_xflags & FS_XFLAG_FORCEALIGN) {
+		if (!xfs_has_forcealign(mp))
+			return -EINVAL;
+		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE)
+			return -EINVAL;
+		if (!(fa->fsx_xflags & (FS_XFLAG_EXTSIZE |
+					FS_XFLAG_EXTSZINHERIT)))
+			return -EINVAL;
+		if (fa->fsx_xflags & FS_XFLAG_REALTIME)
+			return -EINVAL;
+	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
 	ip->i_diflags2 = i_flags2;
@@ -647,6 +665,7 @@ xfs_ioctl_setattr_check_extsize(
 	struct xfs_mount	*mp = ip->i_mount;
 	xfs_failaddr_t		failaddr;
 	uint16_t		new_diflags;
+	uint16_t		new_diflags2;
 
 	if (!fa->fsx_valid)
 		return 0;
@@ -659,6 +678,7 @@ xfs_ioctl_setattr_check_extsize(
 		return -EINVAL;
 
 	new_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
+	new_diflags2 = xfs_flags2diflags2(ip, fa->fsx_xflags);
 
 	/*
 	 * Inode verifiers do not check that the extent size hint is an integer
@@ -678,7 +698,18 @@ xfs_ioctl_setattr_check_extsize(
 	failaddr = xfs_inode_validate_extsize(ip->i_mount,
 			XFS_B_TO_FSB(mp, fa->fsx_extsize),
 			VFS_I(ip)->i_mode, new_diflags);
-	return failaddr != NULL ? -EINVAL : 0;
+	if (failaddr)
+		return -EINVAL;
+
+	if (!(new_diflags2 & XFS_DIFLAG2_FORCEALIGN))
+		return 0;
+
+	failaddr = xfs_inode_validate_forcealign(ip->i_mount,
+				VFS_I(ip)->i_mode, new_diflags2);
+	if (failaddr)
+		return -EINVAL;
+
+	return 0;
 }
 
 static int

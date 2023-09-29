@@ -633,6 +633,11 @@ xfs_dinode_verify(
 	if ((flags2 & XFS_DIFLAG2_REFLINK) && (flags & XFS_DIFLAG_REALTIME))
 		return __this_address;
 
+	/* further extent size hint validation for di_flags2 */
+	fa = xfs_inode_validate_extsize2(be32_to_cpu(dip->di_extsize), flags2);
+	if (fa)
+		return fa;
+
 	/* COW extent size hint validation */
 	fa = xfs_inode_validate_cowextsize(mp, be32_to_cpu(dip->di_cowextsize),
 			mode, flags, flags2);
@@ -643,6 +648,12 @@ xfs_dinode_verify(
 	if (xfs_dinode_has_bigtime(dip) &&
 	    !xfs_has_bigtime(mp))
 		return __this_address;
+
+	if (flags2 & XFS_DIFLAG2_FORCEALIGN) {
+		fa = xfs_inode_validate_forcealign(mp, mode, flags2);
+		if (fa)
+			return fa;
+	}
 
 	return NULL;
 }
@@ -664,7 +675,7 @@ xfs_dinode_calc_crc(
 }
 
 /*
- * Validate di_extsize hint.
+ * Validate di_extsize hint for di_flags.
  *
  * 1. Extent size hint is only valid for directories and regular files.
  * 2. FS_XFLAG_EXTSIZE is only valid for regular files.
@@ -756,6 +767,27 @@ xfs_inode_validate_extsize(
 }
 
 /*
+ * Validate di_extsize hint for di_flags2.
+ *
+ * 1. Validate extsize is non-zero for forcealign
+ */
+xfs_failaddr_t
+xfs_inode_validate_extsize2(
+	uint32_t			extsize,
+	uint16_t			flags2)
+{
+	bool				forcealign_flag;
+
+	forcealign_flag = (flags2 & XFS_DIFLAG2_FORCEALIGN);
+
+	/* non-zero extsize required */
+	if (forcealign_flag && extsize == 0)
+		return __this_address;
+
+	return NULL;
+}
+
+/*
  * Validate di_cowextsize hint.
  *
  * 1. CoW extent size hint can only be set if reflink is enabled on the fs.
@@ -778,11 +810,13 @@ xfs_inode_validate_cowextsize(
 {
 	bool				rt_flag;
 	bool				hint_flag;
+	bool				forcealign_flag;
 	uint32_t			cowextsize_bytes;
 
 	rt_flag = (flags & XFS_DIFLAG_REALTIME);
 	hint_flag = (flags2 & XFS_DIFLAG2_COWEXTSIZE);
 	cowextsize_bytes = XFS_FSB_TO_B(mp, cowextsize);
+	forcealign_flag = (flags2 & XFS_DIFLAG2_FORCEALIGN);
 
 	if (hint_flag && !xfs_has_reflink(mp))
 		return __this_address;
@@ -800,6 +834,9 @@ xfs_inode_validate_cowextsize(
 	if (hint_flag && rt_flag)
 		return __this_address;
 
+	if (forcealign_flag && cowextsize != 0)
+		return __this_address;
+		
 	if (cowextsize_bytes % mp->m_sb.sb_blocksize)
 		return __this_address;
 
@@ -807,6 +844,28 @@ xfs_inode_validate_cowextsize(
 		return __this_address;
 
 	if (cowextsize > mp->m_sb.sb_agblocks / 2)
+		return __this_address;
+
+	return NULL;
+}
+
+/* Validate the forcealign inode flag */
+xfs_failaddr_t
+xfs_inode_validate_forcealign(
+	struct xfs_mount	*mp,
+	uint16_t		mode,
+	uint16_t		flags2)
+{
+	/* superblock rocompat feature flag */
+	if (!xfs_has_forcealign(mp))
+		return __this_address;
+
+	/* Only regular files and directories */
+	if (!S_ISDIR(mode) && !S_ISREG(mode))
+		return __this_address;
+
+	/* Reflink'ed disallowed */
+	if (flags2 & XFS_DIFLAG2_REFLINK)
 		return __this_address;
 
 	return NULL;
