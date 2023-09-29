@@ -1908,6 +1908,7 @@ static void nvme_update_disk_info(struct nvme_ctrl *ctrl, struct gendisk *disk,
 {
 	sector_t capacity = nvme_lba_to_sect(head, le64_to_cpu(id->nsze));
 	u32 bs = 1U << head->lba_shift;
+	struct request_queue *q = disk->queue;
 	u32 atomic_bs, phys_bs, io_opt = 0;
 
 	/*
@@ -1942,15 +1943,55 @@ static void nvme_update_disk_info(struct nvme_ctrl *ctrl, struct gendisk *disk,
 		io_opt = bs * (1 + le16_to_cpu(id->nows));
 	}
 
-	blk_queue_logical_block_size(disk->queue, bs);
+	blk_queue_logical_block_size(q, bs);
 	/*
 	 * Linux filesystems assume writing a single physical block is
 	 * an atomic operation. Hence limit the physical block size to the
 	 * value of the Atomic Write Unit Power Fail parameter.
 	 */
-	blk_queue_physical_block_size(disk->queue, min(phys_bs, atomic_bs));
-	blk_queue_io_min(disk->queue, phys_bs);
-	blk_queue_io_opt(disk->queue, io_opt);
+	blk_queue_physical_block_size(q, min(phys_bs, atomic_bs));
+	blk_queue_io_min(q, phys_bs);
+	blk_queue_io_opt(q, io_opt);
+
+	atomic_bs = rounddown_pow_of_two(atomic_bs);
+	if (id->nsfeat & NVME_NS_FEAT_ATOMICS && id->nawupf) {
+		if (id->nabo) {
+			dev_err(ctrl->device, "Support atomic writes NABO=%d\n",
+				id->nabo);
+		} else {
+			u32 boundary;
+
+			if (le16_to_cpu(id->nabspf))
+				boundary = (le16_to_cpu(id->nabspf) + 1) * bs;
+			else
+				boundary = 0;
+
+			/*
+			 * The boundary size just needs to be a multiple
+			 * of unit_max (and not necessarily a power-of-2), so
+			 * this could be relaxed in the block layer in future.
+			 */
+			if (!boundary || is_power_of_2(boundary)) {
+				blk_queue_atomic_write_max_bytes(q, atomic_bs);
+				blk_queue_atomic_write_unit_min_sectors(q,
+						bs >> SECTOR_SHIFT);
+				blk_queue_atomic_write_unit_max_sectors(q,
+						rounddown_pow_of_two(atomic_bs) >> SECTOR_SHIFT);
+				blk_queue_atomic_write_boundary_bytes(q,
+						boundary);
+			} else {
+				dev_err(ctrl->device, "Unsupported atomic write boundary (%d)\n",
+					boundary);
+			}
+		}
+	} else if (ctrl->subsys->awupf) {
+		blk_queue_atomic_write_max_bytes(q, atomic_bs);
+		blk_queue_atomic_write_unit_min_sectors(q,
+				bs >> SECTOR_SHIFT);
+		blk_queue_atomic_write_unit_max_sectors(q,
+				rounddown_pow_of_two(atomic_bs) >> SECTOR_SHIFT);
+		blk_queue_atomic_write_boundary_bytes(q, 0);
+	}
 
 	/*
 	 * Register a metadata profile for PI, or the plain non-integrity NVMe
