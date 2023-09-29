@@ -814,6 +814,44 @@ xfs_direct_write_iomap_begin(
 	if (error)
 		goto out_unlock;
 
+	if (flags & IOMAP_ATOMIC) {
+		xfs_filblks_t unit_min_fsb, unit_max_fsb;
+		unsigned int unit_min, unit_max;
+
+		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
+		unit_min_fsb = XFS_B_TO_FSBT(mp, unit_min);
+		unit_max_fsb = XFS_B_TO_FSBT(mp, unit_max);
+
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
+			error = -EINVAL;
+			goto out_unlock;
+		}
+
+		if ((offset & mp->m_blockmask) ||
+		    (length & mp->m_blockmask)) {
+			error = -EINVAL;
+			goto out_unlock;
+		}
+
+		if (imap.br_blockcount == unit_min_fsb ||
+		    imap.br_blockcount == unit_max_fsb) {
+			/* ok if exactly min or max */
+		} else if (imap.br_blockcount < unit_min_fsb ||
+			   imap.br_blockcount > unit_max_fsb) {
+			error = -EINVAL;
+			goto out_unlock;
+		} else if (!is_power_of_2(imap.br_blockcount)) {
+			error = -EINVAL;
+			goto out_unlock;
+		}
+
+		if (imap.br_startoff &&
+		    imap.br_startoff & (imap.br_blockcount - 1)) {
+			error = -EINVAL;
+			goto out_unlock;
+		}
+	}
+
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;
 		if (flags & IOMAP_NOWAIT)
