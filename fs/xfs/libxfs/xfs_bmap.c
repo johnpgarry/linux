@@ -3663,6 +3663,10 @@ xfs_bmap_btalloc_low_space(
 {
 	int			error;
 
+	/* The allocator doesn't honour args->alignment */
+	if (args->alignment > 1)
+		return 0;
+
 	if (args->minlen > ap->minlen) {
 		args->minlen = ap->minlen;
 		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
