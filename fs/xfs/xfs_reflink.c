@@ -1802,9 +1802,17 @@ xfs_reflink_remap_prep(
 	if (IS_DAX(inode_in) != IS_DAX(inode_out))
 		goto out_unlock;
 
-	/* XXX Can't reflink forcealign files for now */
-	if (xfs_inode_force_align(src) || xfs_inode_force_align(dest))
-		goto out_unlock;
+	/* Check non-power of two alignment issues, if necessary. */
+	if ((xfs_inode_force_align(src) || xfs_inode_force_align(dest)) &&
+	    !is_power_of_2(alloc_unit)) {
+		ret = xfs_reflink_remap_check_rtalign(src, pos_in, dest,
+				pos_out, len, remap_flags);
+		if (ret)
+			goto out_unlock;
+
+		/* Do the VFS checks with the regular block alignment. */
+		alloc_unit = src->i_mount->m_sb.sb_blocksize;
+	}
 
 	/* Check non-power of two alignment issues, if necessary. */
 	if (XFS_IS_REALTIME_INODE(dest) && !is_power_of_2(alloc_unit)) {
