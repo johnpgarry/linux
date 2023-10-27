@@ -152,7 +152,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_VIRTUAL_GB   0
 #define DEF_VPD_USE_HOSTNO 1
 #define DEF_WRITESAME_LENGTH 0xFFFF
-#define DEF_ATOMIC_WRITE 0
+#define DEF_ATOMIC_WRITE 1
 #define DEF_ATOMIC_MAX_LENGTH 8192
 #define DEF_ATOMIC_ALIGNMENT 2
 #define DEF_ATOMIC_GRANULARITY 2
