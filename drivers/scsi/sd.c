@@ -910,6 +910,7 @@ static void sd_config_atomic(struct scsi_disk *sdkp)
 	blk_queue_atomic_write_unit_min_sectors(q, unit_min);
 	blk_queue_atomic_write_unit_max_sectors(q, unit_max);
 	blk_queue_atomic_write_boundary_bytes(q, 0);
+	blk_queue_virt_boundary(q, 0xfff);
 }
 
 static blk_status_t sd_setup_write_same16_cmnd(struct scsi_cmnd *cmd,

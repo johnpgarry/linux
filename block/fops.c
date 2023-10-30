@@ -52,10 +52,10 @@ static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos,
 		return false;
 	if (iov_iter_count(iter) & (min_bytes - 1))
 		return false;
-	if (!is_power_of_2(iov_iter_count(iter)))
-		return false;
-	if (pos & (iov_iter_count(iter) - 1))
-		return false;
+	//if (!is_power_of_2(iov_iter_count(iter)))
+	//	return false;
+	//if (pos & (iov_iter_count(iter) - 1))
+	//	return false;
 	if (iov_iter_count(iter) > max_bytes)
 		return false;
 	return true;

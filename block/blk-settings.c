@@ -221,8 +221,10 @@ static unsigned int blk_queue_max_guaranteed_bio_size_sectors(
 					limits->max_segments);
 	/*  Limit according to dev sector size as we only support direct-io */
 	unsigned int limit = max_segments * queue_logical_block_size(q);
+	pr_err("%s max_segments=%d limit=%d\n", __func__, max_segments, limit);
 
-	return rounddown_pow_of_two(limit >> SECTOR_SHIFT);
+	//return rounddown_pow_of_two(limit >> SECTOR_SHIFT);
+	return UINT_MAX;
 }
 
 /**
@@ -254,6 +256,7 @@ void blk_queue_atomic_write_unit_max_sectors(struct request_queue *q,
 	struct queue_limits *limits = &q->limits;
 	unsigned int guaranteed_sectors =
 		blk_queue_max_guaranteed_bio_size_sectors(q);
+	pr_err("%s guaranteed_sectors=%d sectors=%d\n", __func__, guaranteed_sectors, sectors);
 
 	limits->atomic_write_unit_max_sectors = min(guaranteed_sectors, sectors);
 }

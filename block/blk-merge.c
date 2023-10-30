@@ -349,6 +349,7 @@ split:
 	if (bio->bi_opf & REQ_ATOMIC) {
 		bio->bi_status = BLK_STS_IOERR;
 		bio_endio(bio);
+		pr_err_ratelimited("%s splitting atomic write\n", __func__);
 		return ERR_PTR(-EIO);
 	}
 	/*
