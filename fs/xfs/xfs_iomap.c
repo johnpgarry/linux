@@ -177,6 +177,9 @@ xfs_eof_alignment(
 	xfs_extlen_t		align = 0;
 
 	if (!XFS_IS_REALTIME_INODE(ip)) {
+		bool first = mp->m_swidth && xfs_has_swalloc(mp);
+		bool second = !!(mp->m_dalign);
+
 		/*
 		 * Round up the allocation request to a stripe unit
 		 * (m_dalign) boundary if the file size is >= stripe unit
@@ -185,14 +188,18 @@ xfs_eof_alignment(
 		 * If mounted with the "-o swalloc" option the alignment is
 		 * increased from the strip unit size to the stripe width.
 		 */
+		pr_err("%s first=%d second=%d m_swidth=%d m_dalign=%d\n",
+			__func__, first, second, mp->m_swidth, mp->m_dalign);
 		if (xfs_inode_force_align(ip)) {
 			align = xfs_get_extsz_hint(ip);
-			pr_err("%s xfs_inode_force_align align=%d\n", __func__, align);
+			pr_err("%s1 xfs_inode_force_align align=%d\n", __func__, align);
 		} else if (mp->m_swidth && xfs_has_swalloc(mp))
 			align = mp->m_swidth;
 		else if (mp->m_dalign)
 			align = mp->m_dalign;
 
+		pr_err("%s2 align=%d XFS_ISIZE(ip)=%lld XFS_FSB_TO_B(mp, align)=%lld\n",
+			__func__, align, XFS_ISIZE(ip), XFS_FSB_TO_B(mp, align));
 		if (align && XFS_ISIZE(ip) < XFS_FSB_TO_B(mp, align))
 			align = 0;
 	}
