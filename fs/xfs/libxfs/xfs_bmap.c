@@ -4145,10 +4145,10 @@ xfs_bmap_alloc_userdata(
 			bma->datatype |= XFS_ALLOC_INITIAL_USER_DATA;
 
 		/* forcealign mode reuses the stripe unit alignment code */
-		if (xfs_inode_force_align(bma->ip) ||
-		    (mp->m_dalign && bma->length >= mp->m_dalign)) {
-			pr_err("%s xfs_inode_force_align mp->m_dalign && bma->length >= mp->m_dalign=%d\n",
-			__func__, mp->m_dalign && bma->length >= mp->m_dalign);
+		pr_err("%s xfs_inode_force_align mp->m_dalign=%d && bma->length=%d >= mp->m_dalign = %d\n",
+			__func__, mp->m_dalign, bma->length,
+			mp->m_dalign && bma->length >= mp->m_dalign);
+		if (mp->m_dalign && bma->length >= mp->m_dalign) {
 			error = xfs_bmap_isaeof(bma, whichfork);
 			if (error)
 				return error;
