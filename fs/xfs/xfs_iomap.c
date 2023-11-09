@@ -815,6 +815,7 @@ xfs_direct_write_iomap_begin(
 	if (flags & IOMAP_ATOMIC_WRITE) {
 		xfs_filblks_t unit_min_fsb, unit_max_fsb;
 		unsigned int unit_min, unit_max;
+		WARN_ON_ONCE(1);
 
 		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
 		unit_min_fsb = XFS_B_TO_FSBT(mp, unit_min);
@@ -828,6 +829,7 @@ xfs_direct_write_iomap_begin(
 		if (offset & XFS_BLOCKMASK(mp) ||
 		    length & XFS_BLOCKMASK(mp)) {
 			error = -EINVAL;
+			pr_err("%s offset/length\n", __func__);
 			goto out_unlock;
 		}
 
@@ -837,8 +839,11 @@ xfs_direct_write_iomap_begin(
 		} else if (imap.br_blockcount < unit_min_fsb ||
 			   imap.br_blockcount > unit_max_fsb) {
 			error = -EINVAL;
+			pr_err("%s br_blockcount=%lld <> unit_min_fsb=%lld/unit_max_fsb=%lld\n",
+				__func__, imap.br_blockcount, unit_min_fsb, unit_max_fsb);
 			goto out_unlock;
 		} else if (!is_power_of_2(imap.br_blockcount)) {
+			pr_err("%s !is_power_of_2\n", __func__);
 			error = -EINVAL;
 			goto out_unlock;
 		}
@@ -846,6 +851,7 @@ xfs_direct_write_iomap_begin(
 		if (imap.br_startoff &&
 		    imap.br_startoff & (imap.br_blockcount - 1)) {
 			error =  -EINVAL;
+			pr_err("%s br_startoff\n", __func__);
 			goto out_unlock;
 		}
 	}
