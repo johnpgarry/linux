@@ -557,6 +557,7 @@ void xfs_get_atomic_write_attr(
 	unsigned int		awu_min, awu_max, align;
 	struct request_queue	*q = bdev->bd_queue;
 	struct xfs_mount	*mp = ip->i_mount;
+	pr_err("%s extsz=%d\n", __func__, extsz);
 
 	/*
 	 * Convert to multiples of the BLOCKSIZE (as we support a minimum
@@ -570,7 +571,7 @@ void xfs_get_atomic_write_attr(
 
 	align = XFS_FSB_TO_B(mp, extsz);
 
-	if (!awu_max || !is_power_of_2(align)) {
+	if (!awu_max || extsz <= 1 || !is_power_of_2(align)) {
 		*unit_min = 0;
 		*unit_max = 0;
 	} else {
