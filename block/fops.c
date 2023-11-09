@@ -45,21 +45,10 @@ static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos,
 			      struct iov_iter *iter)
 {
 	struct request_queue *q = bdev_get_queue(bdev);
-	unsigned int min_bytes = queue_atomic_write_unit_min_bytes(q);
-	unsigned int max_bytes = queue_atomic_write_unit_max_bytes(q);
+	unsigned int unit_min = queue_atomic_write_unit_min_bytes(q);
+	unsigned int unit_max = queue_atomic_write_unit_max_bytes(q);
 
-	if (unlikely(!min_bytes))
-		return false;
-	if (iov_iter_count(iter) & (min_bytes - 1))
-		return false;
-	if (!is_power_of_2(iov_iter_count(iter)))
-		return false;
-	if (pos & (iov_iter_count(iter) - 1))
-		return false;
-	if (iov_iter_count(iter) > max_bytes)
-		return false;
-	WARN_ON_ONCE(1);
-	return true;
+	return is_atomic_write_valid(unit_min, unit_max, pos, iov_iter_count(iter));
 }
 
 #define DIO_INLINE_BIO_VECS 4
