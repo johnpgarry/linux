@@ -913,14 +913,14 @@ void blk_queue_zone_write_granularity(struct request_queue *q,
 				      unsigned int size);
 extern void blk_queue_alignment_offset(struct request_queue *q,
 				       unsigned int alignment);
-extern void blk_queue_atomic_write_max_bytes(struct request_queue *q,
-					     unsigned int bytes);
-extern void blk_queue_atomic_write_unit_max_sectors(struct request_queue *q,
-					    unsigned int sectors);
-extern void blk_queue_atomic_write_unit_min_sectors(struct request_queue *q,
-					    unsigned int sectors);
-extern void blk_queue_atomic_write_boundary_bytes(struct request_queue *q,
-					    unsigned int bytes);
+void blk_queue_atomic_write_max_bytes(struct request_queue *q,
+				unsigned int bytes);
+void blk_queue_atomic_write_unit_max_sectors(struct request_queue *q,
+				unsigned int sectors);
+void blk_queue_atomic_write_unit_min_sectors(struct request_queue *q,
+				unsigned int sectors);
+void blk_queue_atomic_write_boundary_bytes(struct request_queue *q,
+				unsigned int bytes);
 void disk_update_readahead(struct gendisk *disk);
 extern void blk_limits_io_min(struct queue_limits *limits, unsigned int min);
 extern void blk_queue_io_min(struct request_queue *q, unsigned int min);
@@ -1325,22 +1325,26 @@ static inline int queue_dma_alignment(const struct request_queue *q)
 	return q ? q->limits.dma_alignment : 511;
 }
 
-static inline unsigned int queue_atomic_write_unit_max_bytes(const struct request_queue *q)
+static inline unsigned int
+queue_atomic_write_unit_max_bytes(const struct request_queue *q)
 {
 	return q->limits.atomic_write_unit_max_sectors << SECTOR_SHIFT;
 }
 
-static inline unsigned int queue_atomic_write_unit_min_bytes(const struct request_queue *q)
+static inline unsigned int
+queue_atomic_write_unit_min_bytes(const struct request_queue *q)
 {
 	return q->limits.atomic_write_unit_min_sectors << SECTOR_SHIFT;
 }
 
-static inline unsigned int queue_atomic_write_boundary_bytes(const struct request_queue *q)
+static inline unsigned int
+queue_atomic_write_boundary_bytes(const struct request_queue *q)
 {
 	return q->limits.atomic_write_boundary_sectors << SECTOR_SHIFT;
 }
 
-static inline unsigned int queue_atomic_write_max_bytes(const struct request_queue *q)
+static inline unsigned int
+queue_atomic_write_max_bytes(const struct request_queue *q)
 {
 	return q->limits.atomic_write_max_sectors << SECTOR_SHIFT;
 }
