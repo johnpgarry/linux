@@ -1953,7 +1953,6 @@ static void nvme_update_disk_info(struct nvme_ctrl *ctrl, struct gendisk *disk,
 	blk_queue_io_min(q, phys_bs);
 	blk_queue_io_opt(q, io_opt);
 
-	atomic_bs = rounddown_pow_of_two(atomic_bs);
 	if (id->nsfeat & NVME_NS_FEAT_ATOMICS && id->nawupf) {
 		if (id->nabo) {
 			dev_err(ctrl->device, "Support atomic writes NABO=%d\n",
