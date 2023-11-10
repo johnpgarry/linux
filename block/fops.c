@@ -394,8 +394,17 @@ static ssize_t blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 {
 	unsigned int nr_pages;
 
+	bool is_read = iov_iter_rw(iter) == READ;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
+
 	if (!iov_iter_count(iter))
 		return 0;
+	if (atomic_write) {
+		pr_err("%s iter_is_ubuf=%d iter_is_iovec=%d iov_iter_is_kvec=%d iov_iter_is_bvec=%d\n",
+			__func__, iter_is_ubuf(iter), iter_is_iovec(iter),
+			iov_iter_is_kvec(iter), iov_iter_is_bvec(iter));
+
+	}
 
 	nr_pages = bio_iov_vecs_to_alloc(iter, BIO_MAX_VECS + 1);
 	if (likely(nr_pages <= BIO_MAX_VECS)) {

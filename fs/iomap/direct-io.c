@@ -390,6 +390,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		bio->bi_end_io = iomap_dio_bio_end_io;
 
 		ret = bio_iov_iter_get_pages(bio, dio->submit.iter);
+		if (atomic_write) {
+			pr_err("%s iter_is_ubuf=%d iter_is_iovec=%d iov_iter_is_kvec=%d iov_iter_is_bvec=%d\n",
+				__func__, iter_is_ubuf(dio->submit.iter), iter_is_iovec(dio->submit.iter),
+				iov_iter_is_kvec(dio->submit.iter), iov_iter_is_bvec(dio->submit.iter));
+
+		}
 		if (unlikely(ret)) {
 			/*
 			 * We have to stop part way through an IO. We must fall
