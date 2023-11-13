@@ -6033,22 +6033,21 @@ ahd_sglist_allocsize(struct ahd_softc *ahd)
  * and perform initial initializion.
  */
 struct ahd_softc *
-ahd_alloc(void *platform_arg, char *name)
+ahd_alloc(void *platform_arg, char *name, struct scsi_host_template *template)
 {
 	struct  ahd_softc *ahd;
-
-	ahd = kzalloc(sizeof(*ahd), GFP_ATOMIC);
-	if (!ahd) {
-		printk("aic7xxx: cannot malloc softc!\n");
-		kfree(name);
-		return NULL;
+	struct Scsi_Host *shost = scsi_host_alloc(template, sizeof(*ahd));
+	if (!shost) {
+		ahd = ERR_PTR(-ENOMEM);
+		goto err_out_free_name;
 	}
+
+	ahd = shost_priv(shost);
 
 	ahd->seep_config = kmalloc(sizeof(*ahd->seep_config), GFP_ATOMIC);
 	if (ahd->seep_config == NULL) {
-		kfree(ahd);
-		kfree(name);
-		return (NULL);
+		ahd = NULL;
+		goto err_out_put_shost;
 	}
 	LIST_INIT(&ahd->pending_scbs);
 	/* We don't know our unit number until the OSM sets it */
@@ -6078,9 +6077,15 @@ ahd_alloc(void *platform_arg, char *name)
 	}
 #endif
 	if (ahd_platform_alloc(ahd, platform_arg) != 0) {
-		ahd_free(ahd);
 		ahd = NULL;
+		goto err_out_put_shost;
 	}
+	return (ahd);
+
+err_out_put_shost:
+	scsi_host_put(shost);
+err_out_free_name:
+	kfree(name);
 	return (ahd);
 }
 
@@ -6109,6 +6114,7 @@ ahd_set_name(struct ahd_softc *ahd, char *name)
 void
 ahd_free(struct ahd_softc *ahd)
 {
+	struct Scsi_Host *shost = ahd_to_shost(ahd);
 	int i;
 
 	switch (ahd->init_level) {
@@ -6167,7 +6173,7 @@ ahd_free(struct ahd_softc *ahd)
 	kfree(ahd->name);
 	kfree(ahd->seep_config);
 	kfree(ahd->saved_stack);
-	kfree(ahd);
+	scsi_host_put(shost);
 	return;
 }
 

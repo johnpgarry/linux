@@ -558,10 +558,10 @@ ahd_linux_info(struct Scsi_Host *host)
 	static char buffer[512];
 	char	ahd_info[256];
 	char   *bp;
-	struct ahd_softc *ahd;
+	struct ahd_softc *ahd = shost_priv(host);
 
 	bp = &buffer[0];
-	ahd = *(struct ahd_softc **)host->hostdata;
+
 	memset(bp, 0, sizeof(buffer));
 	strcpy(bp, "Adaptec AIC79XX PCI-X SCSI HBA DRIVER, Rev " AIC79XX_DRIVER_VERSION "\n"
 			"        <");
@@ -579,11 +579,9 @@ ahd_linux_info(struct Scsi_Host *host)
  */
 static int ahd_linux_queue_lck(struct scsi_cmnd *cmd)
 {
-	struct	 ahd_softc *ahd;
+	struct	 ahd_softc *ahd = shost_priv(cmd->device->host);
 	struct	 ahd_linux_device *dev = scsi_transport_device_data(cmd->device);
 	int rtn = SCSI_MLQUEUE_HOST_BUSY;
-
-	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 
 	cmd->result = CAM_REQ_INPROG << 16;
 	rtn = ahd_linux_run_command(ahd, dev, cmd);
@@ -596,8 +594,7 @@ static DEF_SCSI_QCMD(ahd_linux_queue)
 static struct scsi_target **
 ahd_linux_target_in_softc(struct scsi_target *starget)
 {
-	struct	ahd_softc *ahd =
-		*((struct ahd_softc **)dev_to_shost(&starget->dev)->hostdata);
+	struct	ahd_softc *ahd = shost_priv(dev_to_shost(&starget->dev));
 	unsigned int target_offset;
 
 	target_offset = starget->id;
@@ -610,8 +607,7 @@ ahd_linux_target_in_softc(struct scsi_target *starget)
 static int
 ahd_linux_target_alloc(struct scsi_target *starget)
 {
-	struct	ahd_softc *ahd =
-		*((struct ahd_softc **)dev_to_shost(&starget->dev)->hostdata);
+	struct	ahd_softc *ahd = shost_priv(dev_to_shost(&starget->dev));
 	struct seeprom_config *sc = ahd->seep_config;
 	unsigned long flags;
 	struct scsi_target **ahd_targp = ahd_linux_target_in_softc(starget);
@@ -674,8 +670,7 @@ ahd_linux_target_destroy(struct scsi_target *starget)
 static int
 ahd_linux_slave_alloc(struct scsi_device *sdev)
 {
-	struct	ahd_softc *ahd =
-		*((struct ahd_softc **)sdev->host->hostdata);
+	struct	ahd_softc *ahd = shost_priv(sdev->host);
 	struct ahd_linux_device *dev;
 
 	if (bootverbose)
@@ -727,9 +722,7 @@ ahd_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 	int	 sectors;
 	int	 cylinders;
 	int	 extended;
-	struct	 ahd_softc *ahd;
-
-	ahd = *((struct ahd_softc **)sdev->host->hostdata);
+	struct	 ahd_softc *ahd = shost_priv(sdev->host);
 
 	if (scsi_partsize(bdev, capacity, geom))
 		return 0;
@@ -769,7 +762,7 @@ ahd_linux_abort(struct scsi_cmnd *cmd)
 static int
 ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 {
-	struct ahd_softc *ahd;
+	struct ahd_softc *ahd = shost_priv(cmd->device->host);
 	struct ahd_linux_device *dev;
 	struct scb *reset_scb;
 	u_int  cdb_byte;
@@ -780,8 +773,6 @@ ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 	DECLARE_COMPLETION_ONSTACK(done);
 
 	reset_scb = NULL;
-
-	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 
 	scmd_printk(KERN_INFO, cmd,
 		    "Attempting to queue a TARGET RESET message:");
@@ -865,11 +856,10 @@ ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 static int
 ahd_linux_bus_reset(struct scsi_cmnd *cmd)
 {
-	struct ahd_softc *ahd;
+	struct ahd_softc *ahd = shost_priv(cmd->device->host);;
 	int    found;
 	unsigned long flags;
 
-	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 #ifdef AHD_DEBUG
 	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0)
 		printk("%s: Bus reset called for cmd %p\n",
@@ -1205,20 +1195,14 @@ __setup("aic79xx=", aic79xx_setup);
 uint32_t aic79xx_verbose;
 
 int
-ahd_linux_register_host(struct ahd_softc *ahd, struct scsi_host_template *template)
+ahd_linux_register_host(struct ahd_softc *ahd)
 {
 	char	buf[80];
-	struct	Scsi_Host *host;
+	struct	Scsi_Host *host = ahd_to_shost(ahd);
 	char	*new_name;
 	u_long	s;
 	int	retval;
 
-	template->name = ahd->description;
-	host = scsi_host_alloc(template, sizeof(struct ahd_softc *));
-	if (host == NULL)
-		return (ENOMEM);
-
-	*((struct ahd_softc **)host->hostdata) = ahd;
 	ahd->platform_data->host = host;
 	host->can_queue = AHD_MAX_QUEUE;
 	host->cmd_per_lun = 2;
@@ -1247,7 +1231,6 @@ ahd_linux_register_host(struct ahd_softc *ahd, struct scsi_host_template *templa
 	retval = scsi_add_host(host, &ahd->dev_softc->dev);
 	if (retval) {
 		printk(KERN_WARNING "aic79xx: scsi_add_host failed\n");
-		scsi_host_put(host);
 		return retval;
 	}
 
@@ -1513,7 +1496,7 @@ ahd_linux_device_queue_depth(struct scsi_device *sdev)
 {
 	struct	ahd_devinfo devinfo;
 	u_int	tags;
-	struct ahd_softc *ahd = *((struct ahd_softc **)sdev->host->hostdata);
+	struct ahd_softc *ahd = shost_priv(sdev->host);
 
 	ahd_compile_devinfo(&devinfo,
 			    ahd->our_id,
@@ -2137,7 +2120,7 @@ ahd_release_simq(struct ahd_softc *ahd)
 static int
 ahd_linux_queue_abort_cmd(struct scsi_cmnd *cmd)
 {
-	struct ahd_softc *ahd;
+	struct ahd_softc *ahd = shost_priv(cmd->device->host);
 	struct ahd_linux_device *dev;
 	struct scb *pending_scb;
 	u_int  saved_scbptr;
@@ -2155,7 +2138,6 @@ ahd_linux_queue_abort_cmd(struct scsi_cmnd *cmd)
 	pending_scb = NULL;
 	paused = FALSE;
 	wait = FALSE;
-	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 
 	scmd_printk(KERN_INFO, cmd,
 		    "Attempting to queue an ABORT message:");
@@ -2367,7 +2349,7 @@ done:
 static void ahd_linux_set_width(struct scsi_target *starget, int width)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_devinfo devinfo;
 	unsigned long flags;
 
@@ -2381,7 +2363,7 @@ static void ahd_linux_set_width(struct scsi_target *starget, int width)
 static void ahd_linux_set_period(struct scsi_target *starget, int period)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2434,7 +2416,7 @@ static void ahd_linux_set_period(struct scsi_target *starget, int period)
 static void ahd_linux_set_offset(struct scsi_target *starget, int offset)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2469,7 +2451,7 @@ static void ahd_linux_set_offset(struct scsi_target *starget, int offset)
 static void ahd_linux_set_dt(struct scsi_target *starget, int dt)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2511,7 +2493,7 @@ static void ahd_linux_set_dt(struct scsi_target *starget, int dt)
 static void ahd_linux_set_qas(struct scsi_target *starget, int qas)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2550,7 +2532,7 @@ static void ahd_linux_set_qas(struct scsi_target *starget, int qas)
 static void ahd_linux_set_iu(struct scsi_target *starget, int iu)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2590,7 +2572,7 @@ static void ahd_linux_set_iu(struct scsi_target *starget, int iu)
 static void ahd_linux_set_rd_strm(struct scsi_target *starget, int rdstrm)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2626,7 +2608,7 @@ static void ahd_linux_set_rd_strm(struct scsi_target *starget, int rdstrm)
 static void ahd_linux_set_wr_flow(struct scsi_target *starget, int wrflow)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2662,7 +2644,7 @@ static void ahd_linux_set_wr_flow(struct scsi_target *starget, int wrflow)
 static void ahd_linux_set_rti(struct scsi_target *starget, int rti)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2706,7 +2688,7 @@ static void ahd_linux_set_rti(struct scsi_target *starget, int rti)
 static void ahd_linux_set_pcomp_en(struct scsi_target *starget, int pcomp)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2756,7 +2738,7 @@ static void ahd_linux_set_pcomp_en(struct scsi_target *starget, int pcomp)
 static void ahd_linux_set_hold_mcs(struct scsi_target *starget, int hold)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	struct ahd_softc *ahd = *((struct ahd_softc **)shost->hostdata);
+	struct ahd_softc *ahd = shost_priv(shost);
 	struct ahd_tmode_tstate *tstate;
 	struct ahd_initiator_tinfo *tinfo 
 		= ahd_fetch_transinfo(ahd,
@@ -2785,7 +2767,7 @@ static void ahd_linux_set_hold_mcs(struct scsi_target *starget, int hold)
 
 static void ahd_linux_get_signalling(struct Scsi_Host *shost)
 {
-	struct ahd_softc *ahd = *(struct ahd_softc **)shost->hostdata;
+	struct ahd_softc *ahd = shost_priv(shost);
 	unsigned long flags;
 	u8 mode;
 

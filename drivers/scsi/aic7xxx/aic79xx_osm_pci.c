@@ -143,6 +143,7 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	char		*name;
 	int		 error;
 	struct device	*dev = &pdev->dev;
+	int ret;
 
 	pci = pdev;
 	entry = ahd_find_pci_device(pci);
@@ -161,8 +162,8 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	name = kstrdup(buf, GFP_ATOMIC);
 	if (name == NULL)
 		return (-ENOMEM);
-	ahd = ahd_alloc(NULL, name);
-	if (ahd == NULL)
+	ahd = ahd_alloc(NULL, name, &aic79xx_driver_template);
+	if (IS_ERR_OR_NULL(ahd))
 		return (-ENOMEM);
 	if (pci_enable_device(pdev)) {
 		ahd_free(ahd);
@@ -190,6 +191,7 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ahd_free(ahd);
 		return (-error);
 	}
+	aic79xx_driver_template.name = ahd->description;
 
 	/*
 	 * Second Function PCI devices need to inherit some
@@ -200,8 +202,12 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_set_drvdata(pdev, ahd);
 
-	ahd_linux_register_host(ahd, &aic79xx_driver_template);
-	return (0);
+	ret = ahd_linux_register_host(ahd);
+	if (ret) {
+		ahd_free(ahd);
+		return ret;
+	}
+	return 0;
 }
 
 static SIMPLE_DEV_PM_OPS(ahd_linux_pci_dev_pm_ops,

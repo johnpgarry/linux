@@ -1338,7 +1338,7 @@ void		ahd_qinfifo_requeue_tail(struct ahd_softc *ahd,
 					 struct scb *scb);
 
 /****************************** Initialization ********************************/
-struct ahd_softc	*ahd_alloc(void *platform_arg, char *name);
+struct ahd_softc	*ahd_alloc(void *platform_arg, char *name, struct scsi_host_template *);
 int			 ahd_softc_init(struct ahd_softc *);
 void			 ahd_controller_info(struct ahd_softc *ahd, char *buf);
 int			 ahd_init(struct ahd_softc *ahd);
@@ -1462,4 +1462,10 @@ int			ahd_print_register(const ahd_reg_parse_entry_t *table,
 					   u_int value,
 					   u_int *cur_column,
 					   u_int wrap_point);
+
+static inline struct Scsi_Host *ahd_to_shost(struct ahd_softc *ahd)
+{
+	return ((struct Scsi_Host *)ahd) - 1;
+}
+
 #endif /* _AIC79XX_H_ */

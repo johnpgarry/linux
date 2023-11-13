@@ -364,8 +364,7 @@ void ahd_insb(struct ahd_softc * ahd, long port,
 			       uint8_t *, int count);
 
 /**************************** Initialization **********************************/
-int		ahd_linux_register_host(struct ahd_softc *,
-					struct scsi_host_template *);
+int		ahd_linux_register_host(struct ahd_softc *);
 
 /******************************** Locking *************************************/
 static inline void
