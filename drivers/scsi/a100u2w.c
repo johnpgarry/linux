@@ -914,7 +914,7 @@ static int inia100_queue_lck(struct scsi_cmnd *cmd)
 	struct orc_scb *scb;
 	struct orc_host *host;		/* Point to Host adapter control block */
 
-	host = (struct orc_host *) cmd->device->host->hostdata;
+	host = shost_priv(cmd->device->host);
 	/* Get free SCSI control block  */
 	if ((scb = orc_alloc_scb(host)) == NULL)
 		return SCSI_MLQUEUE_HOST_BUSY;
@@ -939,9 +939,7 @@ static DEF_SCSI_QCMD(inia100_queue)
 *****************************************************************************/
 static int inia100_abort(struct scsi_cmnd * cmd)
 {
-	struct orc_host *host;
-
-	host = (struct orc_host *) cmd->device->host->hostdata;
+	struct orc_host *host = shost_priv(cmd->device->host);
 	return inia100_abort_cmd(host, cmd);
 }
 
@@ -955,8 +953,7 @@ static int inia100_abort(struct scsi_cmnd * cmd)
 *****************************************************************************/
 static int inia100_bus_reset(struct scsi_cmnd * cmd)
 {				/* I need Host Control Block Information */
-	struct orc_host *host;
-	host = (struct orc_host *) cmd->device->host->hostdata;
+	struct orc_host *host = shost_priv(cmd->device->host);
 	return orc_reset_scsi_bus(host);
 }
 
@@ -969,8 +966,7 @@ static int inia100_bus_reset(struct scsi_cmnd * cmd)
 *****************************************************************************/
 static int inia100_device_reset(struct scsi_cmnd * cmd)
 {				/* I need Host Control Block Information */
-	struct orc_host *host;
-	host = (struct orc_host *) cmd->device->host->hostdata;
+	struct orc_host *host = shost_priv(cmd->device->host);
 	return orc_device_reset(host, cmd, scmd_id(cmd));
 
 }
@@ -1053,8 +1049,8 @@ static void inia100_scb_handler(struct orc_host *host, struct orc_scb *scb)
  */
 static irqreturn_t inia100_intr(int irqno, void *devid)
 {
-	struct Scsi_Host *shost = (struct Scsi_Host *)devid;
-	struct orc_host *host = (struct orc_host *)shost->hostdata;
+	struct Scsi_Host *shost = devid;
+	struct orc_host *host = shost_priv(shost);
 	unsigned long flags;
 	irqreturn_t res;
 
@@ -1110,7 +1106,7 @@ static int inia100_probe_one(struct pci_dev *pdev,
 	if (!shost)
 		goto out_release_region;
 
-	host = (struct orc_host *)shost->hostdata;
+	host = shost_priv(shost);
 	host->pdev = pdev;
 	host->base = port;
 	host->BIOScfg = bios;
@@ -1190,7 +1186,7 @@ out:
 static void inia100_remove_one(struct pci_dev *pdev)
 {
 	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct orc_host *host = (struct orc_host *)shost->hostdata;
+	struct orc_host *host = shost_priv(shost);
 
 	scsi_remove_host(shost);
 
