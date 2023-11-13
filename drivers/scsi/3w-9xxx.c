@@ -156,7 +156,7 @@ static ssize_t twa_show_stats(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 	unsigned long flags = 0;
 	ssize_t len;
 
@@ -1719,10 +1719,8 @@ static int twa_scsi_biosparam(struct scsi_device *sdev, struct block_device *bde
 /* This is the new scsi eh reset function */
 static int twa_scsi_eh_reset(struct scsi_cmnd *SCpnt)
 {
-	TW_Device_Extension *tw_dev = NULL;
+	TW_Device_Extension *tw_dev = shost_priv(SCpnt->device->host);
 	int retval = FAILED;
-
-	tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
 
 	tw_dev->num_resets++;
 
@@ -1750,7 +1748,7 @@ static int twa_scsi_queue_lck(struct scsi_cmnd *SCpnt)
 {
 	void (*done)(struct scsi_cmnd *) = scsi_done;
 	int request_id, retval;
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(SCpnt->device->host);
 
 	/* If we are resetting due to timed out ioctl, report as busy */
 	if (test_bit(TW_IN_RESET, &tw_dev->flags)) {
@@ -1952,7 +1950,7 @@ static void __twa_shutdown(TW_Device_Extension *tw_dev)
 static void twa_shutdown(struct pci_dev *pdev)
 {
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 
 	__twa_shutdown(tw_dev);
 } /* End twa_shutdown() */
@@ -2026,7 +2024,7 @@ static int twa_probe(struct pci_dev *pdev, const struct pci_device_id *dev_id)
 		retval = -ENOMEM;
 		goto out_disable_device;
 	}
-	tw_dev = (TW_Device_Extension *)host->hostdata;
+	tw_dev = shost_priv(host);
 
 	/* Save values to device extension */
 	tw_dev->host = host;
@@ -2151,7 +2149,7 @@ out_disable_device:
 static void twa_remove(struct pci_dev *pdev)
 {
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 
 	scsi_remove_host(tw_dev->host);
 
@@ -2187,7 +2185,7 @@ static int __maybe_unused twa_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 
 	printk(KERN_WARNING "3w-9xxx: Suspending host %d.\n", tw_dev->host->host_no);
 
@@ -2214,7 +2212,7 @@ static int __maybe_unused twa_resume(struct device *dev)
 	int retval = 0;
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 
 	printk(KERN_WARNING "3w-9xxx: Resuming host %d.\n", tw_dev->host->host_no);
 
