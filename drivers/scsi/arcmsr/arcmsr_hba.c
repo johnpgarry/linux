@@ -1033,7 +1033,7 @@ static int arcmsr_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	init_waitqueue_head(&wait_q);
 	bus = pdev->bus->number;
 	dev_fun = pdev->devfn;
-	acb = (struct AdapterControlBlock *) host->hostdata;
+	acb = shost_priv(host);
 	memset(acb,0,sizeof(struct AdapterControlBlock));
 	acb->pdev = pdev;
 	acb->adapter_type = id->driver_data;
@@ -1139,8 +1139,7 @@ static int __maybe_unused arcmsr_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *)host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 
 	arcmsr_disable_outbound_ints(acb);
 	arcmsr_free_irq(pdev, acb);
@@ -1157,8 +1156,7 @@ static int __maybe_unused arcmsr_resume(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *)host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 
 	if (arcmsr_set_dma_mask(acb))
 		goto controller_unregister;
@@ -1642,8 +1640,7 @@ static void arcmsr_free_pcidev(struct AdapterControlBlock *acb)
 static void arcmsr_remove(struct pci_dev *pdev)
 {
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	int poll_count = 0;
 	uint16_t dev_id;
 
@@ -1701,8 +1698,7 @@ static void arcmsr_remove(struct pci_dev *pdev)
 static void arcmsr_shutdown(struct pci_dev *pdev)
 {
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *)host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	if (acb->acb_flags & ACB_F_ADAPTER_REMOVED)
 		return;
 	del_timer_sync(&acb->eternal_timer);
@@ -3232,7 +3228,7 @@ static void arcmsr_handle_virtual_command(struct AdapterControlBlock *acb,
 static int arcmsr_queue_command_lck(struct scsi_cmnd *cmd)
 {
 	struct Scsi_Host *host = cmd->device->host;
-	struct AdapterControlBlock *acb = (struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	struct CommandControlBlock *ccb;
 	int target = cmd->device->id;
 
@@ -4573,10 +4569,10 @@ static uint8_t arcmsr_iop_reset(struct AdapterControlBlock *acb)
 
 static int arcmsr_bus_reset(struct scsi_cmnd *cmd)
 {
-	struct AdapterControlBlock *acb;
+	struct AdapterControlBlock *acb = shost_priv(cmd->device->host);
 	int retry_count = 0;
 	int rtn = FAILED;
-	acb = (struct AdapterControlBlock *) cmd->device->host->hostdata;
+
 	if (acb->acb_flags & ACB_F_ADAPTER_REMOVED)
 		return SUCCESS;
 	pr_notice("arcmsr: executing bus reset eh.....num_resets = %d,"
@@ -4635,8 +4631,7 @@ static int arcmsr_abort_one_cmd(struct AdapterControlBlock *acb,
 
 static int arcmsr_abort(struct scsi_cmnd *cmd)
 {
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *)cmd->device->host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(cmd->device->host);
 	int i = 0;
 	int rtn = FAILED;
 	uint32_t intmask_org;
@@ -4675,8 +4670,7 @@ static int arcmsr_abort(struct scsi_cmnd *cmd)
 
 static const char *arcmsr_info(struct Scsi_Host *host)
 {
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	static char buf[256];
 	char *type;
 	int raid6 = 1;

@@ -66,7 +66,7 @@ static ssize_t arcmsr_sysfs_iop_message_read(struct file *filp,
 {
 	struct device *dev = container_of(kobj,struct device,kobj);
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb = (struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	uint8_t *ptmpQbuffer;
 	int32_t allxfer_len = 0;
 	unsigned long flags;
@@ -113,7 +113,7 @@ static ssize_t arcmsr_sysfs_iop_message_write(struct file *filp,
 {
 	struct device *dev = container_of(kobj,struct device,kobj);
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb = (struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	int32_t user_len, cnt2end;
 	uint8_t *pQbuffer, *ptmpuserbuffer;
 	unsigned long flags;
@@ -161,7 +161,7 @@ static ssize_t arcmsr_sysfs_iop_message_clear(struct file *filp,
 {
 	struct device *dev = container_of(kobj,struct device,kobj);
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb = (struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	uint8_t *pQbuffer;
 	unsigned long flags;
 
@@ -268,8 +268,7 @@ arcmsr_attr_host_driver_posted_cmd(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	return snprintf(buf, PAGE_SIZE,
 			"%4d\n",
 			atomic_read(&acb->ccboutstandingcount));
@@ -280,8 +279,7 @@ arcmsr_attr_host_driver_reset(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	return snprintf(buf, PAGE_SIZE,
 			"%4d\n",
 			acb->num_resets);
@@ -292,8 +290,7 @@ arcmsr_attr_host_driver_abort(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	return snprintf(buf, PAGE_SIZE,
 			"%4d\n",
 			acb->num_aborts);
@@ -304,8 +301,7 @@ arcmsr_attr_host_fw_model(struct device *dev, struct device_attribute *attr,
 			  char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 	return snprintf(buf, PAGE_SIZE,
 			"%s\n",
 			acb->firm_model);
@@ -316,8 +312,7 @@ arcmsr_attr_host_fw_version(struct device *dev,
 			    struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-			(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 
 	return snprintf(buf, PAGE_SIZE,
 			"%s\n",
@@ -329,8 +324,7 @@ arcmsr_attr_host_fw_request_len(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 
 	return snprintf(buf, PAGE_SIZE,
 			"%4d\n",
@@ -342,8 +336,7 @@ arcmsr_attr_host_fw_numbers_queue(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 
 	return snprintf(buf, PAGE_SIZE,
 			"%4d\n",
@@ -355,8 +348,7 @@ arcmsr_attr_host_fw_sdram_size(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 
 	return snprintf(buf, PAGE_SIZE,
 			"%4d\n",
@@ -368,8 +360,7 @@ arcmsr_attr_host_fw_hd_channels(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	struct AdapterControlBlock *acb =
-		(struct AdapterControlBlock *) host->hostdata;
+	struct AdapterControlBlock *acb = shost_priv(host);
 
 	return snprintf(buf, PAGE_SIZE,
 			"%4d\n",
