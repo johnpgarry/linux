@@ -146,8 +146,7 @@ static void blogic_announce_drvr(struct blogic_adapter *adapter)
 
 static const char *blogic_drvr_info(struct Scsi_Host *host)
 {
-	struct blogic_adapter *adapter =
-				(struct blogic_adapter *) host->hostdata;
+	struct blogic_adapter *adapter = shost_priv(host);
 	return adapter->full_model;
 }
 
@@ -2161,8 +2160,7 @@ static void __init blogic_inithoststruct(struct blogic_adapter *adapter,
 */
 static int blogic_slaveconfig(struct scsi_device *dev)
 {
-	struct blogic_adapter *adapter =
-		(struct blogic_adapter *) dev->host->hostdata;
+	struct blogic_adapter *adapter = shost_priv(dev->host);
 	int tgt_id = dev->id;
 	int qdepth = adapter->qdepth[tgt_id];
 
@@ -2305,7 +2303,7 @@ static int __init blogic_init(void)
 					myadapter->addr_count);
 			continue;
 		}
-		myadapter = (struct blogic_adapter *) host->hostdata;
+		myadapter = shost_priv(host);
 		memcpy(myadapter, adapter, sizeof(struct blogic_adapter));
 		myadapter->scsi_host = host;
 		myadapter->host_no = host->host_no;
@@ -2854,8 +2852,7 @@ static bool blogic_write_outbox(struct blogic_adapter *adapter,
 
 static int blogic_hostreset(struct scsi_cmnd *SCpnt)
 {
-	struct blogic_adapter *adapter =
-		(struct blogic_adapter *) SCpnt->device->host->hostdata;
+	struct blogic_adapter *adapter = shost_priv(SCpnt->device->host);
 
 	unsigned int id = SCpnt->device->id;
 	struct blogic_tgt_stats *stats = &adapter->tgt_stats[id];
@@ -2878,8 +2875,7 @@ static int blogic_hostreset(struct scsi_cmnd *SCpnt)
 static int blogic_qcmd_lck(struct scsi_cmnd *command)
 {
 	void (*comp_cb)(struct scsi_cmnd *) = scsi_done;
-	struct blogic_adapter *adapter =
-		(struct blogic_adapter *) command->device->host->hostdata;
+	struct blogic_adapter *adapter = shost_priv(command->device->host);
 	struct blogic_tgt_flags *tgt_flags =
 		&adapter->tgt_flags[command->device->id];
 	struct blogic_tgt_stats *tgt_stats = adapter->tgt_stats;
@@ -3100,8 +3096,7 @@ static DEF_SCSI_QCMD(blogic_qcmd)
 
 static int blogic_abort(struct scsi_cmnd *command)
 {
-	struct blogic_adapter *adapter =
-		(struct blogic_adapter *) command->device->host->hostdata;
+	struct blogic_adapter *adapter = shost_priv(command->device->host);
 
 	int tgt_id = command->device->id;
 	struct blogic_ccb *ccb;
@@ -3241,8 +3236,7 @@ static int blogic_resetadapter(struct blogic_adapter *adapter, bool hard_reset)
 static int blogic_diskparam(struct scsi_device *sdev, struct block_device *dev,
 		sector_t capacity, int *params)
 {
-	struct blogic_adapter *adapter =
-				(struct blogic_adapter *) sdev->host->hostdata;
+	struct blogic_adapter *adapter = shost_priv(sdev->host);
 	struct bios_diskparam *diskparam = (struct bios_diskparam *) params;
 	unsigned char *buf;
 
@@ -3317,8 +3311,7 @@ static int blogic_diskparam(struct scsi_device *sdev, struct block_device *dev,
 static int blogic_write_info(struct Scsi_Host *shost, char *procbuf,
 				int bytes_avail)
 {
-	struct blogic_adapter *adapter =
-				(struct blogic_adapter *) shost->hostdata;
+	struct blogic_adapter *adapter = shost_priv(shost);
 	struct blogic_tgt_stats *tgt_stats;
 
 	tgt_stats = adapter->tgt_stats;
@@ -3330,7 +3323,7 @@ static int blogic_write_info(struct Scsi_Host *shost, char *procbuf,
 
 static int blogic_show_info(struct seq_file *m, struct Scsi_Host *shost)
 {
-	struct blogic_adapter *adapter = (struct blogic_adapter *) shost->hostdata;
+	struct blogic_adapter *adapter = shost_priv(shost);
 	struct blogic_tgt_stats *tgt_stats;
 	int tgt;
 
