@@ -101,7 +101,7 @@ static ssize_t twl_sysfs_aen_read(struct file *filp, struct kobject *kobj,
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct Scsi_Host *shost = class_to_shost(dev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)shost->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(shost);
 	unsigned long flags = 0;
 	ssize_t ret;
 
@@ -132,7 +132,7 @@ static ssize_t twl_sysfs_compat_info(struct file *filp, struct kobject *kobj,
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct Scsi_Host *shost = class_to_shost(dev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)shost->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(shost);
 	unsigned long flags = 0;
 	ssize_t ret;
 
@@ -161,7 +161,7 @@ static ssize_t twl_show_stats(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
 	struct Scsi_Host *host = class_to_shost(dev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 	unsigned long flags = 0;
 	ssize_t len;
 
@@ -1428,7 +1428,7 @@ static int twl_scsi_eh_reset(struct scsi_cmnd *SCpnt)
 	TW_Device_Extension *tw_dev = NULL;
 	int retval = FAILED;
 
-	tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
+	tw_dev = shost_priv(SCpnt->device->host);
 
 	tw_dev->num_resets++;
 
@@ -1456,7 +1456,7 @@ static int twl_scsi_queue_lck(struct scsi_cmnd *SCpnt)
 {
 	void (*done)(struct scsi_cmnd *) = scsi_done;
 	int request_id, retval;
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(SCpnt->device->host);
 
 	/* If we are resetting due to timed out ioctl, report as busy */
 	if (test_bit(TW_IN_RESET, &tw_dev->flags)) {
@@ -1515,7 +1515,7 @@ static void twl_shutdown(struct pci_dev *pdev)
 	if (!host)
 		return;
 
-	tw_dev = (TW_Device_Extension *)host->hostdata;
+	tw_dev = shost_priv(host);
 
 	if (tw_dev->online)
 		__twl_shutdown(tw_dev);
@@ -1708,7 +1708,7 @@ static void twl_remove(struct pci_dev *pdev)
 	if (!host)
 		return;
 
-	tw_dev = (TW_Device_Extension *)host->hostdata;
+	tw_dev = shost_priv(host);
 
 	if (!tw_dev->online)
 		return;
@@ -1750,7 +1750,7 @@ static void twl_remove(struct pci_dev *pdev)
 static int __maybe_unused twl_suspend(struct device *dev)
 {
 	struct Scsi_Host *host = dev_get_drvdata(dev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 
 	printk(KERN_WARNING "3w-sas: Suspending host %d.\n", tw_dev->host->host_no);
 	/* Disable interrupts */
@@ -1777,7 +1777,7 @@ static int __maybe_unused twl_resume(struct device *dev)
 	int retval = 0;
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
+	TW_Device_Extension *tw_dev = shost_priv(host);
 
 	printk(KERN_WARNING "3w-sas: Resuming host %d.\n", tw_dev->host->host_no);
 	pci_try_set_mwi(pdev);
