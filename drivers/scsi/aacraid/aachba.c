@@ -582,9 +582,7 @@ static int aac_get_container_name(struct scsi_cmnd * scsicmd)
 	int data_size;
 	struct aac_get_name *dinfo;
 	struct fib * cmd_fibcontext;
-	struct aac_dev * dev;
-
-	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
+	struct aac_dev *dev = shost_priv(scsicmd->device->host);
 
 	data_size = sizeof_field(struct aac_get_name_resp, data);
 
@@ -620,7 +618,8 @@ static int aac_get_container_name(struct scsi_cmnd * scsicmd)
 
 static int aac_probe_container_callback2(struct scsi_cmnd * scsicmd)
 {
-	struct fsa_dev_info *fsa_dev_ptr = ((struct aac_dev *)(scsicmd->device->host->hostdata))->fsa_dev;
+	struct aac_dev *dev = shost_priv(scsicmd->device->host);
+	struct fsa_dev_info *fsa_dev_ptr = dev->fsa_dev;
 
 	if ((fsa_dev_ptr[scmd_id(scsicmd)].valid & 1))
 		return aac_scsi_cmd(scsicmd);
@@ -748,7 +747,7 @@ static int _aac_probe_container(struct scsi_cmnd * scsicmd, int (*callback)(stru
 	struct fib * fibptr;
 	int status = -ENOMEM;
 
-	if ((fibptr = aac_fib_alloc((struct aac_dev *)scsicmd->device->host->hostdata))) {
+	if ((fibptr = aac_fib_alloc(shost_priv(scsicmd->device->host)))) {
 		struct aac_query_mount *dinfo;
 
 		aac_fib_init(fibptr);
@@ -786,7 +785,7 @@ static int _aac_probe_container(struct scsi_cmnd * scsicmd, int (*callback)(stru
 		}
 	}
 	if (status < 0) {
-		struct fsa_dev_info *fsa_dev_ptr = ((struct aac_dev *)(scsicmd->device->host->hostdata))->fsa_dev;
+		struct fsa_dev_info *fsa_dev_ptr = ((struct aac_dev *)shost_priv(scsicmd->device->host))->fsa_dev;
 		if (fsa_dev_ptr) {
 			fsa_dev_ptr += scmd_id(scsicmd);
 			if ((fsa_dev_ptr->valid & 1) == 0) {
@@ -1012,7 +1011,7 @@ static void get_container_serial_callback(void *context, struct fib * fibptr)
 			int i;
 			struct tvpd_page83 vpdpage83data;
 
-			dev = (struct aac_dev *)scsicmd->device->host->hostdata;
+			dev = shost_priv(scsicmd->device->host);
 
 			memset(((u8 *)&vpdpage83data), 0,
 			       sizeof(vpdpage83data));
@@ -1120,9 +1119,7 @@ static int aac_get_container_serial(struct scsi_cmnd * scsicmd)
 	int status;
 	struct aac_get_serial *dinfo;
 	struct fib * cmd_fibcontext;
-	struct aac_dev * dev;
-
-	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
+	struct aac_dev *dev = shost_priv(scsicmd->device->host);
 
 	cmd_fibcontext = aac_fib_alloc_tag(dev, scsicmd);
 
@@ -1531,12 +1528,10 @@ static struct aac_srb * aac_scsi_common(struct fib * fib, struct scsi_cmnd * cmd
 static struct aac_hba_cmd_req *aac_construct_hbacmd(struct fib *fib,
 							struct scsi_cmnd *cmd)
 {
+	struct aac_dev *dev = shost_priv(cmd->device->host);
 	struct aac_hba_cmd_req *hbacmd;
-	struct aac_dev *dev;
 	int bus, target;
 	u64 address;
-
-	dev = (struct aac_dev *)cmd->device->host->hostdata;
 
 	hbacmd = (struct aac_hba_cmd_req *)fib->hw_fib_va;
 	memset(hbacmd, 0, 96);	/* sizeof(*hbacmd) is not necessary */
@@ -1647,10 +1642,8 @@ static int aac_scsi_32_64(struct fib * fib, struct scsi_cmnd * cmd)
 static int aac_adapter_hba(struct fib *fib, struct scsi_cmnd *cmd)
 {
 	struct aac_hba_cmd_req *hbacmd = aac_construct_hbacmd(fib, cmd);
-	struct aac_dev *dev;
+	struct aac_dev *dev = shost_priv(cmd->device->host);
 	long ret;
-
-	dev = (struct aac_dev *)cmd->device->host->hostdata;
 
 	ret = aac_build_sghba(cmd, hbacmd,
 		dev->scsi_host_ptr->sg_tablesize, (u64)fib->hw_sgl_pa);
@@ -2415,11 +2408,10 @@ static int aac_read(struct scsi_cmnd * scsicmd)
 	u64 lba;
 	u32 count;
 	int status;
-	struct aac_dev *dev;
+	struct aac_dev *dev = shost_priv(scsicmd->device->host);
 	struct fib * cmd_fibcontext;
 	int cid;
 
-	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	/*
 	 *	Get block address and transfer length
 	 */
@@ -2516,11 +2508,10 @@ static int aac_write(struct scsi_cmnd * scsicmd)
 	u32 count;
 	int fua;
 	int status;
-	struct aac_dev *dev;
+	struct aac_dev *dev = shost_priv(scsicmd->device->host);
 	struct fib * cmd_fibcontext;
 	int cid;
 
-	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	/*
 	 *	Get block address and transfer length
 	 */
@@ -2645,9 +2636,8 @@ static int aac_synchronize(struct scsi_cmnd *scsicmd)
 	struct fib *cmd_fibcontext;
 	struct aac_synchronize *synchronizecmd;
 	struct scsi_device *sdev = scsicmd->device;
-	struct aac_dev *aac;
+	struct aac_dev *aac = shost_priv(sdev->host);
 
-	aac = (struct aac_dev *)sdev->host->hostdata;
 	if (aac->in_reset)
 		return SCSI_MLQUEUE_HOST_BUSY;
 
@@ -2712,7 +2702,7 @@ static int aac_start_stop(struct scsi_cmnd *scsicmd)
 	struct fib *cmd_fibcontext;
 	struct aac_power_management *pmcmd;
 	struct scsi_device *sdev = scsicmd->device;
-	struct aac_dev *aac = (struct aac_dev *)sdev->host->hostdata;
+	struct aac_dev *aac = shost_priv(sdev->host);
 
 	if (!(aac->supplement_adapter_info.supported_options2 &
 	      AAC_OPTION_POWER_MANAGEMENT)) {
@@ -2776,7 +2766,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 {
 	u32 cid, bus;
 	struct Scsi_Host *host = scsicmd->device->host;
-	struct aac_dev *dev = (struct aac_dev *)host->hostdata;
+	struct aac_dev *dev = shost_priv(host);
 	struct fsa_dev_info *fsa_dev_ptr = dev->fsa_dev;
 
 	if (fsa_dev_ptr == NULL)
@@ -3713,11 +3703,10 @@ out:
  */
 static int aac_send_srb_fib(struct scsi_cmnd* scsicmd)
 {
+	struct aac_dev* dev = shost_priv(scsicmd->device->host);
 	struct fib* cmd_fibcontext;
-	struct aac_dev* dev;
 	int status;
 
-	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	if (scmd_id(scsicmd) >= dev->maximum_num_physicals ||
 			scsicmd->device->lun > 7) {
 		scsicmd->result = DID_NO_CONNECT << 16;

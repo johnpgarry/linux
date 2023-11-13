@@ -255,7 +255,7 @@ static int aac_queuecommand(struct Scsi_Host *shost,
 
 static const char *aac_info(struct Scsi_Host *shost)
 {
-	struct aac_dev *dev = (struct aac_dev *)shost->hostdata;
+	struct aac_dev *dev = shost_priv(shost);
 	return aac_drivers[dev->cardtype].name;
 }
 
@@ -388,7 +388,7 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 
 static int aac_slave_configure(struct scsi_device *sdev)
 {
-	struct aac_dev *aac = (struct aac_dev *)sdev->host->hostdata;
+	struct aac_dev *aac = shost_priv(sdev->host);
 	int chn, tid;
 	unsigned int depth = 0;
 	unsigned int set_timeout = 0;
@@ -507,7 +507,7 @@ common_config:
 
 static void aac_map_queues(struct Scsi_Host *shost)
 {
-	struct aac_dev *aac = (struct aac_dev *)shost->hostdata;
+	struct aac_dev *aac = shost_priv(shost);
 
 	blk_mq_pci_map_queues(&shost->tag_set.map[HCTX_TYPE_DEFAULT],
 			      aac->pdev, 0);
@@ -525,7 +525,7 @@ static void aac_map_queues(struct Scsi_Host *shost)
 
 static int aac_change_queue_depth(struct scsi_device *sdev, int depth)
 {
-	struct aac_dev *aac = (struct aac_dev *)(sdev->host->hostdata);
+	struct aac_dev *aac = shost_priv(sdev->host);
 	int chn, tid, is_native_device = 0;
 
 	chn = aac_logical_to_phys(sdev_channel(sdev));
@@ -566,7 +566,7 @@ static int aac_change_queue_depth(struct scsi_device *sdev, int depth)
 static ssize_t aac_show_raid_level(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
-	struct aac_dev *aac = (struct aac_dev *)(sdev->host->hostdata);
+	struct aac_dev *aac = shost_priv(sdev->host);
 	if (sdev_channel(sdev) != CONTAINER_CHANNEL)
 		return snprintf(buf, PAGE_SIZE, sdev->no_uld_attach
 		  ? "Hidden\n" :
@@ -587,7 +587,7 @@ static ssize_t aac_show_unique_id(struct device *dev,
 	     struct device_attribute *attr, char *buf)
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
-	struct aac_dev *aac = (struct aac_dev *)(sdev->host->hostdata);
+	struct aac_dev *aac = shost_priv(sdev->host);
 	unsigned char sn[16];
 
 	memset(sn, 0, sizeof(sn));
@@ -625,7 +625,7 @@ static int aac_ioctl(struct scsi_device *sdev, unsigned int cmd,
 		     void __user *arg)
 {
 	int retval;
-	struct aac_dev *dev = (struct aac_dev *)sdev->host->hostdata;
+	struct aac_dev *dev = shost_priv(sdev->host);
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 	retval = aac_adapter_check_health(dev);
@@ -691,7 +691,7 @@ static int aac_eh_abort(struct scsi_cmnd* cmd)
 	struct aac_cmd_priv *cmd_priv = aac_priv(cmd);
 	struct scsi_device * dev = cmd->device;
 	struct Scsi_Host * host = dev->host;
-	struct aac_dev * aac = (struct aac_dev *)host->hostdata;
+	struct aac_dev * aac = shost_priv(host);
 	int count, found;
 	u32 bus, cid;
 	int ret = FAILED;
@@ -912,7 +912,7 @@ static int aac_eh_dev_reset(struct scsi_cmnd *cmd)
 {
 	struct scsi_device * dev = cmd->device;
 	struct Scsi_Host * host = dev->host;
-	struct aac_dev * aac = (struct aac_dev *)host->hostdata;
+	struct aac_dev * aac = shost_priv(host);
 	struct aac_hba_map_info *info;
 	int count;
 	u32 bus, cid;
@@ -975,7 +975,7 @@ static int aac_eh_target_reset(struct scsi_cmnd *cmd)
 {
 	struct scsi_device * dev = cmd->device;
 	struct Scsi_Host * host = dev->host;
-	struct aac_dev * aac = (struct aac_dev *)host->hostdata;
+	struct aac_dev * aac = shost_priv(host);
 	struct aac_hba_map_info *info;
 	int count;
 	u32 bus, cid;
@@ -1041,7 +1041,7 @@ static int aac_eh_bus_reset(struct scsi_cmnd* cmd)
 {
 	struct scsi_device * dev = cmd->device;
 	struct Scsi_Host * host = dev->host;
-	struct aac_dev * aac = (struct aac_dev *)host->hostdata;
+	struct aac_dev * aac = shost_priv(host);
 	int count;
 	u32 cmd_bus;
 	int status = 0;
@@ -1094,7 +1094,7 @@ static int aac_eh_host_reset(struct scsi_cmnd *cmd)
 {
 	struct scsi_device * dev = cmd->device;
 	struct Scsi_Host * host = dev->host;
-	struct aac_dev * aac = (struct aac_dev *)host->hostdata;
+	struct aac_dev * aac = shost_priv(host);
 	int ret = FAILED;
 	__le32 supported_options2 = 0;
 	bool is_mu_reset;
@@ -1196,7 +1196,7 @@ static long aac_cfg_ioctl(struct file *file,
 static ssize_t aac_show_model(struct device *device,
 			      struct device_attribute *attr, char *buf)
 {
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(device)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(device));
 	int len;
 
 	if (dev->supplement_adapter_info.adapter_type_text[0]) {
@@ -1215,7 +1215,7 @@ static ssize_t aac_show_model(struct device *device,
 static ssize_t aac_show_vendor(struct device *device,
 			       struct device_attribute *attr, char *buf)
 {
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(device)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(device));
 	struct aac_supplement_adapter_info *sup_adap_info;
 	int len;
 
@@ -1237,7 +1237,7 @@ static ssize_t aac_show_flags(struct device *cdev,
 			      struct device_attribute *attr, char *buf)
 {
 	int len = 0;
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(cdev)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(cdev));
 
 	if (nblank(dprintk(x)))
 		len = snprintf(buf, PAGE_SIZE, "dprintk\n");
@@ -1264,7 +1264,7 @@ static ssize_t aac_show_kernel_version(struct device *device,
 				       struct device_attribute *attr,
 				       char *buf)
 {
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(device)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(device));
 	int len, tmp;
 
 	tmp = le32_to_cpu(dev->adapter_info.kernelrev);
@@ -1278,7 +1278,7 @@ static ssize_t aac_show_monitor_version(struct device *device,
 					struct device_attribute *attr,
 					char *buf)
 {
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(device)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(device));
 	int len, tmp;
 
 	tmp = le32_to_cpu(dev->adapter_info.monitorrev);
@@ -1292,7 +1292,7 @@ static ssize_t aac_show_bios_version(struct device *device,
 				     struct device_attribute *attr,
 				     char *buf)
 {
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(device)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(device));
 	int len, tmp;
 
 	tmp = le32_to_cpu(dev->adapter_info.biosrev);
@@ -1312,7 +1312,7 @@ static ssize_t aac_show_driver_version(struct device *device,
 static ssize_t aac_show_serial_number(struct device *device,
 			       struct device_attribute *attr, char *buf)
 {
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(device)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(device));
 	int len = 0;
 
 	if (le32_to_cpu(dev->adapter_info.serial[0]) != 0xBAD0)
@@ -1364,7 +1364,7 @@ static ssize_t aac_show_reset_adapter(struct device *device,
 				      struct device_attribute *attr,
 				      char *buf)
 {
-	struct aac_dev *dev = (struct aac_dev*)class_to_shost(device)->hostdata;
+	struct aac_dev *dev = shost_priv(class_to_shost(device));
 	int len, tmp;
 
 	tmp = aac_adapter_check_health(dev);
@@ -1658,7 +1658,7 @@ static int aac_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (aac_cfg_major == AAC_CHARDEV_NEEDS_REINIT)
 		aac_init_char();
 
-	aac = (struct aac_dev *)shost->hostdata;
+	aac = shost_priv(shost);
 	aac->base_start = pci_resource_start(pdev, 0);
 	aac->scsi_host_ptr = shost;
 	aac->pdev = pdev;
@@ -1872,7 +1872,7 @@ error_iounmap:
 static int __maybe_unused aac_suspend(struct device *dev)
 {
 	struct Scsi_Host *shost = dev_get_drvdata(dev);
-	struct aac_dev *aac = (struct aac_dev *)shost->hostdata;
+	struct aac_dev *aac = shost_priv(shost);
 
 	scsi_host_block(shost);
 	aac_cancel_rescan_worker(aac);
@@ -1886,7 +1886,7 @@ static int __maybe_unused aac_suspend(struct device *dev)
 static int __maybe_unused aac_resume(struct device *dev)
 {
 	struct Scsi_Host *shost = dev_get_drvdata(dev);
-	struct aac_dev *aac = (struct aac_dev *)shost->hostdata;
+	struct aac_dev *aac = shost_priv(shost);
 
 	if (aac_acquire_resources(aac))
 		goto fail_device;
@@ -1910,13 +1910,13 @@ static void aac_shutdown(struct pci_dev *dev)
 	struct Scsi_Host *shost = pci_get_drvdata(dev);
 
 	scsi_host_block(shost);
-	__aac_shutdown((struct aac_dev *)shost->hostdata);
+	__aac_shutdown(shost_priv(shost));
 }
 
 static void aac_remove_one(struct pci_dev *pdev)
 {
 	struct Scsi_Host *shost = pci_get_drvdata(pdev);
-	struct aac_dev *aac = (struct aac_dev *)shost->hostdata;
+	struct aac_dev *aac = shost_priv(shost);
 
 	aac_cancel_rescan_worker(aac);
 	aac->use_map_queue = false;
