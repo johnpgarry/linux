@@ -717,6 +717,8 @@ enum {
 #define EXT4_GET_BLOCKS_IO_SUBMIT		0x0400
 	/* Caller is in the atomic contex, find extent if it has been cached */
 #define EXT4_GET_BLOCKS_CACHED_NOWAIT		0x0800
+/* Caller wants strictly aligned allocation */
+#define EXT4_GET_BLOCKS_ALIGNED			0x1000
 
 /*
  * The bit position of these flags must not overlap with any of the
@@ -3694,6 +3696,8 @@ extern int ext4_convert_unwritten_extents(handle_t *handle, struct inode *inode,
 extern int ext4_convert_unwritten_io_end_vec(handle_t *handle,
 					     ext4_io_end_t *io_end);
 extern int ext4_map_blocks(handle_t *handle, struct inode *inode,
+			   struct ext4_map_blocks *map, int flags);
+extern int ext4_map_blocks_aligned(handle_t *handle, struct inode *inode,
 			   struct ext4_map_blocks *map, int flags);
 extern int ext4_ext_calc_credits_for_single_extent(struct inode *inode,
 						   int num,

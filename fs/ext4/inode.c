@@ -454,6 +454,77 @@ static void ext4_map_blocks_es_recheck(handle_t *handle,
 #endif /* ES_AGGRESSIVE_TEST */
 
 /*
+ * This function checks if the map returned by ext4_map_blocks satisfies aligned
+ * allocation requirements. This should be used as the entry point for aligned
+ * allocations
+ */
+static bool ext4_map_check_alignment(struct ext4_map_blocks *map,
+				     unsigned int orig_mlen,
+				     ext4_lblk_t orig_mlblk,
+				     int flags)
+{
+	if (flags & EXT4_GET_BLOCKS_CREATE) {
+		/*
+		 * A create lookup must be mapped to satisfy alignment
+		 * requirements
+		 */
+		if (!(map->m_flags & EXT4_MAP_MAPPED))
+			return false;
+	} else {
+		/*
+		 * For create=0, if we find a hole, this hole should be big
+		 * enough to accommodate our aligned extent later
+		 */
+		if (!(map->m_flags & EXT4_MAP_MAPPED) &&
+		    (!(map->m_flags & EXT4_MAP_UNWRITTEN))) {
+			if (map->m_len < orig_mlen)
+				return false;
+			if (map->m_lblk != orig_mlblk)
+				/* Ideally shouldn't happen */
+				return false;
+			return true;
+		}
+	}
+
+	/*
+	 * For all the remaining cases, to satisfy alignment, the extent should
+	 * be exactly as big as requests and be at the right physical block
+	 * alignment
+	 */
+	if (map->m_len != orig_mlen)
+		return false;
+	if (map->m_lblk != orig_mlblk)
+		return false;
+	if (!map->m_len || map->m_pblk % map->m_len)
+		return false;
+
+	return true;
+}
+
+int ext4_map_blocks_aligned(handle_t *handle, struct inode *inode,
+			    struct ext4_map_blocks *map, int flags)
+{
+	int ret;
+	unsigned int orig_mlen = map->m_len;
+	ext4_lblk_t orig_mlblk = map->m_lblk;
+
+	if (flags & EXT4_GET_BLOCKS_CREATE)
+		flags |= EXT4_GET_BLOCKS_ALIGNED;
+
+	ret = ext4_map_blocks(handle, inode, map, flags);
+
+	if (ret >= 0 &&
+	    !ext4_map_check_alignment(map, orig_mlen, orig_mlblk, flags)) {
+		ext4_warning(
+			inode->i_sb,
+			"Returned extent couldn't satisfy alignment requirements");
+		ret = -EIO;
+	}
+
+	return ret;
+}
+
+/*
  * The ext4_map_blocks() function tries to look up the requested blocks,
  * and returns if the blocks are already mapped.
  *
@@ -474,6 +545,12 @@ static void ext4_map_blocks_es_recheck(handle_t *handle,
  * indicate the length of a hole starting at map->m_lblk.
  *
  * It returns the error in case of allocation failure.
+ *
+ * Note for aligned allocations: While most of the alignment related checks are
+ * done by higher level functions, we do have some optimizations here. When
+ * trying to *create* a new aligned extent if at any point we are sure that the
+ * extent won't be as big as the full length, we exit early instead of going for
+ * the allocation and failing later.
  */
 int ext4_map_blocks(handle_t *handle, struct inode *inode,
 		    struct ext4_map_blocks *map, int flags)
@@ -481,6 +558,7 @@ int ext4_map_blocks(handle_t *handle, struct inode *inode,
 	struct extent_status es;
 	int retval;
 	int ret = 0;
+	unsigned int orig_mlen = map->m_len;
 #ifdef ES_AGGRESSIVE_TEST
 	struct ext4_map_blocks orig_map;
 
@@ -582,6 +660,12 @@ found:
 	/* If it is only a block(s) look up */
 	if ((flags & EXT4_GET_BLOCKS_CREATE) == 0)
 		return retval;
+
+	/* For aligned allocation, we must not change original alignment */
+	if (retval < 0 && (flags & EXT4_GET_BLOCKS_ALIGNED) &&
+	    map->m_len != orig_mlen) {
+		return retval;
+	}
 
 	/*
 	 * Returns if the blocks have already allocated
@@ -3317,7 +3401,10 @@ retry:
 	else if (ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))
 		m_flags = EXT4_GET_BLOCKS_IO_CREATE_EXT;
 
-	ret = ext4_map_blocks(handle, inode, map, m_flags);
+	if (flags & IOMAP_ATOMIC_WRITE)
+		ret = ext4_map_blocks_aligned(handle, inode, map, m_flags);
+	else
+		ret = ext4_map_blocks(handle, inode, map, m_flags);
 
 	/*
 	 * We cannot fill holes in indirect tree based inodes as that could
@@ -3363,7 +3450,11 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		 * especially in multi-threaded overwrite requests.
 		 */
 		if (offset + length <= i_size_read(inode)) {
-			ret = ext4_map_blocks(NULL, inode, &map, 0);
+			if (flags & IOMAP_ATOMIC_WRITE)
+				ret = ext4_map_blocks_aligned(NULL, inode, &map, 0);
+			else
+				ret = ext4_map_blocks(NULL, inode, &map, 0);
+
 			if (ret > 0 && (map.m_flags & EXT4_MAP_MAPPED))
 				goto out;
 		}
@@ -3381,6 +3472,15 @@ out:
 	 * limiting the length of the mapping returned.
 	 */
 	map.m_len = fscrypt_limit_io_blocks(inode, map.m_lblk, map.m_len);
+
+	/*
+	 * Ensure the found extent meets the alignment requirements for aligned
+	 * allocation
+	 */
+	if ((flags & IOMAP_ATOMIC_WRITE) &&
+	    ((map.m_pblk << blkbits) % length ||
+	     (map.m_len << blkbits) != length))
+		return -EIO;
 
 	ext4_set_iomap(inode, iomap, &map, offset, length, flags);
 

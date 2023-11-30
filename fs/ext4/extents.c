@@ -4091,6 +4091,7 @@ int ext4_ext_map_blocks(handle_t *handle, struct inode *inode,
 	int err = 0, depth, ret;
 	unsigned int allocated = 0, offset = 0;
 	unsigned int allocated_clusters = 0;
+	unsigned int orig_mlen = map->m_len;
 	struct ext4_allocation_request ar;
 	ext4_lblk_t cluster_offset;
 
@@ -4282,6 +4283,19 @@ int ext4_ext_map_blocks(handle_t *handle, struct inode *inode,
 		ar.flags |= EXT4_MB_DELALLOC_RESERVED;
 	if (flags & EXT4_GET_BLOCKS_METADATA_NOFAIL)
 		ar.flags |= EXT4_MB_USE_RESERVED;
+	if (flags & EXT4_GET_BLOCKS_ALIGNED) {
+		/*
+		 * During aligned allocation we dont want to map a length smaller
+		 * than the originally requested length since we use this len to
+		 * determine alignment and changing it can misalign the blocks.
+		 */
+		if (ar.len != orig_mlen) {
+			ext4_warning(inode->i_sb,
+				     "Tried to modify requested len of aligned allocation.");
+			goto out;
+		}
+		ar.flags |= EXT4_MB_ALIGNED_ALLOC;
+	}
 	newblock = ext4_mb_new_blocks(handle, &ar, &err);
 	if (!newblock)
 		goto out;

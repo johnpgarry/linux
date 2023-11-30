@@ -399,6 +399,48 @@ static const struct iomap_dio_ops ext4_dio_write_ops = {
 };
 
 /*
+ * Check loff_t because the iov_iter_count() used in blkdev was size_t
+ */
+static bool ext4_dio_atomic_write_checks(struct kiocb *iocb,
+					 struct iov_iter *from)
+{
+	struct inode *inode = iocb->ki_filp->f_inode;
+	struct block_device *bdev = inode->i_sb->s_bdev;
+	size_t len = iov_iter_count(from);
+	loff_t pos = iocb->ki_pos;
+	u8 blkbits = inode->i_blkbits;
+
+	/*
+	 * Currently aligned alloc, which is needed for atomic IO, is only
+	 * supported with extent based files and non bigalloc file systems
+	 */
+	if (EXT4_SB(inode->i_sb)->s_cluster_ratio > 1) {
+		ext4_warning(inode->i_sb,
+			     "Atomic write not supported with bigalloc");
+		return false;
+	}
+	if (!(ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))) {
+		ext4_warning(inode->i_sb,
+			     "Atomic write not supported on non-extent files");
+		return false;
+	}
+	if (len & ((1 << blkbits) - 1))
+		/* len should be blocksize aligned */
+		return false;
+	else if (pos % len)
+		/* pos should be naturally aligned to len */
+		return false;
+	else if (!is_power_of_2(len >> blkbits))
+		/*
+		 * len in blocks should be power of 2 for mballoc to ensure
+		 * alignment
+		 */
+		return false;
+
+	return blkdev_atomic_write_valid(bdev, pos, len);
+}
+
+/*
  * The intention here is to start with shared lock acquired then see if any
  * condition requires an exclusive inode lock. If yes, then we restart the
  * whole operation by releasing the shared lock and acquiring exclusive lock.
@@ -426,11 +468,18 @@ static ssize_t ext4_dio_write_checks(struct kiocb *iocb, struct iov_iter *from,
 	size_t count;
 	ssize_t ret;
 	bool overwrite, unaligned_io;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC);
 
 restart:
 	ret = ext4_generic_write_checks(iocb, from);
 	if (ret <= 0)
 		goto out;
+
+	if (atomic_write && !ext4_dio_atomic_write_checks(iocb, from)) {
+		ext4_warning(inode->i_sb, "Atomic write checks failed.");
+		ret = -EIO;
+		goto out;
+	}
 
 	offset = iocb->ki_pos;
 	count = ret;
