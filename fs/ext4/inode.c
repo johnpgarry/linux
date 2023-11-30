@@ -5630,6 +5630,7 @@ int ext4_getattr(struct mnt_idmap *idmap, const struct path *path,
 	struct ext4_inode *raw_inode;
 	struct ext4_inode_info *ei = EXT4_I(inode);
 	unsigned int flags;
+	struct block_device *bdev = inode->i_sb->s_bdev;
 
 	if ((request_mask & STATX_BTIME) &&
 	    EXT4_FITS_IN_INODE(raw_inode, ei, i_crtime)) {
@@ -5648,8 +5649,6 @@ int ext4_getattr(struct mnt_idmap *idmap, const struct path *path,
 
 		stat->result_mask |= STATX_DIOALIGN;
 		if (dio_align == 1) {
-			struct block_device *bdev = inode->i_sb->s_bdev;
-
 			/* iomap defaults */
 			stat->dio_mem_align = bdev_dma_alignment(bdev) + 1;
 			stat->dio_offset_align = bdev_logical_block_size(bdev);
@@ -5657,6 +5656,41 @@ int ext4_getattr(struct mnt_idmap *idmap, const struct path *path,
 			stat->dio_mem_align = dio_align;
 			stat->dio_offset_align = dio_align;
 		}
+	}
+
+	if ((request_mask & STATX_WRITE_ATOMIC)) {
+		unsigned int awumin, awumax;
+		unsigned int blocksize = 1 << inode->i_blkbits;
+
+		awumin = queue_atomic_write_unit_min_bytes(bdev->bd_queue);
+		awumax = queue_atomic_write_unit_max_bytes(bdev->bd_queue);
+
+		if (!(ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS)) ||
+		    EXT4_SB(inode->i_sb)->s_cluster_ratio > 1) {
+			/*
+			 * Currently not supported for non extent files or
+			 * with bigalloc
+			 */
+			stat->atomic_write_unit_min = 0;
+			stat->atomic_write_unit_max = 0;
+		} else if (awumin && awumax) {
+			/*
+			 * For now we support atomic writes which are
+			 * at least block size bytes. If that exceeds the
+			 * max atomic unit, then don't advertise support
+			 */
+			stat->atomic_write_unit_min = max(awumin, blocksize);
+
+			if (awumax < stat->atomic_write_unit_min) {
+				stat->atomic_write_unit_min = 0;
+				stat->atomic_write_unit_max = 0;
+			} else {
+				stat->atomic_write_unit_max = awumax;
+				stat->attributes |= STATX_ATTR_WRITE_ATOMIC;
+			}
+		}
+		stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC;
+		stat->result_mask |= STATX_WRITE_ATOMIC;
 	}
 
 	flags = ei->i_flags & EXT4_FL_USER_VISIBLE;
