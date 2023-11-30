@@ -4381,6 +4381,58 @@ ext4_mb_pa_adjust_overlap(struct ext4_allocation_context *ac,
 	*end = new_end;
 }
 
+static void ext4_mb_pa_predict_size(struct ext4_allocation_context *ac,
+				    loff_t *start, loff_t *size)
+{
+	struct ext4_sb_info *sbi = EXT4_SB(ac->ac_sb);
+	loff_t new_size = *size;
+	loff_t new_start = *start;
+	int bsbits, max;
+
+	bsbits = ac->ac_sb->s_blocksize_bits;
+	/* max size of free chunks */
+	max = 2 << bsbits;
+
+#define NRL_CHECK_SIZE(req, size, max, chunk_size) \
+	(req <= (size) || max <= (chunk_size))
+
+	if (new_size <= 16 * 1024) {
+		new_size = 16 * 1024;
+	} else if (new_size <= 32 * 1024) {
+		new_size = 32 * 1024;
+	} else if (new_size <= 64 * 1024) {
+		new_size = 64 * 1024;
+	} else if (new_size <= 128 * 1024) {
+		new_size = 128 * 1024;
+	} else if (new_size <= 256 * 1024) {
+		new_size = 256 * 1024;
+	} else if (new_size <= 512 * 1024) {
+		new_size = 512 * 1024;
+	} else if (new_size <= 1024 * 1024) {
+		new_size = 1024 * 1024;
+	} else if (NRL_CHECK_SIZE(new_size, 4 * 1024 * 1024, max, 2 * 1024)) {
+		new_start = ((loff_t)ac->ac_o_ex.fe_logical >>
+						(21 - bsbits)) << 21;
+		new_size = 2 * 1024 * 1024;
+	} else if (NRL_CHECK_SIZE(new_size, 8 * 1024 * 1024, max, 4 * 1024)) {
+		new_start = ((loff_t)ac->ac_o_ex.fe_logical >>
+							(22 - bsbits)) << 22;
+		new_size = 4 * 1024 * 1024;
+	} else if (NRL_CHECK_SIZE(EXT4_C2B(sbi, ac->ac_o_ex.fe_len),
+					(8<<20)>>bsbits, max, 8 * 1024)) {
+		new_start = ((loff_t)ac->ac_o_ex.fe_logical >>
+							(23 - bsbits)) << 23;
+		new_size = 8 * 1024 * 1024;
+	} else {
+		new_start = (loff_t) ac->ac_o_ex.fe_logical << bsbits;
+		new_size = (loff_t) EXT4_C2B(sbi,
+					      ac->ac_o_ex.fe_len) << bsbits;
+	}
+
+	*size = new_size;
+	*start = new_start;
+}
+
 /*
  * Normalization means making request better in terms of
  * size and alignment
@@ -4391,7 +4443,7 @@ ext4_mb_normalize_request(struct ext4_allocation_context *ac,
 {
 	struct ext4_sb_info *sbi = EXT4_SB(ac->ac_sb);
 	struct ext4_super_block *es = sbi->s_es;
-	int bsbits, max;
+	int bsbits;
 	loff_t size, start_off, end;
 	loff_t orig_size __maybe_unused;
 	ext4_lblk_t start;
@@ -4425,47 +4477,12 @@ ext4_mb_normalize_request(struct ext4_allocation_context *ac,
 		size = i_size_read(ac->ac_inode);
 	orig_size = size;
 
-	/* max size of free chunks */
-	max = 2 << bsbits;
-
-#define NRL_CHECK_SIZE(req, size, max, chunk_size)	\
-		(req <= (size) || max <= (chunk_size))
-
 	/* first, try to predict filesize */
 	/* XXX: should this table be tunable? */
 	start_off = 0;
-	if (size <= 16 * 1024) {
-		size = 16 * 1024;
-	} else if (size <= 32 * 1024) {
-		size = 32 * 1024;
-	} else if (size <= 64 * 1024) {
-		size = 64 * 1024;
-	} else if (size <= 128 * 1024) {
-		size = 128 * 1024;
-	} else if (size <= 256 * 1024) {
-		size = 256 * 1024;
-	} else if (size <= 512 * 1024) {
-		size = 512 * 1024;
-	} else if (size <= 1024 * 1024) {
-		size = 1024 * 1024;
-	} else if (NRL_CHECK_SIZE(size, 4 * 1024 * 1024, max, 2 * 1024)) {
-		start_off = ((loff_t)ac->ac_o_ex.fe_logical >>
-						(21 - bsbits)) << 21;
-		size = 2 * 1024 * 1024;
-	} else if (NRL_CHECK_SIZE(size, 8 * 1024 * 1024, max, 4 * 1024)) {
-		start_off = ((loff_t)ac->ac_o_ex.fe_logical >>
-							(22 - bsbits)) << 22;
-		size = 4 * 1024 * 1024;
-	} else if (NRL_CHECK_SIZE(EXT4_C2B(sbi, ac->ac_o_ex.fe_len),
-					(8<<20)>>bsbits, max, 8 * 1024)) {
-		start_off = ((loff_t)ac->ac_o_ex.fe_logical >>
-							(23 - bsbits)) << 23;
-		size = 8 * 1024 * 1024;
-	} else {
-		start_off = (loff_t) ac->ac_o_ex.fe_logical << bsbits;
-		size	  = (loff_t) EXT4_C2B(sbi,
-					      ac->ac_o_ex.fe_len) << bsbits;
-	}
+
+	ext4_mb_pa_predict_size(ac, &start_off, &size);
+
 	size = size >> bsbits;
 	start = start_off >> bsbits;
 
