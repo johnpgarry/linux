@@ -663,7 +663,13 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 			if (ret != -EAGAIN) {
 				trace_iomap_dio_invalidate_fail(inode, iomi.pos,
 								iomi.len);
-				ret = -ENOTBLK;
+				/*
+				 * if this write was supposed to be atomic,
+				 * return the err rather than trying to fall
+				 * back to buffered IO.
+				 */
+				if (!atomic_write)
+					ret = -ENOTBLK;
 			}
 			goto out_free_dio;
 		}
