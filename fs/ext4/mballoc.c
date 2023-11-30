@@ -2150,8 +2150,6 @@ static void ext4_mb_use_best_found(struct ext4_allocation_context *ac,
 	 * space in a special descriptor.
 	 */
 	if (ac->ac_o_ex.fe_len < ac->ac_b_ex.fe_len) {
-		/* Aligned allocation doesn't have preallocation support */
-		WARN_ON(ac->ac_flags & EXT4_MB_ALIGNED_ALLOC);
 		ext4_mb_new_preallocation(ac);
 	}
 
@@ -2991,8 +2989,7 @@ out:
 
 		WARN_ON(!is_power_of_2(len));
 		WARN_ON(start % len);
-		/* We don't support preallocation yet */
-		WARN_ON(ac->ac_b_ex.fe_len != ac->ac_o_ex.fe_len);
+		WARN_ON(ac->ac_b_ex.fe_len < ac->ac_o_ex.fe_len);
 	}
 
  exit:
@@ -4296,7 +4293,7 @@ ext4_mb_pa_adjust_overlap(struct ext4_allocation_context *ac,
 	struct ext4_prealloc_space *tmp_pa = NULL, *left_pa = NULL, *right_pa = NULL;
 	struct rb_node *iter;
 	ext4_lblk_t new_start, tmp_pa_start, right_pa_start = -1;
-	loff_t new_end, tmp_pa_end, left_pa_end = -1;
+	loff_t size, new_end, tmp_pa_end, left_pa_end = -1;
 
 	new_start = *start;
 	new_end = *end;
@@ -4416,6 +4413,22 @@ ext4_mb_pa_adjust_overlap(struct ext4_allocation_context *ac,
 	}
 	read_unlock(&ei->i_prealloc_lock);
 
+	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC) {
+		/*
+		 * Aligned allocation happens via CR_POWER2_ALIGNED criteria
+		 * hence we must make sure that the new size is a power of 2.
+		 */
+		size = new_end - new_start;
+		size = (loff_t)1 << (fls64(size) - 1);
+
+		if (unlikely(size < ac->ac_o_ex.fe_len))
+			size = ac->ac_o_ex.fe_len;
+		new_end = new_start + size;
+
+		WARN_ON(*start != new_start);
+		WARN_ON(!is_power_of_2(size));
+	}
+
 	/* XXX: extra loop to check we really don't overlap preallocations */
 	ext4_mb_pa_assert_overlap(ac, new_start, new_end);
 
@@ -4471,6 +4484,21 @@ static void ext4_mb_pa_predict_size(struct ext4_allocation_context *ac,
 					      ac->ac_o_ex.fe_len) << bsbits;
 	}
 
+	/*
+	 * For aligned allocations, we need to ensure 2 things:
+	 *
+	 * 1. The start should remain same as original start so that finding
+	 * aligned physical blocks for it is straight forward.
+	 *
+	 * 2. The new_size should not be less than the original len. This
+	 * can sometimes happen due to the way we predict size above.
+	 */
+	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC) {
+		new_start = ac->ac_o_ex.fe_logical << bsbits;
+		new_size = max_t(loff_t, new_size,
+				 EXT4_C2B(sbi, ac->ac_o_ex.fe_len) << bsbits);
+	}
+
 	*size = new_size;
 	*start = new_start;
 }
@@ -4502,13 +4530,6 @@ ext4_mb_normalize_request(struct ext4_allocation_context *ac,
 	/* caller may indicate that preallocation isn't
 	 * required (it's a tail, for example) */
 	if (ac->ac_flags & EXT4_MB_HINT_NOPREALLOC)
-		return;
-
-	/*
-	 * caller may have strict alignment requirements. In this case, avoid
-	 * normalization since it is not alignment aware.
-	 */
-	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC)
 		return;
 
 	if (ac->ac_flags & EXT4_MB_HINT_GROUP_ALLOC) {
@@ -4544,8 +4565,13 @@ ext4_mb_normalize_request(struct ext4_allocation_context *ac,
 	start = max(start, rounddown(ac->ac_o_ex.fe_logical,
 			(ext4_lblk_t)EXT4_BLOCKS_PER_GROUP(ac->ac_sb)));
 
-	/* don't cover already allocated blocks in selected range */
+	/*
+	 * don't cover already allocated blocks in selected range. For aligned
+	 * alloc, since we don't change the original start we should ideally not
+	 * enter this if block.
+	 */
 	if (ar->pleft && start <= ar->lleft) {
+		WARN_ON(ac->ac_flags & EXT4_MB_ALIGNED_ALLOC);
 		size -= ar->lleft + 1 - start;
 		start = ar->lleft + 1;
 	}
@@ -4778,32 +4804,46 @@ ext4_mb_check_group_pa(ext4_fsblk_t goal_block,
 }
 
 /*
- * check if found pa meets EXT4_MB_HINT_GOAL_ONLY
+ * check if found pa meets EXT4_MB_HINT_GOAL_ONLY or EXT4_MB_ALIGNED_ALLOC
  */
 static bool
-ext4_mb_pa_goal_check(struct ext4_allocation_context *ac,
+ext4_mb_pa_check(struct ext4_allocation_context *ac,
 		      struct ext4_prealloc_space *pa)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(ac->ac_sb);
 	ext4_fsblk_t start;
 
-	if (likely(!(ac->ac_flags & EXT4_MB_HINT_GOAL_ONLY)))
+	if (likely(!(ac->ac_flags & EXT4_MB_HINT_GOAL_ONLY ||
+		     ac->ac_flags & EXT4_MB_ALIGNED_ALLOC)))
 		return true;
 
-	/*
-	 * If EXT4_MB_HINT_GOAL_ONLY is set, ac_g_ex will not be adjusted
-	 * in ext4_mb_normalize_request and will keep same with ac_o_ex
-	 * from ext4_mb_initialize_context. Choose ac_g_ex here to keep
-	 * consistent with ext4_mb_find_by_goal.
-	 */
-	start = pa->pa_pstart +
-		(ac->ac_g_ex.fe_logical - pa->pa_lstart);
-	if (ext4_grp_offs_to_block(ac->ac_sb, &ac->ac_g_ex) != start)
-		return false;
+	if (ac->ac_flags & EXT4_MB_HINT_GOAL_ONLY) {
+		/*
+		 * If EXT4_MB_HINT_GOAL_ONLY is set, ac_g_ex will not be adjusted
+		 * in ext4_mb_normalize_request and will keep same with ac_o_ex
+		 * from ext4_mb_initialize_context. Choose ac_g_ex here to keep
+		 * consistent with ext4_mb_find_by_goal.
+		 */
+		start = pa->pa_pstart +
+			(ac->ac_g_ex.fe_logical - pa->pa_lstart);
+		if (ext4_grp_offs_to_block(ac->ac_sb, &ac->ac_g_ex) != start)
+			return false;
 
-	if (ac->ac_g_ex.fe_len > pa->pa_len -
-	    EXT4_B2C(sbi, ac->ac_g_ex.fe_logical - pa->pa_lstart))
-		return false;
+		if (ac->ac_g_ex.fe_len >
+		    pa->pa_len - EXT4_B2C(sbi, ac->ac_g_ex.fe_logical -
+						       pa->pa_lstart))
+			return false;
+	} else if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC) {
+		start = pa->pa_pstart +
+			(ac->ac_g_ex.fe_logical - pa->pa_lstart);
+		if (start % EXT4_C2B(sbi, ac->ac_g_ex.fe_len))
+			return false;
+
+		if (EXT4_C2B(sbi, ac->ac_g_ex.fe_len) >
+		    (EXT4_C2B(sbi, pa->pa_len) -
+		     (ac->ac_g_ex.fe_logical - pa->pa_lstart)))
+			return false;
+	}
 
 	return true;
 }
@@ -4824,10 +4864,6 @@ ext4_mb_use_preallocated(struct ext4_allocation_context *ac)
 
 	/* only data can be preallocated */
 	if (!(ac->ac_flags & EXT4_MB_HINT_DATA))
-		return false;
-
-	/* using preallocated blocks is not alignment aware. */
-	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC)
 		return false;
 
 	/*
@@ -4935,41 +4971,49 @@ ext4_mb_use_preallocated(struct ext4_allocation_context *ac)
 		goto try_group_pa;
 	}
 
-	if (tmp_pa->pa_free && likely(ext4_mb_pa_goal_check(ac, tmp_pa))) {
+	if (tmp_pa->pa_free && likely(ext4_mb_pa_check(ac, tmp_pa))) {
 		atomic_inc(&tmp_pa->pa_count);
 		ext4_mb_use_inode_pa(ac, tmp_pa);
 		spin_unlock(&tmp_pa->pa_lock);
 		read_unlock(&ei->i_prealloc_lock);
 		return true;
 	} else {
+		if (tmp_pa->pa_free == 0)
+			/*
+			 * We found a valid overlapping pa but couldn't use it because
+			 * it had no free blocks. This should ideally never happen
+			 * because:
+			 *
+			 * 1. When a new inode pa is added to rbtree it must have
+			 *    pa_free > 0 since otherwise we won't actually need
+			 *    preallocation.
+			 *
+			 * 2. An inode pa that is in the rbtree can only have it's
+			 *    pa_free become zero when another thread calls:
+			 *      ext4_mb_new_blocks
+			 *       ext4_mb_use_preallocated
+			 *        ext4_mb_use_inode_pa
+			 *
+			 * 3. Further, after the above calls make pa_free == 0, we will
+			 *    immediately remove it from the rbtree in:
+			 *      ext4_mb_new_blocks
+			 *       ext4_mb_release_context
+			 *        ext4_mb_put_pa
+			 *
+			 * 4. Since the pa_free becoming 0 and pa_free getting removed
+			 * from tree both happen in ext4_mb_new_blocks, which is always
+			 * called with i_data_sem held for data allocations, we can be
+			 * sure that another process will never see a pa in rbtree with
+			 * pa_free == 0.
+			 */
+			WARN_ON_ONCE(tmp_pa->pa_free == 0);
 		/*
-		 * We found a valid overlapping pa but couldn't use it because
-		 * it had no free blocks. This should ideally never happen
-		 * because:
-		 *
-		 * 1. When a new inode pa is added to rbtree it must have
-		 *    pa_free > 0 since otherwise we won't actually need
-		 *    preallocation.
-		 *
-		 * 2. An inode pa that is in the rbtree can only have it's
-		 *    pa_free become zero when another thread calls:
-		 *      ext4_mb_new_blocks
-		 *       ext4_mb_use_preallocated
-		 *        ext4_mb_use_inode_pa
-		 *
-		 * 3. Further, after the above calls make pa_free == 0, we will
-		 *    immediately remove it from the rbtree in:
-		 *      ext4_mb_new_blocks
-		 *       ext4_mb_release_context
-		 *        ext4_mb_put_pa
-		 *
-		 * 4. Since the pa_free becoming 0 and pa_free getting removed
-		 * from tree both happen in ext4_mb_new_blocks, which is always
-		 * called with i_data_sem held for data allocations, we can be
-		 * sure that another process will never see a pa in rbtree with
-		 * pa_free == 0.
+		 * If we come here we need to disable preallocations else we'd
+		 * have multiple preallocations for the same logical offset
+		 * which is not allowed and will cause BUG_ONs to be triggered
+		 * later.
 		 */
-		WARN_ON_ONCE(tmp_pa->pa_free == 0);
+		ac->ac_flags |= EXT4_MB_HINT_NOPREALLOC;
 	}
 	spin_unlock(&tmp_pa->pa_lock);
 try_group_pa:
@@ -5780,6 +5824,7 @@ static void ext4_mb_group_or_file(struct ext4_allocation_context *ac)
 	int bsbits = ac->ac_sb->s_blocksize_bits;
 	loff_t size, isize;
 	bool inode_pa_eligible, group_pa_eligible;
+	bool is_aligned = (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC);
 
 	if (!(ac->ac_flags & EXT4_MB_HINT_DATA))
 		return;
@@ -5787,7 +5832,8 @@ static void ext4_mb_group_or_file(struct ext4_allocation_context *ac)
 	if (unlikely(ac->ac_flags & EXT4_MB_HINT_GOAL_ONLY))
 		return;
 
-	group_pa_eligible = sbi->s_mb_group_prealloc > 0;
+	/* Aligned allocation does not support group pa */
+	group_pa_eligible = (!is_aligned && sbi->s_mb_group_prealloc > 0);
 	inode_pa_eligible = true;
 	size = extent_logical_end(sbi, &ac->ac_o_ex);
 	isize = (i_size_read(ac->ac_inode) + ac->ac_sb->s_blocksize - 1)
