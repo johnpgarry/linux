@@ -2149,8 +2149,11 @@ static void ext4_mb_use_best_found(struct ext4_allocation_context *ac,
 	 * user requested originally, we store allocated
 	 * space in a special descriptor.
 	 */
-	if (ac->ac_o_ex.fe_len < ac->ac_b_ex.fe_len)
+	if (ac->ac_o_ex.fe_len < ac->ac_b_ex.fe_len) {
+		/* Aligned allocation doesn't have preallocation support */
+		WARN_ON(ac->ac_flags & EXT4_MB_ALIGNED_ALLOC);
 		ext4_mb_new_preallocation(ac);
+	}
 
 }
 
@@ -2783,10 +2786,15 @@ ext4_mb_regular_allocator(struct ext4_allocation_context *ac)
 
 	BUG_ON(ac->ac_status == AC_STATUS_FOUND);
 
-	/* first, try the goal */
-	err = ext4_mb_find_by_goal(ac, &e4b);
-	if (err || ac->ac_status == AC_STATUS_FOUND)
-		goto out;
+	/*
+	 * first, try the goal. Skip trying goal for aligned allocations since
+	 * goal determination logic is not alignment aware (yet)
+	 */
+	if (!(ac->ac_flags & EXT4_MB_ALIGNED_ALLOC)) {
+		err = ext4_mb_find_by_goal(ac, &e4b);
+		if (err || ac->ac_status == AC_STATUS_FOUND)
+			goto out;
+	}
 
 	if (unlikely(ac->ac_flags & EXT4_MB_HINT_GOAL_ONLY))
 		goto out;
@@ -2827,9 +2835,26 @@ ext4_mb_regular_allocator(struct ext4_allocation_context *ac)
 	 */
 	if (ac->ac_2order)
 		cr = CR_POWER2_ALIGNED;
+	else
+		WARN_ON(ac->ac_flags & EXT4_MB_ALIGNED_ALLOC &&
+			ac->ac_g_ex.fe_len > 1);
 repeat:
 	for (; cr < EXT4_MB_NUM_CRS && ac->ac_status == AC_STATUS_CONTINUE; cr++) {
 		ac->ac_criteria = cr;
+
+		if (ac->ac_criteria > CR_POWER2_ALIGNED &&
+		    ac->ac_flags & EXT4_MB_ALIGNED_ALLOC &&
+		    ac->ac_g_ex.fe_len > 1
+		    ) {
+			/*
+			 * Aligned allocation only supports power 2 alignment
+			 * values which can only be satisfied by
+			 * CR_POWER2_ALIGNED. The exception being allocations of
+			 * 1 block which can be done via any criteria
+			 */
+			break;
+		}
+
 		/*
 		 * searching for the right group start
 		 * from the goal value specified
@@ -2954,6 +2979,23 @@ out:
 	if (!err && ac->ac_status != AC_STATUS_FOUND && first_err)
 		err = first_err;
 
+	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC && ac->ac_status == AC_STATUS_FOUND) {
+		ext4_fsblk_t start = ext4_grp_offs_to_block(sb, &ac->ac_b_ex);
+		ext4_grpblk_t len = EXT4_C2B(sbi, ac->ac_b_ex.fe_len);
+
+		if (!len) {
+			ext4_warning(sb, "Expected a non zero len extent");
+			ac->ac_status = AC_STATUS_BREAK;
+			goto exit;
+		}
+
+		WARN_ON(!is_power_of_2(len));
+		WARN_ON(start % len);
+		/* We don't support preallocation yet */
+		WARN_ON(ac->ac_b_ex.fe_len != ac->ac_o_ex.fe_len);
+	}
+
+ exit:
 	mb_debug(sb, "Best len %d, origin len %d, ac_status %u, ac_flags 0x%x, cr %d ret %d\n",
 		 ac->ac_b_ex.fe_len, ac->ac_o_ex.fe_len, ac->ac_status,
 		 ac->ac_flags, cr, err);
@@ -4462,6 +4504,13 @@ ext4_mb_normalize_request(struct ext4_allocation_context *ac,
 	if (ac->ac_flags & EXT4_MB_HINT_NOPREALLOC)
 		return;
 
+	/*
+	 * caller may have strict alignment requirements. In this case, avoid
+	 * normalization since it is not alignment aware.
+	 */
+	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC)
+		return;
+
 	if (ac->ac_flags & EXT4_MB_HINT_GROUP_ALLOC) {
 		ext4_mb_normalize_group_request(ac);
 		return ;
@@ -4775,6 +4824,10 @@ ext4_mb_use_preallocated(struct ext4_allocation_context *ac)
 
 	/* only data can be preallocated */
 	if (!(ac->ac_flags & EXT4_MB_HINT_DATA))
+		return false;
+
+	/* using preallocated blocks is not alignment aware. */
+	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC)
 		return false;
 
 	/*
@@ -6030,6 +6083,12 @@ static bool ext4_mb_discard_preallocations_should_retry(struct super_block *sb,
 	int freed;
 	u64 seq_retry = 0;
 	bool ret = false;
+
+	/* No need to retry for aligned allocations */
+	if (ac->ac_flags & EXT4_MB_ALIGNED_ALLOC) {
+		ret = false;
+		goto out_dbg;
+	}
 
 	freed = ext4_mb_discard_preallocations(sb, ac->ac_o_ex.fe_len);
 	if (freed) {

@@ -216,9 +216,11 @@ enum criteria {
 /* Large fragment size list lookup succeeded at least once for cr = 0 */
 #define EXT4_MB_CR_POWER2_ALIGNED_OPTIMIZED		0x8000
 /* Avg fragment size rb tree lookup succeeded at least once for cr = 1 */
-#define EXT4_MB_CR_GOAL_LEN_FAST_OPTIMIZED		0x00010000
+#define EXT4_MB_CR_GOAL_LEN_FAST_OPTIMIZED		0x10000
 /* Avg fragment size rb tree lookup succeeded at least once for cr = 1.5 */
-#define EXT4_MB_CR_BEST_AVAIL_LEN_OPTIMIZED		0x00020000
+#define EXT4_MB_CR_BEST_AVAIL_LEN_OPTIMIZED		0x20000
+/* The allocation must respect alignment requirements for physical blocks */
+#define EXT4_MB_ALIGNED_ALLOC		0x40000
 
 struct ext4_allocation_request {
 	/* target inode for block we're allocating */
