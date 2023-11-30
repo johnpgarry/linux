@@ -554,7 +554,7 @@ void xfs_get_atomic_write_attr(
 	xfs_extlen_t		extsz = xfs_get_extsz(ip);
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct block_device	*bdev = target->bt_bdev;
-	unsigned int		awu_min, awu_max, align;
+	unsigned int		awu_min, awu_max;
 	struct request_queue	*q = bdev->bd_queue;
 	struct xfs_mount	*mp = ip->i_mount;
 	pr_err("%s extsz=%d\n", __func__, extsz);
@@ -566,21 +566,12 @@ void xfs_get_atomic_write_attr(
 	awu_min = queue_atomic_write_unit_min_bytes(q);
 	awu_max = queue_atomic_write_unit_max_bytes(q);
 
-	awu_min &= ~XFS_BLOCKMASK(mp);
-	awu_max &= ~XFS_BLOCKMASK(mp);
-
-	align = XFS_FSB_TO_B(mp, extsz);
-
-	if (!awu_max || extsz <= 1 || !is_power_of_2(align)) {
+	if (awu_max <= XFS_BLOCKSIZE(mp)) {
 		*unit_min = 0;
 		*unit_max = 0;
 	} else {
-		if (awu_min)
-			*unit_min = min(awu_min, align);
-		else
-			*unit_min = XFS_BLOCKSIZE(mp);
-
-		*unit_max = min(awu_max, align);
+		*unit_min = XFS_BLOCKSIZE(mp);
+		*unit_max = awu_max & ~XFS_BLOCKMASK(mp);
 	}
 }
 
