@@ -318,28 +318,43 @@ xfs_find_trim_cow_extent(
 	struct xfs_iext_cursor	icur;
 
 	*found = false;
+	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld calling xfs_iext_lookup_extent\n", __func__,
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 
 	/*
 	 * If we don't find an overlapping extent, trim the range we need to
 	 * allocate to fit the hole we found.
 	 */
-	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, cmap))
+	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, cmap)) {
 		cmap->br_startoff = offset_fsb + count_fsb;
+		pr_err("%s1 xfs_iext_lookup_extent=0 cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__,
+			cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
+	} else {
+		pr_err("%s1.1 xfs_iext_lookup_extent=1 cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__,
+			cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
+	}
+
 	if (cmap->br_startoff > offset_fsb) {
+		pr_err("%s2 calling xfs_trim_extent\n", __func__);
 		xfs_trim_extent(imap, imap->br_startoff,
 				cmap->br_startoff - imap->br_startoff);
+		pr_err("%s3 calling xfs_bmap_trim_cow and return\n", __func__);
 		return xfs_bmap_trim_cow(ip, imap, shared);
 	}
 
 	*shared = true;
 	if (isnullstartblock(cmap->br_startblock)) {
+		pr_err("%s4 calling xfs_trim_extent\n", __func__);
 		xfs_trim_extent(imap, cmap->br_startoff, cmap->br_blockcount);
+		pr_err("%s4.1 returning\n", __func__);
 		return 0;
 	}
 
 	/* real extent found - no need to allocate */
+	pr_err("%s5 calling xfs_trim_extent\n", __func__);
 	xfs_trim_extent(cmap, offset_fsb, count_fsb);
 	*found = true;
+	pr_err("%s10 out *found\n", __func__);
 	return 0;
 }
 
@@ -528,36 +543,49 @@ xfs_reflink_allocate_cow(
 	bool			found;
 
 	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL));
+	pr_err("%s convert_now=%d imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld i_cowfp=%pS\n", __func__,
+		convert_now, imap->br_startoff, imap->br_startblock, imap->br_blockcount, ip->i_cowfp);
 	if (!ip->i_cowfp) {
 		ASSERT(!xfs_is_reflink_inode(ip));
+		pr_err("%s2 calling xfs_ifork_init_cow\n", __func__);
 		xfs_ifork_init_cow(ip);
 	}
 
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
+	pr_err("%s3 after xfs_find_trim_cow_extent imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__,
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount);
+	pr_err("%s3.1 cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld error=%d *shared=%d found=%d\n", __func__,
+		cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error, *shared, found);
 	if (error || !*shared)
 		return error;
 
 	/* CoW fork has a real extent */
-	if (found)
+	if (found) {
+		pr_err("%s4 calling xfs_reflink_convert_unwritten\n", __func__);
 		return xfs_reflink_convert_unwritten(ip, imap, cmap,
 				convert_now);
+	}
 
 	/*
 	 * CoW fork does not have an extent and data extent is shared.
 	 * Allocate a real extent in the CoW fork.
 	 */
-	if (cmap->br_startoff > imap->br_startoff)
+	if (cmap->br_startoff > imap->br_startoff) {
+		pr_err("%s5 calling xfs_reflink_fill_cow_hole\n", __func__);
 		return xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
 				lockmode, convert_now);
+	}
 
 	/*
 	 * CoW fork has a delalloc reservation. Replace it with a real extent.
 	 * There may or may not be a data fork mapping.
 	 */
 	if (isnullstartblock(cmap->br_startblock) ||
-	    cmap->br_startblock == DELAYSTARTBLOCK)
+	    cmap->br_startblock == DELAYSTARTBLOCK) {
+		pr_err("%s6 calling xfs_reflink_fill_delalloc\n", __func__);
 		return xfs_reflink_fill_delalloc(ip, imap, cmap, shared,
 				lockmode, convert_now);
+	}
 
 	/* Shouldn't get here. */
 	ASSERT(0);
@@ -1387,7 +1415,7 @@ xfs_reflink_remap_blocks(
 		 * find one, that's a good sign that something is seriously
 		 * wrong here.
 		 */
-		ASSERT(nimaps == 1 && imap.br_startoff == srcoff);
+		ASSERT(nimaps == 1 && imap->br_startoff == srcoff);
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
 			ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
 			error = -EFSCORRUPTED;

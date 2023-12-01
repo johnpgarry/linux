@@ -410,9 +410,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		n = bio->bi_iter.bi_size;
 		if (atomic_write && n != iter_len) {
 			/* This bio should have covered the complete length */
-			ret = -EINVAL;
-			bio_put(bio);
-			goto out;
+			pr_err("%s2 error: This bio should have covered the complete length\n", __func__);
+			//ret = -EINVAL;
+			//bio_put(bio);
+			//goto out;
 		}
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);
