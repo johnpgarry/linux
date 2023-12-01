@@ -398,6 +398,28 @@ static const struct iomap_dio_ops ext4_dio_write_ops = {
 	.end_io = ext4_dio_write_end_io,
 };
 
+static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos, size_t len)
+{
+	unsigned int atomic_write_unit_min_bytes =
+			queue_atomic_write_unit_min_bytes(bdev_get_queue(bdev));
+	unsigned int atomic_write_unit_max_bytes =
+			queue_atomic_write_unit_max_bytes(bdev_get_queue(bdev));
+
+	if (!atomic_write_unit_min_bytes)
+		return false;
+	if (pos % atomic_write_unit_min_bytes)
+		return false;
+	if (len % atomic_write_unit_min_bytes)
+		return false;
+	if (!is_power_of_2(len))
+		return false;
+	if (len > atomic_write_unit_max_bytes)
+		return false;
+	if (pos % len)
+		return false;
+	return true;
+ }
+ 
 /*
  * Check loff_t because the iov_iter_count() used in blkdev was size_t
  */
