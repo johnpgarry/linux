@@ -320,14 +320,23 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 	struct bio_vec bv, bvprv, *bvprvp = NULL;
 	struct bvec_iter iter;
 	unsigned nsegs = 0, bytes = 0;
+		struct bio_vec *_bv = bio->bi_io_vec;
 
-	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
+	if (bio->bi_opf & REQ_ATOMIC) {
+		int i;
+
+		pr_err("%s atomic=1 bi_vcnt=%d\n", __func__, bio->bi_vcnt);
+		for (i = 0; i < bio->bi_vcnt && _bv; i++, _bv++) {
+
+			pr_err("%s0 atomic=1 _bv=%pS _bv->bv_page=%pS, ->bv_len=%d, ->bv_offset=%d\n",
+				__func__, _bv, _bv->bv_page, _bv->bv_len, _bv->bv_offset);
+		}
+	}
 
 	bio_for_each_bvec(bv, bio, iter) {
 		if (bio->bi_opf & REQ_ATOMIC)
-			pr_err("%s2 atomic=%d bv.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n",
-				__func__, !!(bio->bi_opf & REQ_ATOMIC), bv.bv_page, bv.bv_len, bv.bv_offset);
+			pr_err("%s2 atomic=%d bv=%pS bv.bv_page=%pS, .bv_len=%d, .bv_offset=%d bvprv=%pS\n",
+				__func__, !!(bio->bi_opf & REQ_ATOMIC), &bv, bv.bv_page, bv.bv_len, bv.bv_offset, &bvprv);
 		/*
 		 * If the queue doesn't support SG gaps and adding this
 		 * offset would create a gap, disallow it.
@@ -344,8 +353,10 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 			bytes += bv.bv_len;
 		} else {
 			if (bvec_split_segs(lim, &bv, &nsegs, &bytes,
-					lim->max_segments, max_bytes))
+					lim->max_segments, max_bytes)) {
+				pr_err("%s4 split due to gap atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
 				goto split;
+			}
 		}
 
 		bvprv = bv;
@@ -517,11 +528,19 @@ static unsigned blk_bvec_map_sg(struct request_queue *q,
 	unsigned nbytes = bvec->bv_len;
 	unsigned nsegs = 0, total = 0;
 
+//		struct page	*bv_page;
+//	unsigned int	bv_len;
+//	unsigned int	bv_offset;
+
+	pr_err("%s bvec.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n", __func__,
+		bvec->bv_page, bvec->bv_len, bvec->bv_offset);
 	while (nbytes > 0) {
 		unsigned offset = bvec->bv_offset + total;
 		unsigned len = min(get_max_segment_size(&q->limits,
 				   bvec->bv_page, offset), nbytes);
 		struct page *page = bvec->bv_page;
+		pr_err("%s1 nbytes=%d len=%d offset=%d total=%d\n", __func__,
+			nbytes, len, offset, total);
 
 		/*
 		 * Unfortunately a fair number of drivers barf on scatterlists
@@ -548,6 +567,7 @@ static unsigned blk_bvec_map_sg(struct request_queue *q,
 static inline int __blk_bvec_map_sg(struct bio_vec bv,
 		struct scatterlist *sglist, struct scatterlist **sg)
 {
+	pr_err("%s bv=%pS\n", __func__, &bv);
 	*sg = blk_next_sg(sg, sglist);
 	sg_set_page(*sg, bv.bv_page, bv.bv_len, bv.bv_offset);
 	return 1;
@@ -583,9 +603,13 @@ static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 	struct bvec_iter iter;
 	int nsegs = 0;
 	bool new_bio = false;
+	pr_err("%s bio=%pS\n", __func__, bio);
 
 	for_each_bio(bio) {
+		pr_err("%s2 bio=%pS\n", __func__, bio);
 		bio_for_each_bvec(bvec, bio, iter) {
+			pr_err("%s3 bio=%pS bvec=%pS bvec.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n",
+				__func__, bio, &bvec, bvec.bv_page, bvec.bv_len, bvec.bv_offset);
 			/*
 			 * Only try to merge bvecs from two bios given we
 			 * have done bio internal merge when adding pages
@@ -619,6 +643,8 @@ int __blk_rq_map_sg(struct request_queue *q, struct request *rq,
 		struct scatterlist *sglist, struct scatterlist **last_sg)
 {
 	int nsegs = 0;
+
+	pr_err("%s q=%pS rq=%pS\n", __func__, q, rq);
 
 	if (rq->rq_flags & RQF_SPECIAL_PAYLOAD)
 		nsegs = __blk_bvec_map_sg(rq->special_vec, sglist, last_sg);

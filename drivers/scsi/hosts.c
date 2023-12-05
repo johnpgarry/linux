@@ -477,6 +477,8 @@ struct Scsi_Host *scsi_host_alloc(const struct scsi_host_template *sht, int priv
 		shost->max_segment_size = sht->max_segment_size;
 	else
 		shost->max_segment_size = BLK_MAX_SEGMENT_SIZE;
+	pr_err("%s shost->max_segment_size=%d sht->max_segment_size=%d\n",
+		__func__, shost->max_segment_size, sht->max_segment_size);
 
 	/*
 	 * assume a 4GB boundary, if not set
