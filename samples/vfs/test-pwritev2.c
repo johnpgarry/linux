@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 		file = *argv_orig;
 	}
 
-	while ((opt = getopt(argc, argv, "l:p:Padbm")) != -1) {
+	while ((opt = getopt(argc, argv, "l:p:Padm")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
@@ -80,6 +80,7 @@ int main(int argc, char **argv)
 				break;
 			case 'd':
 				o_flags |= O_DIRECT;
+				break;
 			case 'P':
 				middle_start_end_align_4096 = 1;
 				break;
