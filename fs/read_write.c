@@ -827,10 +827,14 @@ ssize_t vfs_iter_read(struct file *file, struct iov_iter *iter, loff_t *ppos,
 	if (ret < 0)
 		return ret;
 
+	if (flags & 0x20)
+		pr_err("%s atomic write_iter=%pS\n", __func__, file->f_op->write_iter);
+
 	ret = do_iter_readv_writev(file, iter, ppos, READ, flags);
 out:
 	if (ret >= 0)
 		fsnotify_access(file);
+
 	return ret;
 }
 EXPORT_SYMBOL(vfs_iter_read);
@@ -1124,7 +1128,7 @@ SYSCALL_DEFINE6(pwritev2, unsigned long, fd, const struct iovec __user *, vec,
 		rwf_t, flags)
 {
 	loff_t pos = pos_from_hilo(pos_h, pos_l);
-
+	pr_err("%s flags=0x%x vlen=%ld\n", __func__, flags, vlen);
 	if (pos == -1)
 		return do_writev(fd, vec, vlen, flags);
 

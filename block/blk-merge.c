@@ -309,6 +309,11 @@ static bool bvec_split_segs(const struct queue_limits *lim,
  * responsible for ensuring that @bs is only destroyed after processing of the
  * split bio has finished.
  */
+//
+//
+//	struct page	*bv_page;
+//	unsigned int	bv_len;
+//	unsigned int	bv_offset;
 struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 		unsigned *segs, struct bio_set *bs, unsigned max_bytes)
 {
@@ -316,13 +321,21 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 	struct bvec_iter iter;
 	unsigned nsegs = 0, bytes = 0;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
+
 	bio_for_each_bvec(bv, bio, iter) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s2 atomic=%d bv.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n",
+				__func__, !!(bio->bi_opf & REQ_ATOMIC), bv.bv_page, bv.bv_len, bv.bv_offset);
 		/*
 		 * If the queue doesn't support SG gaps and adding this
 		 * offset would create a gap, disallow it.
 		 */
-		if (bvprvp && bvec_gap_to_prev(lim, bvprvp, bv.bv_offset))
+		if (bvprvp && bvec_gap_to_prev(lim, bvprvp, bv.bv_offset)) {
+			pr_err("%s3 split due to gap atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
 			goto split;
+		}
 
 		if (nsegs < lim->max_segments &&
 		    bytes + bv.bv_len <= max_bytes &&
