@@ -290,6 +290,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
+	if (atomic_write)
+		pr_err("%s atomic_write=1\n", __func__);
+
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
@@ -575,6 +578,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
+
+	if (atomic_write)
+		pr_err("%s atomic_write=1\n", __func__);
 
 	if (!iomi.len)
 		return NULL;
