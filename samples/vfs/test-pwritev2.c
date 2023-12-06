@@ -58,6 +58,7 @@ int main(int argc, char **argv)
 	int multi_vectors = 0;
 	int max_vectors;
 	int vectors;
+	int byte_index;
 
 	argv_orig++;
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
@@ -112,9 +113,13 @@ int main(int argc, char **argv)
 		buffers[i] = NULL;
 
 	if (multi_vectors == 0) {
-		buffers[0] = malloc(write_size);
+		unsigned char *ptr = buffers[0] = malloc(write_size);
 		if (!buffers[0])
 			return -1;
+		for (byte_index = 0; byte_index < write_size; byte_index++, ptr++) {
+			*ptr = rand();
+		}
+
 		iov[0].iov_len = write_size;
 		iov[0].iov_base = buffers[0];
 		vectors = 1;
@@ -122,9 +127,14 @@ int main(int argc, char **argv)
 	}
 
 	for (i = 0; i < max_vectors; i++) {
+		unsigned char *ptr;
 		posix_memalign(&buffers[i], 4096, 4096);
 		if (!buffers[i])
 			return -1;
+		ptr = buffers[i];
+		for (byte_index = 0; byte_index < 4096; byte_index++, ptr++) {
+			*ptr = rand();
+		}
 		//printf("buffers[%d]=%p\n", i, buffers[i]);
 	}
 
