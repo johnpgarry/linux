@@ -187,8 +187,8 @@ bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, loff_t 
 		return false;
 	if (!is_power_of_2(length))
 		return false;
-	if (pos & (length - 1))
-		return false;
+	//if (pos & (length - 1))
+	//	return false;
 	if (length > unit_max)
 		return false;
 //	WARN_ON_ONCE(1);
