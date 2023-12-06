@@ -3529,24 +3529,8 @@ extern int vfs_fadvise(struct file *file, loff_t offset, loff_t len,
 		       int advice);
 extern int generic_fadvise(struct file *file, loff_t offset, loff_t len,
 			   int advice);
+extern bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, loff_t pos, size_t length);
 
-static inline bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, loff_t pos, size_t length)
-{
-	pr_err("%s unit_min=%d unit_max=%d pos=%lld length=%zd\n", __func__, 
-		unit_min, unit_max, pos, length);
-	if (unlikely(!unit_min))
-		return false;
-	if (length & (unit_min - 1))
-		return false;
-	if (!is_power_of_2(length))
-		return false;
-	if (pos & (length - 1))
-		return false;
-	if (length > unit_max)
-		return false;
-//	WARN_ON_ONCE(1);
-	return true;
 
-}
 
 #endif /* _LINUX_FS_H */
