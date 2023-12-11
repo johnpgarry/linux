@@ -485,6 +485,8 @@ struct nvme_ns_head {
 #define NVME_NSHEAD_DISK_LIVE	0
 	struct nvme_ns __rcu	*current_path[];
 #endif
+	u32 atomic_max;
+	u32 atomic_boundary;
 };
 
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
@@ -522,7 +524,6 @@ struct nvme_ns {
 	struct device		cdev_device;
 
 	struct nvme_fault_inject fault_inject;
-
 };
 
 /* NVMe ns supports metadata actions by the controller (generate/strip) */
