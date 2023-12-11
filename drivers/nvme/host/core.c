@@ -905,6 +905,26 @@ static inline blk_status_t nvme_setup_rw(struct nvme_ns *ns,
 	if (req->cmd_flags & REQ_RAHEAD)
 		dsmgmt |= NVME_RW_DSM_FREQ_PREFETCH;
 
+	/*
+	 * Ensure that nothing has been sent which cannot be executed
+	 * atomically.
+	 */
+	if (req->cmd_flags & REQ_ATOMIC) {
+		if (blk_rq_bytes(req) > ns->atomic_max)
+			return BLK_STS_IOERR;
+
+		if (ns->atomic_boundary) {
+			u32 boundary = ns->atomic_boundary >> ns->lba_shift;
+			u32 imask = ~(boundary - 1);
+			u32 lba = nvme_sect_to_lba(ns, blk_rq_pos(req));
+			u32 end = lba + (blk_rq_bytes(req) >> ns->lba_shift)
+					- 1;
+
+			if ((lba & imask) != (end & imask))
+				return BLK_STS_IOERR;
+		}
+	}
+
 	cmnd->rw.opcode = op;
 	cmnd->rw.flags = 0;
 	cmnd->rw.nsid = cpu_to_le32(ns->head->ns_id);
@@ -1936,6 +1956,9 @@ static void nvme_update_atomic_write_disk_info(struct gendisk *disk,
 		dev_info(ns->ctrl->device, "Atomic writes not supported for NABO set (%d blocks)\n",
 				id->nabo);
 	}
+
+	ns->atomic_max = atomic_bs;
+	ns->atomic_boundary = boundary;
 
 	blk_queue_atomic_write_max_bytes(disk->queue, atomic_bs);
 	blk_queue_atomic_write_unit_min_sectors(disk->queue, bs >> SECTOR_SHIFT);
