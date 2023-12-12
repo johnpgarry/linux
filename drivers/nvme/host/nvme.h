@@ -520,6 +520,8 @@ struct nvme_ns {
 
 	struct nvme_fault_inject fault_inject;
 
+	u32 atomic_max;
+	u32 atomic_boundary;
 };
 
 /* NVMe ns supports metadata actions by the controller (generate/strip) */
