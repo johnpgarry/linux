@@ -1894,27 +1894,15 @@ static void nvme_set_queue_limits(struct nvme_ctrl *ctrl,
 	blk_queue_write_cache(q, vwc, vwc);
 }
 
-static void nvme_update_disk_info(struct gendisk *disk,
-		struct nvme_ns *ns, struct nvme_id_ns *id)
+static void nvme_update_atomic_write_disk_info(struct gendisk *disk,
+		struct nvme_ns *ns, struct nvme_id_ns *id, u32 bs, u32 phys_bs)
 {
-	sector_t capacity = nvme_lba_to_sect(ns, le64_to_cpu(id->nsze));
-	u32 bs = 1U << ns->lba_shift;
-	u32 atomic_bs, phys_bs, io_opt = 0;
+	unsigned int max_bytes = 0, unit_min = 0, unit_max = 0, boundary = 0;
+	u32 atomic_bs = bs;
 
-	/*
-	 * The block layer can't support LBA sizes larger than the page size
-	 * or smaller than a sector size yet, so catch this early and don't
-	 * allow block I/O.
-	 */
-	if (ns->lba_shift > PAGE_SHIFT || ns->lba_shift < SECTOR_SHIFT) {
-		capacity = 0;
-		bs = (1 << 9);
-	}
-
-	blk_integrity_unregister(disk);
-
-	atomic_bs = phys_bs = bs;
 	if (id->nabo == 0) {
+		unsigned int ns_boundary;
+
 		/*
 		 * Bit 1 indicates whether NAWUPF is defined for this namespace
 		 * and whether it should be used instead of AWUPF. If NAWUPF ==
@@ -1924,22 +1912,77 @@ static void nvme_update_disk_info(struct gendisk *disk,
 			atomic_bs = (1 + le16_to_cpu(id->nawupf)) * bs;
 		else
 			atomic_bs = (1 + ns->ctrl->subsys->awupf) * bs;
+
+		if (le16_to_cpu(id->nabspf))
+			ns_boundary = (le16_to_cpu(id->nabspf) + 1) * bs;
+		else
+			ns_boundary = 0;
+
+		/*
+		 * The boundary size just needs to be a multiple
+		 * of unit_max (and not necessarily a power-of-2), so
+		 * this could be relaxed in the block layer in future.
+		 */
+		if (!ns_boundary || is_power_of_2(ns_boundary)) {
+			max_bytes = atomic_bs;
+			unit_min = bs >> SECTOR_SHIFT;
+			unit_max = rounddown_pow_of_two(atomic_bs) >> SECTOR_SHIFT;
+			boundary = ns_boundary;
+		} else {
+			dev_notice(ns->ctrl->device, "Unsupported atomic write boundary (%d bytes)\n",
+				ns_boundary);
+		}
+	} else {
+		dev_info(ns->ctrl->device, "Atomic writes not supported for NABO set (%d blocks)\n",
+				id->nabo);
 	}
 
-	if (id->nsfeat & NVME_NS_FEAT_IO_OPT) {
-		/* NPWG = Namespace Preferred Write Granularity */
-		phys_bs = bs * (1 + le16_to_cpu(id->npwg));
-		/* NOWS = Namespace Optimal Write Size */
-		io_opt = bs * (1 + le16_to_cpu(id->nows));
-	}
+	blk_queue_atomic_write_max_bytes(disk->queue, atomic_bs);
+	blk_queue_atomic_write_unit_min_sectors(disk->queue, bs >> SECTOR_SHIFT);
+	blk_queue_atomic_write_unit_max_sectors(disk->queue,
+		rounddown_pow_of_two(atomic_bs) >> SECTOR_SHIFT);
+	blk_queue_atomic_write_boundary_bytes(disk->queue, boundary);
 
-	blk_queue_logical_block_size(disk->queue, bs);
 	/*
 	 * Linux filesystems assume writing a single physical block is
 	 * an atomic operation. Hence limit the physical block size to the
 	 * value of the Atomic Write Unit Power Fail parameter.
 	 */
 	blk_queue_physical_block_size(disk->queue, min(phys_bs, atomic_bs));
+}
+
+static void nvme_update_disk_info(struct gendisk *disk,
+		struct nvme_ns *ns, struct nvme_id_ns *id)
+{
+	sector_t capacity = nvme_lba_to_sect(ns, le64_to_cpu(id->nsze));
+	u32 bs, phys_bs, io_opt = 0;
+
+	/*
+	 * The block layer can't support LBA sizes larger than the page size
+	 * or smaller than a sector size yet, so catch this early and don't
+	 * allow block I/O.
+	 */
+	if (ns->lba_shift > PAGE_SHIFT || ns->lba_shift < SECTOR_SHIFT) {
+		capacity = 0;
+		bs = (1 << 9);
+	} else {
+		bs = 1U << ns->lba_shift;
+	}
+
+	blk_integrity_unregister(disk);
+
+	if (id->nsfeat & NVME_NS_FEAT_IO_OPT) {
+		/* NPWG = Namespace Preferred Write Granularity */
+		phys_bs = bs * (1 + le16_to_cpu(id->npwg));
+		/* NOWS = Namespace Optimal Write Size */
+		io_opt = bs * (1 + le16_to_cpu(id->nows));
+	} else {
+		phys_bs = bs;
+	}
+
+	nvme_update_atomic_write_disk_info(disk, ns, id, bs, phys_bs);
+
+	blk_queue_logical_block_size(disk->queue, bs);
 	blk_queue_io_min(disk->queue, phys_bs);
 	blk_queue_io_opt(disk->queue, io_opt);
 
