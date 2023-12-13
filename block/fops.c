@@ -640,7 +640,7 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	if (bdev_nowait(handle->bdev))
 		filp->f_mode |= FMODE_NOWAIT;
 
-	if (queue_atomic_write_unit_min_bytes(bdev_get_queue(handle->bdev)))
+	if (queue_atomic_write_unit_min_bytes(bdev_get_queue(handle->bdev)) && (filp->f_flags & O_DIRECT))
 		filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
 
 	filp->f_mapping = handle->bdev->bd_inode->i_mapping;
