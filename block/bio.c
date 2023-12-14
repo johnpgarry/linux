@@ -1234,6 +1234,9 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	size_t offset;
 	int ret = 0;
 
+	bool atomic_write = bio->bi_opf & REQ_ATOMIC;
+	if (atomic_write)
+		pr_err("%s bio=%pS iter=%pS user_backed_iter=%d\n", __func__, bio, iter, user_backed_iter(iter));
 	/*
 	 * Move page array up in the allocated memory for the bio vecs as far as
 	 * possible so that we can start filling biovecs from the beginning
@@ -1255,6 +1258,8 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	size = iov_iter_extract_pages(iter, &pages,
 				      UINT_MAX - bio->bi_iter.bi_size,
 				      nr_pages, extraction_flags, &offset);
+	if (atomic_write)
+		pr_err("%s2 bio=%pS iter=%pS size=%zd nr_pages=%d\n", __func__, bio, iter, size, nr_pages);
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
 
@@ -1317,7 +1322,9 @@ out:
 int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 {
 	int ret = 0;
-
+	bool atomic_write = bio->bi_opf & REQ_ATOMIC;
+	if (atomic_write)
+		pr_err("%s bio=%pS iter=%pS\n", __func__, bio, iter);
 	if (WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED)))
 		return -EIO;
 

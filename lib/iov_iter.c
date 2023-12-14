@@ -1600,6 +1600,7 @@ static ssize_t iov_iter_extract_user_pages(struct iov_iter *i,
 	unsigned int gup_flags = 0;
 	size_t offset;
 	int res;
+	pr_err("%s i=%pS maxpages=%d\n", __func__, i, maxpages);
 
 	if (i->data_source == ITER_DEST)
 		gup_flags |= FOLL_WRITE;
@@ -1609,6 +1610,7 @@ static ssize_t iov_iter_extract_user_pages(struct iov_iter *i,
 		gup_flags |= FOLL_NOFAULT;
 
 	addr = first_iovec_segment(i, &maxsize);
+	pr_err("%s2 i=%pS maxpages=%d maxsize=%zd\n", __func__, i, maxpages, maxsize);
 	*offset0 = offset = addr % PAGE_SIZE;
 	addr &= PAGE_MASK;
 	maxpages = want_pages_array(pages, maxsize, offset, maxpages);

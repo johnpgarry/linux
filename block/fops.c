@@ -72,6 +72,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bool should_dirty = false;
 	struct bio bio;
 	ssize_t ret;
+	struct file	*ki_filp = iocb->ki_filp;
+
+	if (atomic_write)
+		pr_err("%s ki_filp=%pS ->f_flags=0x%x O_DIRECT=%d atomic_write\n", __func__, ki_filp, ki_filp->f_flags, !!(ki_filp->f_flags & O_DIRECT));
 
 	if (blkdev_dio_unaligned(bdev, pos, iter))
 		return -EINVAL;
@@ -95,10 +99,12 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	} else {
 		bio_init(&bio, bdev, vecs, nr_pages, dio_bio_write_op(iocb));
 	}
-	bio.bi_iter.bi_sector = pos >> SECTOR_SHIFT;
-	bio.bi_ioprio = iocb->ki_ioprio;
 	if (atomic_write)
 		bio.bi_opf |= REQ_ATOMIC;
+	if (atomic_write)
+		pr_err("%s iocb=%pS iter=%pS atomic_write=%d\n", __func__, iocb, iter, atomic_write);
+	bio.bi_iter.bi_sector = pos >> SECTOR_SHIFT;
+	bio.bi_ioprio = iocb->ki_ioprio;
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
 	if (unlikely(ret))
@@ -622,6 +628,8 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	struct bdev_handle *handle;
 	blk_mode_t mode;
 
+	pr_err("%s inode=%pS filp=%pS ->f_flags=0x%x O_DIRECT=%d\n", __func__, inode, filp, filp->f_flags, !!(filp->f_flags & O_DIRECT));
+
 	/*
 	 * Preserve backwards compatibility and allow large file access
 	 * even if userspace doesn't ask for it explicitly. Some mkfs
@@ -699,6 +707,8 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	loff_t size = bdev_nr_bytes(bdev);
 	size_t shorted = 0;
 	ssize_t ret;
+	struct file	*ki_filp = iocb->ki_filp;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC);
 
 	if (bdev_read_only(bdev))
 		return -EPERM;
@@ -725,6 +735,10 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if (ret)
 		return ret;
 
+	if (atomic_write)
+		pr_err("%s ki_filp=%pS ->f_flags=0x%x O_DIRECT=%d atomic_write=1 iocb->ki_flags & IOCB_DIRECT=%d\n",
+			__func__, ki_filp, ki_filp->f_flags, !!(ki_filp->f_flags & O_DIRECT), !!(iocb->ki_flags & IOCB_DIRECT));
+ 
 	if (iocb->ki_flags & IOCB_DIRECT) {
 		ret = blkdev_direct_write(iocb, from);
 		if (ret >= 0 && iov_iter_count(from))
