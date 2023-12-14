@@ -718,16 +718,22 @@ static bool iov_iter_aligned_iovec(const struct iov_iter *i, unsigned addr_mask,
 	size_t skip = i->iov_offset;
 	unsigned k;
 
+	pr_err("%s addr_mask=0x%x len_mask=0x%x size=%zd skip=%zd nr_segs=%ld\n", __func__,
+		addr_mask, len_mask, size, skip, i->nr_segs);
 	for (k = 0; k < i->nr_segs; k++, skip = 0) {
 		const struct iovec *iov = iter_iov(i) + k;
 		size_t len = iov->iov_len - skip;
 
 		if (len > size)
 			len = size;
-		if (len & len_mask)
+		if (len & len_mask) {
+			pr_err("%s1 error len=%zd k=%d\n", __func__, len, k);
 			return false;
-		if ((unsigned long)(iov->iov_base + skip) & addr_mask)
+		}
+		if ((unsigned long)(iov->iov_base + skip) & addr_mask) {
+			pr_err("%s2 error iov_base=%pS skip=%zd k=%d\n", __func__, iov->iov_base, skip, k);
 			return false;
+		}
 
 		size -= len;
 		if (!size)

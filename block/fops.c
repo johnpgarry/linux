@@ -56,6 +56,10 @@ static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos,
 		return false;
 	if (iov_iter_count(iter) > max_bytes)
 		return false;
+
+	pr_err("%s iov_iter_is_aligned(iter, PAGE_SIZE - 1, PAGE_SIZE -1)=%d\n",
+		__func__, iov_iter_is_aligned(iter, PAGE_SIZE - 1, PAGE_SIZE -1));
+
 	return true;
 }
 
@@ -628,7 +632,7 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	struct bdev_handle *handle;
 	blk_mode_t mode;
 
-	pr_err("%s inode=%pS filp=%pS ->f_flags=0x%x O_DIRECT=%d\n", __func__, inode, filp, filp->f_flags, !!(filp->f_flags & O_DIRECT));
+	//pr_err("%s inode=%pS filp=%pS ->f_flags=0x%x O_DIRECT=%d\n", __func__, inode, filp, filp->f_flags, !!(filp->f_flags & O_DIRECT));
 
 	/*
 	 * Preserve backwards compatibility and allow large file access

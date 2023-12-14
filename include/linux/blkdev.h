@@ -1357,6 +1357,8 @@ static inline unsigned int bdev_dma_alignment(struct block_device *bdev)
 static inline bool bdev_iter_is_aligned(struct block_device *bdev,
 					struct iov_iter *iter)
 {
+	pr_err("%s iter_is_ubuf=%d iter_is_iovec=%d\n",
+		__func__, iter_is_ubuf(iter), iter_is_iovec(iter));
 	return iov_iter_is_aligned(iter, bdev_dma_alignment(bdev),
 				   bdev_logical_block_size(bdev) - 1);
 }
