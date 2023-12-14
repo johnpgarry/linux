@@ -1909,7 +1909,8 @@ static void nvme_set_queue_limits(struct nvme_ctrl *ctrl,
 		blk_queue_max_hw_sectors(q, ctrl->max_hw_sectors);
 		blk_queue_max_segments(q, min_t(u32, max_segments, USHRT_MAX));
 	}
-	blk_queue_virt_boundary(q, NVME_CTRL_PAGE_SIZE - 1);
+	if (q == ctrl->admin_q || ctrl->need_virt_boundary)
+		blk_queue_virt_boundary(q, NVME_CTRL_PAGE_SIZE - 1);
 	blk_queue_dma_alignment(q, 3);
 	blk_queue_write_cache(q, vwc, vwc);
 }
@@ -1943,7 +1944,8 @@ static void nvme_update_atomic_write_disk_info(struct gendisk *disk,
 		 * of unit_max (and not necessarily a power-of-2), so
 		 * this could be relaxed in the block layer in future.
 		 */
-		if (!ns_boundary || is_power_of_2(ns_boundary)) {
+		if ((!ns_boundary || is_power_of_2(ns_boundary)) &&
+			!ns->ctrl->need_virt_boundary) {
 			max_bytes = atomic_bs;
 			unit_min = bs >> SECTOR_SHIFT;
 			unit_max = rounddown_pow_of_two(atomic_bs) >> SECTOR_SHIFT;
