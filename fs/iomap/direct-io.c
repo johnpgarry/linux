@@ -373,6 +373,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua);
 
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
+	if (atomic_write)
+		pr_err("%s0 atomic_write=1 nr_pages=%d\n", __func__, nr_pages);
 	do {
 		size_t n;
 		if (dio->error) {
@@ -382,6 +384,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		bio = iomap_dio_alloc_bio(iter, dio, nr_pages, bio_opf);
+		if (atomic_write)
+			pr_err("%s1 after iomap_dio_alloc_bio atomic_write=1 nr_pages=%d bio=%pS ->bi_vcnt=%d\n", __func__, nr_pages, bio, bio->bi_vcnt);
 		fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
 					  GFP_KERNEL);
 		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
@@ -394,9 +398,18 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 		ret = bio_iov_iter_get_pages(bio, dio->submit.iter);
 		if (atomic_write) {
-			pr_err("%s iter_is_ubuf=%d iter_is_iovec=%d iov_iter_is_kvec=%d iov_iter_is_bvec=%d\n",
+			int ii;
+			struct bio_vec *_bv = bio->bi_io_vec;
+
+			pr_err("%s2.0 after bio_iov_iter_get_pages atomic_write=1 nr_pages=%d bio=%pS ->bi_vcnt=%d\n", __func__, nr_pages, bio, bio->bi_vcnt);
+			pr_err("%s2.1 iter_is_ubuf=%d iter_is_iovec=%d iov_iter_is_kvec=%d iov_iter_is_bvec=%d\n",
 				__func__, iter_is_ubuf(dio->submit.iter), iter_is_iovec(dio->submit.iter),
 				iov_iter_is_kvec(dio->submit.iter), iov_iter_is_bvec(dio->submit.iter));
+			for (ii = 0; ii < bio->bi_vcnt && _bv; ii++, _bv++) {
+
+				pr_err("%s2.1 atomic=1 _bv=%pS _bv->bv_page=%pS, ->bv_len=%d, ->bv_offset=%d\n",
+					__func__, _bv, _bv->bv_page, _bv->bv_len, _bv->bv_offset);
+			}
 
 		}
 		if (unlikely(ret)) {
