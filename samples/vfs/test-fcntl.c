@@ -38,7 +38,6 @@ struct statx_timestamp;
 #define DEFAULT_WRITE_SIZE 1024
 #define RWF_ATOMIC      (0x00000020)
 
-#define F_SET_ATOMIC_WRITE_SIZE  (F_LINUX_SPECIFIC_BASE + 15)
 int main(int argc, char **argv)
 {
 	struct iovec *iov;
@@ -96,14 +95,15 @@ int main(int argc, char **argv)
 		}
 	}
 #endif
-	printf("file=%s write_size=%d offset=%d o_flags=0x%x wr_flags=0x%x multi_vector_alloc_size=%d\n", file, write_size, offset, o_flags, wr_flags, multi_vector_alloc_size);
+#define F_LINUX_SPECIFIC_BASE	1024
+#define F_SET_ATOMIC_WRITE_SIZE             (F_LINUX_SPECIFIC_BASE + 15)
+	printf("file=%s F_GET_RW_HINT=%d F_SET_ATOMIC_WRITE_SIZE=%d\n",
+		file, F_GET_RW_HINT, F_SET_ATOMIC_WRITE_SIZE);
 	fd = open(file, o_flags, 777);
 	if (fd < 0) {
 		printf("could not open %s\n", file);
 		return -1;	
 	}
-
-
 	result = fcntl(fd, F_SET_ATOMIC_WRITE_SIZE, 123456);
 
 	return result;
