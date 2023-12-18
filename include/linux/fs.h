@@ -185,6 +185,9 @@ typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 /* File supports async nowait buffered writes */
 #define FMODE_BUF_WASYNC	((__force fmode_t)0x80000000)
 
+/* File supports atomic writes */
+#define FMODE_CAN_ATOMIC_WRITE	((__force fmode_t)0x100000000)
+
 /*
  * Attribute flags.  These should be or-ed together to figure out what
  * has been changed!
@@ -3344,6 +3347,10 @@ static inline int kiocb_set_rw_flags(struct kiocb *ki, rwf_t flags)
 		if (!(ki->ki_filp->f_mode & FMODE_NOWAIT))
 			return -EOPNOTSUPP;
 		kiocb_flags |= IOCB_NOIO;
+	}
+	if (flags & RWF_ATOMIC) {
+		if (!(ki->ki_filp->f_mode & FMODE_CAN_ATOMIC_WRITE))
+			return -EOPNOTSUPP;
 	}
 	kiocb_flags |= (__force int) (flags & RWF_SUPPORTED);
 	if (flags & RWF_SYNC)
