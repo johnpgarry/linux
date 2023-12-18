@@ -912,8 +912,14 @@ static inline blk_status_t nvme_setup_rw(struct nvme_ns *ns,
 		dsmgmt |= NVME_RW_DSM_FREQ_PREFETCH;
 
 	if (req->cmd_flags & REQ_ATOMIC) {
-		//if (blk_rq_bytes(req) > )
-
+		if (blk_rq_bytes(req) > atomic_bs /* insert proper value */)
+			return BLK_STS_IOERR;
+		if (boundary /* insert proper boundary value */ &&
+		    bio_straddles_atomic_write_boundary(req->__sector,
+				blk_rq_bytes(req),
+				atomic_write_boundary_bytes)
+			)
+			return BLK_STS_IOERR;
 	}
 
 	cmnd->rw.opcode = op;

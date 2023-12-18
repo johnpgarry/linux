@@ -928,7 +928,9 @@ static bool bvec_try_merge_page(struct bio_vec *bv, struct page *page,
 	bv->bv_len += len;
 	return true;
 }
-
+//	struct page	*bv_page;
+//	unsigned int	bv_len;
+//	unsigned int	bv_offset;
 /*
  * Try to merge a page into a segment, while obeying the hardware segment
  * size limit.  This is not for normal read/write bios, but for passthrough
@@ -944,8 +946,12 @@ bool bvec_try_merge_hw_page(struct request_queue *q, struct bio_vec *bv,
 
 	if ((addr1 | mask) != (addr2 | mask))
 		return false;
-	if (len > queue_max_segment_size(q) - bv->bv_len)
+
+	if (len > queue_max_segment_size(q) - bv->bv_len) {
+		pr_err("%s cannot merge bv=%pS bv->bv_len=%d, ->bv_offset=%d, ->bv_page=%pS len=%d offset=%d\n",
+			__func__, bv, bv->bv_len, bv->bv_offset, bv->bv_page, len, offset);
 		return false;
+	}
 	return bvec_try_merge_page(bv, page, len, offset, same_page);
 }
 
@@ -1246,6 +1252,11 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	size_t offset;
 	int ret = 0;
 
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
+
+	if (atomic)
+		pr_err("%s bio=%pS bi_vcnt=%d iter_is_ubuf=%d\n", __func__, bio, bio->bi_vcnt, iter_is_ubuf(iter));
+
 	/*
 	 * Move page array up in the allocated memory for the bio vecs as far as
 	 * possible so that we can start filling biovecs from the beginning
@@ -1267,6 +1278,8 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	size = iov_iter_extract_pages(iter, &pages,
 				      UINT_MAX - bio->bi_iter.bi_size,
 				      nr_pages, extraction_flags, &offset);
+	if (atomic)
+		pr_err("%s2 bio=%pS bi_vcnt=%d size=%zd\n", __func__, bio, bio->bi_vcnt, size);
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
 
@@ -1285,6 +1298,12 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 
 	for (left = size, i = 0; left > 0; left -= len, i++) {
 		struct page *page = pages[i];
+		if (atomic) {
+
+			phys_addr_t paaddr = page_to_phys(page);
+			pr_err("%s3 pages[%d]=%pS virt=%pS phys=%pad\n",
+				__func__, i, pages[i], page_to_virt(page), &paaddr);
+		}
 
 		len = min_t(size_t, PAGE_SIZE - offset, left);
 		if (bio_op(bio) == REQ_OP_ZONE_APPEND) {

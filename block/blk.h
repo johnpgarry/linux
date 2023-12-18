@@ -105,8 +105,18 @@ static inline bool biovec_phys_mergeable(struct request_queue *q,
 static inline bool __bvec_gap_to_prev(const struct queue_limits *lim,
 		struct bio_vec *bprv, unsigned int offset)
 {
-	return (offset & lim->virt_boundary_mask) ||
+	bool res;
+
+	res = (offset & lim->virt_boundary_mask) ||
 		((bprv->bv_offset + bprv->bv_len) & lim->virt_boundary_mask);
+
+	if (res) {
+
+		pr_err("%s returning true offset=%d bprv->bv_offset=%d, ->bv_len=%d\n",
+			__func__, offset, bprv->bv_offset, bprv->bv_len);
+	}
+
+	return res;
 }
 
 /*

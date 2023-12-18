@@ -53,12 +53,15 @@ int main(int argc, char **argv)
 	char **argv_orig = argv;
 	int argc_i;
 	int middle_start_end_align_4096 = 0;
+	int large_vectors = 0;
 	int i, remain;
 	int avg_size;
 	int multi_vectors = 0;
 	int max_vectors;
 	int vectors;
 	int byte_index;
+	int multi_vector_alloc_size;
+	int ret;
 
 	argv_orig++;
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
@@ -85,14 +88,36 @@ int main(int argc, char **argv)
 			case 'P':
 				middle_start_end_align_4096 = 1;
 				break;
+			case 'L':
+				large_vectors = 1;
+				break;
 		}
 	}
 
 	if (multi_vectors) {
-		max_vectors = (4 * write_size) / 4096;
+		if (large_vectors) {
+			multi_vector_alloc_size = 5 * 4096;
+		} else {
+			multi_vector_alloc_size = 4096;
+		}
+		max_vectors = (4 * write_size) / multi_vector_alloc_size;
+		if (max_vectors > 1024) {
+			max_vectors = 1024;
+			multi_vector_alloc_size = (write_size * 4) / max_vectors;
+		}
+		if (max_vectors == 0)
+			max_vectors = 1;
 		avg_size = write_size / max_vectors;
 	} else {
 		max_vectors = 1;
+		if (large_vectors) {
+			printf("large vectors should not be set without -m\n");
+			return -1;
+		}
+		if (middle_start_end_align_4096) {
+			printf("PAGE-aligned vectors should not be set without -m\n");
+			return -1;
+		}
 	}
 
 	iov = malloc(sizeof(*iov) * max_vectors);
@@ -102,7 +127,7 @@ int main(int argc, char **argv)
 	if (!buffers)
 		return -1;
 
-	printf("file=%s write_size=%d offset=%d o_flags=0x%x wr_flags=0x%x\n", file, write_size, offset, o_flags, wr_flags);
+	printf("file=%s write_size=%d offset=%d o_flags=0x%x wr_flags=0x%x multi_vector_alloc_size=%d\n", file, write_size, offset, o_flags, wr_flags, multi_vector_alloc_size);
 	fd = open(file, o_flags, 777);
 	if (fd < 0) {
 		printf("could not open %s\n", file);
@@ -128,11 +153,11 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < max_vectors; i++) {
 		unsigned char *ptr;
-		posix_memalign(&buffers[i], 4096, 4096);
+		posix_memalign(&buffers[i], 4096, multi_vector_alloc_size);
 		if (!buffers[i])
 			return -1;
 		ptr = buffers[i];
-		for (byte_index = 0; byte_index < 4096; byte_index++, ptr++) {
+		for (byte_index = 0; byte_index < multi_vector_alloc_size; byte_index++, ptr++) {
 			*ptr = rand();
 		}
 		//printf("buffers[%d]=%p\n", i, buffers[i]);
@@ -192,6 +217,12 @@ do_write:
 	}
 	written = pwritev2(fd, iov, vectors, offset, wr_flags);
 	printf("wrote %zd bytes at offset %zd\n", written, offset);
+	if (written == write_size) {
+		ret = 0;
+	} else {
+		ret = -1;
+	}
+
 	close(fd);
 	for (i = 0; i < max_vectors; i++)
 		free(buffers[i]);

@@ -155,7 +155,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_VPD_USE_HOSTNO 1
 #define DEF_WRITESAME_LENGTH 0xFFFF
 #define DEF_ATOMIC_WR  1
-#define DEF_ATOMIC_WR_MAX_LENGTH 8192
+#define DEF_ATOMIC_WR_MAX_LENGTH 1024
 #define DEF_ATOMIC_WR_ALIGN 2
 #define DEF_ATOMIC_WR_GRAN 2
 #define DEF_ATOMIC_WR_MAX_LENGTH_BNDRY (DEF_ATOMIC_WR_MAX_LENGTH)
@@ -8576,7 +8576,8 @@ static struct scsi_host_template sdebug_driver_template = {
 	.sg_tablesize =		SG_MAX_SEGMENTS,
 	.cmd_per_lun =		DEF_CMD_PER_LUN,
 	.max_sectors =		-1U,
-	.max_segment_size =	12288, // 3x 4K pages
+	//.max_segment_size =	-1U, //12288, // 3x 4K pages
+	.max_segment_size =	8192, // 2x 4K pages
 	.module =		THIS_MODULE,
 	.track_queue_depth =	1,
 	.cmd_size = sizeof(struct sdebug_scsi_cmd),
@@ -8596,8 +8597,8 @@ static int sdebug_driver_probe(struct device *dev)
 
 	sdebug_driver_template.can_queue = sdebug_max_queue;
 	sdebug_driver_template.cmd_per_lun = sdebug_max_queue;
-	if (!sdebug_clustering)
-		sdebug_driver_template.dma_boundary = PAGE_SIZE - 1;
+	//if (!sdebug_clustering)
+	//	sdebug_driver_template.dma_boundary = PAGE_SIZE - 1;
 
 	hpnt = scsi_host_alloc(&sdebug_driver_template, 0);
 	if (NULL == hpnt) {
