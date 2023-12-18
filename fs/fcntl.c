@@ -312,6 +312,16 @@ static long fcntl_rw_hint(struct file *file, unsigned int cmd,
 		return -EINVAL;
 	}
 }
+static long fcntl_atomic_write(struct file *file, unsigned int cmd,
+			  unsigned long arg)
+{
+	struct inode *inode = file_inode(file);
+
+	pr_err("%s file=%pS inode=%pS cmd=0x%x (%d) arg=0x%lx (%ld)\n",
+		__func__, file, inode, cmd, cmd, arg, arg);
+
+	return 0;
+}
 
 static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 		struct file *filp)
@@ -418,6 +428,9 @@ static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 	case F_GET_RW_HINT:
 	case F_SET_RW_HINT:
 		err = fcntl_rw_hint(filp, cmd, arg);
+		break;
+	case F_SET_ATOMIC_WRITE_SIZE:
+		err = fcntl_atomic_write(filp, cmd, arg);
 		break;
 	default:
 		break;
