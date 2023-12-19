@@ -317,10 +317,11 @@ static long fcntl_atomic_write(struct file *file, unsigned int cmd,
 {
 	struct inode *inode = file_inode(file);
 
-	pr_err("%s file=%pS inode=%pS cmd=0x%x (%d) arg=0x%lx (%ld)\n",
-		__func__, file, inode, cmd, cmd, arg, arg);
-
-	return 0;
+	pr_err("%s file=%pS inode=%pS cmd=0x%x (%d) arg=0x%lx (%ld) enable_atomic_writes=%pS file->f_op=%pS\n",
+		__func__, file, inode, cmd, cmd, arg, arg, file->f_op->enable_atomic_writes, file->f_op);
+	if (file->f_op->enable_atomic_writes)
+		return file->f_op->enable_atomic_writes(file, arg);
+	return -EOPNOTSUPP;
 }
 
 static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
