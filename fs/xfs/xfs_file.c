@@ -1478,6 +1478,37 @@ xfs_file_mmap(
 	return 0;
 }
 
+STATIC int
+xfs_enable_atomic_writes(
+	struct file	*file,
+	unsigned int unit_max)
+{
+	struct xfs_inode *ip = XFS_I(file_inode(file));
+
+	xfs_extlen_t		extsz = xfs_get_extsz(ip);
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	struct block_device	*bdev = target->bt_bdev;
+	struct request_queue	*q = bdev->bd_queue;
+	struct xfs_mount	*mp = ip->i_mount;
+	unsigned int		awu_min = queue_atomic_write_unit_max_bytes(q);
+	pr_err("%s file=%pS ip=%pS unit_max=%d extsz=%d q=%pS mp=%pS bdev=%pS awu_min=%d\n",
+		__func__, file, ip, unit_max, extsz, q, mp, bdev, awu_min);
+
+	if (awu_min == 0) {
+		if (unit_max > 0) {
+			/* If HW support then don't expect unit_max > 0 as we rely on unbounded CoW size */
+			return -ENOTBLK;
+		}
+		/* Do something for CoW support ... */
+
+		return 0;
+	}
+
+
+
+	return -EOPNOTSUPP;
+}
+
 const struct file_operations xfs_file_operations = {
 	.llseek		= xfs_file_llseek,
 	.read_iter	= xfs_file_read_iter,
@@ -1498,6 +1529,7 @@ const struct file_operations xfs_file_operations = {
 	.fallocate	= xfs_file_fallocate,
 	.fadvise	= xfs_file_fadvise,
 	.remap_file_range = xfs_file_remap_range,
+	.enable_atomic_writes = xfs_enable_atomic_writes,
 };
 
 const struct file_operations xfs_dir_file_operations = {
