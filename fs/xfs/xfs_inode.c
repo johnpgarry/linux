@@ -81,6 +81,10 @@ xfs_get_extsz(
 
 	pr_err("%s XFS_IS_REALTIME_INODE=%d sb_rextsize=%d ip->i_extsize=%d\n",
 		__func__, XFS_IS_REALTIME_INODE(ip), ip->i_mount->m_sb.sb_rextsize, ip->i_extsize);
+
+	if ((ip->i_diflags & XFS_DIFLAG_EXTSIZE) && (ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN) && ip->i_extsize)
+		return ip->i_extsize;
+
 	if (XFS_IS_REALTIME_INODE(ip))
 		return ip->i_mount->m_sb.sb_rextsize;
 
