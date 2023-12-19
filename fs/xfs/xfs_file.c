@@ -1496,7 +1496,7 @@ xfs_enable_atomic_writes(
 
 	if (awu_min == 0) {
 		if (unit_max > 0) {
-			/* If HW support then don't expect unit_max > 0 as we rely on unbounded CoW size */
+			/* We expect unbounded CoW size if no HW support */
 			return -ENOTBLK;
 		}
 		/* Do something for CoW support ... */
@@ -1504,7 +1504,8 @@ xfs_enable_atomic_writes(
 		return 0;
 	}
 
-
+	pr_err("%s2 file=%pS ip=%pS xfs_inode_forcealign=%d\n",
+		__func__, file, ip, xfs_inode_forcealign(ip));
 
 	return -EOPNOTSUPP;
 }

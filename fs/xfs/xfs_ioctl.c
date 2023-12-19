@@ -1110,8 +1110,10 @@ xfs_flags2diflags2(
 		di_flags2 |= XFS_DIFLAG2_DAX;
 	if (xflags & FS_XFLAG_COWEXTSIZE)
 		di_flags2 |= XFS_DIFLAG2_COWEXTSIZE;
-	if (xflags & FS_XFLAG_FORCEALIGN)
+	if (xflags & FS_XFLAG_FORCEALIGN) {
+			WARN_ON_ONCE(1);
 		di_flags2 |= XFS_DIFLAG2_FORCEALIGN;
+	}
 
 	return di_flags2;
 }
@@ -1153,6 +1155,7 @@ xfs_ioctl_setattr_xflags(
 	 * extent size hint.  It doesn't apply to realtime files.
 	 */
 	if (fa->fsx_xflags & FS_XFLAG_FORCEALIGN) {
+			WARN_ON_ONCE(1);
 		if (!xfs_has_forcealign(mp))
 			return -EINVAL;
 		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE)
