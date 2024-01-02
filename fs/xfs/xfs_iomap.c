@@ -833,6 +833,7 @@ xfs_direct_write_iomap_begin(
 		 * atomic write rules then offset and length will be at block-aligned/
 		 * multiple.
 		 */
+		#ifdef dsddsd
 		if (!is_atomic_write_valid(unit_min, unit_max,
 			XFS_FSB_TO_B(mp, imap.br_startblock), /* offset, */
 
@@ -846,6 +847,7 @@ xfs_direct_write_iomap_begin(
 			pr_err("%s !is_atomic_write_valid\n", __func__);
 			goto out_unlock;
 		}
+		#endif
 	}
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
