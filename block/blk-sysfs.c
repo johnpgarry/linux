@@ -112,6 +112,11 @@ static ssize_t queue_max_segments_show(struct request_queue *q, char *page)
 	return queue_var_show(queue_max_segments(q), page);
 }
 
+static ssize_t queue_seg_boundary_mask_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(queue_segment_boundary(q), page);
+}
+
 static ssize_t queue_max_discard_segments_show(struct request_queue *q,
 		char *page)
 {
@@ -510,6 +515,7 @@ QUEUE_RW_ENTRY(queue_ra, "read_ahead_kb");
 QUEUE_RW_ENTRY(queue_max_sectors, "max_sectors_kb");
 QUEUE_RO_ENTRY(queue_max_hw_sectors, "max_hw_sectors_kb");
 QUEUE_RO_ENTRY(queue_max_segments, "max_segments");
+QUEUE_RO_ENTRY(queue_seg_boundary_mask, "seg_boundary_mask");
 QUEUE_RO_ENTRY(queue_max_integrity_segments, "max_integrity_segments");
 QUEUE_RO_ENTRY(queue_max_segment_size, "max_segment_size");
 QUEUE_RW_ENTRY(elv_iosched, "scheduler");
@@ -645,6 +651,7 @@ static struct attribute *queue_attrs[] = {
 	&queue_max_hw_sectors_entry.attr,
 	&queue_max_sectors_entry.attr,
 	&queue_max_segments_entry.attr,
+	&queue_seg_boundary_mask_entry.attr,
 	&queue_max_discard_segments_entry.attr,
 	&queue_max_integrity_segments_entry.attr,
 	&queue_max_segment_size_entry.attr,
