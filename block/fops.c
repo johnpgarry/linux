@@ -65,12 +65,18 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	struct bio bio;
 	ssize_t ret;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	if (blkdev_dio_unaligned(bdev, pos, iter)) {
+		pr_err("%s blkdev_dio_unaligned failed\n", __func__);
 		return -EINVAL;
+	}
 
-	if (atomic_write && !blkdev_atomic_write_valid(bdev, pos, iter))
+	if (atomic_write && !blkdev_atomic_write_valid(bdev, pos, iter)) {
+		pr_err("%s blkdev_atomic_write_valid failed\n", __func__);
 		return -EINVAL;
+	}
 
+	if (atomic_write)
+		pr_err("%s0\n", __func__);
 	if (nr_pages <= DIO_INLINE_BIO_VECS)
 		vecs = inline_vecs;
 	else {
@@ -79,7 +85,8 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 		if (!vecs)
 			return -ENOMEM;
 	}
-
+	if (atomic_write)
+		pr_err("%s1\n", __func__);
 	if (is_read) {
 		bio_init(&bio, bdev, vecs, nr_pages, REQ_OP_READ);
 		if (user_backed_iter(iter))
@@ -97,6 +104,8 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 		goto out;
 	ret = bio.bi_iter.bi_size;
 
+	if (atomic_write)
+		pr_err("%s2 ret=%zd\n", __func__, ret);
 	if (iov_iter_rw(iter) == WRITE)
 		task_io_account_write(ret);
 
@@ -109,12 +118,16 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	if (unlikely(bio.bi_status))
 		ret = blk_status_to_errno(bio.bi_status);
 
+	if (atomic_write)
+		pr_err("%s3 ret=%zd\n", __func__, ret);
 out:
 	if (vecs != inline_vecs)
 		kfree(vecs);
 
 	bio_uninit(&bio);
 
+	if (atomic_write)
+		pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 
@@ -676,8 +689,15 @@ blkdev_direct_write(struct kiocb *iocb, struct iov_iter *from)
 {
 	size_t count = iov_iter_count(from);
 	ssize_t written;
+	bool is_read = 0;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
+
+	if (atomic_write)
+		pr_err("%s\n", __func__);
 
 	written = kiocb_invalidate_pages(iocb, count);
+	if (atomic_write)
+		pr_err("%s1 written=%zd\n", __func__, written);
 	if (written) {
 		if (written == -EBUSY)
 			return 0;
@@ -685,6 +705,8 @@ blkdev_direct_write(struct kiocb *iocb, struct iov_iter *from)
 	}
 
 	written = blkdev_direct_IO(iocb, from);
+	if (atomic_write)
+		pr_err("%s2 written=%zd\n", __func__, written);
 	if (written > 0) {
 		kiocb_invalidate_post_direct_write(iocb, count);
 		iocb->ki_pos += written;
@@ -715,21 +737,36 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	loff_t size = bdev_nr_bytes(bdev);
 	size_t shorted = 0;
 	ssize_t ret;
+	bool is_read = 0;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
 
-	if (bdev_read_only(bdev))
+	if (atomic_write)
+		pr_err("%s\n", __func__);
+
+	if (bdev_read_only(bdev)) {
+		pr_err("%s error0 bdev_read_only\n", __func__);
 		return -EPERM;
+	}
 
-	if (IS_SWAPFILE(bd_inode) && !is_hibernate_resume_dev(bd_inode->i_rdev))
+	if (IS_SWAPFILE(bd_inode) && !is_hibernate_resume_dev(bd_inode->i_rdev)) {
+		pr_err("%s error1 IS_SWAPFILE\n", __func__);
 		return -ETXTBSY;
+	}
 
-	if (!iov_iter_count(from))
+	if (!iov_iter_count(from)) {
+		pr_err("%s error2 iov_iter_count\n", __func__);
 		return 0;
+	}
 
-	if (iocb->ki_pos >= size)
+	if (iocb->ki_pos >= size) {
+		pr_err("%s error3 iocb->ki_pos >= size\n", __func__);
 		return -ENOSPC;
+	}
 
-	if ((iocb->ki_flags & (IOCB_NOWAIT | IOCB_DIRECT)) == IOCB_NOWAIT)
+	if ((iocb->ki_flags & (IOCB_NOWAIT | IOCB_DIRECT)) == IOCB_NOWAIT) {
+		pr_err("%s error4 IOCB_NOWAIT\n", __func__);
 		return -EOPNOTSUPP;
+	}
 
 	size -= iocb->ki_pos;
 	if (iov_iter_count(from) > size) {

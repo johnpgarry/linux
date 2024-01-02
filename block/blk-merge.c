@@ -235,7 +235,7 @@ static inline unsigned get_max_segment_size(const struct queue_limits *lim,
 
 	offset = mask & (page_to_phys(start_page) + offset);
 	if (print)
-		pr_err("%s mask=0x%lx - offset=%ld = %ld pa=%pa max_segment_size=%d\n",
+		pr_err("%s seg boundary mask=0x%lx - offset=%ld = %ld pa=%pa max_segment_size=%d\n",
 			__func__, mask, offset, mask - offset, &pa, lim->max_segment_size);
 
 	/*
@@ -267,7 +267,7 @@ static inline unsigned get_max_segment_size(const struct queue_limits *lim,
  */
 static bool bvec_split_segs(const struct queue_limits *lim,
 		const struct bio_vec *bv, unsigned *nsegs, unsigned *bytes_accounted_for_in_bio,
-		const unsigned max_segs_per_req, const unsigned max_bytes_per_request)
+		const unsigned max_segs_per_req, const unsigned max_bytes_per_request, bool print)
 {
 	const unsigned initial_bytes = *bytes_accounted_for_in_bio;
 	const unsigned max_len_for_this_bvec = min(max_bytes_per_request, UINT_MAX) - *bytes_accounted_for_in_bio;
@@ -275,10 +275,7 @@ static bool bvec_split_segs(const struct queue_limits *lim,
 	unsigned total_len = 0;
 	unsigned seg_size = 0;
 	bool res;
-	bool print = 0;
 
-	if (bv->bv_len > 30000)
-		print = 1;
 
 	if (print)
 		pr_err("%s bv=%pS bv->bv_len=%d, ->bv_offset=%d max_len_for_this_bvec=%d len=%d seg_boundary_mask=0x%lx\n",
@@ -308,7 +305,7 @@ static bool bvec_split_segs(const struct queue_limits *lim,
 
 	/* tell the caller to split the bvec if it is too big to fit */
 	res = len > 0 || bv->bv_len > max_len_for_this_bvec;
-	if (res)
+	if (res && print)
 		pr_err("%s10 returning true len=%d bv=%pS bv->bv_len=%d, ->bv_offset=%d, ->bv_page=%pS max_len_for_this_bvec=%d max_bytes_per_request=%d *bytes_accounted_for_in_bio=%d (initial=%d) *nsegs=%d max_segs_per_req=%d\n",
 			__func__, len, bv, bv->bv_len, bv->bv_offset, bv->bv_page, max_len_for_this_bvec, max_bytes_per_request, *bytes_accounted_for_in_bio, initial_bytes, *nsegs, max_segs_per_req);
 	return res;
@@ -346,8 +343,9 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 	struct bvec_iter iter;
 	unsigned nsegs = 0, bytes = 0;
 	struct bio_vec *_bv = bio->bi_io_vec;
+	bool print = bio->bi_opf & REQ_ATOMIC;
 
-	if (bio->bi_opf & REQ_ATOMIC) {
+	if (print) {
 //	if (1) {
 		int i;
 
@@ -360,7 +358,7 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 	}
 
 	bio_for_each_bvec(bv, bio, iter) {
-		if (bio->bi_opf & REQ_ATOMIC)
+		if (print)
 		//if (1)
 			pr_err("%s2 itering for check to split atomic=%d bv=%pS bv.bv_page=%pS, .bv_len=%d, .bv_offset=%d bvprvp=%pS bytes=%d *segs=%d nsegs=%d\n",
 				__func__, !!(bio->bi_opf & REQ_ATOMIC), &bv, bv.bv_page, bv.bv_len, bv.bv_offset, bvprvp, bytes, *segs, nsegs);
@@ -369,7 +367,8 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 		 * offset would create a gap, disallow it.
 		 */
 		if (bvprvp && bvec_gap_to_prev(lim, bvprvp, bv.bv_offset)) {
-			pr_err("%s2.1 split due to gap atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
+			if (print)
+				pr_err("%s2.1 split due to gap atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
 			goto split;
 		}
 
@@ -380,8 +379,9 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 			bytes += bv.bv_len;
 		} else {
 			if (bvec_split_segs(lim, &bv, &nsegs, &bytes,
-					lim->max_segments, max_bytes)) {
-				pr_err("%s2.2 split due to bvec_split_segs atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
+					lim->max_segments, max_bytes, print)) {
+				if (print)
+					pr_err("%s2.2 split due to bvec_split_segs atomic=%d\n", __func__, !!(bio->bi_opf & REQ_ATOMIC));
 				goto split;
 			}
 		}
@@ -390,7 +390,7 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 		bvprvp = &bvprv;
 	}
 
-	if (bio->bi_opf & REQ_ATOMIC)
+	if (print)
 		pr_err("%s10 bio=%pS nsegs=%d\n", __func__, bio, nsegs);
 	*segs = nsegs;
 	return NULL;
@@ -530,7 +530,7 @@ unsigned int blk_recalc_rq_segments(struct request *rq)
 
 	rq_for_each_bvec(bv, rq, iter)
 		bvec_split_segs(&rq->q->limits, &bv, &nr_phys_segs, &bytes,
-				UINT_MAX, UINT_MAX);
+				UINT_MAX, UINT_MAX, false);
 	return nr_phys_segs;
 }
 
@@ -553,7 +553,7 @@ static inline struct scatterlist *blk_next_sg(struct scatterlist **sg,
 
 static unsigned blk_bvec_map_sg(struct request_queue *q,
 		struct bio_vec *bvec, struct scatterlist *sglist,
-		struct scatterlist **sg)
+		struct scatterlist **sg, bool print)
 {
 	unsigned nbytes = bvec->bv_len;
 	unsigned nsegs = 0, total = 0;
@@ -562,15 +562,17 @@ static unsigned blk_bvec_map_sg(struct request_queue *q,
 //	unsigned int	bv_len;
 //	unsigned int	bv_offset;
 
-	pr_err("%s bvec.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n", __func__,
-		bvec->bv_page, bvec->bv_len, bvec->bv_offset);
+	if (print)
+		pr_err("%s bvec.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n", __func__,
+			bvec->bv_page, bvec->bv_len, bvec->bv_offset);
 	while (nbytes > 0) {
 		unsigned offset = bvec->bv_offset + total;
 		unsigned len = min(get_max_segment_size(&q->limits,
 				   bvec->bv_page, offset, 0), nbytes);
 		struct page *page = bvec->bv_page;
-		pr_err("%s1 nbytes=%d len=%d offset=%d total=%d\n", __func__,
-			nbytes, len, offset, total);
+		if (print)
+			pr_err("%s1 nbytes=%d len=%d offset=%d total=%d\n", __func__,
+				nbytes, len, offset, total);
 
 		/*
 		 * Unfortunately a fair number of drivers barf on scatterlists
@@ -595,10 +597,11 @@ static unsigned blk_bvec_map_sg(struct request_queue *q,
 }
 
 static inline int __blk_bvec_map_sg(struct bio_vec bv,
-		struct scatterlist *sglist, struct scatterlist **sg)
+		struct scatterlist *sglist, struct scatterlist **sg, bool print)
 {
-	pr_err("%s bv=%pS .bv_page=%pS, .bv_len=%d, .bv_offset=%d\n", __func__, &bv,
-		bv.bv_page, bv.bv_len, bv.bv_offset);
+	if (print)
+		pr_err("%s bv=%pS .bv_page=%pS, .bv_len=%d, .bv_offset=%d\n", __func__, &bv,
+			bv.bv_page, bv.bv_len, bv.bv_offset);
 	*sg = blk_next_sg(sg, sglist);
 	sg_set_page(*sg, bv.bv_page, bv.bv_len, bv.bv_offset);
 	return 1;
@@ -636,13 +639,18 @@ static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 	struct bvec_iter iter;
 	int nsegs = 0;
 	bool new_bio = false;
-	pr_err("%s bio=%pS atomic=%d\n", __func__, bio, !!(bio->bi_opf & REQ_ATOMIC));
+	bool print = bio->bi_opf & REQ_ATOMIC;
+
+	if (print)
+		pr_err("%s bio=%pS atomic=%d\n", __func__, bio, !!(bio->bi_opf & REQ_ATOMIC));
 
 	for_each_bio(bio) {
-		pr_err("%s2 bio=%pS\n", __func__, bio);
+		if (print)
+			pr_err("%s2 bio=%pS\n", __func__, bio);
 		bio_for_each_bvec(bvec, bio, iter) {
-			pr_err("%s3 bio=%pS bvec=%pS bvec.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n",
-				__func__, bio, &bvec, bvec.bv_page, bvec.bv_len, bvec.bv_offset);
+			if (print)
+				pr_err("%s3 bio=%pS bvec=%pS bvec.bv_page=%pS, .bv_len=%d, .bv_offset=%d\n",
+					__func__, bio, &bvec, bvec.bv_page, bvec.bv_len, bvec.bv_offset);
 			/*
 			 * Only try to merge bvecs from two bios given we
 			 * have done bio internal merge when adding pages
@@ -653,9 +661,9 @@ static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 				goto next_bvec;
 
 			if (bvec.bv_offset + bvec.bv_len <= PAGE_SIZE)
-				nsegs += __blk_bvec_map_sg(bvec, sglist, sg);
+				nsegs += __blk_bvec_map_sg(bvec, sglist, sg, print);
 			else
-				nsegs += blk_bvec_map_sg(q, &bvec, sglist, sg);
+				nsegs += blk_bvec_map_sg(q, &bvec, sglist, sg, print);
  next_bvec:
 			new_bio = false;
 		}
@@ -676,12 +684,14 @@ int __blk_rq_map_sg(struct request_queue *q, struct request *rq,
 		struct scatterlist *sglist, struct scatterlist **last_sg)
 {
 	int nsegs = 0;
+	bool print = rq->cmd_flags & REQ_ATOMIC;
 
-	pr_err("%s q=%pS rq=%pS rq->bio=%pS atomic=%d\n", __func__, q, rq, rq->bio,
-		!!(rq->cmd_flags & REQ_ATOMIC));
+	if (print)
+		pr_err("%s q=%pS rq=%pS rq->bio=%pS atomic=%d\n", __func__, q, rq, rq->bio,
+			!!(rq->cmd_flags & REQ_ATOMIC));
 
 	if (rq->rq_flags & RQF_SPECIAL_PAYLOAD)
-		nsegs = __blk_bvec_map_sg(rq->special_vec, sglist, last_sg);
+		nsegs = __blk_bvec_map_sg(rq->special_vec, sglist, last_sg, print);
 	else if (rq->bio)
 		nsegs = __blk_bios_map_sg(q, rq->bio, sglist, last_sg);
 

@@ -228,7 +228,7 @@ static unsigned int blk_queue_max_guaranteed_bio_sectors(
 	if (!max_segments)
 		return 0;
 
-	/* subtractaa 1 to assume PAGE-misaligned IOV start address */
+	/* subtract 1 to assume PAGE-misaligned IOV start address */
 	return rounddown_pow_of_two((max_segments - 1) * PAGE_SECTORS);
 }
 

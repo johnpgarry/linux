@@ -972,6 +972,7 @@ static void sd_config_atomic(struct scsi_disk *sdkp)
 	blk_queue_atomic_write_max_bytes(q, max_atomic * logical_block_size);
 	blk_queue_atomic_write_unit_min_sectors(q, unit_min);
 	blk_queue_atomic_write_unit_max_sectors(q, unit_max);
+	sd_printk(KERN_ERR, sdkp, "%s unit_max sectors=%d\n", __func__, unit_max);
 	blk_queue_atomic_write_boundary_bytes(q, 0);
 
 //	blk_queue_virt_boundary(q, 4096 - 1);
