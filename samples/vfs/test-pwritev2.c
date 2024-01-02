@@ -48,19 +48,18 @@ int main(int argc, char **argv)
 	int o_flags = O_RDWR;
 	off_t offset = 0;
 	int opt = 0;
-	int write_size = DEFAULT_WRITE_SIZE;
+	unsigned int write_size = DEFAULT_WRITE_SIZE;
 	char *file = NULL;
 	char **argv_orig = argv;
 	int argc_i;
 	int middle_start_end_align_4096 = 0;
 	int large_vectors = 0;
 	int i, remain;
-	int avg_size;
 	int multi_vectors = 0;
 	int max_vectors;
 	int vectors;
 	int byte_index;
-	int multi_vector_alloc_size;
+	int multi_vector_alloc_size = -1;
 	int ret;
 
 	argv_orig++;
@@ -68,13 +67,25 @@ int main(int argc, char **argv)
 		file = *argv_orig;
 	}
 
-	while ((opt = getopt(argc, argv, "l:p:Padm")) != -1) {
+	while ((opt = getopt(argc, argv, "l:p:PadmhS:")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
+				if (write_size == 0) {
+					printf("write size cannot be zero\n");
+					exit(0);
+				}
+				if (write_size % 512) {
+					printf("write size must be multiple of 512\n");
+					exit(0);
+				}
 				break;
 			case 'p':
 				offset = atoi(optarg);
+				if (offset % 512) {
+					printf("offset must be multiple of 512\n");
+					exit(0);
+				}
 				break;
 			case 'm':
 				multi_vectors = 1;
@@ -88,26 +99,59 @@ int main(int argc, char **argv)
 			case 'P':
 				middle_start_end_align_4096 = 1;
 				break;
-			case 'L':
-				large_vectors = 1;
+			case 'S':
+				multi_vector_alloc_size = atoi(optarg);
+				if (multi_vector_alloc_size == 0) {
+					printf("multi-vector alloc size cannot be zero\n");
+					exit(0);
+				}
+				if (multi_vector_alloc_size % 512) {
+					printf("multi-vector alloc size must be multiple of 512\n");
+					exit(0);
+				}
 				break;
+			case 'h':
+				printf("Options:\n");
+				printf("l: write size\n");
+				printf("p: write offset\n");
+				printf("m: multi-vectors\n");
+				printf("a: atomic\n");
+				printf("d: direct I/O\n");
+				printf("S: vector size\n");
+				printf("P: middle start+end align to 4096\n");
+				exit(0);
+		}
+	}
+
+	if (multi_vectors == 0) {
+		if (multi_vector_alloc_size > 0) {
+			printf("multi-vector size set but not multi-vector mode\n");
+			exit(0);
+		}
+	} else {
+		if (multi_vector_alloc_size < 0) {
+			multi_vector_alloc_size = 8192;
+
+			if (multi_vector_alloc_size > write_size)
+				multi_vector_alloc_size = write_size;
+
+			printf("default multi-vector alloc size set to %d\n",
+				multi_vector_alloc_size);
+		}
+
+		if (multi_vector_alloc_size > write_size) {
+			printf("multi-vector size too large\n");
+			exit(0);
 		}
 	}
 
 	if (multi_vectors) {
-		if (large_vectors) {
-			multi_vector_alloc_size = 5 * 4096;
-		} else {
-			multi_vector_alloc_size = 4096;
-		}
 		max_vectors = (4 * write_size) / multi_vector_alloc_size;
-		if (max_vectors > 1024) {
-			max_vectors = 1024;
-			multi_vector_alloc_size = (write_size * 4) / max_vectors;
+		if (max_vectors > 4096) {
+			max_vectors = 4096;
 		}
 		if (max_vectors == 0)
 			max_vectors = 1;
-		avg_size = write_size / max_vectors;
 	} else {
 		max_vectors = 1;
 		if (large_vectors) {
@@ -173,6 +217,7 @@ int main(int argc, char **argv)
 	for (vectors = 0, i = 0; i < max_vectors && remain > 0; i++, vectors++) {
 		int sz;
 		int offset;
+		int multi_vector_alloc_size_kb = multi_vector_alloc_size / 1024;
 
 		if (i == 0) {
 			sz = 1024;
@@ -191,24 +236,23 @@ int main(int argc, char **argv)
 			else if (middle_start_end_align_4096)
 				sz = 4096;
 			else {
-				if (offset == 0)
-					sz = 1024 + (1024 * (rand() % 3));
-				else if (offset == 1024)
-					sz = 1024 + (1024 * (rand() % 2));
-				else if (offset == 2048)
-					sz = 1024 + (1024 * (rand() % 1));
-				else
-					sz = 1024;
+				sz = 1024 + (1024 * (rand() % multi_vector_alloc_size_kb));
+				if (sz + offset > multi_vector_alloc_size)
+					sz = multi_vector_alloc_size - offset;
 			}
 		}
+
+		if (sz > remain)
+			sz = remain;
 
 		iov[i].iov_len = sz;
 		iov[i].iov_base = buffers[i];
 		iov[i].iov_base += offset;
 		remain -= sz;
-		//printf("3 i=%d remain=%d\n", i, remain);
+		printf("3 i=%d remain=%d offset=%d sz=%d\n", i, remain, offset, sz);
 	}
 
+	printf("vectors=%d\n", vectors);
 do_write:
 	for (i = 0; i < vectors; i++) {
 		if (iov[i].iov_len)
