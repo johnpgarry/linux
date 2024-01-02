@@ -129,8 +129,10 @@ struct statx {
 	/* 0xa0 */
 	__u32	stx_atomic_write_unit_min;
 	__u32	stx_atomic_write_unit_max;
+	__u32	stx_atomic_write_max_vecs;
+	__u32	__spare1[1];
 	/* 0xb0 */
-	__u64	__spare3[11];	/* Spare space for future expansion */
+	__u64	__spare3[10];	/* Spare space for future expansion */
 	/* 0x100 */
 };
 
