@@ -222,6 +222,7 @@ EXPORT_SYMBOL(blk_queue_atomic_write_boundary_bytes);
 static unsigned int blk_queue_max_guaranteed_bio_sectors(
 					struct queue_limits *limits)
 {
+	#ifdef old_way
 	unsigned int max_segments = min_t(unsigned int, BIO_MAX_VECS,
 					  limits->max_segments);
 
@@ -230,6 +231,11 @@ static unsigned int blk_queue_max_guaranteed_bio_sectors(
 
 	/* subtract 1 to assume PAGE-misaligned IOV start address */
 	return rounddown_pow_of_two((max_segments - 1) * PAGE_SECTORS);
+	#else
+
+	return SZ_1M * 1024;
+
+	#endif
 }
 
 /**

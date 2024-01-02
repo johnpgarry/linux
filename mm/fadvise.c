@@ -177,20 +177,24 @@ int generic_fadvise(struct file *file, loff_t offset, loff_t len, int advice)
 }
 EXPORT_SYMBOL(generic_fadvise);
 
-bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, loff_t pos, size_t length)
+bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, unsigned int max_vecs, loff_t pos, struct iov_iter *iter)
 {
-	pr_err("%s unit_min=%d unit_max=%d pos=%lld length=%zd\n", __func__, 
-		unit_min, unit_max, pos, length);
+	pr_err("%s unit_min=%d unit_max=%d max_vecs=%d pos=%lld length=%zd nr_segs=%ld ubuf=%d iovec=%d\n", __func__, 
+		unit_min, unit_max, max_vecs, pos, iov_iter_count(iter), iter->nr_segs, iter_is_ubuf(iter), 
+		iter_is_iovec(iter));
 	if (unlikely(!unit_min))
 		return false;
-	if (length & (unit_min - 1))
+	if (iov_iter_count(iter) & (unit_min - 1))
 		return false;
-	if (!is_power_of_2(length))
+	if (!is_power_of_2(iov_iter_count(iter)))
 		return false;
 	//if (pos & (length - 1))
 	//	return false;
-	if (length > unit_max)
+	if (iov_iter_count(iter) > unit_max)
 		return false;
+	if (iter->nr_segs > max_vecs)
+		return false;
+
 //	WARN_ON_ONCE(1);
 	return true;
 

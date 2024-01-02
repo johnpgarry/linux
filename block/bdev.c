@@ -1143,7 +1143,8 @@ void bdev_statx(struct dentry *dentry, struct kstat *stat, u32 request_mask)
 
 		generic_fill_statx_atomic_writes(stat,
 			queue_atomic_write_unit_min_bytes(bd_queue),
-			queue_atomic_write_unit_max_bytes(bd_queue));
+			queue_atomic_write_unit_max_bytes(bd_queue),
+			queue_atomic_write_unit_max_vecs(bd_queue));
 	}
 
 	blkdev_put_no_open(bdev);

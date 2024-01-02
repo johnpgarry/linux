@@ -47,8 +47,9 @@ static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos,
 	struct request_queue *q = bdev_get_queue(bdev);
 	unsigned int unit_min = queue_atomic_write_unit_min_bytes(q);
 	unsigned int unit_max = queue_atomic_write_unit_max_bytes(q);
+	unsigned int max_vecs = queue_atomic_write_unit_max_vecs(q);
 
-	return is_atomic_write_valid(unit_min, unit_max, pos, iov_iter_count(iter));
+	return is_atomic_write_valid(unit_min, unit_max, max_vecs, pos, iter);
 }
 
 #define DIO_INLINE_BIO_VECS 4

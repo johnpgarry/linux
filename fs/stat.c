@@ -94,13 +94,15 @@ EXPORT_SYMBOL(generic_fill_statx_attr);
  * @stat:	Where to fill in the attribute flags
  * @unit_min:	Minimum supported atomic write length
  * @unit_max:	Maximum supported atomic write length
+ * @max_vecs:	Maximum number of iovecs
  *
  * Fill in the STATX{_ATTR}_WRITE_ATOMIC flags in the kstat structure from
  * atomic write unit_min and unit_max values.
  */
 void generic_fill_statx_atomic_writes(struct kstat *stat,
 				      unsigned int unit_min,
-				      unsigned int unit_max)
+				      unsigned int unit_max,
+				      unsigned int max_vecs)
 {
 	/* Confirm that the request type is known */
 	stat->result_mask |= STATX_WRITE_ATOMIC;
@@ -111,6 +113,7 @@ void generic_fill_statx_atomic_writes(struct kstat *stat,
 	if (unit_min) {
 		stat->atomic_write_unit_min = unit_min;
 		stat->atomic_write_unit_max = unit_max;
+		stat->atomic_write_max_vecs = max_vecs;
 
 		/* Confirm atomic writes are actually supported */
 		stat->attributes |= STATX_ATTR_WRITE_ATOMIC;
@@ -688,6 +691,7 @@ cp_statx(const struct kstat *stat, struct statx __user *buffer)
 	tmp.stx_dio_offset_align = stat->dio_offset_align;
 	tmp.stx_atomic_write_unit_min = stat->atomic_write_unit_min;
 	tmp.stx_atomic_write_unit_max = stat->atomic_write_unit_max;
+	tmp.stx_atomic_write_max_vecs = stat->atomic_write_max_vecs;
 
 	return copy_to_user(buffer, &tmp, sizeof(tmp)) ? -EFAULT : 0;
 }
