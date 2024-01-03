@@ -294,7 +294,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		pr_err("%s atomic_write=1\n", __func__);
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
-	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
+	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter, atomic_write))
 		return -EINVAL;
 
 	if (iomap->type == IOMAP_UNWRITTEN) {

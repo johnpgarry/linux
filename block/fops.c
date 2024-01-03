@@ -35,10 +35,10 @@ static blk_opf_t dio_bio_write_op(struct kiocb *iocb)
 }
 
 static bool blkdev_dio_unaligned(struct block_device *bdev, loff_t pos,
-			      struct iov_iter *iter)
+			      struct iov_iter *iter, bool atomic_write)
 {
 	return pos & (bdev_logical_block_size(bdev) - 1) ||
-		!bdev_iter_is_aligned(bdev, iter);
+		!bdev_iter_is_aligned(bdev, iter, atomic_write);
 }
 
 static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos,
@@ -66,8 +66,8 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	struct bio bio;
 	ssize_t ret;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter)) {
-		pr_err("%s blkdev_dio_unaligned failed\n", __func__);
+	if (blkdev_dio_unaligned(bdev, pos, iter, atomic_write)) {
+		pr_err("%s blkdev_dio_unaligned failed atomic_write=%d\n", __func__, atomic_write);
 		return -EINVAL;
 	}
 
@@ -206,7 +206,7 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	if (atomic_write)
 		return -EINVAL;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	if (blkdev_dio_unaligned(bdev, pos, iter, false))
 		return -EINVAL;
 
 	if (iocb->ki_flags & IOCB_ALLOC_CACHE)
@@ -346,7 +346,7 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter))
+	if (blkdev_dio_unaligned(bdev, pos, iter, atomic_write))
 		return -EINVAL;
 
 	if (atomic_write && !blkdev_atomic_write_valid(bdev, pos, iter))

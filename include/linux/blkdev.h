@@ -1347,10 +1347,14 @@ static inline unsigned int bdev_dma_alignment(struct block_device *bdev)
 }
 
 static inline bool bdev_iter_is_aligned(struct block_device *bdev,
-					struct iov_iter *iter)
+					struct iov_iter *iter, bool atomic_write)
 {
-	return iov_iter_is_aligned(iter, bdev_dma_alignment(bdev),
-				   bdev_logical_block_size(bdev) - 1);
+	unsigned addr_mask = bdev_dma_alignment(bdev);
+
+	if (atomic_write)
+		addr_mask |= PAGE_SIZE - 1;
+
+	return iov_iter_is_aligned(iter, addr_mask, bdev_logical_block_size(bdev) - 1);
 }
 
 static inline int blk_rq_aligned(struct request_queue *q, unsigned long addr,
