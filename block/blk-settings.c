@@ -238,11 +238,11 @@ static unsigned int blk_queue_max_guaranteed_bio_sectors(
 	if (queue_virt_boundary(q))
 		return UINT_MAX;
 
-	if (max_segments < 2)
+	if (max_segments < 1)
 		return 0;
 
 	/* All vectors need to be PAGE-aligned */
-	return rounddown_pow_of_two((max_segments - 1) * PAGE_SECTORS);
+	return rounddown_pow_of_two(max_segments * PAGE_SECTORS);
 
 	#endif
 }
