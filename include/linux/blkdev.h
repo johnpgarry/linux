@@ -1325,6 +1325,11 @@ queue_atomic_write_boundary_bytes(const struct request_queue *q)
 static inline unsigned int
 queue_atomic_write_unit_max_vecs(const struct request_queue *q)
 {
+	/* Keep simple: If the controller has any DMA restrictions, limit
+	to 1 vector, such that we can come up with a atomic_write_unit_max value */
+	//if (queue_virt_boundary(q) || queue_segment_boundary(q) > PAGE_SIZE ||
+	//	queue_max_segment_size(q) < BLK_MAX_SEGMENT_SIZE)
+	//	return 1;
 	if (queue_virt_boundary(q))
 		return 1;
 	return min(BIO_MAX_VECS, queue_max_segments(q));
