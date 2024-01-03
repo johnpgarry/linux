@@ -413,14 +413,18 @@ static ssize_t blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 
 	if (!iov_iter_count(iter))
 		return 0;
-	if (atomic_write) {
-		pr_err("%s iter_is_ubuf=%d iter_is_iovec=%d iov_iter_is_kvec=%d iov_iter_is_bvec=%d\n",
-			__func__, iter_is_ubuf(iter), iter_is_iovec(iter),
-			iov_iter_is_kvec(iter), iov_iter_is_bvec(iter));
-
-	}
 
 	nr_pages = bio_iov_vecs_to_alloc(iter, BIO_MAX_VECS + 1);
+	if (atomic_write) {
+		struct block_device *bdev = I_BDEV(iocb->ki_filp->f_mapping->host);
+		loff_t pos = iocb->ki_pos;
+		bool valid = blkdev_atomic_write_valid(bdev, pos, iter);
+
+		pr_err("%s iter_is_ubuf=%d iter_is_iovec=%d iov_iter_is_kvec=%d iov_iter_is_bvec=%d nr_pages=%d valid=%d\n",
+			__func__, iter_is_ubuf(iter), iter_is_iovec(iter),
+			iov_iter_is_kvec(iter), iov_iter_is_bvec(iter), nr_pages, valid);
+	}
+
 	if (likely(nr_pages <= BIO_MAX_VECS)) {
 		if (is_sync_kiocb(iocb))
 			return __blkdev_direct_IO_simple(iocb, iter, nr_pages);
