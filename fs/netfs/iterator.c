@@ -50,7 +50,7 @@ ssize_t netfs_extract_user_iter(struct iov_iter *orig, size_t orig_len,
 	if (WARN_ON_ONCE(!iter_is_ubuf(orig) && !iter_is_iovec(orig)))
 		return -EIO;
 
-	max_pages = iov_iter_npages(orig, INT_MAX);
+	max_pages = iov_iter_npages(orig, INT_MAX, false);
 	bv_size = array_size(max_pages, sizeof(*bv));
 	bv = kvmalloc(bv_size, GFP_KERNEL);
 	if (!bv)

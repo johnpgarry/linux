@@ -1241,7 +1241,7 @@ ssize_t __blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 	if (unlikely(sdio.blkfactor))
 		sdio.pages_in_io = 2;
 
-	sdio.pages_in_io += iov_iter_npages(iter, INT_MAX);
+	sdio.pages_in_io += iov_iter_npages(iter, INT_MAX, false);
 
 	blk_start_plug(&plug);
 

@@ -372,7 +372,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 */
 	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua);
 
-	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
+	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS, false);
 	if (atomic_write)
 		pr_err("%s0 atomic_write=1 nr_pages=%d\n", __func__, nr_pages);
 	do {
@@ -441,7 +441,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		copied += n;
 
 		nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter,
-						 BIO_MAX_VECS);
+						 BIO_MAX_VECS, false);
 		/*
 		 * We can only poll for single bio I/Os.
 		 */
