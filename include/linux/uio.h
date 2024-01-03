@@ -284,7 +284,7 @@ ssize_t iov_iter_get_pages2(struct iov_iter *i, struct page **pages,
 			size_t maxsize, unsigned maxpages, size_t *start);
 ssize_t iov_iter_get_pages_alloc2(struct iov_iter *i, struct page ***pages,
 			size_t maxsize, size_t *start);
-int iov_iter_npages(const struct iov_iter *i, int maxpages);
+int iov_iter_npages(const struct iov_iter *i, int maxpages, bool print);
 void iov_iter_restore(struct iov_iter *i, struct iov_iter_state *state);
 
 const void *dup_iter(struct iov_iter *new, struct iov_iter *old, gfp_t flags);
@@ -331,7 +331,7 @@ iov_iter_npages_cap(struct iov_iter *i, int maxpages, size_t max_bytes)
 		shorted = iov_iter_count(i) - max_bytes;
 		iov_iter_truncate(i, max_bytes);
 	}
-	npages = iov_iter_npages(i, maxpages);
+	npages = iov_iter_npages(i, maxpages, false);
 	if (shorted)
 		iov_iter_reexpand(i, iov_iter_count(i) + shorted);
 

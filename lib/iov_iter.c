@@ -1088,19 +1088,29 @@ ssize_t iov_iter_get_pages_alloc2(struct iov_iter *i,
 }
 EXPORT_SYMBOL(iov_iter_get_pages_alloc2);
 
-static int iov_npages(const struct iov_iter *i, int maxpages)
+static int iov_npages(const struct iov_iter *i, int maxpages, bool print)
 {
 	size_t skip = i->iov_offset, size = i->count;
 	const struct iovec *p;
 	int npages = 0;
+	int index = 0;
+	
+	if (print)
+		pr_err("%s skip=%zd size=%zd maxpages=%d\n", __func__, skip, size, maxpages);
 
-	for (p = iter_iov(i); size; skip = 0, p++) {
+	for (p = iter_iov(i); size; skip = 0, p++, index++) {
 		unsigned offs = offset_in_page(p->iov_base + skip);
 		size_t len = min(p->iov_len - skip, size);
+		if (print)
+			pr_err("%s1 index=%d skip=%zd size=%zd p=%pS (iov_base=%pS iov_len=%ld) offs=%d len=%zd npages=%d\n",
+				__func__, index, skip, size, p, p->iov_base, p->iov_len, offs, len, npages);
 
 		if (len) {
 			size -= len;
 			npages += DIV_ROUND_UP(offs + len, PAGE_SIZE);
+			if (print)
+				pr_err("%s2 index=%d size=%zd offs + len=%ld npages=%d\n",
+					__func__, index, size, offs + len, npages);
 			if (unlikely(npages > maxpages))
 				return maxpages;
 		}
@@ -1126,7 +1136,7 @@ static int bvec_npages(const struct iov_iter *i, int maxpages)
 	return npages;
 }
 
-int iov_iter_npages(const struct iov_iter *i, int maxpages)
+int iov_iter_npages(const struct iov_iter *i, int maxpages, bool print)
 {
 	if (unlikely(!i->count))
 		return 0;
@@ -1139,7 +1149,7 @@ int iov_iter_npages(const struct iov_iter *i, int maxpages)
 	}
 	/* iovec and kvec have identical layouts */
 	if (likely(iter_is_iovec(i) || iov_iter_is_kvec(i)))
-		return iov_npages(i, maxpages);
+		return iov_npages(i, maxpages, print);
 	if (iov_iter_is_bvec(i))
 		return bvec_npages(i, maxpages);
 	if (iov_iter_is_xarray(i)) {

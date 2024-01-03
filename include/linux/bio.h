@@ -456,11 +456,11 @@ static inline void bio_wouldblock_error(struct bio *bio)
  * pointed by @iter. If @iter is backed by bvec it's going to be reused
  * instead of allocating a new one.
  */
-static inline int bio_iov_vecs_to_alloc(struct iov_iter *iter, int max_segs)
+static inline int bio_iov_vecs_to_alloc(struct iov_iter *iter, int max_segs, bool print)
 {
 	if (iov_iter_is_bvec(iter))
 		return 0;
-	return iov_iter_npages(iter, max_segs);
+	return iov_iter_npages(iter, max_segs, print);
 }
 
 struct request_queue;

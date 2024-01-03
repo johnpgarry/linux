@@ -267,7 +267,7 @@ static int bio_map_user_iov(struct request *rq, struct iov_iter *iter,
 {
 	iov_iter_extraction_t extraction_flags = 0;
 	unsigned int max_sectors = queue_max_hw_sectors(rq->q);
-	unsigned int nr_vecs = iov_iter_npages(iter, BIO_MAX_VECS);
+	unsigned int nr_vecs = iov_iter_npages(iter, BIO_MAX_VECS, false);
 	struct bio *bio;
 	int ret;
 	int j;
