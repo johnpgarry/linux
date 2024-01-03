@@ -188,8 +188,8 @@ bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, unsigne
 		return false;
 	if (!is_power_of_2(iov_iter_count(iter)))
 		return false;
-	//if (pos & (length - 1))
-	//	return false;
+	if (pos & (iov_iter_count(iter) - 1))
+		return false;
 	if (iov_iter_count(iter) > unit_max)
 		return false;
 	if (iter->nr_segs > max_vecs)
