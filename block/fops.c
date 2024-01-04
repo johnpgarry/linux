@@ -203,8 +203,6 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
 
-	if (atomic_write)
-		return -EINVAL;
 
 	if (blkdev_dio_unaligned(bdev, pos, iter, false))
 		return -EINVAL;
@@ -281,6 +279,8 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 			submit_bio(bio);
 			break;
 		}
+		if (atomic_write)
+			WARN_ON_ONCE(1);
 		atomic_inc(&dio->ref);
 		submit_bio(bio);
 		bio = bio_alloc(bdev, nr_pages, opf, GFP_KERNEL);
