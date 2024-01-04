@@ -346,11 +346,20 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
 
-	if (blkdev_dio_unaligned(bdev, pos, iter, atomic_write))
-		return -EINVAL;
+	if (atomic_write)
+		pr_err("%s atomic_write=%d nr_pages=%d\n", __func__, atomic_write, nr_pages);
 
-	if (atomic_write && !blkdev_atomic_write_valid(bdev, pos, iter))
+	if (blkdev_dio_unaligned(bdev, pos, iter, atomic_write)) {
+		if (atomic_write)
+			pr_err("%s1 blkdev_dio_unaligned failed\n", __func__);
 		return -EINVAL;
+	}
+
+	if (atomic_write && !blkdev_atomic_write_valid(bdev, pos, iter)) {
+		if (atomic_write)
+			pr_err("%s2 blkdev_atomic_write_valid failed\n", __func__);
+		return -EINVAL;
+	}
 
 	if (iocb->ki_flags & IOCB_ALLOC_CACHE)
 		opf |= REQ_ALLOC_CACHE;
