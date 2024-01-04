@@ -1143,8 +1143,9 @@ int iov_iter_npages(const struct iov_iter *i, int maxpages, bool print)
 	if (likely(iter_is_ubuf(i))) {
 		unsigned offs = offset_in_page(i->ubuf + i->iov_offset);
 		int npages = DIV_ROUND_UP(offs + i->count, PAGE_SIZE);
-		pr_err("%s i->count=%zd i->iov_offset=%zd\n", __func__,
-			i->count, i->iov_offset);
+		if (print)
+			pr_err("%s i->count=%zd i->iov_offset=%zd\n", __func__,
+				i->count, i->iov_offset);
 		return min(npages, maxpages);
 	}
 	/* iovec and kvec have identical layouts */
