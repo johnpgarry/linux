@@ -40,13 +40,12 @@ struct statx_timestamp;
 
 int main(int argc, char **argv)
 {
-	struct iovec *iov;
-	void **buffers;
+	struct iovec *iov = NULL;
+	void **buffers = NULL;
 	ssize_t written;
 	int fd;
-	int wr_flags = RWF_SYNC;
+	int rw_flags = RWF_SYNC;
 	int o_flags = O_RDWR;
-	off_t offset = 0;
 	int opt = 0;
 	unsigned int write_size = DEFAULT_WRITE_SIZE;
 	char *file = NULL;
@@ -61,6 +60,8 @@ int main(int argc, char **argv)
 	int byte_index;
 	int multi_vector_alloc_size = -1;
 	int ret;
+	loff_t pos = 0;
+	char *read_buffer = NULL;
 
 	argv_orig++;
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
@@ -81,9 +82,9 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 'p':
-				offset = atoi(optarg);
-				if (offset % 512) {
-					printf("offset must be multiple of 512\n");
+				pos = atoi(optarg);
+				if (pos % 512) {
+					printf("pos must be multiple of 512\n");
 					exit(0);
 				}
 				break;
@@ -91,7 +92,7 @@ int main(int argc, char **argv)
 				multi_vectors = 1;
 				break;
 			case 'a':
-				wr_flags |= RWF_ATOMIC;
+				rw_flags |= RWF_ATOMIC;
 				break;
 			case 'd':
 				o_flags |= O_DIRECT;
@@ -171,7 +172,7 @@ int main(int argc, char **argv)
 	if (!buffers)
 		return -1;
 
-	printf("file=%s write_size=%d offset=%d o_flags=0x%x wr_flags=0x%x multi_vector_alloc_size=%d\n", file, write_size, offset, o_flags, wr_flags, multi_vector_alloc_size);
+	printf("file=%s write_size=%d pos=%d o_flags=0x%x rw_flags=0x%x multi_vector_alloc_size=%d\n", file, write_size, pos, o_flags, rw_flags, multi_vector_alloc_size);
 	fd = open(file, o_flags, 777);
 	if (fd < 0) {
 		printf("could not open %s\n", file);
@@ -182,9 +183,10 @@ int main(int argc, char **argv)
 		buffers[i] = NULL;
 
 	if (multi_vectors == 0) {
-		unsigned char *ptr = buffers[0] = malloc(write_size);
+		posix_memalign(&buffers[0], 4096, write_size);
 		if (!buffers[0])
 			return -1;
+		unsigned char *ptr = buffers[0];
 		for (byte_index = 0; byte_index < write_size; byte_index++, ptr++) {
 			*ptr = rand();
 		}
@@ -259,19 +261,58 @@ do_write:
 			printf("iov[%d].iov_base=0x%x, .iov_len=%d offset=%d\n", 
 				i, iov[i].iov_base, iov[i].iov_len, iov[i].iov_base - buffers[i]);
 	}
-	written = pwritev2(fd, iov, vectors, offset, wr_flags);
-	printf("wrote %zd bytes at offset %zd\n", written, offset);
+	written = pwritev2(fd, iov, vectors, pos, rw_flags);
+	printf("wrote %zd bytes at pos %zd write_size=%d\n", written, pos, write_size);
 	if (written == write_size) {
 		ret = 0;
 	} else {
 		ret = -1;
+		goto end;
 	}
 
+	read_buffer = malloc(write_size);
+	if (!read_buffer) {
+		printf("could not alloc read buffer\n");
+		return -1;
+	}
+	struct iovec iov_read = {
+		.iov_base = read_buffer,
+		.iov_len = write_size,
+	};
+	int dataread = preadv2(fd, &iov_read, 1, pos, 0);
+	if (dataread == write_size) {
+		ret = 0;
+	} else {
+		printf("read incorrect amount of data, wanted=%d got=%d\n", write_size, dataread);
+		return -1;
+	}
+
+	remain = write_size;
+	char *read_data = read_buffer;
+	for (i = 0; i < vectors; i++) {
+		char *tmp_buf = iov[i].iov_base;
+		if (memcmp(read_data, tmp_buf, iov[i].iov_len)) {
+			int incorrect_pos = 0;
+
+			for (;;) {
+				if (*read_data != *tmp_buf)
+					break;
+				incorrect_pos++;
+			}
+			printf("read back incorrect data for vector=%d wanted for pos %d [%d] vs got [%d] iov[i].iov_len=%ld\n", i, incorrect_pos,
+				*tmp_buf, *read_data, iov[i].iov_len);
+			return -1;
+		}
+		read_data += iov[i].iov_len;
+	}
+	printf("read back and compared ok data, wanted size=%d got=%d\n", write_size, dataread);
+end:
 	close(fd);
 	for (i = 0; i < max_vectors; i++)
 		free(buffers[i]);
 	free(buffers);
 	free(iov);
+	free(read_buffer);
 	
 	return 0;
 }
