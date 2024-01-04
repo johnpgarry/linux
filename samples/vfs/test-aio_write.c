@@ -35,7 +35,7 @@ struct statx_timestamp;
 #define __NR_statx -1
 #endif
 
-#include <aio.h>
+#include <libaio.h>
 
 #define DEFAULT_WRITE_SIZE 1024
 #define RWF_ATOMIC      (0x00000020)
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	void **buffers;
 	ssize_t written;
 	int fd;
-	int wr_flags = RWF_SYNC;
+	int rw_flags = RWF_SYNC;
 	int o_flags = O_RDWR;
 	off_t offset = 0;
 	int opt = 0;
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 				multi_vectors = 1;
 				break;
 			case 'a':
-				wr_flags |= RWF_ATOMIC;
+				rw_flags |= RWF_ATOMIC;
 				break;
 			case 'd':
 				o_flags |= O_DIRECT;
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 	if (!buffers)
 		return -1;
 
-	printf("file=%s write_size=%d offset=%d o_flags=0x%x wr_flags=0x%x multi_vector_alloc_size=%d\n", file, write_size, offset, o_flags, wr_flags, multi_vector_alloc_size);
+	printf("file=%s write_size=%d offset=%d o_flags=0x%x wr_flags=0x%x multi_vector_alloc_size=%d\n", file, write_size, offset, o_flags, rw_flags, multi_vector_alloc_size);
 	fd = open(file, o_flags, 777);
 	if (fd < 0) {
 		printf("could not open %s\n", file);
@@ -263,34 +263,33 @@ do_write:
 	}
 
 	{
-		struct aiocb op = {
-			//.aio_rw_flags = wr_flags,
-			.aio_fildes = fd,
-			.aio_offset = 0,
-			.aio_buf = buffers[0],
-			.aio_nbytes = write_size,
-			.aio_sigevent.sigev_notify = SIGEV_NONE,
-		};
-	
-		printf("calling aio_write op.aio_buf=%d, aio_nbytes=%d, aio_fildes=%d\n", op.aio_buf, op.aio_nbytes, op.aio_fildes);
-		int ret = aio_write(&op);
-		printf("called aio_write ret=%d\n", ret);
+		io_context_t ctx = 0;
+		int bytes_read;
+		printf("calling io_setup\n");
+		int r = io_setup(100, &ctx);
+		printf("called io_setup r=%d\n", r);
 
-		// wait until everything is done
-		{
-			const struct aiocb *aiolist[1];
-			aiolist[0] = &op;
 
-			printf("calling aio_suspend\n");
-			int ret = aio_suspend(aiolist, 1, NULL);
-			printf("called aio_suspend ret=%d\n", ret);
+		char buf[4096];
+		struct iocb cb;
+		struct iocb *list_of_iocb[1] = {&cb};
+		printf("calling io_prep_pwrite\n");
+		io_prep_pwrite(&cb, fd, buf, sizeof(buf), offset);
+		printf("called io_prep_pwrite\n");
+		cb.__pad2 |= rw_flags;
 
-			// report possible errors
-			{
-				ret = aio_error(&op);
-				printf("aio_error ret=%d\n", ret);
-			}
-		}
+		printf("calling io_submit\n");
+		struct iocb* iocbs = &cb;
+		r = io_submit(ctx, 1, &iocbs);
+		printf("called io_submit, r=%d\n", r);
+
+
+		struct io_event events[1] = {{0}};
+		r = io_getevents(ctx, 1, 1, events, NULL);
+		printf("called io_getevents r=%d\n", r);
+
+		bytes_read = events[0].res;
+		printf("bytes_read=%d\n", bytes_read);
 	}
 
 	printf("wrote %zd bytes at offset %zd\n", written, offset);
