@@ -1878,6 +1878,7 @@ void __scsi_init_queue(struct Scsi_Host *shost, struct request_queue *q)
 	/*
 	 * this limit is imposed by hardware restrictions
 	 */
+	pr_err("%s q=%pS\n", __func__, q);
 	blk_queue_max_segments(q, min_t(unsigned short, shost->sg_tablesize,
 					SG_MAX_SEGMENTS));
 
@@ -1893,7 +1894,7 @@ void __scsi_init_queue(struct Scsi_Host *shost, struct request_queue *q)
 	blk_queue_segment_boundary(q, shost->dma_boundary);
 	dma_set_seg_boundary(dev, shost->dma_boundary);
 
-	pr_err("%s shost->max_segment_size=%d q=%pS\n", __func__, shost->max_segment_size, q);
+	pr_err("%s2 shost->max_segment_size=%d q=%pS shost->max_sectors=max_sectors=%d\n", __func__, shost->max_segment_size, q, shost->max_sectors);
 	blk_queue_max_segment_size(q, shost->max_segment_size);
 	blk_queue_virt_boundary(q, shost->virt_boundary_mask);
 	dma_set_max_seg_size(dev, queue_max_segment_size(q));
