@@ -3339,6 +3339,8 @@ xfs_bmap_compute_alignments(
 	else if (mp->m_dalign)
 		stripe_align = mp->m_dalign;
 
+	pr_err("%s ap->ip=%pS xfs_inode_atomicwrites=%d xfs_inode_atomicwrites=%d\n",
+		__func__, ap->ip, xfs_inode_atomicwrites(ap->ip), xfs_inode_atomicwrites(ap->ip));
 	if (ap->flags & XFS_BMAPI_COWFORK)
 		align = xfs_get_cowextsz_hint(ap->ip);
 	else if (ap->datatype & XFS_ALLOC_USERDATA)
@@ -3348,7 +3350,12 @@ xfs_bmap_compute_alignments(
 	 * xfs_get_cowextsz_hint() returns extsz_hint for when forcealign is
 	 * set as forcealign and cowextsz_hint are mutually exclusive
 	 */
-	if (xfs_inode_forcealign(ap->ip) && align) {
+	if (xfs_inode_atomicwrites(ap->ip) && align) {
+		pr_err("%s2 ap->ip=%pS atomicwrites align=%d\n", __func__, ap->ip, align);
+		args->alignment = align;
+		if (stripe_align % align)
+			stripe_align = align;
+	} else if (xfs_inode_forcealign(ap->ip) && align) {
 		args->alignment = align;
 		if (stripe_align % align)
 			stripe_align = align;

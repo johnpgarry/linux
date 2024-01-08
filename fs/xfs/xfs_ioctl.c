@@ -996,6 +996,8 @@ xfs_fill_fsxattr(
 
 	fileattr_fill_xflags(fa, xfs_ip2xflags(ip));
 
+	pr_err("%s ip=%pS fa->flags=0x%x, fsx_xflags=0x%x\n", __func__, ip, fa->flags, fa->fsx_xflags);
+
 	if (ip->i_diflags & XFS_DIFLAG_EXTSIZE) {
 		fa->fsx_extsize = XFS_FSB_TO_B(mp, ip->i_extsize);
 	} else if (ip->i_diflags & XFS_DIFLAG_EXTSZINHERIT) {
@@ -1016,11 +1018,17 @@ xfs_fill_fsxattr(
 
 	if (ip->i_diflags2 & XFS_DIFLAG2_COWEXTSIZE)
 		fa->fsx_cowextsize = XFS_FSB_TO_B(mp, ip->i_cowextsize);
+
+	if (ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES)
+		fa->fsx_atomicwrites_size = XFS_FSB_TO_B(mp, ip->i_atomicwrites_size);
+
 	fa->fsx_projid = ip->i_projid;
 	if (ifp && !xfs_need_iread_extents(ifp))
 		fa->fsx_nextents = xfs_iext_count(ifp);
 	else
 		fa->fsx_nextents = xfs_ifork_nextents(ifp);
+
+	pr_err("%s10 ip=%pS fa->flags=0x%x, fsx_xflags=0x%x\n", __func__, ip, fa->flags, fa->fsx_xflags);
 }
 
 STATIC int
@@ -1114,6 +1122,9 @@ xfs_flags2diflags2(
 			WARN_ON_ONCE(1);
 		di_flags2 |= XFS_DIFLAG2_FORCEALIGN;
 	}
+	if (xflags & FS_XFLAG_ATOMICWRITES) {
+		di_flags2 |= XFS_DIFLAG2_ATOMICWRITES;
+	}
 
 	return di_flags2;
 }
@@ -1165,6 +1176,21 @@ xfs_ioctl_setattr_xflags(
 			return -EINVAL;
 		if (fa->fsx_xflags & FS_XFLAG_REALTIME)
 			return -EINVAL;
+	}
+
+	if (fa->fsx_xflags & FS_XFLAG_ATOMICWRITES) {
+		pr_err("%s FS_XFLAG_ATOMICWRITES\n", __func__);
+		/*
+		if (!xfs_has_forcealign(mp))
+			return -EINVAL;
+		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE)
+			return -EINVAL;
+		if (!(fa->fsx_xflags & (FS_XFLAG_EXTSIZE |
+					FS_XFLAG_EXTSZINHERIT)))
+			return -EINVAL;
+		if (fa->fsx_xflags & FS_XFLAG_REALTIME)
+			return -EINVAL;
+		*/
 	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
@@ -1342,6 +1368,8 @@ xfs_fileattr_set(
 
 	trace_xfs_ioctl_setattr(ip);
 
+	pr_err("%s ip=%pS fa->flags=0x%x, fsx_xflags=0x%x, fsx_atomicwrites_size=%d\n", __func__, ip, fa->flags, fa->fsx_xflags, fa->fsx_atomicwrites_size);
+
 	if (d_is_special(dentry))
 		return -ENOTTY;
 
@@ -1420,10 +1448,20 @@ xfs_fileattr_set(
 	 * extent size hint should be set on the inode. If no extent size flags
 	 * are set on the inode then unconditionally clear the extent size hint.
 	 */
-	if (ip->i_diflags & (XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT))
+	pr_err("%s ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES=%d\n", __func__, !!(ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES));
+	if (ip->i_diflags & (XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT)) {
 		ip->i_extsize = XFS_B_TO_FSB(mp, fa->fsx_extsize);
-	else
+		pr_err("%s2 setting i_extsize=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set\n", __func__, ip->i_extsize);
+	} else {
 		ip->i_extsize = 0;
+	}
+
+	if (ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		ip->i_atomicwrites_size = XFS_B_TO_FSB(mp, fa->fsx_atomicwrites_size);
+		pr_err("%s3 setting i_atomicwrites_size=%d\n", __func__, ip->i_atomicwrites_size);
+	} else {
+		ip->i_atomicwrites_size = 0;
+	}
 
 	if (xfs_has_v3inodes(mp)) {
 		if (ip->i_diflags2 & XFS_DIFLAG2_COWEXTSIZE)
@@ -1441,6 +1479,7 @@ skip_xattr:
 	xfs_qm_dqrele(olddquot);
 	xfs_qm_dqrele(pdqp);
 
+	pr_err("%s10 i_atomicwrites_size=%d xfs_has_v3inodes=%d\n", __func__, ip->i_atomicwrites_size, xfs_has_v3inodes(mp));
 	return error;
 
 error_trans_cancel:

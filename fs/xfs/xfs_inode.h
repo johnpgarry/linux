@@ -63,6 +63,7 @@ typedef struct xfs_inode {
 		xfs_extlen_t	i_cowextsize;	/* basic cow extent size */
 		uint16_t	i_flushiter;	/* incremented on flush */
 	};
+
 	uint8_t			i_forkoff;	/* attr fork offset >> 3 */
 	uint16_t		i_diflags;	/* XFS_DIFLAG_... */
 	uint64_t		i_diflags2;	/* XFS_DIFLAG2_... */
@@ -92,6 +93,7 @@ typedef struct xfs_inode {
 	spinlock_t		i_ioend_lock;
 	struct work_struct	i_ioend_work;
 	struct list_head	i_ioend_list;
+	uint16_t		i_atomicwrites_size;
 } xfs_inode_t;
 
 static inline bool xfs_inode_on_unlinked_list(const struct xfs_inode *ip)
@@ -308,6 +310,11 @@ static inline bool xfs_inode_has_large_extent_counts(struct xfs_inode *ip)
 static inline bool xfs_inode_forcealign(struct xfs_inode *ip)
 {
 	return ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN;
+}
+
+static inline bool xfs_inode_atomicwrites(struct xfs_inode *ip)
+{
+	return ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES;
 }
 
 /*
@@ -549,6 +556,7 @@ void		xfs_lock_two_inodes(struct xfs_inode *ip0, uint ip0_mode,
 xfs_extlen_t	xfs_get_extsz_hint(struct xfs_inode *ip);
 xfs_extlen_t	xfs_get_extsz(struct xfs_inode *ip);
 xfs_extlen_t	xfs_get_cowextsz_hint(struct xfs_inode *ip);
+xfs_extlen_t	xfs_get_atomicwrites_size(struct xfs_inode *ip);
 
 int xfs_init_new_inode(struct mnt_idmap *idmap, struct xfs_trans *tp,
 		struct xfs_inode *pip, xfs_ino_t ino, umode_t mode,

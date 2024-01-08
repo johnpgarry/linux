@@ -118,7 +118,8 @@ struct fsxattr {
 	__u32		fsx_nextents;	/* nextents field value (get)	*/
 	__u32		fsx_projid;	/* project identifier (get/set) */
 	__u32		fsx_cowextsize;	/* CoW extsize field value (get/set)*/
-	unsigned char	fsx_pad[8];
+	__u32		fsx_atomicwrites_size; /* unit max */
+	unsigned char	fsx_pad[4];
 };
 
 /*
@@ -142,7 +143,7 @@ struct fsxattr {
 #define FS_XFLAG_COWEXTSIZE	0x00010000	/* CoW extent size allocator hint */
 /* data extent mappings for regular files must be aligned to extent size hint */
 #define FS_XFLAG_FORCEALIGN	0x00020000
-#define FS_XFLAG_ATOMIC_WRITES	0x00040000
+#define FS_XFLAG_ATOMICWRITES	0x00040000
 #define FS_XFLAG_HASATTR	0x80000000	/* no DIFLAG for this	*/
 
 /* the read-only stuff doesn't really belong here, but any other place is

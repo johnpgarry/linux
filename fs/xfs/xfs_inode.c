@@ -58,6 +58,11 @@ xfs_get_extsz_hint(
 	 */
 	if (xfs_is_always_cow_inode(ip))
 		return 0;
+	pr_err("%s XFS_DIFLAG_EXTSIZE=%d i_extsize=%d xfs_inode_atomicwrites=%d xfs_get_atomicwrites_size=%d\n",
+		__func__, !!(ip->i_diflags & XFS_DIFLAG_EXTSIZE), ip->i_extsize, xfs_inode_atomicwrites(ip), xfs_get_atomicwrites_size(ip));
+	if (xfs_inode_atomicwrites(ip))
+		return xfs_get_atomicwrites_size(ip);
+
 	if ((ip->i_diflags & XFS_DIFLAG_EXTSIZE) && ip->i_extsize)
 		return ip->i_extsize;
 	if (XFS_IS_REALTIME_INODE(ip))
@@ -112,6 +117,15 @@ xfs_get_cowextsz_hint(
 	if (a == 0)
 		return XFS_DEFAULT_COWEXTSZ_HINT;
 	return a;
+}
+
+xfs_extlen_t
+xfs_get_atomicwrites_size(
+	struct xfs_inode	*ip)
+{
+	pr_err("%s ip=%pS i_atomicwrites_size=%d\n", __func__, ip, ip->i_atomicwrites_size);
+
+	return ip->i_atomicwrites_size;
 }
 
 /*
