@@ -299,10 +299,13 @@ struct queue_limits {
 	unsigned int		discard_alignment;
 	unsigned int		zone_write_granularity;
 
-	unsigned int		atomic_write_boundary_sectors;
 	unsigned int		atomic_write_max_sectors;
+	unsigned int		atomic_write_hw_max_sectors;
+	unsigned int		atomic_write_hw_boundary_sectors;
 	unsigned int		atomic_write_unit_min_sectors;
+	unsigned int		atomic_write_hw_unit_min_sectors;
 	unsigned int		atomic_write_unit_max_sectors;
+	unsigned int		atomic_write_hw_unit_max_sectors;
 
 	unsigned short		max_segments;
 	unsigned short		max_integrity_segments;
@@ -1319,7 +1322,7 @@ queue_atomic_write_unit_min_bytes(const struct request_queue *q)
 static inline unsigned int
 queue_atomic_write_boundary_bytes(const struct request_queue *q)
 {
-	return q->limits.atomic_write_boundary_sectors << SECTOR_SHIFT;
+	return q->limits.atomic_write_hw_boundary_sectors << SECTOR_SHIFT;
 }
 
 static inline unsigned int
