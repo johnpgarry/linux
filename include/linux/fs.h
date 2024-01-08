@@ -3542,6 +3542,7 @@ extern int vfs_fadvise(struct file *file, loff_t offset, loff_t len,
 extern int generic_fadvise(struct file *file, loff_t offset, loff_t len,
 			   int advice);
 extern bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, unsigned int max_vecs, loff_t pos, struct iov_iter *iter);
+extern bool is_atomic_write_valid2(unsigned int unit_min, unsigned int unit_max, loff_t pos, loff_t length);
 
 
 

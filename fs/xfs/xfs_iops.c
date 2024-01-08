@@ -551,7 +551,7 @@ void xfs_get_atomic_write_attr(
 	unsigned int *unit_min,
 	unsigned int *unit_max)
 {
-	xfs_extlen_t		extsz = xfs_get_extsz(ip);
+	xfs_extlen_t		extsz = xfs_get_atomicwrites_size(ip);
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct block_device	*bdev = target->bt_bdev;
 
@@ -571,7 +571,7 @@ void xfs_get_atomic_write_attr(
 
 	align = XFS_FSB_TO_B(mp, extsz);
 
-	if (!awu_max || !is_power_of_2(align)) {
+	if (!awu_max || !xfs_inode_atomicwrites(ip) || !align || !is_power_of_2(align)) {
 		*unit_min = 0;
 		*unit_max = 0;
 	} else {
