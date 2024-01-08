@@ -814,8 +814,8 @@ xfs_direct_write_iomap_begin(
 	if (error)
 		goto out_unlock;
 
-	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__,
-		offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
+	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld IOMAP_ATOMIC_WRITE=%d\n", __func__,
+		offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, !!(flags & IOMAP_ATOMIC_WRITE));
 	if (flags & IOMAP_ATOMIC_WRITE) {
 		unsigned int unit_min, unit_max;
 
@@ -833,21 +833,19 @@ xfs_direct_write_iomap_begin(
 		 * atomic write rules then offset and length will be at block-aligned/
 		 * multiple.
 		 */
-		#ifdef dsddsd
-		if (!is_atomic_write_valid(unit_min, unit_max,
-			XFS_FSB_TO_B(mp, imap.br_startblock), /* offset, */
+		// bool is_atomic_write_valid(unsigned int unit_min, unsigned int unit_max, unsigned int max_vecs, loff_t pos, struct iov_iter *iter)
+		//if (!is_atomic_write_valid2(unit_min, unit_max, XFS_FSB_TO_B(mp, imap.br_startblock), XFS_FSB_TO_B(mp, imap.br_blockcount))) {
+		if (!is_atomic_write_valid2(unit_min, unit_max, offset, length)) {
 
-
-			// sector = (iomap->addr + pos - iomap->offset) >> SECTOR_SHIFT;
-			// iomap->addr = BBTOB(xfs_fsb_to_db(ip, imap->br_startblock));
-			// iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
+			//sector = (iomap->addr + pos - iomap->offset) >> SECTOR_SHIFT;
+			//iomap->addr = BBTOB(xfs_fsb_to_db(ip, imap->br_startblock));
+			//iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 			
-			XFS_FSB_TO_B(mp, imap.br_blockcount)/* length */)) {
+			//XFS_FSB_TO_B(mp, imap.br_blockcount)/* length */)) {
 			error =  -EINVAL;
 			pr_err("%s !is_atomic_write_valid\n", __func__);
 			goto out_unlock;
 		}
-		#endif
 	}
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
