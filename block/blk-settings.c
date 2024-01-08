@@ -142,6 +142,21 @@ static unsigned int blk_queue_max_guaranteed_bio_sectors(
 	#endif
 }
 
+void blk_atomic_writes_update_limits(struct request_queue *	q)
+{
+	struct queue_limits *limits = &q->limits;
+	unsigned int guaranteed_sectors =
+		blk_queue_max_guaranteed_bio_sectors(limits, q);
+	unsigned int max_hw_sectors = rounddown_pow_of_two(limits->max_hw_sectors);
+
+
+	limits->atomic_write_max_sectors = min(limits->atomic_write_hw_max_sectors, max_hw_sectors);
+	limits->atomic_write_unit_min_sectors = min3(guaranteed_sectors, limits->atomic_write_hw_unit_min_sectors, max_hw_sectors);
+	limits->atomic_write_unit_max_sectors = min3(guaranteed_sectors, limits->atomic_write_hw_unit_max_sectors, max_hw_sectors);
+	pr_err("%s q=%pS max_hw_sectors=%d atomic_write_hw_unit_max_sectors=%d atomic_write_unit_max_sectors=%d\n",
+		__func__, q, max_hw_sectors, limits->atomic_write_hw_unit_max_sectors, limits->atomic_write_unit_max_sectors);
+}
+
 /**
  * blk_queue_max_hw_sectors - set max sectors for a request for this queue
  * @q:  the request queue for the device
@@ -164,8 +179,7 @@ static unsigned int blk_queue_max_guaranteed_bio_sectors(
 void blk_queue_max_hw_sectors(struct request_queue *q, unsigned int max_hw_sectors)
 {
 	struct queue_limits *limits = &q->limits;
-	unsigned int max_sectors, guaranteed_sectors =
-		blk_queue_max_guaranteed_bio_sectors(limits, q);
+	unsigned int max_sectors;
 
 	if ((max_hw_sectors << 9) < PAGE_SIZE) {
 		max_hw_sectors = 1 << (PAGE_SHIFT - 9);
@@ -187,9 +201,9 @@ void blk_queue_max_hw_sectors(struct request_queue *q, unsigned int max_hw_secto
 				 limits->logical_block_size >> SECTOR_SHIFT);
 	limits->max_sectors = max_sectors;
 
-	limits->atomic_write_max_sectors = min(limits->atomic_write_hw_max_sectors, max_hw_sectors);
-	limits->atomic_write_unit_min_sectors = min3(guaranteed_sectors, limits->atomic_write_hw_unit_min_sectors, rounddown_pow_of_two(max_hw_sectors));
-	limits->atomic_write_unit_max_sectors = min3(guaranteed_sectors, limits->atomic_write_hw_unit_max_sectors, rounddown_pow_of_two(max_hw_sectors));
+
+	pr_err("%s q=%pS max_hw_sectors=%d calling blk_atomic_writes_update_limits\n", __func__, q, max_hw_sectors);
+	blk_atomic_writes_update_limits(q);
 
 	if (!q->disk)
 		return;
@@ -238,8 +252,7 @@ void blk_queue_atomic_write_max_bytes(struct request_queue *q,
 				      unsigned int bytes)
 {
 	q->limits.atomic_write_hw_max_sectors = bytes >> SECTOR_SHIFT;
-	q->limits.atomic_write_max_sectors = min(q->limits.atomic_write_hw_max_sectors,
-		q->limits.max_hw_sectors);
+	blk_atomic_writes_update_limits(q);
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_max_bytes);
 
@@ -265,12 +278,9 @@ EXPORT_SYMBOL(blk_queue_atomic_write_boundary_bytes);
 void blk_queue_atomic_write_unit_min_sectors(struct request_queue *q,
 					     unsigned int sectors)
 {
-	struct queue_limits *limits = &q->limits;
-	unsigned int guaranteed_sectors =
-		blk_queue_max_guaranteed_bio_sectors(limits, q);
 
-	limits->atomic_write_hw_unit_min_sectors = sectors;
-	limits->atomic_write_unit_min_sectors = min3(guaranteed_sectors, sectors, rounddown_pow_of_two(limits->max_hw_sectors));
+	q->limits.atomic_write_hw_unit_min_sectors = sectors;
+	blk_atomic_writes_update_limits(q);
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_unit_min_sectors);
 
@@ -283,12 +293,10 @@ EXPORT_SYMBOL(blk_queue_atomic_write_unit_min_sectors);
 void blk_queue_atomic_write_unit_max_sectors(struct request_queue *q,
 					     unsigned int sectors)
 {
-	struct queue_limits *limits = &q->limits;
-	unsigned int guaranteed_sectors =
-		blk_queue_max_guaranteed_bio_sectors(limits, q);
+	pr_err("%s q=%pS sectors=%d\n", __func__, q, sectors);
 
-	limits->atomic_write_hw_unit_max_sectors = sectors;
-	limits->atomic_write_unit_max_sectors = min3(guaranteed_sectors, sectors, rounddown_pow_of_two(limits->max_hw_sectors));
+	q->limits.atomic_write_hw_unit_max_sectors = sectors;
+	blk_atomic_writes_update_limits(q);
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_unit_max_sectors);
 

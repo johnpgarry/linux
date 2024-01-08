@@ -1955,6 +1955,7 @@ static void nvme_update_atomic_write_disk_info(struct gendisk *disk,
 	blk_queue_atomic_write_unit_min_sectors(q, unit_min >> SECTOR_SHIFT);
 	blk_queue_atomic_write_unit_max_sectors(q, unit_max >> SECTOR_SHIFT);
 	blk_queue_atomic_write_boundary_bytes(q, boundary);
+	pr_err("%s q=%pS\n", __func__, q);
 }
 
 static void nvme_update_disk_info(struct nvme_ctrl *ctrl, struct gendisk *disk,
