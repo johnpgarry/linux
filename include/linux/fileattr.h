@@ -12,7 +12,7 @@
 #define FS_XFLAG_COMMON \
 	(FS_XFLAG_SYNC | FS_XFLAG_IMMUTABLE | FS_XFLAG_APPEND | \
 	 FS_XFLAG_NODUMP | FS_XFLAG_NOATIME | FS_XFLAG_DAX | \
-	 FS_XFLAG_PROJINHERIT | FS_XFLAG_ATOMIC_WRITES)
+	 FS_XFLAG_PROJINHERIT | FS_XFLAG_ATOMICWRITES)
 
 /*
  * Merged interface for miscellaneous file attributes.  'flags' originates from
@@ -28,6 +28,7 @@ struct fileattr {
 	u32	fsx_nextents;	/* nextents field value (get)	*/
 	u32	fsx_projid;	/* project identifier (get/set) */
 	u32	fsx_cowextsize;	/* CoW extsize field value (get/set)*/
+	u32	fsx_atomicwrites_size;	/* CoW extsize field value (get/set)*/
 	/* selectors: */
 	bool	flags_valid:1;
 	bool	fsx_valid:1;

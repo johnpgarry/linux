@@ -551,6 +551,10 @@ int copy_fsxattr_to_user(const struct fileattr *fa, struct fsxattr __user *ufa)
 	xfa.fsx_nextents = fa->fsx_nextents;
 	xfa.fsx_projid = fa->fsx_projid;
 	xfa.fsx_cowextsize = fa->fsx_cowextsize;
+	xfa.fsx_atomicwrites_size = fa->fsx_atomicwrites_size;
+
+	pr_err("%s2 fa->flags=0x%x, fsx_xflags=0x%x, fsx_extsize=%d, fsx_atomicwrites_size=%d\n",
+		__func__, fa->flags, fa->fsx_xflags, fa->fsx_extsize, fa->fsx_atomicwrites_size);
 
 	if (copy_to_user(ufa, &xfa, sizeof(xfa)))
 		return -EFAULT;
@@ -566,12 +570,15 @@ static int copy_fsxattr_from_user(struct fileattr *fa,
 
 	if (copy_from_user(&xfa, ufa, sizeof(xfa)))
 		return -EFAULT;
+	pr_err("%s1 fsx_xflags=0x%x, fsx_extsize=%d, fsx_atomicwrites_size=%d\n", __func__, xfa.fsx_xflags, xfa.fsx_extsize, xfa.fsx_atomicwrites_size);
 
 	fileattr_fill_xflags(fa, xfa.fsx_xflags);
 	fa->fsx_extsize = xfa.fsx_extsize;
 	fa->fsx_nextents = xfa.fsx_nextents;
 	fa->fsx_projid = xfa.fsx_projid;
 	fa->fsx_cowextsize = xfa.fsx_cowextsize;
+	fa->fsx_atomicwrites_size = xfa.fsx_atomicwrites_size;
+	pr_err("%s2 fa->flags=0x%x, fsx_xflags=0x%x, fsx_extsize=%d, fsx_atomicwrites_size=%d\n", __func__, fa->flags, fa->fsx_xflags, fa->fsx_extsize, fa->fsx_atomicwrites_size);
 
 	return 0;
 }
@@ -686,6 +693,7 @@ int vfs_fileattr_set(struct mnt_idmap *idmap, struct dentry *dentry,
 		if (fa->flags_valid) {
 			fa->fsx_xflags |= old_ma.fsx_xflags & ~FS_XFLAG_COMMON;
 			fa->fsx_extsize = old_ma.fsx_extsize;
+			pr_err("%s fa->fsx_extsize=%d\n", __func__, fa->fsx_extsize);
 			fa->fsx_nextents = old_ma.fsx_nextents;
 			fa->fsx_projid = old_ma.fsx_projid;
 			fa->fsx_cowextsize = old_ma.fsx_cowextsize;
