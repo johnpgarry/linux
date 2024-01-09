@@ -673,6 +673,9 @@ xfs_ip2xflags(
 			WARN_ON_ONCE(1);
 			flags |= FS_XFLAG_FORCEALIGN;
 		}
+		if (ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES) {
+			flags |= FS_XFLAG_ATOMICWRITES;
+		}
 	}
 
 	if (xfs_inode_has_attr_fork(ip))
