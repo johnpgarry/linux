@@ -252,11 +252,11 @@ xfs_iomap_write_direct(
 	int			error;
 	int			bmapi_flags = XFS_BMAPI_PREALLOC;
 	int			nr_exts = XFS_IEXT_ADD_NOSPLIT_CNT;
-
 	ASSERT(count_fsb > 0);
 
 	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
 					   xfs_get_extsz_hint(ip));
+	pr_err("%s offset_fsb=%lld count_fsb=%lld resaligned=%lld\n", __func__, offset_fsb, count_fsb, resaligned);
 	if (unlikely(XFS_IS_REALTIME_INODE(ip))) {
 		dblocks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
 		rblocks = resaligned;
@@ -564,6 +564,7 @@ xfs_iomap_write_unwritten(
 	uint		resblks;
 	int		error;
 
+	pr_err("%s offset=%lld count=%lld\n", __func__, offset, count);
 	trace_xfs_unwritten_convert(ip, offset, count);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -824,6 +825,7 @@ xfs_direct_write_iomap_begin(
 		/* We should only iter once so ensure that our mapping covers the range */
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
 			error = -EINVAL;
+			pr_err("%s2 !imap_spans_range\n", __func__);
 			goto out_unlock;
 		}
 
@@ -843,7 +845,7 @@ xfs_direct_write_iomap_begin(
 			
 			//XFS_FSB_TO_B(mp, imap.br_blockcount)/* length */)) {
 			error =  -EINVAL;
-			pr_err("%s !is_atomic_write_valid\n", __func__);
+			pr_err("%s3 !is_atomic_write_valid\n", __func__);
 			goto out_unlock;
 		}
 	}
@@ -921,6 +923,8 @@ allocate_blocks:
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
 	xfs_iunlock(ip, lockmode);
 
+	pr_err("%s4 offset_fsb=%lld end_fsb=%lld - offset_fsb=%lld=%lld\n", __func__,
+		offset_fsb, end_fsb, offset_fsb, end_fsb - offset_fsb);
 	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
 			flags, &imap, &seq);
 	if (error)

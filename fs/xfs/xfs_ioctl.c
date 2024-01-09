@@ -1037,11 +1037,13 @@ xfs_ioc_fsgetxattra(
 	void			__user *arg)
 {
 	struct fileattr		fa;
+	pr_err("%s ip=%pS\n", __func__, ip);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	xfs_fill_fsxattr(ip, XFS_ATTR_FORK, &fa);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
+	pr_err("%s2 ip=%pS fa.flags=0x%x, fsx_xflags=0x%x\n", __func__, ip, fa.flags, fa.fsx_xflags);
 	return copy_fsxattr_to_user(&fa, arg);
 }
 
@@ -1051,6 +1053,7 @@ xfs_fileattr_get(
 	struct fileattr		*fa)
 {
 	struct xfs_inode	*ip = XFS_I(d_inode(dentry));
+	pr_err("%s ip=%pS\n", __func__, ip);
 
 	if (d_is_special(dentry))
 		return -ENOTTY;
@@ -1058,6 +1061,7 @@ xfs_fileattr_get(
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	xfs_fill_fsxattr(ip, XFS_DATA_FORK, fa);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	pr_err("%s2 ip=%pS fa->flags=0x%x, fsx_xflags=0x%x\n", __func__, ip, fa->flags, fa->fsx_xflags);
 
 	return 0;
 }

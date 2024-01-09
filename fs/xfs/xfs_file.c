@@ -1228,8 +1228,10 @@ xfs_file_open(
 	struct inode	*inode,
 	struct file	*file)
 {
+	struct xfs_inode *ip = XFS_I(inode);
 	if (xfs_is_shutdown(XFS_M(inode->i_sb)))
 		return -EIO;
+	//pr_err("%s file=%pS inode=%pS ip=%pS xfs_inode_atomicwrites=%d\n", __func__, file, inode, ip, xfs_inode_atomicwrites(ip));
 	file->f_mode |= FMODE_NOWAIT | FMODE_BUF_RASYNC | FMODE_BUF_WASYNC |
 			FMODE_DIO_PARALLEL_WRITE | FMODE_CAN_ODIRECT;
 	if (xfs_inode_atomicwrites(ip))
