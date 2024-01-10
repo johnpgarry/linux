@@ -380,6 +380,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		if (dio->error) {
 			iov_iter_revert(dio->submit.iter, copied);
 			copied = ret = 0;
+			pr_err("%s2YYY error\n", __func__);
 			goto out;
 		}
 
@@ -420,15 +421,17 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			 * the block we haven't written data to.
 			 */
 			bio_put(bio);
+			pr_err("%s2XXX error\n", __func__);
 			goto zero_tail;
 		}
 
 		n = bio->bi_iter.bi_size;
 		if (atomic_write && n != iter_len) {
 			/* This bio should have covered the complete length */
-			ret = -EINVAL;
-			bio_put(bio);
-			goto out;
+		//	ret = -EINVAL;
+			pr_err("%s2.x atomic=1, n=%zd != iter_len=%zd\n", __func__, n, iter_len);
+	//		bio_put(bio);
+		//	goto out;
 		}
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);
@@ -450,6 +453,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		iomap_dio_submit_bio(iter, dio, bio, pos);
 		pos += n;
 	} while (nr_pages);
+	if (atomic_write)
+		pr_err("%s3 atomic=1\n", __func__);
 
 	/*
 	 * We need to zeroout the tail of a sub-block write if the extent type

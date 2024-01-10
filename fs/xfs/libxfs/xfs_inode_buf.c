@@ -796,24 +796,34 @@ xfs_inode_validate_forcealign(
 	uint32_t		cowextsize)
 {
 	/* superblock rocompat feature flag */
-	if (!xfs_has_forcealign(mp))
+	if (!xfs_has_forcealign(mp)) {
+		pr_err("%s error xfs_has_forcealign\n", __func__);
 		return __this_address;
+	}
 
 	/* Only regular files and directories */
-	if (!S_ISDIR(mode) && !S_ISREG(mode))
+	if (!S_ISDIR(mode) && !S_ISREG(mode)) {
+		pr_err("%s error !S_ISDIR(mode) && !S_ISREG(mode)\n", __func__);
 		return __this_address;
+	}
 
 	/* Doesn't apply to realtime files */
-	if (flags & XFS_DIFLAG_REALTIME)
+	if (flags & XFS_DIFLAG_REALTIME) {
+		pr_err("%s error XFS_DIFLAG_REALTIME\n", __func__);
 		return __this_address;
+	}
 
 	/* Requires a nonzero extent size hint */
-	if (extsize == 0)
+	if (extsize == 0) {
+		pr_err("%s error extsize == 0\n", __func__);
 		return __this_address;
+	}
 
 	/* Requires no cow extent size hint */
-	if (cowextsize != 0)
+	if (cowextsize != 0) {
+		pr_err("%s error cowextsize == 0\n", __func__);
 		return __this_address;
+	}
 
 	return NULL;
 }

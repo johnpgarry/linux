@@ -4470,13 +4470,20 @@ xfs_bmapi_write(
 	if (error)
 		goto error0;
 
+	pr_err("%s1 bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &bma.icur, &bma.got))
 		eof = true;
 	if (!xfs_iext_peek_prev_extent(ifp, &bma.icur, &bma.prev))
 		bma.prev.br_startoff = NULLFILEOFF;
 	bma.minleft = xfs_bmapi_minleft(tp, ip, whichfork);
 
-	pr_err("%s2 bma.length=%d, minlen=%d, total=%d len=%lld\n", __func__, bma.length, bma.minlen, bma.total, len);
+	pr_err("%s2 bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 	n = 0;
 	end = bno + len;
 	obno = bno;
@@ -4554,15 +4561,23 @@ xfs_bmapi_write(
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
+		pr_err("%s5.1 mval->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
+			__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount);
 		xfs_bmapi_trim_map(mval, &bma.got, &bno, len, obno,
 							end, n, flags);
 		pr_err("%s6 bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
+		pr_err("%s6.1 mval->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
+			__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount);
 
 		/* Execute unwritten extent conversion if necessary */
-		error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
+		//if (xfs_inode_atomicwrites(ip))
+	//		error = 0;
+	//	else
+			error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
+
 		pr_err("%s7 bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,

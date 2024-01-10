@@ -153,8 +153,8 @@ void blk_atomic_writes_update_limits(struct request_queue *	q)
 	limits->atomic_write_max_sectors = min(limits->atomic_write_hw_max_sectors, max_hw_sectors);
 	limits->atomic_write_unit_min_sectors = min3(guaranteed_sectors, limits->atomic_write_hw_unit_min_sectors, max_hw_sectors);
 	limits->atomic_write_unit_max_sectors = min3(guaranteed_sectors, limits->atomic_write_hw_unit_max_sectors, max_hw_sectors);
-	pr_err("%s q=%pS max_hw_sectors=%d atomic_write_hw_unit_max_sectors=%d atomic_write_unit_max_sectors=%d\n",
-		__func__, q, max_hw_sectors, limits->atomic_write_hw_unit_max_sectors, limits->atomic_write_unit_max_sectors);
+	pr_err("%s q=%pS max_hw_sectors=%d atomic_write_hw_unit_max_sectors=%d atomic_write_unit_max_sectors=%d limits->max_hw_sectors=%d\n",
+		__func__, q, max_hw_sectors, limits->atomic_write_hw_unit_max_sectors, limits->atomic_write_unit_max_sectors, limits->max_hw_sectors);
 }
 
 /**

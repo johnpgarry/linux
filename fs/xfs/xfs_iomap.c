@@ -564,7 +564,8 @@ xfs_iomap_write_unwritten(
 	uint		resblks;
 	int		error;
 
-	pr_err("%s offset=%lld count=%lld\n", __func__, offset, count);
+	pr_err("%s offset=%lld count=%lld xfs_inode_atomicwrites=%d\n", __func__, offset, count, xfs_inode_atomicwrites(ip));
+
 	trace_xfs_unwritten_convert(ip, offset, count);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -615,9 +616,24 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
+
+#if 0
+
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+#endif
+
+
+		pr_err("%s2 offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, blockcount=%lld\n",
+			__func__, offset, count, offset_fsb, count_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);
+		pr_err("%s3 offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, blockcount=%lld\n",
+			__func__, offset, count, offset_fsb, count_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 		if (error)
 			goto error_on_bmapi_transaction;
 
@@ -815,8 +831,8 @@ xfs_direct_write_iomap_begin(
 	if (error)
 		goto out_unlock;
 
-	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld IOMAP_ATOMIC_WRITE=%d\n", __func__,
-		offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, !!(flags & IOMAP_ATOMIC_WRITE));
+	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld IOMAP_ATOMIC_WRITE=%d nimaps=%d\n", __func__,
+		offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, !!(flags & IOMAP_ATOMIC_WRITE), nimaps);
 	if (flags & IOMAP_ATOMIC_WRITE) {
 		unsigned int unit_min, unit_max;
 
@@ -824,9 +840,9 @@ xfs_direct_write_iomap_begin(
 
 		/* We should only iter once so ensure that our mapping covers the range */
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
-			error = -EINVAL;
+		//	error = -EINVAL;
 			pr_err("%s2 !imap_spans_range\n", __func__);
-			goto out_unlock;
+		//	goto out_unlock;
 		}
 
 		/*
@@ -844,9 +860,9 @@ xfs_direct_write_iomap_begin(
 			//iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 			
 			//XFS_FSB_TO_B(mp, imap.br_blockcount)/* length */)) {
-			error =  -EINVAL;
+		//	error =  -EINVAL;
 			pr_err("%s3 !is_atomic_write_valid\n", __func__);
-			goto out_unlock;
+		//	goto out_unlock;
 		}
 	}
 

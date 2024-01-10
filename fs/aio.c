@@ -9,7 +9,6 @@
  *
  *	See ../COPYING for licensing terms.
  */
-#define pr_fmt(fmt) "%s: " fmt, __func__
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -1379,6 +1378,7 @@ SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
 	long ret;
+	pr_err("%s\n", __func__);
 
 	ret = get_user(ctx, ctxp);
 	if (unlikely(ret))
@@ -1410,6 +1410,7 @@ COMPAT_SYSCALL_DEFINE2(io_setup, unsigned, nr_events, u32 __user *, ctx32p)
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
 	long ret;
+	pr_err("%s\n", __func__);
 
 	ret = get_user(ctx, ctx32p);
 	if (unlikely(ret))
@@ -1446,6 +1447,7 @@ out:
 SYSCALL_DEFINE1(io_destroy, aio_context_t, ctx)
 {
 	struct kioctx *ioctx = lookup_ioctx(ctx);
+	pr_err("%s\n", __func__);
 	if (likely(NULL != ioctx)) {
 		struct ctx_rq_wait wait;
 		int ret;
@@ -1543,6 +1545,8 @@ static ssize_t aio_setup_rw(int rw, const struct iocb *iocb,
 	void __user *buf = (void __user *)(uintptr_t)iocb->aio_buf;
 	size_t len = iocb->aio_nbytes;
 
+	pr_err("%s rw=%d iocb=%pS (aio_rw_flags=0x%x) vectored=%d\n", __func__, rw, iocb, iocb->aio_rw_flags, vectored);
+
 	if (!vectored) {
 		ssize_t ret = import_ubuf(rw, buf, len, iter);
 		*iovec = NULL;
@@ -1607,7 +1611,9 @@ static int aio_write(struct kiocb *req, const struct iocb *iocb,
 	struct file *file;
 	int ret;
 
+
 	ret = aio_prep_rw(req, iocb);
+	pr_err("%s req=%pS iocb=%pS vectored=%d req->ki_pos=%lld\n", __func__, req, iocb, vectored, req->ki_pos);
 	if (ret)
 		return ret;
 	file = req->ki_filp;
@@ -1965,6 +1971,7 @@ static int __io_submit_one(struct kioctx *ctx, const struct iocb *iocb,
 			   bool compat)
 {
 	req->ki_filp = fget(iocb->aio_fildes);
+	pr_err("%s ctx=%pS iocb=%pS\n", __func__, ctx, iocb);
 	if (unlikely(!req->ki_filp))
 		return -EBADF;
 
@@ -1984,7 +1991,7 @@ static int __io_submit_one(struct kioctx *ctx, const struct iocb *iocb,
 	}
 
 	if (unlikely(put_user(KIOCB_KEY, &user_iocb->aio_key))) {
-		pr_debug("EFAULT: aio_key\n");
+		pr_err("EFAULT: aio_key\n");
 		return -EFAULT;
 	}
 
@@ -2009,7 +2016,7 @@ static int __io_submit_one(struct kioctx *ctx, const struct iocb *iocb,
 	case IOCB_CMD_POLL:
 		return aio_poll(req, iocb);
 	default:
-		pr_debug("invalid aio operation %d\n", iocb->aio_lio_opcode);
+		pr_err("%s invalid aio operation %d\n", __func__, iocb->aio_lio_opcode);
 		return -EINVAL;
 	}
 }
@@ -2020,9 +2027,12 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	struct aio_kiocb *req;
 	struct iocb iocb;
 	int err;
+	pr_err("%s ctx=%pS user_iocb=%pS\n", __func__, ctx, user_iocb);
 
-	if (unlikely(copy_from_user(&iocb, user_iocb, sizeof(iocb))))
+	if (unlikely(copy_from_user(&iocb, user_iocb, sizeof(iocb)))) {
+		pr_err("%s copy_from_user ERROR user_iocb=%p\n", __func__, user_iocb);
 		return -EFAULT;
+	}
 
 	/* enforce forwards compatibility on users */
 	if (unlikely(iocb.aio_reserved2)) {
@@ -2081,6 +2091,7 @@ SYSCALL_DEFINE3(io_submit, aio_context_t, ctx_id, long, nr,
 	int i = 0;
 	struct blk_plug plug;
 
+	pr_err("%s nr=%ld iocbpp=%pS\n", __func__, nr, iocbpp);
 	if (unlikely(nr < 0))
 		return -EINVAL;
 
@@ -2090,6 +2101,7 @@ SYSCALL_DEFINE3(io_submit, aio_context_t, ctx_id, long, nr,
 		return -EINVAL;
 	}
 
+	pr_err("%s2 nr=%ld iocbpp=%pS ctx->nr_events=%d\n", __func__, nr, iocbpp, ctx->nr_events);
 	if (nr > ctx->nr_events)
 		nr = ctx->nr_events;
 
@@ -2099,14 +2111,19 @@ SYSCALL_DEFINE3(io_submit, aio_context_t, ctx_id, long, nr,
 		struct iocb __user *user_iocb;
 
 		if (unlikely(get_user(user_iocb, iocbpp + i))) {
+			pr_err("%s get_user ERROR\n", __func__);
 			ret = -EFAULT;
 			break;
 		}
 
+		pr_err("%s2.1 i=%d calling io_submit_one user_iocb=%pS\n", __func__, i, user_iocb);
 		ret = io_submit_one(ctx, user_iocb, false);
-		if (ret)
+		if (ret) {
+			pr_err("%s2.2 ERROR nr=%ld i=%d ret=%ld\n", __func__, nr, i, ret);
 			break;
+		}
 	}
+	pr_err("%s3 nr=%ld i=%d ret=%ld\n", __func__, nr, i, ret);
 	if (nr > AIO_PLUG_THRESHOLD)
 		blk_finish_plug(&plug);
 
@@ -2122,6 +2139,7 @@ COMPAT_SYSCALL_DEFINE3(io_submit, compat_aio_context_t, ctx_id,
 	long ret = 0;
 	int i = 0;
 	struct blk_plug plug;
+	pr_err("%s nr=%d iocbpp=%pS\n", __func__, nr, iocbpp);
 
 	if (unlikely(nr < 0))
 		return -EINVAL;
@@ -2141,6 +2159,7 @@ COMPAT_SYSCALL_DEFINE3(io_submit, compat_aio_context_t, ctx_id,
 		compat_uptr_t user_iocb;
 
 		if (unlikely(get_user(user_iocb, iocbpp + i))) {
+			pr_err("%s get_user ERROR\n", __func__);
 			ret = -EFAULT;
 			break;
 		}
@@ -2175,9 +2194,12 @@ SYSCALL_DEFINE3(io_cancel, aio_context_t, ctx_id, struct iocb __user *, iocb,
 	int ret = -EINVAL;
 	u32 key;
 	u64 obj = (u64)(unsigned long)iocb;
+	pr_err("%s\n", __func__);
 
-	if (unlikely(get_user(key, &iocb->aio_key)))
+	if (unlikely(get_user(key, &iocb->aio_key))) {
+		pr_err("%s get_user ERROR\n", __func__);
 		return -EFAULT;
+	}
 	if (unlikely(key != KIOCB_KEY))
 		return -EINVAL;
 
@@ -2252,8 +2274,11 @@ SYSCALL_DEFINE5(io_getevents, aio_context_t, ctx_id,
 	struct timespec64	ts;
 	int			ret;
 
-	if (timeout && unlikely(get_timespec64(&ts, timeout)))
+	pr_err("%s\n", __func__);
+	if (timeout && unlikely(get_timespec64(&ts, timeout))) {
+		pr_err("%s ERROR\n", __func__);
 		return -EFAULT;
+	}
 
 	ret = do_io_getevents(ctx_id, min_nr, nr, events, timeout ? &ts : NULL);
 	if (!ret && signal_pending(current))
@@ -2281,8 +2306,11 @@ SYSCALL_DEFINE6(io_pgetevents,
 	bool interrupted;
 	int ret;
 
-	if (timeout && unlikely(get_timespec64(&ts, timeout)))
+	pr_err("%s\n", __func__);
+	if (timeout && unlikely(get_timespec64(&ts, timeout))) {
+		pr_err("%s ERROR\n", __func__);
 		return -EFAULT;
+	}
 
 	if (usig && copy_from_user(&ksig, usig, sizeof(ksig)))
 		return -EFAULT;
@@ -2315,6 +2343,7 @@ SYSCALL_DEFINE6(io_pgetevents_time32,
 	struct timespec64	ts;
 	bool interrupted;
 	int ret;
+	pr_err("%s\n", __func__);
 
 	if (timeout && unlikely(get_old_timespec32(&ts, timeout)))
 		return -EFAULT;
@@ -2349,6 +2378,7 @@ SYSCALL_DEFINE5(io_getevents_time32, __u32, ctx_id,
 {
 	struct timespec64 t;
 	int ret;
+	pr_err("%s\n", __func__);
 
 	if (timeout && get_old_timespec32(&t, timeout))
 		return -EFAULT;
@@ -2382,6 +2412,7 @@ COMPAT_SYSCALL_DEFINE6(io_pgetevents,
 	struct timespec64 t;
 	bool interrupted;
 	int ret;
+	pr_err("%s\n", __func__);
 
 	if (timeout && get_old_timespec32(&t, timeout))
 		return -EFAULT;
@@ -2417,6 +2448,7 @@ COMPAT_SYSCALL_DEFINE6(io_pgetevents_time64,
 	struct timespec64 t;
 	bool interrupted;
 	int ret;
+	pr_err("%s\n", __func__);
 
 	if (timeout && get_timespec64(&t, timeout))
 		return -EFAULT;

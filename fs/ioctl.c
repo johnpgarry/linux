@@ -530,6 +530,7 @@ int vfs_fileattr_get(struct dentry *dentry, struct fileattr *fa)
 	if (!inode->i_op->fileattr_get)
 		return -ENOIOCTLCMD;
 
+	pr_err("%s calling fileattr_get=%pS\n", __func__, inode->i_op->fileattr_get);
 	return inode->i_op->fileattr_get(dentry, fa);
 }
 EXPORT_SYMBOL(vfs_fileattr_get);
@@ -714,6 +715,7 @@ static int ioctl_getflags(struct file *file, unsigned int __user *argp)
 {
 	struct fileattr fa = { .flags_valid = true }; /* hint only */
 	int err;
+	pr_err("%s\n", __func__);
 
 	err = vfs_fileattr_get(file->f_path.dentry, &fa);
 	if (!err)
@@ -728,11 +730,12 @@ static int ioctl_setflags(struct file *file, unsigned int __user *argp)
 	struct fileattr fa;
 	unsigned int flags;
 	int err;
-
+	pr_err("%s\n", __func__);
 	err = get_user(flags, argp);
 	if (!err) {
 		err = mnt_want_write_file(file);
 		if (!err) {
+			pr_err("%s2 calling fileattr_fill_flags\n", __func__);
 			fileattr_fill_flags(&fa, flags);
 			err = vfs_fileattr_set(idmap, dentry, &fa);
 			mnt_drop_write_file(file);
@@ -746,9 +749,12 @@ static int ioctl_fsgetxattr(struct file *file, void __user *argp)
 	struct fileattr fa = { .fsx_valid = true }; /* hint only */
 	int err;
 
+	pr_err("%s file=%pS\n", __func__, file);
 	err = vfs_fileattr_get(file->f_path.dentry, &fa);
+	pr_err("%s2 file=%pS fa.flags=0x%x, fsx_xflags=0x%x\n", __func__, file, fa.flags, fa.fsx_xflags);
 	if (!err)
 		err = copy_fsxattr_to_user(&fa, argp);
+	pr_err("%s3 file=%pS fa.flags=0x%x, fsx_xflags=0x%x\n", __func__, file, fa.flags, fa.fsx_xflags);
 
 	return err;
 }
