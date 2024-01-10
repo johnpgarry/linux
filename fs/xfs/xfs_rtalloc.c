@@ -837,6 +837,10 @@ xfs_growfs_rt(
 	/* Can only change rt extent size when adding rt volume. */
 	if (sbp->sb_rblocks > 0 && in->extsize != sbp->sb_rextsize)
 		return -EINVAL;
+ 
+	/* Cannot change rt extent size when forcealign is set. */
+	if (xfs_has_forcealign(mp) && in->extsize != sbp->sb_rextsize)
+		return -EINVAL;
 
 	/* Range check the extent size. */
 	if (XFS_FSB_TO_B(mp, in->extsize) > XFS_MAX_RTEXTSIZE ||

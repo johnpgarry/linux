@@ -163,6 +163,8 @@ xfs_sb_version_to_features(
 		features |= XFS_FEAT_REFLINK;
 	if (sbp->sb_features_ro_compat & XFS_SB_FEAT_RO_COMPAT_INOBTCNT)
 		features |= XFS_FEAT_INOBTCNT;
+	if (sbp->sb_features_ro_compat & XFS_SB_FEAT_RO_COMPAT_FORCEALIGN)
+		features |= XFS_FEAT_FORCEALIGN;
 	if (sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_FTYPE)
 		features |= XFS_FEAT_FTYPE;
 	if (sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_SPINODES)
@@ -177,6 +179,27 @@ xfs_sb_version_to_features(
 		features |= XFS_FEAT_NREXT64;
 
 	return features;
+}
+
+static int
+xfs_validate_sb_forcealign(
+	struct xfs_mount	*mp,
+	struct xfs_sb		*sbp)
+{
+	if (sbp->sb_rextsize == 0) {
+		xfs_warn(mp,
+ "Cannot have forced allocation alignment of zero.");
+		return -EINVAL;
+	}
+
+	if (sbp->sb_agblocks % sbp->sb_rextsize != 0) {
+		xfs_warn(mp,
+ "Allocation group size %u not aligned to forcealign %u.",
+				sbp->sb_agblocks, sbp->sb_rextsize);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 /* Check all the superblock fields we care about when reading one in. */
@@ -361,6 +384,14 @@ xfs_validate_sb_common(
 					 sbp->sb_inoalignmt, align);
 				return -EINVAL;
 			}
+		}
+
+		if (sbp->sb_features_ro_compat & XFS_SB_FEAT_RO_COMPAT_FORCEALIGN) {
+			int error;
+
+			error = xfs_validate_sb_forcealign(mp, sbp);
+			if (error)
+				return error;
 		}
 	} else if (sbp->sb_qflags & (XFS_PQUOTA_ENFD | XFS_GQUOTA_ENFD |
 				XFS_PQUOTA_CHKD | XFS_GQUOTA_CHKD)) {
