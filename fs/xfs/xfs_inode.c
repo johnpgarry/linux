@@ -52,6 +52,10 @@ xfs_extlen_t
 xfs_get_extsz_hint(
 	struct xfs_inode	*ip)
 {
+	/* forcealign means we align to rextsize */
+	if (xfs_inode_force_align(ip))
+	return ip->i_mount->m_sb.sb_rextsize;
+
 	/*
 	 * No point in aligning allocations if we need to COW to actually
 	 * write to them.
@@ -76,6 +80,10 @@ xfs_get_cowextsz_hint(
 	struct xfs_inode	*ip)
 {
 	xfs_extlen_t		a, b;
+
+	/* forcealign means we align to rextsize */
+	if (xfs_inode_force_align(ip))
+		return ip->i_mount->m_sb.sb_rextsize;
 
 	a = 0;
 	if (ip->i_diflags2 & XFS_DIFLAG2_COWEXTSIZE)
