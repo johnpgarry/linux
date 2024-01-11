@@ -62,13 +62,14 @@ int main(int argc, char **argv)
 	int ret;
 	loff_t pos = 0;
 	char *read_buffer = NULL;
+	int verify = 0;
 
 	argv_orig++;
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
 		file = *argv_orig;
 	}
 
-	while ((opt = getopt(argc, argv, "l:p:PadmhS:")) != -1) {
+	while ((opt = getopt(argc, argv, "l:p:PadmhS:v")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
@@ -97,6 +98,9 @@ int main(int argc, char **argv)
 			case 'd':
 				o_flags |= O_DIRECT;
 				break;
+			case 'v':
+				verify = 1;
+				break;
 			case 'P':
 				middle_start_end_align_4096 = 1;
 				break;
@@ -120,6 +124,7 @@ int main(int argc, char **argv)
 				printf("d: direct I/O\n");
 				printf("S: vector size\n");
 				printf("P: middle start+end align to 4096\n");
+				printf("v: verify data written properly\n");
 				exit(0);
 		}
 	}
@@ -269,6 +274,9 @@ do_write:
 		ret = -1;
 		goto end;
 	}
+
+	if (verify == 0)
+		goto end;
 
 	read_buffer = malloc(write_size);
 	if (!read_buffer) {
