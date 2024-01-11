@@ -566,8 +566,8 @@ void xfs_get_atomic_write_attr(
 	awu_min = queue_atomic_write_unit_min_bytes(q);
 	awu_max = queue_atomic_write_unit_max_bytes(q);
 
-	awu_min &= ~XFS_BLOCKMASK(mp);
-	awu_max &= ~XFS_BLOCKMASK(mp);
+	awu_min &= ~mp->m_blockmask;
+	awu_max &= ~mp->m_blockmask;
 
 	align = XFS_FSB_TO_B(mp, extsz);
 
@@ -578,7 +578,7 @@ void xfs_get_atomic_write_attr(
 		if (awu_min)
 			*unit_min = min(awu_min, align);
 		else
-			*unit_min = XFS_BLOCKSIZE(mp);
+			*unit_min = mp->m_sb.sb_blocksize;
 
 		*unit_max = min(awu_max, align);
 	}

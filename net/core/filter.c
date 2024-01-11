@@ -11791,7 +11791,7 @@ bpf_sk_base_func_proto(enum bpf_func_id func_id)
 }
 
 __bpf_kfunc_start_defs();
-__bpf_kfunc int bpf_dynptr_from_skb(struct sk_buff *skb, u64 flags,
+static __bpf_kfunc int bpf_dynptr_from_skb(struct sk_buff *skb, u64 flags,
 				    struct bpf_dynptr_kern *ptr__uninit)
 {
 	if (flags) {
@@ -11804,7 +11804,7 @@ __bpf_kfunc int bpf_dynptr_from_skb(struct sk_buff *skb, u64 flags,
 	return 0;
 }
 
-__bpf_kfunc int bpf_dynptr_from_xdp(struct xdp_buff *xdp, u64 flags,
+static __bpf_kfunc int bpf_dynptr_from_xdp(struct xdp_buff *xdp, u64 flags,
 				    struct bpf_dynptr_kern *ptr__uninit)
 {
 	if (flags) {
@@ -11817,7 +11817,7 @@ __bpf_kfunc int bpf_dynptr_from_xdp(struct xdp_buff *xdp, u64 flags,
 	return 0;
 }
 
-__bpf_kfunc int bpf_sock_addr_set_sun_path(struct bpf_sock_addr_kern *sa_kern,
+static __bpf_kfunc int bpf_sock_addr_set_sun_path(struct bpf_sock_addr_kern *sa_kern,
 					   const u8 *sun_path, u32 sun_path__sz)
 {
 	struct sockaddr_un *un;
@@ -11918,7 +11918,7 @@ __bpf_kfunc_start_defs();
  * EPROTONOSUPPORT if protocol specific destroy handler is not supported.
  * 0 otherwise
  */
-__bpf_kfunc int bpf_sock_destroy(struct sock_common *sock)
+static __bpf_kfunc int bpf_sock_destroy(struct sock_common *sock)
 {
 	struct sock *sk = (struct sock *)sock;
 

@@ -708,7 +708,7 @@ __bpf_kfunc_start_defs();
  * * ``-EOPNOTSUPP`` : means device driver does not implement kfunc
  * * ``-ENODATA``    : means no RX-timestamp available for this frame
  */
-__bpf_kfunc int bpf_xdp_metadata_rx_timestamp(const struct xdp_md *ctx, u64 *timestamp)
+static __bpf_kfunc int bpf_xdp_metadata_rx_timestamp(const struct xdp_md *ctx, u64 *timestamp)
 {
 	return -EOPNOTSUPP;
 }
@@ -730,7 +730,7 @@ __bpf_kfunc int bpf_xdp_metadata_rx_timestamp(const struct xdp_md *ctx, u64 *tim
  * * ``-EOPNOTSUPP`` : means device driver doesn't implement kfunc
  * * ``-ENODATA``    : means no RX-hash available for this frame
  */
-__bpf_kfunc int bpf_xdp_metadata_rx_hash(const struct xdp_md *ctx, u32 *hash,
+static __bpf_kfunc int bpf_xdp_metadata_rx_hash(const struct xdp_md *ctx, u32 *hash,
 					 enum xdp_rss_hash_type *rss_type)
 {
 	return -EOPNOTSUPP;

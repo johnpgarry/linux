@@ -215,7 +215,7 @@ unlock_ret:
 
 __bpf_hook_start();
 
-__weak noinline void bpf_rstat_flush(struct cgroup *cgrp,
+noinline static void bpf_rstat_flush(struct cgroup *cgrp,
 				     struct cgroup *parent, int cpu)
 {
 }

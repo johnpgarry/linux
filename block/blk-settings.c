@@ -142,7 +142,7 @@ static unsigned int blk_queue_max_guaranteed_bio_sectors(
 	#endif
 }
 
-void blk_atomic_writes_update_limits(struct request_queue *	q)
+static void blk_atomic_writes_update_limits(struct request_queue *	q)
 {
 	struct queue_limits *limits = &q->limits;
 	unsigned int guaranteed_sectors =

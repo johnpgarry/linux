@@ -1691,7 +1691,7 @@ struct file *__sys_socket_file(int family, int type, int protocol)
 
 __bpf_hook_start();
 
-__weak noinline int update_socket_protocol(int family, int type, int protocol)
+static noinline int update_socket_protocol(int family, int type, int protocol)
 {
 	return protocol;
 }
