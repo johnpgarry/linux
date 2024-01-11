@@ -806,7 +806,6 @@ xfs_inode_inherit_flags2(
 	if (pip->i_diflags2 & XFS_DIFLAG2_DAX)
 		ip->i_diflags2 |= XFS_DIFLAG2_DAX;
 	if (pip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN) {
-			WARN_ON_ONCE(1);
 		ip->i_diflags2 |= XFS_DIFLAG2_FORCEALIGN;
 	}
 
@@ -819,7 +818,6 @@ xfs_inode_inherit_flags2(
 	}
 
 	if (ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN) {
-			WARN_ON_ONCE(1);
 		failaddr = xfs_inode_validate_forcealign(ip->i_mount,
 				VFS_I(ip)->i_mode, ip->i_diflags, ip->i_extsize,
 				ip->i_cowextsize);
