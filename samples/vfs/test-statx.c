@@ -41,7 +41,7 @@ struct statx_timestamp;
 #define __NR_statx -1
 #endif
 
-#define STATX_WRITE_ATOMIC	0x00004000U	/* Want/got atomic_write_* fields */
+#define STATX_WRITE_ATOMIC	0x00008000U	/* Want/got atomic_write_* fields */
 #define STATX_ATTR_WRITE_ATOMIC		0x00400000 /* File supports atomic write operations */
 
 static __attribute__((unused))
