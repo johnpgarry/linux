@@ -3363,6 +3363,8 @@ xfs_bmap_compute_alignments(
                if (!stripe_align || stripe_align % mp->m_sb.sb_rextsize)
                        stripe_align = mp->m_sb.sb_rextsize;
                args->alignment = stripe_align;
+               pr_err("%s xfs_bmap_use_forcealign alignment=%d i_extsize=%d sb_rextsize=%d\n",
+               	__func__, args->alignment, ap->ip->i_extsize, mp->m_sb.sb_rextsize);
        }
 
 	if (ap->flags & XFS_BMAPI_COWFORK)

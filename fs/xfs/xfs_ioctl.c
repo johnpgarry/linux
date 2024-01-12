@@ -996,6 +996,9 @@ xfs_fill_fsxattr(
 
 	fileattr_fill_xflags(fa, xfs_ip2xflags(ip));
 
+	pr_err("%s ip=%pS fa->flags=0x%x, fsx_xflags=0x%x XFS_DIFLAG_EXTSIZE=%d i_extsize=%lld\n",
+		__func__, ip, fa->flags, fa->fsx_xflags, !!(ip->i_diflags & XFS_DIFLAG_EXTSIZE), XFS_FSB_TO_B(mp, ip->i_extsize));
+
 	if (ip->i_diflags & XFS_DIFLAG_EXTSIZE) {
 		fa->fsx_extsize = XFS_FSB_TO_B(mp, ip->i_extsize);
 	} else if (ip->i_diflags & XFS_DIFLAG_EXTSZINHERIT) {
@@ -1021,6 +1024,8 @@ xfs_fill_fsxattr(
 		fa->fsx_nextents = xfs_iext_count(ifp);
 	else
 		fa->fsx_nextents = xfs_ifork_nextents(ifp);
+
+	pr_err("%s10 ip=%pS fa->flags=0x%x, fsx_xflags=0x%x\n", __func__, ip, fa->flags, fa->fsx_xflags);
 }
 
 STATIC int
@@ -1029,11 +1034,13 @@ xfs_ioc_fsgetxattra(
 	void			__user *arg)
 {
 	struct fileattr		fa;
+	pr_err("%s ip=%pS\n", __func__, ip);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	xfs_fill_fsxattr(ip, XFS_ATTR_FORK, &fa);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
+	pr_err("%s2 ip=%pS fa.flags=0x%x, fsx_xflags=0x%x\n", __func__, ip, fa.flags, fa.fsx_xflags);
 	return copy_fsxattr_to_user(&fa, arg);
 }
 
@@ -1043,6 +1050,7 @@ xfs_fileattr_get(
 	struct fileattr		*fa)
 {
 	struct xfs_inode	*ip = XFS_I(d_inode(dentry));
+	pr_err("%s ip=%pS\n", __func__, ip);
 
 	if (d_is_special(dentry))
 		return -ENOTTY;
@@ -1157,13 +1165,19 @@ xfs_ioctl_setattr_xflags(
 	 * size hint.
 	 */
 	if (fa->fsx_xflags & FS_XFLAG_FORCEALIGN) {
-		if (!xfs_has_forcealign(mp))
+		if (!xfs_has_forcealign(mp)) {
+			pr_err("%s error !xfs_has_forcealign\n", __func__);
 			return -EINVAL;
-		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE)
+		}
+		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE) {
+			pr_err("%s error FS_XFLAG_COWEXTSIZE\n", __func__);
 			return -EINVAL;
+		}
 		if (fa->fsx_xflags & (FS_XFLAG_EXTSIZE |
-				      FS_XFLAG_EXTSZINHERIT))
+				      FS_XFLAG_EXTSZINHERIT)) {
+			pr_err("%s error FS_XFLAG_EXTSIZE | FS_XFLAG_EXTSZINHERIT\n", __func__);
 			return -EINVAL;
+		}
 	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
@@ -1341,6 +1355,8 @@ xfs_fileattr_set(
 
 	trace_xfs_ioctl_setattr(ip);
 
+	pr_err("%s ip=%pS fa->flags=0x%x, fsx_xflags=0x%x\n", __func__, ip, fa->flags, fa->fsx_xflags);
+
 	if (d_is_special(dentry))
 		return -ENOTTY;
 
@@ -1419,10 +1435,13 @@ xfs_fileattr_set(
 	 * extent size hint should be set on the inode. If no extent size flags
 	 * are set on the inode then unconditionally clear the extent size hint.
 	 */
-	if (ip->i_diflags & (XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT))
+	pr_err("%s\n", __func__);
+	if (ip->i_diflags & (XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT)) {
 		ip->i_extsize = XFS_B_TO_FSB(mp, fa->fsx_extsize);
-	else
+		pr_err("%s2 setting i_extsize=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set\n", __func__, ip->i_extsize);
+	} else {
 		ip->i_extsize = 0;
+	}
 
 	if (xfs_has_v3inodes(mp)) {
 		if (ip->i_diflags2 & XFS_DIFLAG2_COWEXTSIZE)
