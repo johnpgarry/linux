@@ -291,6 +291,12 @@ xfs_iomap_write_direct(
 		}
 	}
 
+	if (xfs_inode_force_align(ip)) {
+		pr_err("%s2.1 special xfs_inode_force_align handling atomic_write offset_fsb=%lld count_fsb=%lld resaligned=%lld imap->br_state=%d\n",
+				__func__, offset_fsb, count_fsb, resaligned, imap->br_state);
+		bmapi_flags = XFS_BMAPI_ZERO;
+	}
+
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, dblocks,
 			rblocks, force, &tp);
 	if (error)
