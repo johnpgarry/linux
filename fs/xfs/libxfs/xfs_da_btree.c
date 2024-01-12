@@ -2156,7 +2156,7 @@ xfs_da_grow_inode_int(
 	/*
 	 * Find a spot in the file space to put the new block.
 	 */
-	error = xfs_bmap_first_unused(tp, dp, count, bno, w);
+	error = xfs_bmap_first_unused(tp, dp, count, bno, w, false);
 	if (error)
 		return error;
 
@@ -2166,7 +2166,7 @@ xfs_da_grow_inode_int(
 	nmap = 1;
 	error = xfs_bmapi_write(tp, dp, *bno, count,
 			xfs_bmapi_aflag(w)|XFS_BMAPI_METADATA|XFS_BMAPI_CONTIG,
-			args->total, &map, &nmap);
+			args->total, &map, &nmap, false);
 	if (error)
 		return error;
 
@@ -2188,7 +2188,7 @@ xfs_da_grow_inode_int(
 			nmap = min(XFS_BMAP_MAX_NMAP, c);
 			error = xfs_bmapi_write(tp, dp, b, c,
 					xfs_bmapi_aflag(w)|XFS_BMAPI_METADATA,
-					args->total, &mapp[mapi], &nmap);
+					args->total, &mapp[mapi], &nmap, false);
 			if (error)
 				goto out_free_map;
 			if (nmap < 1)
@@ -2294,7 +2294,7 @@ xfs_da3_swap_lastblock(
 	ASSERT(w == XFS_DATA_FORK);
 	mp = dp->i_mount;
 	lastoff = args->geo->freeblk;
-	error = xfs_bmap_last_before(tp, dp, &lastoff, w);
+	error = xfs_bmap_last_before(tp, dp, &lastoff, w, false);
 	if (error)
 		return error;
 	if (XFS_IS_CORRUPT(mp, lastoff == 0))

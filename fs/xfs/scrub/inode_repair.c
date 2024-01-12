@@ -1388,14 +1388,14 @@ xrep_inode_blockdir_size(
 
 	trace_xrep_inode_blockdir_size(sc);
 
-	error = xfs_iread_extents(sc->tp, sc->ip, XFS_DATA_FORK);
+	error = xfs_iread_extents(sc->tp, sc->ip, XFS_DATA_FORK, false);
 	if (error)
 		return;
 
 	/* Find the last block before 32G; this is the dir size. */
 	ifp = xfs_ifork_ptr(sc->ip, XFS_DATA_FORK);
 	off = XFS_B_TO_FSB(sc->mp, XFS_DIR2_SPACE_SIZE);
-	if (!xfs_iext_lookup_extent_before(sc->ip, ifp, &off, &icur, &got)) {
+	if (!xfs_iext_lookup_extent_before(sc->ip, ifp, &off, &icur, &got, false)) {
 		/* zero-extents directory? */
 		return;
 	}

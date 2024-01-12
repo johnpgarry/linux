@@ -65,7 +65,7 @@ static void iomap_dio_submit_bio(const struct iomap_iter *iter,
 		struct iomap_dio *dio, struct bio *bio, loff_t pos)
 {
 	struct kiocb *iocb = dio->iocb;
-
+	pr_err("%s bio->bi_ter.bi_sector=%lld, bi_size=%d bio=%pS op=%d\n", __func__, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, bio, bio_op(bio));
 	atomic_inc(&dio->ref);
 
 	/* Sync dio can't be polled reliably */
@@ -74,10 +74,15 @@ static void iomap_dio_submit_bio(const struct iomap_iter *iter,
 		WRITE_ONCE(iocb->private, bio);
 	}
 
-	if (dio->dops && dio->dops->submit_io)
+	if (dio->dops && dio->dops->submit_io) {
+		pr_err("%s3 bio->bi_ter.bi_sector=%lld, bi_size=%d bio=%pS calling dio->dops->submit_io=%pS\n", 
+			__func__, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, bio, dio->dops->submit_io);
 		dio->dops->submit_io(iter, bio, pos);
-	else
+	} else {
+		pr_err("%s4 bio->bi_ter.bi_sector=%lld, bi_size=%d bio=%pS calling submit_bio\n", 
+			__func__, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, bio);
 		submit_bio(bio);
+	}
 }
 
 ssize_t iomap_dio_complete(struct iomap_dio *dio)
@@ -247,6 +252,7 @@ static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 	bio->bi_end_io = iomap_dio_bio_end_io;
 
 	__bio_add_page(bio, page, len, 0);
+	pr_err("%s calling iomap_dio_submit_bio\n", __func__);
 	iomap_dio_submit_bio(iter, dio, bio, pos);
 }
 
@@ -290,8 +296,6 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
-	if (atomic_write)
-		pr_err("%s atomic_write=1\n", __func__);
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter, atomic_write))
@@ -300,6 +304,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
 		need_zeroout = true;
+		pr_err("%s atomic_write=%d type=IOMAP_UNWRITTEN\n", __func__, atomic_write);
+	} else {
+		pr_err("%s atomic_write=%d type=%d\n", __func__, atomic_write, iomap->type);
 	}
 
 	if (iomap->flags & IOMAP_F_SHARED)
@@ -450,6 +457,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		 */
 		if (nr_pages)
 			dio->iocb->ki_flags &= ~IOCB_HIPRI;
+		pr_err("%s2.y calling iomap_dio_submit_bio nr_pages=%d\n", __func__, nr_pages);
 		iomap_dio_submit_bio(iter, dio, bio, pos);
 		pos += n;
 	} while (nr_pages);
@@ -473,6 +481,7 @@ zero_tail:
 out:
 	/* Undo iter limitation to current extent */
 	iov_iter_reexpand(dio->submit.iter, orig_count - copied);
+	pr_err("%s10 copied=%zd ret=%d\n", __func__, copied, ret);
 	if (copied)
 		return copied;
 	return ret;

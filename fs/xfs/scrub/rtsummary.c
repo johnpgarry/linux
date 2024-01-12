@@ -238,7 +238,7 @@ xchk_rtsum_compare(
 
 	/* Mappings may not cross or lie beyond EOF. */
 	endoff = XFS_B_TO_FSB(mp, ip->i_disk_size);
-	if (xfs_iext_lookup_extent(ip, &ip->i_df, endoff, &icur, &map)) {
+	if (xfs_iext_lookup_extent(ip, &ip->i_df, endoff, &icur, &map, false)) {
 		xchk_fblock_set_corrupt(sc, XFS_DATA_FORK, endoff);
 		return 0;
 	}

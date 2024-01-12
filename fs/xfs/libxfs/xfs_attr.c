@@ -91,7 +91,7 @@ xfs_attr_is_leaf(
 		return false;
 
 	xfs_iext_first(ifp, &icur);
-	xfs_iext_get_extent(ifp, &icur, &imap);
+	xfs_iext_get_extent(ifp, &icur, &imap, false);
 	return imap.br_startoff == 0 && imap.br_blockcount == 1;
 }
 

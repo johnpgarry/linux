@@ -365,7 +365,7 @@ xfs_bmap_update_finish_item(
 
 	bi = container_of(item, struct xfs_bmap_intent, bi_list);
 
-	error = xfs_bmap_finish_one(tp, bi);
+	error = xfs_bmap_finish_one(tp, bi, false);
 	if (!error && bi->bi_bmap.br_blockcount > 0) {
 		ASSERT(bi->bi_type == XFS_BMAP_UNMAP);
 		return -EAGAIN;

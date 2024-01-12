@@ -86,7 +86,7 @@ xfs_bmap_count_leaves(
 	struct xfs_bmbt_irec	got;
 	xfs_extnum_t		numrecs = 0;
 
-	for_each_xfs_iext(ifp, &icur, &got) {
+	for_each_xfs_iext(ifp, &icur, &got, false) {
 		if (!isnullstartblock(got.br_startblock)) {
 			*count += got.br_blockcount;
 			numrecs++;
@@ -122,7 +122,7 @@ xfs_bmap_count_blocks(
 
 	switch (ifp->if_format) {
 	case XFS_DINODE_FMT_BTREE:
-		error = xfs_iread_extents(tp, ip, whichfork);
+		error = xfs_iread_extents(tp, ip, whichfork, false);
 		if (error)
 			return error;
 
@@ -267,6 +267,7 @@ xfs_getbmap(
 	struct xfs_bmbt_irec	got, rec;
 	xfs_filblks_t		len;
 	struct xfs_iext_cursor	icur;
+	pr_err("%s\n", __func__);
 
 	if (bmv->bmv_iflags & ~BMV_IF_VALID)
 		return -EINVAL;
@@ -365,11 +366,11 @@ xfs_getbmap(
 	first_bno = bno = XFS_BB_TO_FSBT(mp, bmv->bmv_offset);
 	len = XFS_BB_TO_FSB(mp, bmv->bmv_length);
 
-	error = xfs_iread_extents(NULL, ip, whichfork);
+	error = xfs_iread_extents(NULL, ip, whichfork, false);
 	if (error)
 		goto out_unlock_ilock;
 
-	if (!xfs_iext_lookup_extent(ip, ifp, bno, &icur, &got)) {
+	if (!xfs_iext_lookup_extent(ip, ifp, bno, &icur, &got, false)) {
 		/*
 		 * Report a whole-file hole if the delalloc flag is set to
 		 * stay compatible with the old implementation.
@@ -453,11 +454,12 @@ xfs_bmap_punch_delalloc_range(
 	struct xfs_bmbt_irec	got, del;
 	struct xfs_iext_cursor	icur;
 	int			error = 0;
+	bool atomic_write = false;
 
 	ASSERT(!xfs_need_iread_extents(ifp));
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	if (!xfs_iext_lookup_extent_before(ip, ifp, &end_fsb, &icur, &got))
+	if (!xfs_iext_lookup_extent_before(ip, ifp, &end_fsb, &icur, &got, atomic_write))
 		goto out_unlock;
 
 	while (got.br_startoff + got.br_blockcount > start_fsb) {
@@ -477,8 +479,8 @@ xfs_bmap_punch_delalloc_range(
 		}
 
 		error = xfs_bmap_del_extent_delay(ip, XFS_DATA_FORK, &icur,
-						  &got, &del);
-		if (error || !xfs_iext_get_extent(ifp, &icur, &got))
+						  &got, &del, atomic_write);
+		if (error || !xfs_iext_get_extent(ifp, &icur, &got, false))
 			break;
 	}
 
@@ -723,7 +725,7 @@ xfs_alloc_file_space(
 
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
-				&nimaps);
+				&nimaps, false);
 		if (error)
 			goto error;
 
@@ -987,7 +989,7 @@ xfs_collapse_file_space(
 
 	while (!done) {
 		error = xfs_bmap_collapse_extents(tp, ip, &next_fsb, shift_fsb,
-				&done);
+				&done, false);
 		if (error)
 			goto out_trans_cancel;
 		if (done)
@@ -1040,7 +1042,7 @@ xfs_insert_file_space(
 
 	trace_xfs_insert_file_space(ip);
 
-	error = xfs_bmap_can_insert_extents(ip, stop_fsb, shift_fsb);
+	error = xfs_bmap_can_insert_extents(ip, stop_fsb, shift_fsb, false);
 	if (error)
 		return error;
 
@@ -1068,7 +1070,7 @@ xfs_insert_file_space(
 	 * is not the starting block of extent, we need to split the extent at
 	 * stop_fsb.
 	 */
-	error = xfs_bmap_split_extent(tp, ip, stop_fsb);
+	error = xfs_bmap_split_extent(tp, ip, stop_fsb, false);
 	if (error)
 		goto out_trans_cancel;
 
@@ -1078,7 +1080,7 @@ xfs_insert_file_space(
 			goto out_trans_cancel;
 
 		error = xfs_bmap_insert_extents(tp, ip, &next_fsb, shift_fsb,
-				&done, stop_fsb);
+				&done, stop_fsb, false);
 		if (error)
 			goto out_trans_cancel;
 	} while (!done);

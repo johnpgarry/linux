@@ -1732,7 +1732,7 @@ xfs_dir2_node_to_leaf(
 	/*
 	 * Now find the block just before the freespace block.
 	 */
-	if ((error = xfs_bmap_last_before(tp, dp, &fo, XFS_DATA_FORK))) {
+	if ((error = xfs_bmap_last_before(tp, dp, &fo, XFS_DATA_FORK, false))) {
 		return error;
 	}
 	/*

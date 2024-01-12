@@ -381,7 +381,7 @@ DECLARE_EVENT_CLASS(xfs_bmap_class,
 		struct xfs_bmbt_irec	r;
 
 		ifp = xfs_iext_state_to_fork(ip, state);
-		xfs_iext_get_extent(ifp, cur, &r);
+		xfs_iext_get_extent(ifp, cur, &r, false);
 		__entry->dev = VFS_I(ip)->i_sb->s_dev;
 		__entry->ino = ip->i_ino;
 		__entry->leaf = cur->leaf;

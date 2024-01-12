@@ -1179,7 +1179,7 @@ xfs_qm_dqusage_adjust(
 	if (XFS_IS_REALTIME_INODE(ip)) {
 		struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, XFS_DATA_FORK);
 
-		error = xfs_iread_extents(tp, ip, XFS_DATA_FORK);
+		error = xfs_iread_extents(tp, ip, XFS_DATA_FORK, false);
 		if (error)
 			goto error0;
 

@@ -458,7 +458,7 @@ xfs_attr_rmt_find_hole(
 	 */
 	blkcnt = xfs_attr3_rmt_blocks(mp, args->rmtvaluelen);
 	error = xfs_bmap_first_unused(args->trans, args->dp, blkcnt, &lfileoff,
-						   XFS_ATTR_FORK);
+						   XFS_ATTR_FORK, false);
 	if (error)
 		return error;
 
@@ -615,7 +615,7 @@ xfs_attr_rmtval_set_blk(
 	error = xfs_bmapi_write(args->trans, dp,
 			(xfs_fileoff_t)attr->xattri_lblkno,
 			attr->xattri_blkcnt, XFS_BMAPI_ATTRFORK, args->total,
-			map, &nmap);
+			map, &nmap, false);
 	if (error)
 		return error;
 

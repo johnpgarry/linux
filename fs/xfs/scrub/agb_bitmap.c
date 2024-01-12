@@ -77,7 +77,7 @@ xagb_bitmap_set_btblocks(
 	struct xfs_btree_cur	*cur)
 {
 	return xfs_btree_visit_blocks(cur, xagb_bitmap_visit_btblock,
-			XFS_BTREE_VISIT_ALL, bitmap);
+			XFS_BTREE_VISIT_ALL, bitmap, false);
 }
 
 /*

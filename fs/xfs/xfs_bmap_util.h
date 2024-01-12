@@ -50,7 +50,7 @@ int	xfs_bmap_extsize_align(struct xfs_mount *mp, struct xfs_bmbt_irec *gotp,
 bool	xfs_bmap_adjacent(struct xfs_bmalloca *ap);
 int	xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 			     int whichfork, struct xfs_bmbt_irec *rec,
-			     int *is_empty);
+			     int *is_empty, bool atomic_write);
 
 /* preallocation and hole punch interface */
 int	xfs_alloc_file_space(struct xfs_inode *ip, xfs_off_t offset,

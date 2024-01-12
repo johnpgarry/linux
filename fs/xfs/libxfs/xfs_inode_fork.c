@@ -561,11 +561,12 @@ xfs_iextents_copy(
 	struct xfs_iext_cursor	icur;
 	struct xfs_bmbt_irec	rec;
 	int64_t			copied = 0;
+	bool atomic_write = false;
 
 	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL | XFS_ILOCK_SHARED));
 	ASSERT(ifp->if_bytes > 0);
 
-	for_each_xfs_iext(ifp, &icur, &rec) {
+	for_each_xfs_iext(ifp, &icur, &rec, atomic_write) {
 		if (isnullstartblock(rec.br_startblock))
 			continue;
 		ASSERT(xfs_bmap_validate_extent(ip, whichfork, &rec) == NULL);

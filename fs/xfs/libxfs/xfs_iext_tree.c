@@ -930,33 +930,75 @@ xfs_iext_lookup_extent(
 	struct xfs_ifork	*ifp,
 	xfs_fileoff_t		offset,
 	struct xfs_iext_cursor	*cur,
-	struct xfs_bmbt_irec	*gotp)
+	struct xfs_bmbt_irec	*gotp,
+	bool atomic_write)
 {
 	XFS_STATS_INC(ip->i_mount, xs_look_exlist);
+// struct xfs_iext_leaf {
+//	struct xfs_iext_rec	recs[RECS_PER_LEAF];
+//	struct xfs_iext_leaf	*prev;
+//	struct xfs_iext_leaf	*next;
+//};
+
+
 
 	cur->leaf = xfs_iext_find_level(ifp, offset, 1);
+	if (atomic_write)
+		pr_err("%s atomic_write offset=%lld cur->leaf=%pS (return early with false if NULL)\n", __func__, offset, cur->leaf);
 	if (!cur->leaf) {
 		cur->pos = 0;
 		return false;
 	}
+	for (cur->pos = 0; cur->pos < xfs_iext_max_recs(ifp); cur->pos++) {
+		struct xfs_iext_rec *rec = cur_rec(cur);
 
+		if (atomic_write) {
+			if (rec) {
+				int mybr_state;
+
+				if (rec->hi & (1 << 21))
+					mybr_state = XFS_EXT_UNWRITTEN;
+				else
+					mybr_state = XFS_EXT_NORM;
+				pr_err("%s1 printing leafs atomic_write cur=%pS rec=%pS lo=%lld hi=%lld br_state=%d\n", __func__, cur, rec, rec->lo, rec->hi, mybr_state);
+			} else
+				pr_err("%s1 printing leafs atomic_write cur=%pS rec=%pS\n", __func__, cur, rec);
+		}
+	}
+	
 	for (cur->pos = 0; cur->pos < xfs_iext_max_recs(ifp); cur->pos++) {
 		struct xfs_iext_rec *rec = cur_rec(cur);
 
 		if (xfs_iext_rec_is_empty(rec))
 			break;
-		if (xfs_iext_rec_cmp(rec, offset) >= 0)
+		if (xfs_iext_rec_cmp(rec, offset) >= 0) {
+			if (atomic_write)
+				pr_err("%s3 xfs_iext_rec_cmp passed cur=%pS rec=%pS lo=%lld hi=%lld offset=%lld\n", __func__, cur, rec, rec->lo, rec->hi, offset);
 			goto found;
+		}
 	}
 
+	if (atomic_write)
+		pr_err("%s6 Try looking in the next node for an entry > offset\n", __func__);
 	/* Try looking in the next node for an entry > offset */
-	if (ifp->if_height == 1 || !cur->leaf->next)
+	if (ifp->if_height == 1 || !cur->leaf->next) {
+		if (atomic_write)
+			pr_err("%s6 Try looking in the next node .. is false\n", __func__);
 		return false;
+	}
 	cur->leaf = cur->leaf->next;
 	cur->pos = 0;
-	if (!xfs_iext_valid(ifp, cur))
+	if (!xfs_iext_valid(ifp, cur)) {
+		if (atomic_write)
+			pr_err("%s7 !xfs_iext_valid\n", __func__);
 		return false;
+	}
 found:
+	{
+		struct xfs_iext_rec *rec1 = cur_rec(cur);
+		if (atomic_write)
+			pr_err("%s9 found atomic_write cur=%pS rec1=%pS lo=%lld hi=%lld offset=%lld\n", __func__, cur, rec1, rec1->lo, rec1->hi, offset);
+	}
 	xfs_iext_get(gotp, cur_rec(cur));
 	return true;
 }
@@ -971,10 +1013,13 @@ xfs_iext_lookup_extent_before(
 	struct xfs_ifork	*ifp,
 	xfs_fileoff_t		*end,
 	struct xfs_iext_cursor	*cur,
-	struct xfs_bmbt_irec	*gotp)
+	struct xfs_bmbt_irec	*gotp,
+	bool atomic_write)
 {
+	if (atomic_write)
+		pr_err("%s atomic_write calling xfs_iext_lookup_extent\n", __func__);
 	/* could be optimized to not even look up the next on a match.. */
-	if (xfs_iext_lookup_extent(ip, ifp, *end - 1, cur, gotp) &&
+	if (xfs_iext_lookup_extent(ip, ifp, *end - 1, cur, gotp, atomic_write) &&
 	    gotp->br_startoff <= *end - 1)
 		return true;
 	if (!xfs_iext_prev_extent(ifp, cur, gotp))
@@ -988,10 +1033,13 @@ xfs_iext_update_extent(
 	struct xfs_inode	*ip,
 	int			state,
 	struct xfs_iext_cursor	*cur,
-	struct xfs_bmbt_irec	*new)
+	struct xfs_bmbt_irec	*new,
+	bool atomic_write)
 {
 	struct xfs_ifork	*ifp = xfs_iext_state_to_fork(ip, state);
 
+	if (atomic_write)
+		pr_err("%s atomic_write ifp=%pS\n", __func__, ifp);
 	xfs_iext_inc_seq(ifp);
 
 	if (cur->pos == 0) {
@@ -1017,14 +1065,32 @@ bool
 xfs_iext_get_extent(
 	struct xfs_ifork	*ifp,
 	struct xfs_iext_cursor	*cur,
-	struct xfs_bmbt_irec	*gotp)
+	struct xfs_bmbt_irec	*gotp,
+	bool atomic_write)
 {
+	struct xfs_iext_rec *rec = cur_rec(cur);
+	if (atomic_write)
+		pr_err("%s atomic_write cur=%pS xfs_iext_valid=%d\n",
+			__func__, cur, xfs_iext_valid(ifp, cur));
 	if (!xfs_iext_valid(ifp, cur))
-		return false;
+		return false;;
 	xfs_iext_get(gotp, cur_rec(cur));
+	if (atomic_write)
+		pr_err("%s2 atomic_write cur=%pS rec=%pS lo=%lld hi=%lld gotp=%pS br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, cur, rec, rec->lo, rec->hi, gotp,
+			gotp->br_startoff, gotp->br_startblock, gotp->br_blockcount, gotp->br_state);
 	return true;
 }
+#if 0
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
 
+#endif
 /*
  * This is a recursive function, because of that we need to be extremely
  * careful with stack usage.

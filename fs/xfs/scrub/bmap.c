@@ -507,7 +507,7 @@ xchk_bmapbt_rec(
 	}
 
 	if (!xfs_iext_lookup_extent(ip, ifp, irec.br_startoff, &icur,
-				&iext_irec) ||
+				&iext_irec, false) ||
 	    irec.br_startoff != iext_irec.br_startoff ||
 	    irec.br_startblock != iext_irec.br_startblock ||
 	    irec.br_blockcount != iext_irec.br_blockcount ||
@@ -534,7 +534,7 @@ xchk_bmap_btree(
 	/* Load the incore bmap cache if it's not loaded. */
 	info->was_loaded = !xfs_need_iread_extents(ifp);
 
-	error = xfs_iread_extents(sc->tp, ip, whichfork);
+	error = xfs_iread_extents(sc->tp, ip, whichfork, false);
 	if (!xchk_fblock_process_error(sc, whichfork, 0, &error))
 		goto out;
 
@@ -584,7 +584,7 @@ xchk_bmap_check_rmap(
 		goto out;
 	}
 	have_map = xfs_iext_lookup_extent(sc->ip, ifp, rec->rm_offset,
-			&sbcri->icur, &irec);
+			&sbcri->icur, &irec, false);
 	if (!have_map)
 		xchk_fblock_set_corrupt(sc, sbcri->whichfork,
 				rec->rm_offset);
@@ -860,7 +860,7 @@ xchk_bmap_iext_iter(
 
 	/* Advance to the next iextent record and check the mapping. */
 	xfs_iext_next(ifp, &info->icur);
-	if (!xfs_iext_get_extent(ifp, &info->icur, irec))
+	if (!xfs_iext_get_extent(ifp, &info->icur, irec, false))
 		return false;
 
 	if (!xchk_bmap_iext_mapping(info, irec)) {

@@ -164,7 +164,7 @@ xchk_read_leaf_dir_buf(
 	last_da = xfs_dir2_byte_to_da(geo, XFS_DIR2_LEAF_OFFSET);
 	map_off = xfs_dir2_db_to_da(geo, xfs_dir2_byte_to_db(geo, *curoff));
 
-	if (!xfs_iext_lookup_extent(dp, ifp, map_off, &icur, &map))
+	if (!xfs_iext_lookup_extent(dp, ifp, map_off, &icur, &map, false))
 		return 0;
 	if (map.br_startoff >= last_da)
 		return 0;
@@ -287,7 +287,7 @@ xchk_dir_walk(
 		return xchk_dir_walk_sf(sc, dp, dirent_fn, priv);
 
 	/* dir2 functions require that the data fork is loaded */
-	error = xfs_iread_extents(sc->tp, dp, XFS_DATA_FORK);
+	error = xfs_iread_extents(sc->tp, dp, XFS_DATA_FORK, false);
 	if (error)
 		return error;
 
@@ -340,7 +340,7 @@ xchk_dir_lookup(
 	}
 
 	/* dir2 functions require that the data fork is loaded */
-	error = xfs_iread_extents(sc->tp, dp, XFS_DATA_FORK);
+	error = xfs_iread_extents(sc->tp, dp, XFS_DATA_FORK, false);
 	if (error)
 		return error;
 

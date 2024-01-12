@@ -171,7 +171,7 @@ void		xfs_idestroy_fork(struct xfs_ifork *ifp);
 void *		xfs_idata_realloc(struct xfs_inode *ip, int64_t byte_diff,
 				int whichfork);
 void		xfs_iroot_realloc(struct xfs_inode *, int, int);
-int		xfs_iread_extents(struct xfs_trans *, struct xfs_inode *, int);
+int		xfs_iread_extents(struct xfs_trans *, struct xfs_inode *, int, bool atomic_write);
 int		xfs_iextents_copy(struct xfs_inode *, struct xfs_bmbt_rec *,
 				  int);
 void		xfs_init_local_fork(struct xfs_inode *ip, int whichfork,
@@ -190,17 +190,21 @@ void		xfs_iext_destroy(struct xfs_ifork *);
 bool		xfs_iext_lookup_extent(struct xfs_inode *ip,
 			struct xfs_ifork *ifp, xfs_fileoff_t bno,
 			struct xfs_iext_cursor *cur,
-			struct xfs_bmbt_irec *gotp);
+			struct xfs_bmbt_irec *gotp,
+			bool atomic_write);
 bool		xfs_iext_lookup_extent_before(struct xfs_inode *ip,
 			struct xfs_ifork *ifp, xfs_fileoff_t *end,
 			struct xfs_iext_cursor *cur,
-			struct xfs_bmbt_irec *gotp);
+			struct xfs_bmbt_irec *gotp,
+			bool atomic_write);
 bool		xfs_iext_get_extent(struct xfs_ifork *ifp,
 			struct xfs_iext_cursor *cur,
-			struct xfs_bmbt_irec *gotp);
+			struct xfs_bmbt_irec *gotp,
+			bool atomic_write);
 void		xfs_iext_update_extent(struct xfs_inode *ip, int state,
 			struct xfs_iext_cursor *cur,
-			struct xfs_bmbt_irec *gotp);
+			struct xfs_bmbt_irec *gotp,
+			bool atomic_write);
 
 void		xfs_iext_first(struct xfs_ifork *, struct xfs_iext_cursor *);
 void		xfs_iext_last(struct xfs_ifork *, struct xfs_iext_cursor *);
@@ -211,14 +215,14 @@ static inline bool xfs_iext_next_extent(struct xfs_ifork *ifp,
 		struct xfs_iext_cursor *cur, struct xfs_bmbt_irec *gotp)
 {
 	xfs_iext_next(ifp, cur);
-	return xfs_iext_get_extent(ifp, cur, gotp);
+	return xfs_iext_get_extent(ifp, cur, gotp, false);
 }
 
 static inline bool xfs_iext_prev_extent(struct xfs_ifork *ifp,
 		struct xfs_iext_cursor *cur, struct xfs_bmbt_irec *gotp)
 {
 	xfs_iext_prev(ifp, cur);
-	return xfs_iext_get_extent(ifp, cur, gotp);
+	return xfs_iext_get_extent(ifp, cur, gotp, false);
 }
 
 /*
@@ -230,7 +234,7 @@ static inline bool xfs_iext_peek_next_extent(struct xfs_ifork *ifp,
 	struct xfs_iext_cursor ncur = *cur;
 
 	xfs_iext_next(ifp, &ncur);
-	return xfs_iext_get_extent(ifp, &ncur, gotp);
+	return xfs_iext_get_extent(ifp, &ncur, gotp, false);
 }
 
 /*
@@ -242,12 +246,12 @@ static inline bool xfs_iext_peek_prev_extent(struct xfs_ifork *ifp,
 	struct xfs_iext_cursor ncur = *cur;
 
 	xfs_iext_prev(ifp, &ncur);
-	return xfs_iext_get_extent(ifp, &ncur, gotp);
+	return xfs_iext_get_extent(ifp, &ncur, gotp, false);
 }
 
-#define for_each_xfs_iext(ifp, ext, got)		\
+#define for_each_xfs_iext(ifp, ext, got, atomic_write)		\
 	for (xfs_iext_first((ifp), (ext));		\
-	     xfs_iext_get_extent((ifp), (ext), (got));	\
+	     xfs_iext_get_extent((ifp), (ext), (got), (atomic_write));	\
 	     xfs_iext_next((ifp), (ext)))
 
 extern struct kmem_cache	*xfs_ifork_cache;

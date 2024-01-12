@@ -706,7 +706,7 @@ xfs_growfs_rt_alloc(
 		 */
 		nmap = 1;
 		error = xfs_bmapi_write(tp, ip, oblocks, nblocks - oblocks,
-					XFS_BMAPI_METADATA, 0, &map, &nmap);
+					XFS_BMAPI_METADATA, 0, &map, &nmap, false);
 		if (!error && nmap < 1)
 			error = -ENOSPC;
 		if (error)
@@ -1173,12 +1173,12 @@ xfs_rtmount_iread_extents(
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL | lock_class);
 
-	error = xfs_iread_extents(tp, ip, XFS_DATA_FORK);
+	error = xfs_iread_extents(tp, ip, XFS_DATA_FORK, false);
 	if (error)
 		goto out_unlock;
 
 	if (xfs_inode_has_attr_fork(ip)) {
-		error = xfs_iread_extents(tp, ip, XFS_ATTR_FORK);
+		error = xfs_iread_extents(tp, ip, XFS_ATTR_FORK, false);
 		if (error)
 			goto out_unlock;
 	}

@@ -258,7 +258,7 @@ xfs_dir2_leaf_readbuf(
 	int			ra_want;
 	int			error = 0;
 
-	error = xfs_iread_extents(args->trans, dp, XFS_DATA_FORK);
+	error = xfs_iread_extents(args->trans, dp, XFS_DATA_FORK, false);
 	if (error)
 		goto out;
 
@@ -269,7 +269,7 @@ xfs_dir2_leaf_readbuf(
 	 */
 	last_da = xfs_dir2_byte_to_da(geo, XFS_DIR2_LEAF_OFFSET);
 	map_off = xfs_dir2_db_to_da(geo, xfs_dir2_byte_to_db(geo, *cur_off));
-	if (!xfs_iext_lookup_extent(dp, ifp, map_off, &icur, &map))
+	if (!xfs_iext_lookup_extent(dp, ifp, map_off, &icur, &map, false))
 		goto out;
 	if (map.br_startoff >= last_da)
 		goto out;

@@ -713,7 +713,7 @@ xfs_dir2_shrink_inode(
 	if (dp->i_disk_size > xfs_dir2_db_off_to_byte(args->geo, db + 1, 0))
 		return 0;
 	bno = da;
-	if ((error = xfs_bmap_last_before(tp, dp, &bno, XFS_DATA_FORK))) {
+	if ((error = xfs_bmap_last_before(tp, dp, &bno, XFS_DATA_FORK, false))) {
 		/*
 		 * This can't really happen unless there's kernel corruption.
 		 */

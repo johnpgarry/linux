@@ -4340,19 +4340,22 @@ xfs_btree_visit_block(
 	struct xfs_btree_cur		*cur,
 	int				level,
 	xfs_btree_visit_blocks_fn	fn,
-	void				*data)
+	void				*data,
+	bool atomic_write)
 {
 	struct xfs_btree_block		*block;
 	struct xfs_buf			*bp;
 	union xfs_btree_ptr		rptr;
 	int				error;
 
+	if (atomic_write)
+		pr_err("%s atomic_write level=%d\n", __func__, level);
 	/* do right sibling readahead */
 	xfs_btree_readahead(cur, level, XFS_BTCUR_RIGHTRA);
 	block = xfs_btree_get_block(cur, level, &bp);
 
 	/* process the block */
-	error = fn(cur, level, data);
+	error = fn(cur, level, data, atomic_write);
 	if (error)
 		return error;
 
@@ -4386,13 +4389,15 @@ xfs_btree_visit_blocks(
 	struct xfs_btree_cur		*cur,
 	xfs_btree_visit_blocks_fn	fn,
 	unsigned int			flags,
-	void				*data)
+	void				*data,
+	bool atomic_write)
 {
 	union xfs_btree_ptr		lptr;
 	int				level;
 	struct xfs_btree_block		*block = NULL;
 	int				error = 0;
-
+	if (atomic_write)
+		pr_err("%s atomic_write\n", __func__);
 	cur->bc_ops->init_ptr_from_cur(cur, &lptr);
 
 	/* for each level */
@@ -4420,7 +4425,7 @@ xfs_btree_visit_blocks(
 
 		/* for each buffer in the level */
 		do {
-			error = xfs_btree_visit_block(cur, level, fn, data);
+			error = xfs_btree_visit_block(cur, level, fn, data, atomic_write);
 		} while (!error);
 
 		if (error != -ENOENT)
@@ -4463,12 +4468,15 @@ static int
 xfs_btree_block_change_owner(
 	struct xfs_btree_cur	*cur,
 	int			level,
-	void			*data)
+	void			*data,
+	bool atomic_write)
 {
 	struct xfs_btree_block_change_owner_info	*bbcoi = data;
 	struct xfs_btree_block	*block;
 	struct xfs_buf		*bp;
 
+	if (atomic_write)
+		pr_err("%s atomic_write\n", __func__);
 	/* modify the owner */
 	block = xfs_btree_get_block(cur, level, &bp);
 	if (cur->bc_flags & XFS_BTREE_LONG_PTRS) {
@@ -4518,7 +4526,7 @@ xfs_btree_change_owner(
 	bbcoi.buffer_list = buffer_list;
 
 	return xfs_btree_visit_blocks(cur, xfs_btree_block_change_owner,
-			XFS_BTREE_VISIT_ALL, &bbcoi);
+			XFS_BTREE_VISIT_ALL, &bbcoi, false);
 }
 
 /* Verify the v5 fields of a long-format btree block. */
@@ -4994,11 +5002,14 @@ static int
 xfs_btree_count_blocks_helper(
 	struct xfs_btree_cur	*cur,
 	int			level,
-	void			*data)
+	void			*data,
+	bool atomic_write)
 {
 	xfs_extlen_t		*blocks = data;
 	(*blocks)++;
 
+	if (atomic_write)
+		pr_err("%s atomic_write *blocks=%d\n", __func__, *blocks);
 	return 0;
 }
 
@@ -5010,7 +5021,7 @@ xfs_btree_count_blocks(
 {
 	*blocks = 0;
 	return xfs_btree_visit_blocks(cur, xfs_btree_count_blocks_helper,
-			XFS_BTREE_VISIT_ALL, blocks);
+			XFS_BTREE_VISIT_ALL, blocks, false);
 }
 
 /* Compare two btree pointers. */

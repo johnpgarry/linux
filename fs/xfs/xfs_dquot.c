@@ -722,7 +722,7 @@ xfs_dq_get_next_id(
 	start = (xfs_fsblock_t)next_id / mp->m_quotainfo->qi_dqperchunk;
 
 	lock_flags = xfs_ilock_data_map_shared(quotip);
-	error = xfs_iread_extents(NULL, quotip, XFS_DATA_FORK);
+	error = xfs_iread_extents(NULL, quotip, XFS_DATA_FORK, false);
 	if (error)
 		return error;
 

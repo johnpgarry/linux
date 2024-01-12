@@ -367,7 +367,7 @@ xrep_cow_find_mapping(
 	struct xfs_inode	*ip = xc->sc->ip;
 	struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, XFS_COW_FORK);
 
-	if (!xfs_iext_lookup_extent(ip, ifp, startoff, icur, got))
+	if (!xfs_iext_lookup_extent(ip, ifp, startoff, icur, got, false))
 		goto bad;
 
 	if (got->br_startoff > startoff)

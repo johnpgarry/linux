@@ -127,8 +127,10 @@ xfs_end_ioend(
 	 */
 	if (ioend->io_flags & IOMAP_F_SHARED)
 		error = xfs_reflink_end_cow(ip, offset, size);
-	else if (ioend->io_type == IOMAP_UNWRITTEN)
-		error = xfs_iomap_write_unwritten(ip, offset, size, false);
+	else if (ioend->io_type == IOMAP_UNWRITTEN) {
+		pr_err("%s calling xfs_iomap_write_unwritten offset=%lld size=%zd\n", __func__, offset, size);
+		error = xfs_iomap_write_unwritten(ip, offset, size, false, true);
+	}
 
 	if (!error && xfs_ioend_is_append(ioend))
 		error = xfs_setfilesize(ip, ioend->io_offset, ioend->io_size);
@@ -289,6 +291,9 @@ xfs_map_blocks(
 	struct xfs_iext_cursor	icur;
 	int			retries = 0;
 	int			error = 0;
+	
+	pr_err("%s\n", __func__);
+
 
 	if (xfs_is_shutdown(mp))
 		return -EIO;
@@ -330,7 +335,7 @@ retry:
 	 * it directly instead of looking up anything in the data fork.
 	 */
 	if (xfs_inode_has_cow_data(ip) &&
-	    xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &imap))
+	    xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &imap, false))
 		cow_fsb = imap.br_startoff;
 	if (cow_fsb != NULLFILEOFF && cow_fsb <= offset_fsb) {
 		XFS_WPC(wpc)->cow_seq = READ_ONCE(ip->i_cowfp->if_seq);
@@ -354,7 +359,7 @@ retry:
 	 * offset.  This will convert delayed allocations (including COW ones)
 	 * into real extents.
 	 */
-	if (!xfs_iext_lookup_extent(ip, &ip->i_df, offset_fsb, &icur, &imap))
+	if (!xfs_iext_lookup_extent(ip, &ip->i_df, offset_fsb, &icur, &imap, false))
 		imap.br_startoff = end_fsb;	/* fake a hole past EOF */
 	XFS_WPC(wpc)->data_seq = READ_ONCE(ip->i_df.if_seq);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
