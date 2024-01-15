@@ -563,6 +563,10 @@ xfs_can_free_eofblocks(
 		pr_err("%s3.1 end_fsb=%lld XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1\n", __func__, end_fsb);
 	}
 
+	if (xfs_inode_atomicwrites(ip)) {
+		end_fsb = roundup_64(end_fsb, xfs_get_extsz_hint(ip));
+		pr_err("%s3.3 end_fsb=%lld xfs_get_extsz_hint()=%d i_atomicwrites_size=%d\n", __func__, end_fsb, xfs_get_extsz_hint(ip), ip->i_atomicwrites_size);
+	}
 
 	last_fsb = XFS_B_TO_FSB(mp, mp->m_super->s_maxbytes);
 	if (last_fsb <= end_fsb) {
