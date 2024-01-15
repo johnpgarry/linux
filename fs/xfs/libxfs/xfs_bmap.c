@@ -2102,6 +2102,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 * The left and right neighbors are both contiguous with new.
 		 */
 		LEFT.br_blockcount += PREV.br_blockcount + RIGHT.br_blockcount;
+		pr_err("%s2 atomic_write=%d\n", __func__, atomic_write);
 
 		xfs_iext_remove(ip, icur, state);
 		xfs_iext_remove(ip, icur, state);
@@ -2155,6 +2156,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 * The left neighbor is contiguous, the right is not.
 		 */
 		LEFT.br_blockcount += PREV.br_blockcount;
+		pr_err("%s3 atomic_write=%d\n", __func__, atomic_write);
 
 		xfs_iext_remove(ip, icur, state);
 		xfs_iext_prev(ifp, icur);
@@ -2196,6 +2198,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 */
 		PREV.br_blockcount += RIGHT.br_blockcount;
 		PREV.br_state = new->br_state;
+		pr_err("%s4 atomic_write=%d\n", __func__, atomic_write);
 
 		xfs_iext_next(ifp, icur);
 		xfs_iext_remove(ip, icur, state);
@@ -2240,6 +2243,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 */
 		PREV.br_state = new->br_state;
 		xfs_iext_update_extent(ip, state, icur, &PREV, atomic_write);
+		pr_err("%s5 atomic_write=%d\n", __func__, atomic_write);
 
 		if (cur == NULL)
 			rval = XFS_ILOG_DEXT;
@@ -2273,6 +2277,7 @@ xfs_bmap_add_extent_unwritten_real(
 		xfs_iext_update_extent(ip, state, icur, &PREV, atomic_write);
 		xfs_iext_prev(ifp, icur);
 		xfs_iext_update_extent(ip, state, icur, &LEFT, atomic_write);
+		pr_err("%s6 atomic_write=%d\n", __func__, atomic_write);
 
 		if (cur == NULL)
 			rval = XFS_ILOG_DEXT;
@@ -2306,6 +2311,7 @@ xfs_bmap_add_extent_unwritten_real(
 		PREV.br_startoff += new->br_blockcount;
 		PREV.br_startblock += new->br_blockcount;
 		PREV.br_blockcount -= new->br_blockcount;
+		pr_err("%s7 atomic_write=%d\n", __func__, atomic_write);
 
 		xfs_iext_update_extent(ip, state, icur, &PREV, atomic_write);
 		xfs_iext_insert(ip, icur, new, state);
@@ -2342,6 +2348,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 */
 		old = PREV;
 		PREV.br_blockcount -= new->br_blockcount;
+		pr_err("%s8 atomic_write=%d\n", __func__, atomic_write);
 
 		RIGHT.br_startoff = new->br_startoff;
 		RIGHT.br_startblock = new->br_startblock;
@@ -2381,6 +2388,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 */
 		old = PREV;
 		PREV.br_blockcount -= new->br_blockcount;
+		pr_err("%s9 atomic_write=%d\n", __func__, atomic_write);
 
 		xfs_iext_update_extent(ip, state, icur, &PREV, atomic_write);
 		xfs_iext_next(ifp, icur);
@@ -2425,6 +2433,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 */
 		old = PREV;
 		PREV.br_blockcount = new->br_startoff - PREV.br_startoff;
+		pr_err("%s10 atomic_write=%d\n", __func__, atomic_write);
 
 		r[0] = *new;
 		r[1].br_startoff = new_endoff;
@@ -2500,9 +2509,11 @@ xfs_bmap_add_extent_unwritten_real(
 	/* update reverse mappings */
 	xfs_rmap_convert_extent(mp, tp, ip, whichfork, new);
 
+	pr_err("%s11 atomic_write=%d\n", __func__, atomic_write);
 	/* convert to a btree if necessary */
 	if (xfs_bmap_needs_btree(ip, whichfork)) {
 		int	tmp_logflags;	/* partial log flag return val */
+		pr_err("%s12 atomic_write=%d\n", __func__, atomic_write);
 
 		ASSERT(cur == NULL);
 		error = xfs_bmap_extents_to_btree(tp, ip, &cur, 0,
@@ -2518,6 +2529,7 @@ xfs_bmap_add_extent_unwritten_real(
 		*curp = cur;
 	}
 
+	pr_err("%s13 atomic_write=%d\n", __func__, atomic_write);
 	xfs_bmap_check_leaf_extents(*curp, ip, whichfork);
 done:
 	*logflagsp |= rval;
@@ -4253,8 +4265,10 @@ xfs_bmap_alloc_userdata(
 				return error;
 		}
 
-		if (XFS_IS_REALTIME_INODE(bma->ip))
-			return xfs_bmap_rtalloc(bma);
+		if (XFS_IS_REALTIME_INODE(bma->ip)) {
+			error = xfs_bmap_rtalloc(bma);
+			goto out;
+		}
 	}
 
 	if (unlikely(XFS_TEST_ERROR(false, mp,
@@ -4262,7 +4276,46 @@ xfs_bmap_alloc_userdata(
 		return xfs_bmap_exact_minlen_extent_alloc(bma);
 	pr_err("%s8 bma->length=%d, minlen=%d mp->m_ag_max_usable=%d\n",
 			__func__, bma->length, bma->minlen, mp->m_ag_max_usable);
-	return xfs_bmap_btalloc(bma);
+	error = xfs_bmap_btalloc(bma);
+
+out:
+	pr_err("%s10 out bma->length=%d, minlen=%d, total=%d, minlen=%d, minleft=%d, eof=%d, offset=%lld, length=%d\n",
+			__func__, bma->length, bma->minlen, bma->total, bma->minlen, bma->minleft, bma->eof, bma->offset, bma->length);
+	pr_err("%s10.0 out got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount, bma->got.br_state);
+	pr_err("%s10.1 out prev.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, bma->prev.br_startoff, bma->prev.br_startblock, bma->prev.br_blockcount, bma->prev.br_state);
+
+#if 0
+
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+struct xfs_bmbt_irec	got;	/* extent after, or delayed */
+
+	xfs_fileoff_t		offset;	/* offset in file filling in */
+	xfs_extlen_t		length;	/* i/o length asked/allocated */
+	xfs_fsblock_t		blkno;	/* starting block of new extent */
+
+	struct xfs_btree_cur	*cur;	/* btree cursor */
+	struct xfs_iext_cursor	icur;	/* incore extent cursor */
+	int			nallocs;/* number of extents alloc'd */
+	int			logflags;/* flags for transaction logging */
+
+	xfs_extlen_t		total;	/* total blocks needed for xaction */
+	xfs_extlen_t		minlen;	/* minimum allocation size (blocks) */
+	xfs_extlen_t		minleft; /* amount must be left after alloc */
+	bool			eof;	/* set if allocating past last extent */
+	bool			wasdel;	/* replacing a delayed allocation */
+	bool			aeof;	/* allocated space at eof */
+	bool			conv;	/* overwriting unwritten extents */
+	int			datatype;/* data type being allocated */
+	uint32_t		flags;
+#endif
+
+
+	return error;
 }
 
 static int
@@ -4316,6 +4369,7 @@ xfs_bmapi_allocate(
 		return error;
 
 	if (bma->flags & XFS_BMAPI_ZERO) {
+		pr_err("%s4 calling xfs_zero_extent bma->blkno=%lld, length=%d\n", __func__, bma->blkno, bma->length);
 		error = xfs_zero_extent(bma->ip, bma->blkno, bma->length);
 		if (error)
 			return error;
@@ -4380,16 +4434,25 @@ xfs_bmapi_convert_unwritten(
 	int			error;
 	bool atomic_write = flags & IOMAP_ATOMIC_WRITE;
 
+	pr_err("%s len=%lld\n", __func__, len);
+	pr_err("%s0 bma->length=%d, minlen=%d, total=%d, minlen=%d, minleft=%d, eof=%d, offset=%lld, length=%d\n",
+			__func__, bma->length, bma->minlen, bma->total, bma->minlen, bma->minleft, bma->eof, bma->offset, bma->length);
+	pr_err("%s0.0 got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount, bma->got.br_state);
+	pr_err("%s0.1 prev.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, bma->prev.br_startoff, bma->prev.br_startblock, bma->prev.br_blockcount, bma->prev.br_state);
 	/* check if we need to do unwritten->real conversion */
 	if (mval->br_state == XFS_EXT_UNWRITTEN &&
 	    (flags & XFS_BMAPI_PREALLOC))
 		return 0;
+	pr_err("%s2 len=%lld\n", __func__, len);
 
 	/* check if we need to do real->unwritten conversion */
 	if (mval->br_state == XFS_EXT_NORM &&
 	    (flags & (XFS_BMAPI_PREALLOC | XFS_BMAPI_CONVERT)) !=
 			(XFS_BMAPI_PREALLOC | XFS_BMAPI_CONVERT))
 		return 0;
+	pr_err("%s3 len=%lld\n", __func__, len);
 
 	/*
 	 * Modify (by adding) the state flag, if writing.
@@ -4401,12 +4464,14 @@ xfs_bmapi_convert_unwritten(
 	}
 	mval->br_state = (mval->br_state == XFS_EXT_UNWRITTEN)
 				? XFS_EXT_NORM : XFS_EXT_UNWRITTEN;
+	pr_err("%s4 len=%lld\n", __func__, len);
 
 	/*
 	 * Before insertion into the bmbt, zero the range being converted
 	 * if required.
 	 */
 	if (flags & XFS_BMAPI_ZERO) {
+		pr_err("%s5 calling xfs_zero_extent mval->br_startblock=%lld, br_blockcount=%lld\n", __func__, mval->br_startblock, mval->br_blockcount);
 		error = xfs_zero_extent(bma->ip, mval->br_startblock,
 					mval->br_blockcount);
 		if (error)
@@ -4438,12 +4503,14 @@ xfs_bmapi_convert_unwritten(
 	 */
 	xfs_iext_get_extent(ifp, &bma->icur, &bma->got, atomic_write);
 
+	pr_err("%s6  mval->br_startblock=%lld, br_blockcount=%lld\n", __func__, mval->br_startblock, mval->br_blockcount);
 	/*
 	 * We may have combined previously unwritten space with written space,
 	 * so generate another request.
 	 */
 	if (mval->br_blockcount < len)
 		return -EAGAIN;
+	pr_err("%s7  mval->br_startblock=%lld, br_blockcount=%lld\n", __func__, mval->br_startblock, mval->br_blockcount);
 	return 0;
 }
 

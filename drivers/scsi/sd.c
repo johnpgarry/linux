@@ -1039,6 +1039,7 @@ static blk_status_t sd_setup_write_zeroes_cmnd(struct scsi_cmnd *cmd)
 	struct scsi_disk *sdkp = scsi_disk(rq->q->disk);
 	u64 lba = sectors_to_logical(sdp, blk_rq_pos(rq));
 	u32 nr_blocks = sectors_to_logical(sdp, blk_rq_sectors(rq));
+	pr_err("%s\n", __func__);
 
 	if (!(rq->cmd_flags & REQ_NOUNMAP)) {
 		switch (sdkp->zeroing_mode) {
@@ -1272,7 +1273,7 @@ static int sd_cdl_dld(struct scsi_disk *sdkp, struct scsi_cmnd *scmd)
 	return (hint - IOPRIO_HINT_DEV_DURATION_LIMIT_1) + 1;
 }
 
-static blk_status_t sd_setup_atomic_cmnd(struct scsi_cmnd *cmd,
+static blk_status_t sd_setup_atomic_write_cmnd(struct scsi_cmnd *cmd,
 					sector_t lba, unsigned int nr_blocks,
 					bool boundary, unsigned char flags)
 {
@@ -1384,7 +1385,7 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 		ret = sd_setup_rw32_cmnd(cmd, write, lba, nr_blocks,
 					 protect | fua, dld);
 	} else if (rq->cmd_flags & REQ_ATOMIC && write) {
-		ret = sd_setup_atomic_cmnd(cmd, lba, nr_blocks,
+		ret = sd_setup_atomic_write_cmnd(cmd, lba, nr_blocks,
 				sdkp->use_atomic_write_boundary,
 				protect | fua);
 	} else if (sdp->use_16_for_rw || (nr_blocks > 0xffff)) {

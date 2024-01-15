@@ -181,17 +181,23 @@ xfs_eof_alignment(
 		 * If mounted with the "-o swalloc" option the alignment is
 		 * increased from the strip unit size to the stripe width.
 		 */
-		if (xfs_inode_forcealign(ip))
+		if (xfs_inode_forcealign(ip)) {
 			align = xfs_get_extsz_hint(ip);
-		else if (mp->m_swidth && xfs_has_swalloc(mp))
+			pr_err("%s1 align=%d\n", __func__, align);
+		} else if (mp->m_swidth && xfs_has_swalloc(mp)) {
 			align = mp->m_swidth;
-		else if (mp->m_dalign)
+			pr_err("%s2 align=%d\n", __func__, align);
+		} else if (mp->m_dalign) {
 			align = mp->m_dalign;
+			pr_err("%s3 align=%d\n", __func__, align);
+		}
 
 		if (align && XFS_ISIZE(ip) < XFS_FSB_TO_B(mp, align))
 			align = 0;
+		pr_err("%s4 align=%d\n", __func__, align);
 	}
 
+		pr_err("%s5 align=%d\n", __func__, align);
 	return align;
 }
 
@@ -285,12 +291,22 @@ xfs_iomap_write_direct(
 	 * left but we need to do unwritten extent conversion.
 	 */
 	if (flags & IOMAP_DAX) {
+	//if (flags & IOMAP_DAX) {
 		bmapi_flags = XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO;
+		if (atomic_write)
+			pr_err("%s2 special DAX handling atomic_write offset_fsb=%lld count_fsb=%lld resaligned=%lld imap->br_state=%d\n",
+				__func__, offset_fsb, count_fsb, resaligned, imap->br_state);
 		if (imap->br_state == XFS_EXT_UNWRITTEN) {
 			force = true;
 			nr_exts = XFS_IEXT_WRITE_UNWRITTEN_CNT;
 			dblocks = XFS_DIOSTRAT_SPACE_RES(mp, 0) << 1;
 		}
+	}
+
+	if (flags & IOMAP_ATOMIC_WRITE) {
+		pr_err("%s2.1 special atomic write handling atomic_write offset_fsb=%lld count_fsb=%lld resaligned=%lld imap->br_state=%d\n",
+				__func__, offset_fsb, count_fsb, resaligned, imap->br_state);
+		bmapi_flags = XFS_BMAPI_ZERO;
 	}
 
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, dblocks,
@@ -338,13 +354,13 @@ out_unlock:
 	*seq = xfs_iomap_inode_sequence(ip, 0);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	if (atomic_write)
-		pr_err("%s10out out_unlock error=%d\n", __func__, error);
+		pr_err("%s10 out out_unlock error=%d\n", __func__, error);
 	return error;
 
 out_trans_cancel:
 	xfs_trans_cancel(tp);
 	if (atomic_write)
-		pr_err("%s11out out_trans_cancel goto unlock error=%d\n", __func__, error);
+		pr_err("%s11 out out_trans_cancel goto unlock error=%d\n", __func__, error);
 	goto out_unlock;
 }
 
@@ -862,9 +878,9 @@ xfs_direct_write_iomap_begin(
 
 		/* We should only iter once so ensure that our mapping covers the range */
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
-		//	error = -EINVAL;
+			error = -EINVAL;
 			pr_err("%s2 !imap_spans_range\n", __func__);
-		//	goto out_unlock;
+			goto out_unlock;
 		}
 
 		/*
@@ -1517,6 +1533,7 @@ xfs_zero_range(
 	bool			*did_zero)
 {
 	struct inode		*inode = VFS_I(ip);
+	pr_err("%s\n", __func__);
 
 	if (IS_DAX(inode))
 		return dax_zero_range(inode, pos, len, did_zero,

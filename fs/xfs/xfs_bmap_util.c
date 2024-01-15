@@ -63,6 +63,8 @@ xfs_zero_extent(
 	xfs_daddr_t		sector = xfs_fsb_to_db(ip, start_fsb);
 	sector_t		block = XFS_BB_TO_FSBT(mp, sector);
 
+	pr_err("%s calling blkdev_issue_zeroout start_fsb=%lld count_fsb=%lld\n",
+		__func__, start_fsb, count_fsb);
 	return blkdev_issue_zeroout(target->bt_bdev,
 		block << (mp->m_super->s_blocksize_bits - 9),
 		count_fsb << (mp->m_super->s_blocksize_bits - 9),

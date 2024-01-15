@@ -121,6 +121,7 @@ static int __blkdev_issue_write_zeroes(struct block_device *bdev,
 {
 	struct bio *bio = *biop;
 	unsigned int max_write_zeroes_sectors;
+	pr_err("%s sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 
 	if (bdev_read_only(bdev))
 		return -EPERM;
@@ -222,10 +223,14 @@ int __blkdev_issue_zeroout(struct block_device *bdev, sector_t sector,
 	int ret;
 	sector_t bs_mask;
 
+
+
+
 	bs_mask = (bdev_logical_block_size(bdev) >> 9) - 1;
 	if ((sector | nr_sects) & bs_mask)
 		return -EINVAL;
 
+	pr_err("%s calling __blkdev_issue_write_zeroes sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 	ret = __blkdev_issue_write_zeroes(bdev, sector, nr_sects, gfp_mask,
 			biop, flags);
 	if (ret != -EOPNOTSUPP || (flags & BLKDEV_ZERO_NOFALLBACK))
@@ -266,6 +271,8 @@ retry:
 	bio = NULL;
 	blk_start_plug(&plug);
 	if (try_write_zeroes) {
+		pr_err("%s calling __blkdev_issue_write_zeroes sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
+
 		ret = __blkdev_issue_write_zeroes(bdev, sector, nr_sects,
 						  gfp_mask, &bio, flags);
 	} else if (!(flags & BLKDEV_ZERO_NOFALLBACK)) {
