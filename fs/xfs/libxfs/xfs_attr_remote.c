@@ -401,6 +401,7 @@ xfs_attr_rmtval_get(
 	valuelen = args->rmtvaluelen;
 	while (valuelen > 0) {
 		nmap = ATTR_RMTVALUE_MAPSIZE;
+		pr_err("%s calling xfs_bmapi_read\n", __func__);
 		error = xfs_bmapi_read(args->dp, (xfs_fileoff_t)lblkno,
 				       blkcnt, map, &nmap,
 				       XFS_BMAPI_ATTRFORK);
@@ -500,6 +501,7 @@ xfs_attr_rmtval_set_value(
 		ASSERT(blkcnt > 0);
 
 		nmap = 1;
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 		error = xfs_bmapi_read(dp, (xfs_fileoff_t)lblkno,
 				       blkcnt, &map, &nmap,
 				       XFS_BMAPI_ATTRFORK);
@@ -655,6 +657,7 @@ xfs_attr_rmtval_invalidate(
 		 * Try to remember where we decided to put the value.
 		 */
 		nmap = 1;
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 		error = xfs_bmapi_read(args->dp, (xfs_fileoff_t)lblkno,
 				       blkcnt, &map, &nmap, XFS_BMAPI_ATTRFORK);
 		if (error)

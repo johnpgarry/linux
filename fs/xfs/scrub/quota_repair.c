@@ -463,6 +463,7 @@ xrep_quota_data_fork(
 	}
 
 	if (truncate) {
+		pr_err("%s calling xfs_bunmapi_range\n", __func__);
 		/* Erase everything after the block containing the max dquot */
 		error = xfs_bunmapi_range(&sc->tp, sc->ip, 0,
 				max_dqid_off * sc->mp->m_sb.sb_blocksize,

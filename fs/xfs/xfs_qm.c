@@ -1010,6 +1010,7 @@ xfs_qm_reset_dqcounts_buf(
 		 * the inode is never added to the transaction.
 		 */
 		lock_mode = xfs_ilock_data_map_shared(qip);
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 		error = xfs_bmapi_read(qip, lblkno, maxlblkcnt - lblkno,
 				       map, &nmaps, 0);
 		xfs_iunlock(qip, lock_mode);

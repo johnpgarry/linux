@@ -111,6 +111,7 @@ xfs_rtbuf_get(
 		*cbpp = NULL;
 	}
 
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 	error = xfs_bmapi_read(ip, block, 1, &map, &nmap, 0);
 	if (error)
 		return error;

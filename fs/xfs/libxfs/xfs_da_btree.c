@@ -2521,6 +2521,7 @@ xfs_dabuf_map(
 		irecs = kmem_zalloc(sizeof(irec) * nfsb, KM_NOFS);
 
 	nirecs = nfsb;
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 	error = xfs_bmapi_read(dp, bno, nfsb, irecs, &nirecs,
 			xfs_bmapi_aflag(whichfork));
 	if (error)

@@ -387,7 +387,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		if (dio->error) {
 			iov_iter_revert(dio->submit.iter, copied);
 			copied = ret = 0;
-			pr_err("%s2YYY error\n", __func__);
+			pr_err("%s2YYY dio->error set\n", __func__);
 			goto out;
 		}
 
@@ -435,10 +435,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		n = bio->bi_iter.bi_size;
 		if (atomic_write && n != iter_len) {
 			/* This bio should have covered the complete length */
-		//	ret = -EINVAL;
-			pr_err("%s2.x atomic=1, n=%zd != iter_len=%zd\n", __func__, n, iter_len);
-	//		bio_put(bio);
-		//	goto out;
+			pr_err("%s2.x This bio should have covered the complete length n=%zd != iter_len=%zd\n", __func__, n, iter_len);
+			ret = -EINVAL;
+			bio_put(bio);
+			goto out;
 		}
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);

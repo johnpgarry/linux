@@ -428,6 +428,7 @@ xfs_dquot_disk_read(
 	/*
 	 * Find the block map; no allocations yet
 	 */
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 	error = xfs_bmapi_read(quotip, dqp->q_fileoffset,
 			XFS_DQUOT_CLUSTER_SIZE_FSB, &map, &nmaps, 0);
 	xfs_iunlock(quotip, lock_mode);

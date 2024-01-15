@@ -180,9 +180,10 @@ void		xfs_init_local_fork(struct xfs_inode *ip, int whichfork,
 xfs_extnum_t	xfs_iext_count(struct xfs_ifork *ifp);
 void		xfs_iext_insert_raw(struct xfs_ifork *ifp,
 			struct xfs_iext_cursor *cur,
-			struct xfs_bmbt_irec *irec);
+			struct xfs_bmbt_irec *irec,
+			bool atomic_write);
 void		xfs_iext_insert(struct xfs_inode *, struct xfs_iext_cursor *cur,
-			struct xfs_bmbt_irec *, int);
+			struct xfs_bmbt_irec *, int, bool atomic_write);
 void		xfs_iext_remove(struct xfs_inode *, struct xfs_iext_cursor *,
 			int);
 void		xfs_iext_destroy(struct xfs_ifork *);

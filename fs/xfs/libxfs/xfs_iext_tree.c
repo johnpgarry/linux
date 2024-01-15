@@ -48,15 +48,29 @@ static inline void xfs_iext_rec_clear(struct xfs_iext_rec *rec)
 	rec->lo = 0;
 	rec->hi = 0;
 }
+#if 0
 
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+#endif
 static void
 xfs_iext_set(
 	struct xfs_iext_rec	*rec,
-	struct xfs_bmbt_irec	*irec)
+	struct xfs_bmbt_irec	*irec,
+	bool atomic_write)
 {
 	ASSERT((irec->br_startoff & ~XFS_IEXT_STARTOFF_MASK) == 0);
 	ASSERT((irec->br_blockcount & ~XFS_IEXT_LENGTH_MASK) == 0);
 	ASSERT((irec->br_startblock & ~XFS_IEXT_STARTBLOCK_MASK) == 0);
+
+	if (1)
+		pr_err("%s atomic_write=%d irec->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, atomic_write, irec->br_startoff, irec->br_startblock, irec->br_blockcount, irec->br_state);
 
 	rec->lo = irec->br_startoff & XFS_IEXT_STARTOFF_MASK;
 	rec->hi = irec->br_blockcount & XFS_IEXT_LENGTH_MASK;
@@ -625,13 +639,16 @@ void
 xfs_iext_insert_raw(
 	struct xfs_ifork	*ifp,
 	struct xfs_iext_cursor	*cur,
-	struct xfs_bmbt_irec	*irec)
+	struct xfs_bmbt_irec	*irec,
+	bool atomic_write)
 {
 	xfs_fileoff_t		offset = irec->br_startoff;
 	struct xfs_iext_leaf	*new = NULL;
 	int			nr_entries, i;
 
 	xfs_iext_inc_seq(ifp);
+	pr_err("%s atomic_write=%d irec->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, atomic_write, irec->br_startoff, irec->br_startblock, irec->br_blockcount, irec->br_state);
 
 	if (ifp->if_height == 0)
 		xfs_iext_alloc_root(ifp, cur);
@@ -657,7 +674,9 @@ xfs_iext_insert_raw(
 
 	for (i = nr_entries; i > cur->pos; i--)
 		cur->leaf->recs[i] = cur->leaf->recs[i - 1];
-	xfs_iext_set(cur_rec(cur), irec);
+	pr_err("%s6 calling xfs_iext_set atomic_write=%d irec->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, atomic_write, irec->br_startoff, irec->br_startblock, irec->br_blockcount, irec->br_state);
+	xfs_iext_set(cur_rec(cur), irec, atomic_write);
 	ifp->if_bytes += sizeof(struct xfs_iext_rec);
 
 	if (new)
@@ -669,11 +688,12 @@ xfs_iext_insert(
 	struct xfs_inode	*ip,
 	struct xfs_iext_cursor	*cur,
 	struct xfs_bmbt_irec	*irec,
-	int			state)
+	int			state,
+	bool atomic_write)
 {
 	struct xfs_ifork	*ifp = xfs_iext_state_to_fork(ip, state);
 
-	xfs_iext_insert_raw(ifp, cur, irec);
+	xfs_iext_insert_raw(ifp, cur, irec, atomic_write);
 	trace_xfs_iext_insert(ip, cur, state, _RET_IP_);
 }
 
@@ -949,6 +969,7 @@ xfs_iext_lookup_extent(
 		cur->pos = 0;
 		return false;
 	}
+	#ifdef dsdd
 	for (cur->pos = 0; cur->pos < xfs_iext_max_recs(ifp); cur->pos++) {
 		struct xfs_iext_rec *rec = cur_rec(cur);
 
@@ -965,12 +986,18 @@ xfs_iext_lookup_extent(
 				pr_err("%s1 printing leafs atomic_write cur=%pS rec=%pS\n", __func__, cur, rec);
 		}
 	}
+	#endif
 	
 	for (cur->pos = 0; cur->pos < xfs_iext_max_recs(ifp); cur->pos++) {
 		struct xfs_iext_rec *rec = cur_rec(cur);
 
-		if (xfs_iext_rec_is_empty(rec))
+		if (atomic_write)
+			pr_err("%s2 checking xfs_iext_rec_is_empty cur=%pS rec=%pS lo=%lld hi=%lld offset=%lld\n", __func__, cur, rec, rec->lo, rec->hi, offset);
+		if (xfs_iext_rec_is_empty(rec)) {
+			if (atomic_write)
+				pr_err("%s2.1 xfs_iext_rec_is_empty is true cur=%pS rec=%pS lo=%lld hi=%lld offset=%lld\n", __func__, cur, rec, rec->lo, rec->hi, offset);
 			break;
+		}
 		if (xfs_iext_rec_cmp(rec, offset) >= 0) {
 			if (atomic_write)
 				pr_err("%s3 xfs_iext_rec_cmp passed cur=%pS rec=%pS lo=%lld hi=%lld offset=%lld\n", __func__, cur, rec, rec->lo, rec->hi, offset);
@@ -1000,6 +1027,10 @@ found:
 			pr_err("%s9 found atomic_write cur=%pS rec1=%pS lo=%lld hi=%lld offset=%lld\n", __func__, cur, rec1, rec1->lo, rec1->hi, offset);
 	}
 	xfs_iext_get(gotp, cur_rec(cur));
+
+	if (atomic_write)
+		pr_err("%s10 out gotp->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, gotp->br_startoff, gotp->br_startblock, gotp->br_blockcount, gotp->br_state);
 	return true;
 }
 
@@ -1038,8 +1069,7 @@ xfs_iext_update_extent(
 {
 	struct xfs_ifork	*ifp = xfs_iext_state_to_fork(ip, state);
 
-	if (atomic_write)
-		pr_err("%s atomic_write ifp=%pS\n", __func__, ifp);
+	pr_err("%s atomic_write=%d ifp=%pS\n", __func__, atomic_write, ifp);
 	xfs_iext_inc_seq(ifp);
 
 	if (cur->pos == 0) {
@@ -1053,7 +1083,7 @@ xfs_iext_update_extent(
 	}
 
 	trace_xfs_bmap_pre_update(ip, cur, state, _RET_IP_);
-	xfs_iext_set(cur_rec(cur), new);
+	xfs_iext_set(cur_rec(cur), new, atomic_write);
 	trace_xfs_bmap_post_update(ip, cur, state, _RET_IP_);
 }
 

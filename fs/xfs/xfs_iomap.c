@@ -856,9 +856,8 @@ xfs_direct_write_iomap_begin(
 	error = xfs_ilock_for_iomap(ip, flags, &lockmode);
 	if (error)
 		return error;
-	if (atomic_write)
-		pr_err("%s calling xfs_bmapi_read end_fsb=%lld - offset_fsb=%lld = %lld imap flags=0x%x\n",
-				__func__, end_fsb, offset_fsb, end_fsb - offset_fsb, flags);
+	pr_err("%s atomic_write=%d calling xfs_bmapi_read end_fsb=%lld - offset_fsb=%lld = %lld imap flags=0x%x\n",
+				__func__, atomic_write, end_fsb, offset_fsb, end_fsb - offset_fsb, flags);
 	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
 			       &nimaps, flags & IOMAP_ATOMIC_WRITE);
 	if (error)
@@ -868,8 +867,8 @@ xfs_direct_write_iomap_begin(
 //	XFS_EXT_NORM, XFS_EXT_UNWRITTEN,
 //} xfs_exntst_t;
 
-	if (atomic_write)
-		pr_err("%s1 after xfs_bmapi_read offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d IOMAP_ATOMIC_WRITE=%d nimaps=%d\n", __func__,
+	pr_err("%s1 atomic_write=%d after xfs_bmapi_read offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d IOMAP_ATOMIC_WRITE=%d nimaps=%d\n", __func__,
+			atomic_write,
 			offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, !!(flags & IOMAP_ATOMIC_WRITE), nimaps);
 	if (atomic_write) {
 		unsigned int unit_min, unit_max;
@@ -1369,6 +1368,7 @@ xfs_read_iomap_begin(
 	error = xfs_ilock_for_iomap(ip, flags, &lockmode);
 	if (error)
 		return error;
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
 			       &nimaps, 0);
 	if (!error && ((flags & IOMAP_REPORT) || IS_DAX(inode)))

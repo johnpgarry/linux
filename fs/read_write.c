@@ -1128,7 +1128,7 @@ SYSCALL_DEFINE6(pwritev2, unsigned long, fd, const struct iovec __user *, vec,
 		rwf_t, flags)
 {
 	loff_t pos = pos_from_hilo(pos_h, pos_l);
-	pr_err("%s flags=0x%x vlen=%ld\n", __func__, flags, vlen);
+	pr_err("************** %s ********** flags=0x%x vlen=%ld ****************\n", __func__, flags, vlen);
 	if (pos == -1)
 		return do_writev(fd, vec, vlen, flags);
 

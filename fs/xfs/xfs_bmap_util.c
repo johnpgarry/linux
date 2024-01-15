@@ -516,8 +516,10 @@ xfs_can_free_eofblocks(
 	       (VFS_I(ip)->i_state & I_FREEING));
 
 	/* prealloc/delalloc exists only on regular files */
-	if (!S_ISREG(VFS_I(ip)->i_mode))
+	if (!S_ISREG(VFS_I(ip)->i_mode)) {
+		pr_err("%s i_mode return false\n", __func__);
 		return false;
+	}
 
 	/*
 	 * Zero sized files with no cached pages and delalloc blocks will not
@@ -525,20 +527,28 @@ xfs_can_free_eofblocks(
 	 */
 	if (VFS_I(ip)->i_size == 0 &&
 	    VFS_I(ip)->i_mapping->nrpages == 0 &&
-	    ip->i_delayed_blks == 0)
+	    ip->i_delayed_blks == 0) {
+		pr_err("%s i_size && i_mapping->nrpages return false\n", __func__);
 		return false;
+	}
 
 	/* If we haven't read in the extent list, then don't do it now. */
-	if (xfs_need_iread_extents(&ip->i_df))
+	if (xfs_need_iread_extents(&ip->i_df)) {
+		pr_err("%s xfs_need_iread_extents return false\n", __func__);
 		return false;
+	}
 
 	/*
 	 * Do not free real preallocated or append-only files unless the file
 	 * has delalloc blocks and we are forced to remove them.
 	 */
-	if (ip->i_diflags & (XFS_DIFLAG_PREALLOC | XFS_DIFLAG_APPEND))
-		if (!force || ip->i_delayed_blks == 0)
+	if (ip->i_diflags & (XFS_DIFLAG_PREALLOC | XFS_DIFLAG_APPEND)) {
+		pr_err("%s XFS_DIFLAG_PREALLOC | XFS_DIFLAG_APPEND\n", __func__);
+		if (!force || ip->i_delayed_blks == 0) {
+			pr_err("%s XFS_DIFLAG_PREALLOC | XFS_DIFLAG_APPEND !force || ip->i_delayed_blks == 0\n", __func__);
 			return false;
+		}
+	}
 
 	/*
 	 * Do not try to free post-EOF blocks if EOF is beyond the end of the
@@ -546,27 +556,48 @@ xfs_can_free_eofblocks(
 	 * forever.
 	 */
 	end_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_ISIZE(ip));
-	if (XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1)
+	pr_err("%s3 end_fsb=%lld\n", __func__, end_fsb);
+	if (XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1) {
+	
 		end_fsb = xfs_rtb_roundup_rtx(mp, end_fsb);
-	last_fsb = XFS_B_TO_FSB(mp, mp->m_super->s_maxbytes);
-	if (last_fsb <= end_fsb)
-		return false;
+		pr_err("%s3.1 end_fsb=%lld XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1\n", __func__, end_fsb);
+	}
 
+
+	last_fsb = XFS_B_TO_FSB(mp, mp->m_super->s_maxbytes);
+	if (last_fsb <= end_fsb) {
+		pr_err("%s last_fsb <= end_fsb\n", __func__);
+		return false;
+	}
+#if 0
+
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+	#endif
 	/*
 	 * Look up the mapping for the first block past EOF.  If we can't find
 	 * it, there's nothing to free.
 	 */
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	pr_err("%s4 calling xfs_bmapi_read last_fsb=%lld end_fsb=%lld\n", __func__, last_fsb, end_fsb);
 	error = xfs_bmapi_read(ip, end_fsb, last_fsb - end_fsb, &imap, &nimaps,
 			0);
+	pr_err("%s5 called xfs_bmapi_read end_fsb=%lld last_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+		__func__, end_fsb, last_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-	if (error || nimaps == 0)
+	if (error || nimaps == 0) {
+		pr_err("%s6 error || nimaps \n", __func__);
 		return false;
+	}
 
 	/*
 	 * If there's a real mapping there or there are delayed allocation
 	 * reservations, then we have post-EOF blocks to try to free.
 	 */
+	pr_err("%s10 imap.br_startblock=%lld != HOLESTARTBLOCK=%lld =%d ip->i_delayed_blk=%lld\n",
+		__func__, imap.br_startblock, HOLESTARTBLOCK, imap.br_startblock != HOLESTARTBLOCK, ip->i_delayed_blks);
 	return imap.br_startblock != HOLESTARTBLOCK || ip->i_delayed_blks;
 }
 
@@ -606,6 +637,7 @@ xfs_free_eofblocks(
 	 * flushed to disk then the files may be full of holes (ie NULL files
 	 * bug).
 	 */
+	pr_err("%s calling xfs_itruncate_extents_flags\n", __func__);
 	error = xfs_itruncate_extents_flags(&tp, ip, XFS_DATA_FORK,
 				XFS_ISIZE(ip), XFS_BMAPI_NODISCARD);
 	if (error)
@@ -905,6 +937,7 @@ xfs_prepare_shift(
 	 * into the accessible region of the file.
 	 */
 	if (xfs_can_free_eofblocks(ip, true)) {
+		pr_err("%s calling xfs_free_eofblocks\n", __func__);
 		error = xfs_free_eofblocks(ip);
 		if (error)
 			return error;

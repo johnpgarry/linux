@@ -175,6 +175,7 @@ xfs_fs_map_blocks(
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 
 	lock_flags = xfs_ilock_data_map_shared(ip);
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb,
 				&imap, &nimaps, bmapi_flags);
 	seq = xfs_iomap_inode_sequence(ip, 0);
@@ -232,6 +233,7 @@ xfs_pnfs_validate_isize(
 	int			error = 0;
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 	error = xfs_bmapi_read(ip, XFS_B_TO_FSBT(ip->i_mount, isize - 1), 1,
 				&imap, &nimaps, 0);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);

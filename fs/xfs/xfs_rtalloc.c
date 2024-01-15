@@ -1339,7 +1339,9 @@ xfs_bmap_rtalloc(
 	};
 	int			error;
 
+	pr_err("%s\n", __func__);
 	align = xfs_get_extsz_hint(ap->ip);
+	pr_err("%s2 align=%d\n", __func__, align);
 retry:
 	error = xfs_bmap_extsize_align(mp, &ap->got, &ap->prev,
 					align, 1, ap->eof, 0,

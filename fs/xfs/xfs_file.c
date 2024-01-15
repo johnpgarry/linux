@@ -1271,6 +1271,7 @@ xfs_file_release(
 	struct inode	*inode,
 	struct file	*filp)
 {
+	pr_err("%s calling xfs_release\n", __func__);
 	return xfs_release(XFS_I(inode));
 }
 

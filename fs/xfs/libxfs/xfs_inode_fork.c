@@ -147,7 +147,7 @@ xfs_iformat_extents(
 						fa, &new);
 			}
 
-			xfs_iext_insert(ip, &icur, &new, state);
+			xfs_iext_insert(ip, &icur, &new, state, false);
 			trace_xfs_read_extent(ip, &icur, state, _THIS_IP_);
 			xfs_iext_next(ifp, &icur);
 		}

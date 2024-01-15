@@ -117,6 +117,7 @@ xchk_rtbitmap_check_extents(
 			break;
 
 		/* Make sure we have a written extent. */
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 		error = xfs_bmapi_read(ip, off, endoff - off, &map, &nmap,
 				XFS_DATA_FORK);
 		if (!xchk_fblock_process_error(sc, XFS_DATA_FORK, off, &error))

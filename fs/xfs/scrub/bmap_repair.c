@@ -539,7 +539,7 @@ xrep_bmap_extents_load(
 
 		xfs_bmbt_disk_get_all(&rec, &irec);
 
-		xfs_iext_insert_raw(ifp, &icur, &irec);
+		xfs_iext_insert_raw(ifp, &icur, &irec, false);
 		if (!isnullstartblock(irec.br_startblock))
 			ifp->if_nextents++;
 

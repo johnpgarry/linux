@@ -792,6 +792,7 @@ xfs_reflink_end_cow_extent(
 
 	/* Grab the corresponding mapping in the data fork. */
 	nmaps = 1;
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 	error = xfs_bmapi_read(ip, del.br_startoff, del.br_blockcount, &data,
 			&nmaps, 0);
 	if (error)

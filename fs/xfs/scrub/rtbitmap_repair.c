@@ -68,6 +68,7 @@ xrep_rtbitmap_data_mappings(
 		 * If we have a real extent mapping this block then we're
 		 * in ok shape.
 		 */
+	pr_err("%s calling xfs_bmapi_read\n", __func__);
 		error = xfs_bmapi_read(sc->ip, off, len - off, &map, &nmaps,
 				XFS_DATA_FORK);
 		if (error)

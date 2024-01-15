@@ -1429,6 +1429,7 @@ xfs_itruncate_extents_flags(
 		return 0;
 	}
 
+	pr_err("%s calling xfs_bunmapi_range new_size=%lld\n", __func__, new_size);
 	error = xfs_bunmapi_range(&tp, ip, flags, first_unmap_block,
 			XFS_MAX_FILEOFF);
 	if (error)
@@ -1463,14 +1464,17 @@ xfs_release(
 {
 	xfs_mount_t	*mp = ip->i_mount;
 	int		error = 0;
+	pr_err("%s\n", __func__);
 
 	if (!S_ISREG(VFS_I(ip)->i_mode) || (VFS_I(ip)->i_mode == 0))
 		return 0;
 
+	pr_err("%s0\n", __func__);
 	/* If this is a read-only mount, don't do this (would generate I/O) */
 	if (xfs_is_readonly(mp))
 		return 0;
 
+	pr_err("%s1\n", __func__);
 	if (!xfs_is_shutdown(mp)) {
 		int truncated;
 
@@ -1495,6 +1499,7 @@ xfs_release(
 		}
 	}
 
+	pr_err("%s3 check VFS_I(ip)->i_nlink\n", __func__);
 	if (VFS_I(ip)->i_nlink == 0)
 		return 0;
 
@@ -1504,9 +1509,11 @@ xfs_release(
 	 * another chance to drop them once the last reference to the inode is
 	 * dropped, so we'll never leak blocks permanently.
 	 */
+	pr_err("%s3.1\n", __func__);
 	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL))
 		return 0;
 
+	pr_err("%s4 calling xfs_can_free_eofblocks\n", __func__);
 	if (xfs_can_free_eofblocks(ip, false)) {
 		/*
 		 * Check if the inode is being opened, written and closed
@@ -1522,9 +1529,11 @@ xfs_release(
 		 * speculative allocation, but after that we will leave it in
 		 * place.
 		 */
+		pr_err("%s5 calling xfs_iflags_test for\n", __func__);
 		if (xfs_iflags_test(ip, XFS_IDIRTY_RELEASE))
 			goto out_unlock;
 
+		pr_err("%s6 calling xfs_free_eofblocks\n", __func__);
 		error = xfs_free_eofblocks(ip);
 		if (error)
 			goto out_unlock;
@@ -1787,8 +1796,10 @@ xfs_inactive(
 		 * about acquiring it in reclaim context. We have the only
 		 * reference to the inode at this point anyways.
 		 */
-		if (xfs_can_free_eofblocks(ip, true))
+		if (xfs_can_free_eofblocks(ip, true)) {
+			pr_err("%s calling xfs_free_eofblocks\n", __func__);
 			error = xfs_free_eofblocks(ip);
+		}
 
 		goto out;
 	}

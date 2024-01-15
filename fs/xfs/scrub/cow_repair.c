@@ -431,7 +431,7 @@ xrep_cow_replace_mapping(
 	new.br_startoff = got->br_startoff;
 	new.br_startblock = repl->fsbno;
 	new.br_blockcount = repl->len;
-	xfs_iext_insert(ip, icur, &new, BMAP_COWFORK);
+	xfs_iext_insert(ip, icur, &new, BMAP_COWFORK, false);
 }
 
 /*
