@@ -404,6 +404,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		n = bio->bi_iter.bi_size;
 		if (atomic_write && n != iter_len) {
 			/* This bio should have covered the complete length */
+			pr_err("%s2.x This bio should have covered the complete length n=%zd != iter_len=%zd\n", __func__, n, iter_len);
 			ret = -EINVAL;
 			bio_put(bio);
 			goto out;
