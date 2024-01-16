@@ -28,6 +28,9 @@ struct statx_timestamp;
 #include <sys/stat.h>
 #undef statx
 #undef statx_timestamp
+#define statx foo1
+#define statx_timestamp foo_timestamp1
+#include "../../include/uapi/linux/stat.h"
 
 #define AT_STATX_SYNC_TYPE	0x6000
 #define AT_STATX_SYNC_AS_STAT	0x0000
@@ -37,6 +40,11 @@ struct statx_timestamp;
 #ifndef __NR_statx
 #define __NR_statx -1
 #endif
+
+#define STATX_WRITE_ATOMIC	0x00008000U	/* Want/got atomic_write_* fields */
+#define STATX_ATTR_WRITE_ATOMIC		0x00400000 /* File supports atomic write operations */
+
+extern int open(const char *path, int flags, ...);
 
 static __attribute__((unused))
 ssize_t statx(int dfd, const char *filename, unsigned flags,
@@ -78,7 +86,7 @@ static void dump_statx(struct statx *stx)
 {
 	char buffer[256], ft = '?';
 
-	printf("results=%x\n", stx->stx_mask);
+	printf("%s results=%x\n", __func__, stx->stx_mask);
 
 	printf(" ");
 	if (stx->stx_mask & STATX_SIZE)
@@ -147,6 +155,7 @@ static void dump_statx(struct statx *stx)
 	if (stx->stx_mask & STATX_BTIME)
 		print_time(" Birth: ", &stx->stx_btime);
 
+	printf("stx_attributes_mask=0x%llx\n", stx->stx_attributes_mask);
 	if (stx->stx_attributes_mask) {
 		unsigned char bits, mbits;
 		int loop, byte;
@@ -162,6 +171,13 @@ static void dump_statx(struct statx *stx)
 			"???me???"	/* 15- 8	0x00000000-0000ff00 */
 			"?dai?c??"	/*  7- 0	0x00000000-000000ff */
 			;
+
+		if (stx->stx_attributes & STATX_ATTR_WRITE_ATOMIC) {
+			printf("\tSTATX_ATTR_WRITE_ATOMIC set\n");
+			printf("\tunit min: %d\n", stx->stx_atomic_write_unit_min);
+			printf("\tunit max: %d\n", stx->stx_atomic_write_unit_max);
+			printf("\tsegments max: %d\n", stx->stx_atomic_write_segments_max);
+		}
 
 		printf("Attributes: %016llx (",
 		       (unsigned long long)stx->stx_attributes);
@@ -216,7 +232,8 @@ static void dump_hex(unsigned long long *data, int from, int to)
 int main(int argc, char **argv)
 {
 	struct statx stx;
-	int ret, raw = 0, atflag = AT_SYMLINK_NOFOLLOW;
+	int ret, raw = 0, atflag = AT_SYMLINK_NOFOLLOW, use_fd = 0, fd = -1;
+	int o_flags = O_RDWR;
 
 	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
 
@@ -243,14 +260,41 @@ int main(int argc, char **argv)
 			atflag |= AT_NO_AUTOMOUNT;
 			continue;
 		}
+		if (strcmp(*argv, "-a") == 0) {
+			mask |= STATX_WRITE_ATOMIC;
+			continue;
+		}
 		if (strcmp(*argv, "-R") == 0) {
 			raw = 1;
 			continue;
 		}
+		if (strcmp(*argv, "-f") == 0) {
+			use_fd = 1;
+			atflag |= AT_EMPTY_PATH;
+			continue;
+		}
+		if (strcmp(*argv, "-d") == 0) {
+			o_flags |= O_DIRECT;
+			continue;
+		}
 
 		memset(&stx, 0xbf, sizeof(stx));
-		ret = statx(AT_FDCWD, *argv, atflag, mask, &stx);
+		printf("%s use_fd=%d o_flags=0x%x (O_DIRECT=%d)\n",
+			__func__, use_fd, o_flags, !!(o_flags & O_DIRECT));
+		if (use_fd) {
+			char *file = *argv;
+			fd = open(file, o_flags, 777);
+			if (fd < 0) {
+				printf("could not open %s\n", file);
+				return -1;
+			}
+			ret = statx(fd, "", atflag, mask, &stx);
+		} else {
+			ret = statx(AT_FDCWD, *argv, atflag, mask, &stx);
+		}
 		printf("statx(%s) = %d\n", *argv, ret);
+		if (fd >= 0)
+			close(fd);
 		if (ret < 0) {
 			perror(*argv);
 			exit(1);
