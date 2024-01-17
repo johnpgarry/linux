@@ -565,19 +565,22 @@ void xfs_get_atomic_write_attr(
 	awu_min = queue_atomic_write_unit_min_bytes(q);
 	awu_max = queue_atomic_write_unit_max_bytes(q);
 
-	awu_min &= ~XFS_BLOCKMASK(mp);
-	awu_max &= ~XFS_BLOCKMASK(mp);
+	awu_min &= ~mp->m_blockmask;
+	awu_max &= ~mp->m_blockmask;
 
 	align = XFS_FSB_TO_B(mp, extsz);
 
-	if (!awu_max || !is_power_of_2(align)) {
+	pr_err("%s ip=%pS awu_max=%d xfs_inode_atomicwrites=%d align=%d\n",
+		__func__, ip, awu_max, xfs_inode_atomicwrites(ip), align);
+
+	if (!awu_max || !xfs_inode_atomicwrites(ip) || !align || !is_power_of_2(align)) {
 		*unit_min = 0;
 		*unit_max = 0;
 	} else {
 		if (awu_min)
 			*unit_min = min(awu_min, align);
 		else
-			*unit_min = XFS_BLOCKSIZE(mp);
+			*unit_min = mp->m_sb.sb_blocksize;
 
 		*unit_max = min(awu_max, align);
 	}

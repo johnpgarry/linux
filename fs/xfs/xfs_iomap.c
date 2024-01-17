@@ -289,6 +289,13 @@ xfs_iomap_write_direct(
 		}
 	}
 
+	if (xfs_inode_atomicwrites(ip)) {
+		pr_err("%s2.1 special atomic write handling atomic_write offset_fsb=%lld count_fsb=%lld resaligned=%lld imap->br_state=%d IOMAP_ATOMIC_WRITE=%d\n",
+				__func__, offset_fsb, count_fsb, resaligned, imap->br_state,
+				!!(flags & IOMAP_ATOMIC_WRITE));
+		bmapi_flags = XFS_BMAPI_ZERO;
+	}
+
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, dblocks,
 			rblocks, force, &tp);
 	if (error)
@@ -815,6 +822,7 @@ xfs_direct_write_iomap_begin(
 	if (flags & IOMAP_ATOMIC_WRITE) {
 		xfs_filblks_t unit_min_fsb, unit_max_fsb;
 		unsigned int unit_min, unit_max;
+		pr_err("%s IOMAP_ATOMIC_WRITE\n", __func__);
 
 		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
 		unit_min_fsb = XFS_B_TO_FSBT(mp, unit_min);
@@ -822,11 +830,13 @@ xfs_direct_write_iomap_begin(
 
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
 			error = -EINVAL;
+			pr_err("%s !imap_spans_range\n", __func__);
 			goto out_unlock;
 		}
 
-		if (offset & XFS_BLOCKMASK(mp) ||
-		    length & XFS_BLOCKMASK(mp)) {
+		if ((offset & mp->m_blockmask) ||
+		    (length & mp->m_blockmask)) {
+			pr_err("%s offset & mp->m_blockmask || length & mp->m_blockmask\n", __func__);
 			error = -EINVAL;
 			goto out_unlock;
 		}
@@ -837,14 +847,17 @@ xfs_direct_write_iomap_begin(
 		} else if (imap.br_blockcount < unit_min_fsb ||
 			   imap.br_blockcount > unit_max_fsb) {
 			error = -EINVAL;
+			pr_err("%s imap.br_blockcount < unit_min_fsb || imap.br_blockcount > unit_max_fsb\n", __func__);
 			goto out_unlock;
 		} else if (!is_power_of_2(imap.br_blockcount)) {
+			pr_err("%s !is_power_of_2(imap.br_blockcount\n", __func__);
 			error = -EINVAL;
 			goto out_unlock;
 		}
 
 		if (imap.br_startoff &&
 		    imap.br_startoff & (imap.br_blockcount - 1)) {
+			pr_err("%s imap.br_startoff && imap.br_startoff & (imap.br_blockcount - 1)\n", __func__);
 			error =  -EINVAL;
 			goto out_unlock;
 		}

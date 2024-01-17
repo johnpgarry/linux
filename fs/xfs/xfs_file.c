@@ -1228,10 +1228,13 @@ xfs_file_open(
 	struct inode	*inode,
 	struct file	*file)
 {
+	struct xfs_inode *ip = XFS_I(inode);
 	if (xfs_is_shutdown(XFS_M(inode->i_sb)))
 		return -EIO;
 	file->f_mode |= FMODE_NOWAIT | FMODE_BUF_RASYNC | FMODE_BUF_WASYNC |
 			FMODE_DIO_PARALLEL_WRITE | FMODE_CAN_ODIRECT;
+	if (xfs_inode_atomicwrites(ip))
+		file->f_mode |= FMODE_CAN_ATOMIC_WRITE;
 	return generic_file_open(inode, file);
 }
 
