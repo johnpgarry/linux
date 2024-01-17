@@ -520,8 +520,10 @@ xfs_stat_blksize(
 	 * If the file blocks are being allocated from a realtime volume, then
 	 * always return the realtime extent size.
 	 */
-	if (XFS_IS_REALTIME_INODE(ip))
+	if (XFS_IS_REALTIME_INODE(ip)) {
+		pr_err("%s calling xfs_get_extsz_hint for RT\n", __func__);
 		return XFS_FSB_TO_B(mp, xfs_get_extsz_hint(ip));
+	}
 
 	/*
 	 * Allow large block sizes to be reported to userspace programs if the
@@ -551,13 +553,15 @@ void xfs_get_atomic_write_attr(
 	unsigned int *unit_min,
 	unsigned int *unit_max)
 {
-	xfs_extlen_t		extsz = xfs_get_extsz(ip);
+	xfs_extlen_t		extsz;
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct block_device	*bdev = target->bt_bdev;
 	unsigned int		awu_min, awu_max, align;
 	struct request_queue	*q = bdev->bd_queue;
 	struct xfs_mount	*mp = ip->i_mount;
 
+	pr_err("%s calling xfs_get_extsz\n", __func__);
+	extsz = xfs_get_extsz(ip);
 	/*
 	 * Convert to multiples of the BLOCKSIZE (as we support a minimum
 	 * atomic write unit of BLOCKSIZE).
@@ -570,8 +574,8 @@ void xfs_get_atomic_write_attr(
 
 	align = XFS_FSB_TO_B(mp, extsz);
 
-	pr_err("%s ip=%pS awu_max=%d xfs_inode_atomicwrites=%d align=%d\n",
-		__func__, ip, awu_max, xfs_inode_atomicwrites(ip), align);
+	pr_err("%s2 ip=%pS awu_max=%d xfs_inode_atomicwrites=%d align=%d extsz=%d\n",
+		__func__, ip, awu_max, xfs_inode_atomicwrites(ip), align, extsz);
 
 	if (!awu_max || !xfs_inode_atomicwrites(ip) || !align || !is_power_of_2(align)) {
 		*unit_min = 0;

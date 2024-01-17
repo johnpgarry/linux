@@ -58,6 +58,9 @@ xfs_get_extsz_hint(
 	 */
 	if (xfs_is_always_cow_inode(ip))
 		return 0;
+	if (XFS_IS_REALTIME_INODE(ip))
+		pr_err("%s XFS_DIFLAG_EXTSIZE=%d ip->i_extsize=%d ip->i_mount->m_sb.sb_rextsize=%d\n",
+			__func__, !!(ip->i_diflags & XFS_DIFLAG_EXTSIZE), ip->i_extsize, ip->i_mount->m_sb.sb_rextsize);
 	if ((ip->i_diflags & XFS_DIFLAG_EXTSIZE) && ip->i_extsize)
 		return ip->i_extsize;
 	if (XFS_IS_REALTIME_INODE(ip))
@@ -79,7 +82,8 @@ xfs_get_extsz(
 	if (xfs_is_always_cow_inode(ip))
 		return 0;
 
-	pr_err("%s XFS_IS_REALTIME_INODE=%d sb_rextsize=%d\n", __func__, XFS_IS_REALTIME_INODE(ip), ip->i_mount->m_sb.sb_rextsize);
+	if (XFS_IS_REALTIME_INODE(ip))
+		pr_err("%s XFS_IS_REALTIME_INODE=%d sb_rextsize=%d\n", __func__, XFS_IS_REALTIME_INODE(ip), ip->i_mount->m_sb.sb_rextsize);
 	if (XFS_IS_REALTIME_INODE(ip))
 		return ip->i_mount->m_sb.sb_rextsize;
 
@@ -101,6 +105,7 @@ xfs_get_cowextsz_hint(
 	a = 0;
 	if (ip->i_diflags2 & XFS_DIFLAG2_COWEXTSIZE)
 		a = ip->i_cowextsize;
+	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	b = xfs_get_extsz_hint(ip);
 
 	a = max(a, b);

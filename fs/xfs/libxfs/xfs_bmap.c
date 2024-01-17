@@ -3341,8 +3341,10 @@ xfs_bmap_compute_alignments(
 
 	if (ap->flags & XFS_BMAPI_COWFORK)
 		align = xfs_get_cowextsz_hint(ap->ip);
-	else if (ap->datatype & XFS_ALLOC_USERDATA)
+	else if (ap->datatype & XFS_ALLOC_USERDATA) {
+		pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 		align = xfs_get_extsz_hint(ap->ip);
+	}
 	if (align) {
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
@@ -4112,6 +4114,8 @@ xfs_bmapi_allocate(
 	int			error;
 
 	ASSERT(bma->length > 0);
+	pr_err("%s bma->length=%d, minlen=%d mp->m_ag_max_usable=%d\n",
+			__func__, bma->length, bma->minlen, mp->m_ag_max_usable);
 
 	/*
 	 * For the wasdelay case, we could also just allocate the stuff asked
@@ -4134,6 +4138,8 @@ xfs_bmapi_allocate(
 	else
 		bma->minlen = 1;
 
+	pr_err("%s3 bma->length=%d, minlen=%d mp->m_ag_max_usable=%d\n",
+			__func__, bma->length, bma->minlen, mp->m_ag_max_usable);
 	if (bma->flags & XFS_BMAPI_METADATA) {
 		if (unlikely(XFS_TEST_ERROR(false, mp,
 				XFS_ERRTAG_BMAP_ALLOC_MINLEN_EXTENT)))
@@ -4147,6 +4153,7 @@ xfs_bmapi_allocate(
 		return error;
 
 	if (bma->flags & XFS_BMAPI_ZERO) {
+		pr_err("%s4 calling xfs_zero_extent bma->blkno=%lld, length=%d\n", __func__, bma->blkno, bma->length);
 		error = xfs_zero_extent(bma->ip, bma->blkno, bma->length);
 		if (error)
 			return error;
@@ -4350,6 +4357,11 @@ xfs_bmapi_write(
 	int			n;		/* current extent index */
 	xfs_fileoff_t		obno;		/* old block number (offset) */
 
+		pr_err("%s bma.length=%d, minlen=%d, total=%d len=%lld bno=%lld total=%d flags=0x%x XFS_BMAPI_PREALLOC=%d, _CONVERT=%d, _ZERO=%d\n",
+			__func__, bma.length, bma.minlen, bma.total, len, bno, total, flags,
+			!!(flags & XFS_BMAPI_PREALLOC),
+			!!(flags & XFS_BMAPI_CONVERT),
+			!!(flags & XFS_BMAPI_ZERO));
 #ifdef DEBUG
 	xfs_fileoff_t		orig_bno;	/* original block number value */
 	int			orig_flags;	/* original flags arg value */
@@ -4398,18 +4410,28 @@ xfs_bmapi_write(
 	if (error)
 		goto error0;
 
+		pr_err("%s1 calling xfs_iext_lookup_extent bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &bma.icur, &bma.got))
 		eof = true;
 	if (!xfs_iext_peek_prev_extent(ifp, &bma.icur, &bma.prev))
 		bma.prev.br_startoff = NULLFILEOFF;
 	bma.minleft = xfs_bmapi_minleft(tp, ip, whichfork);
 
+		pr_err("%s2 going to loop bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 	n = 0;
 	end = bno + len;
 	obno = bno;
 	while (bno < end && n < *nmap) {
 		bool			need_alloc = false, wasdelay = false;
 
+			pr_err("%s3 starting to loop bno=%lld end=%lld bma.length=%d, minlen=%d, total=%d, len=%lld end=%lld n=%d *nmap=%d\n",
+				__func__, bno, end, bma.length, bma.minlen, bma.total, len, end, n, *nmap);
 		/* in hole or beyond EOF? */
 		if (eof || bma.got.br_startoff > bno) {
 			/*
@@ -4443,11 +4465,13 @@ xfs_bmapi_write(
 			 * xfs_extlen_t and therefore 32 bits. Hence we have to
 			 * check for 32-bit overflows and handle them here.
 			 */
+				pr_err("%s3.1 looping bma.length=%d, minlen=%d, total=%d, len=%lld\n", __func__, bma.length, bma.minlen, bma.total, len);
 			if (len > (xfs_filblks_t)XFS_MAX_BMBT_EXTLEN)
 				bma.length = XFS_MAX_BMBT_EXTLEN;
 			else
 				bma.length = len;
 
+				pr_err("%s4 looping bma.length=%d, minlen=%d, total=%d\n", __func__, bma.length, bma.minlen, bma.total);
 			ASSERT(len > 0);
 			ASSERT(bma.length > 0);
 			error = xfs_bmapi_allocate(&bma);
@@ -4466,18 +4490,42 @@ xfs_bmapi_write(
 		}
 
 		/* Deal with the allocated space we found.  */
+			pr_err("%s5 outside loop bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
+			pr_err("%s5.1 calling xfs_bmapi_trim_map mval->br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld obno=%lld\n",
+			__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount, len, obno);
 		xfs_bmapi_trim_map(mval, &bma.got, &bno, len, obno,
 							end, n, flags);
+			pr_err("%s6 called xfs_bmapi_trim_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
+			pr_err("%s6.1 calling xfs_bmapi_convert_unwritten mval->br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount, len);
 
 		/* Execute unwritten extent conversion if necessary */
 		error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
+			pr_err("%s7 called xfs_bmapi_convert_unwritten bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 		if (error == -EAGAIN)
 			continue;
 		if (error)
 			goto error0;
 
+			pr_err("%s8 calling xfs_bmapi_update_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 		/* update the extent map to return */
 		xfs_bmapi_update_map(&mval, &bno, &len, obno, end, &n, flags);
+			pr_err("%s9 called xfs_bmapi_update_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 
 		/*
 		 * If we're done, stop now.  Stop when we've allocated
@@ -4504,6 +4552,10 @@ xfs_bmapi_write(
 	xfs_bmapi_finish(&bma, whichfork, 0);
 	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
 		orig_nmap, *nmap);
+		pr_err("%s10 out bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+			__func__, bma.length, bma.minlen, bma.total,
+			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
+			len);
 	return 0;
 error0:
 	xfs_bmapi_finish(&bma, whichfork, error);

@@ -1077,6 +1077,7 @@ xfs_flags2diflags(
 	uint16_t		di_flags =
 		(ip->i_diflags & XFS_DIFLAG_PREALLOC);
 
+	pr_err("%s S_ISREG=%d xflags=0x%x\n", __func__, S_ISREG(VFS_I(ip)->i_mode), xflags);
 	if (xflags & FS_XFLAG_IMMUTABLE)
 		di_flags |= XFS_DIFLAG_IMMUTABLE;
 	if (xflags & FS_XFLAG_APPEND)
@@ -1143,10 +1144,13 @@ xfs_ioctl_setattr_xflags(
 	bool			atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
 
-	pr_err("%s fa->fsx_xflags=0x%x REALTIME=%d ATOMICWRITES=%d\n",
+	pr_err("%s fa->fsx_xflags=0x%x REALTIME=%d ATOMICWRITES=%d EXTSIZE=%d EXTSZINHERIT=%d\n",
 		__func__, fa->fsx_xflags,
 		!!(fa->fsx_xflags & FS_XFLAG_REALTIME),
-		!!(fa->fsx_xflags & FS_XFLAG_ATOMICWRITES)); 
+		!!(fa->fsx_xflags & FS_XFLAG_ATOMICWRITES),
+		!!(fa->fsx_xflags & FS_XFLAG_EXTSIZE),
+		!!(fa->fsx_xflags & FS_XFLAG_EXTSZINHERIT));
+
 	if (rtflag != XFS_IS_REALTIME_INODE(ip) ||
 		atomic_writes != xfs_inode_atomicwrites(ip)) {
 		/* Can't change realtime or atomic writes flags if any extents are allocated. */
@@ -1285,6 +1289,7 @@ xfs_ioctl_setattr_check_extsize(
 	xfs_failaddr_t		failaddr;
 	uint16_t		new_diflags;
 
+	pr_err("%s fa->fsx_valid=%d, fsx_xflags=0x%x, fsx_extsize=%d\n", __func__, fa->fsx_valid, fa->fsx_xflags, fa->fsx_extsize);
 	if (!fa->fsx_valid)
 		return 0;
 
@@ -1315,6 +1320,7 @@ xfs_ioctl_setattr_check_extsize(
 	failaddr = xfs_inode_validate_extsize(ip->i_mount,
 			XFS_B_TO_FSB(mp, fa->fsx_extsize),
 			VFS_I(ip)->i_mode, new_diflags);
+	pr_err("%s10 out fa->fsx_valid=%d, fsx_xflags=0x%x failaddr=%pS\n", __func__, fa->fsx_valid, fa->fsx_xflags, failaddr);
 	return failaddr != NULL ? -EINVAL : 0;
 }
 

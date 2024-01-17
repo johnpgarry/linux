@@ -1339,6 +1339,9 @@ xfs_bmap_rtalloc(
 	};
 	int			error;
 
+	pr_err("%s ap->length=%d, minlen=%d, total=%d, minlen=%d, minleft=%d, eof=%d, offset=%lld, length=%d\n",
+			__func__, ap->length, ap->minlen, ap->total, ap->minlen, ap->minleft, ap->eof, ap->offset, ap->length);
+	pr_err("%s0 calling xfs_get_extsz_hint\n", __func__);
 	align = xfs_get_extsz_hint(ap->ip);
 retry:
 	error = xfs_bmap_extsize_align(mp, &ap->got, &ap->prev,
@@ -1348,6 +1351,8 @@ retry:
 		return error;
 	ASSERT(ap->length);
 	ASSERT(xfs_extlen_to_rtxmod(mp, ap->length) == 0);
+	pr_err("%s1 ap->length=%d, minlen=%d, total=%d, minlen=%d, minleft=%d, eof=%d, offset=%lld, length=%d\n",
+			__func__, ap->length, ap->minlen, ap->total, ap->minlen, ap->minleft, ap->eof, ap->offset, ap->length);
 
 	/*
 	 * If we shifted the file offset downward to satisfy an extent size
@@ -1412,6 +1417,9 @@ retry:
 			xfs_rtalloc_align_minmax(&raminlen, &ralen, &prod);
 	}
 
+
+	pr_err("%s3 ap->length=%d, minlen=%d, total=%d, minlen=%d, minleft=%d, eof=%d, offset=%lld, length=%d\n",
+			__func__, ap->length, ap->minlen, ap->total, ap->minlen, ap->minleft, ap->eof, ap->offset, ap->length);
 	if (start) {
 		error = xfs_rtallocate_extent_near(&args, start, raminlen,
 				ralen, &ralen, prod, &rtx);

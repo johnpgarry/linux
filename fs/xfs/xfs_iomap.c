@@ -203,11 +203,12 @@ xfs_iomap_eof_align_last_fsb(
 	xfs_fileoff_t		end_fsb)
 {
 	struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, XFS_DATA_FORK);
-	xfs_extlen_t		extsz = xfs_get_extsz_hint(ip);
+	xfs_extlen_t		extsz;
 	xfs_extlen_t		align = xfs_eof_alignment(ip);
 	struct xfs_bmbt_irec	irec;
 	struct xfs_iext_cursor	icur;
-
+	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
+	extsz = xfs_get_extsz_hint(ip);
 	ASSERT(!xfs_need_iread_extents(ifp));
 
 	/*
@@ -253,6 +254,7 @@ xfs_iomap_write_direct(
 
 	ASSERT(count_fsb > 0);
 
+	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
 					   xfs_get_extsz_hint(ip));
 	if (unlikely(XFS_IS_REALTIME_INODE(ip))) {
@@ -1021,6 +1023,7 @@ xfs_buffered_write_iomap_begin(
 		return -EIO;
 
 	/* we can't use delayed allocations when using extent size hints */
+	pr_err("%s calling xfs_get_extsz_hint\n", __func__);
 	if (xfs_get_extsz_hint(ip))
 		return xfs_direct_write_iomap_begin(inode, offset, count,
 				flags, iomap, srcmap);

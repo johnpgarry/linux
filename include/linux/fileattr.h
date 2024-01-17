@@ -33,6 +33,18 @@ struct fileattr {
 	bool	fsx_valid:1;
 };
 
+#if 0
+struct fsxattr {
+	__u32		fsx_xflags;	/* xflags field value (get/set) */
+	__u32		fsx_extsize;	/* extsize field value (get/set)*/
+	__u32		fsx_nextents;	/* nextents field value (get)	*/
+	__u32		fsx_projid;	/* project identifier (get/set) */
+	__u32		fsx_cowextsize;	/* cow extsize field value (get/set) */
+	__u32		fsx_atomicwrites_size;	/*  */
+	unsigned char	fsx_pad[4];
+};
+#endif
+
 int copy_fsxattr_to_user(const struct fileattr *fa, struct fsxattr __user *ufa);
 
 void fileattr_fill_xflags(struct fileattr *fa, u32 xflags);

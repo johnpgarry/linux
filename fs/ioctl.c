@@ -569,7 +569,7 @@ static int copy_fsxattr_from_user(struct fileattr *fa,
 
 	if (copy_from_user(&xfa, ufa, sizeof(xfa)))
 		return -EFAULT;
-	pr_err("%s1 fsx_xflags=0x%x, fsx_extsize=%d, fsx_atomicwrites_size=?\n", __func__, xfa.fsx_xflags, xfa.fsx_extsize);
+	pr_err("%s1 initial from userspace xfa.fsx_xflags=0x%x, fsx_extsize=%d, fsx_atomicwrites_size=?\n", __func__, xfa.fsx_xflags, xfa.fsx_extsize);
 
 	fileattr_fill_xflags(fa, xfa.fsx_xflags);
 	fa->fsx_extsize = xfa.fsx_extsize;
@@ -577,7 +577,7 @@ static int copy_fsxattr_from_user(struct fileattr *fa,
 	fa->fsx_projid = xfa.fsx_projid;
 	fa->fsx_cowextsize = xfa.fsx_cowextsize;
 //	fa->fsx_atomicwrites_size = xfa.fsx_atomicwrites_size;
-	pr_err("%s2 fa->flags=0x%x, fsx_xflags=0x%x, fsx_extsize=%d, fsx_atomicwrites_size=?\n", __func__, fa->flags, fa->fsx_xflags, fa->fsx_extsize);
+	pr_err("%s2 copied fa->flags=0x%x, fsx_xflags=0x%x, fsx_extsize=%d, fsx_atomicwrites_size=?\n", __func__, fa->flags, fa->fsx_xflags, fa->fsx_extsize);
 
 	return 0;
 }
@@ -593,7 +593,8 @@ static int fileattr_set_prepare(struct inode *inode,
 			      struct fileattr *fa)
 {
 	int err;
-
+	pr_err("%s fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d\n", __func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid);
+	pr_err("%s0 old_ma->fsx_extsize=%d old_ma->fsx_xflags=0x%x flags_valid=%d\n", __func__, old_ma->fsx_extsize, old_ma->fsx_xflags, old_ma->flags_valid);
 	/*
 	 * The IMMUTABLE and APPEND_ONLY flags can only be changed by
 	 * the relevant capability.
@@ -605,6 +606,7 @@ static int fileattr_set_prepare(struct inode *inode,
 	err = fscrypt_prepare_setflags(inode, old_ma->flags, fa->flags);
 	if (err)
 		return err;
+	pr_err("%s1 fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d\n", __func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid);
 
 	/*
 	 * Project Quota ID state is only allowed to change from within the init
@@ -626,6 +628,7 @@ static int fileattr_set_prepare(struct inode *inode,
 		    !projid_valid(make_kprojid(&init_user_ns, fa->fsx_projid)))
 			return -EINVAL;
 	}
+	pr_err("%s2 fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d\n", __func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid);
 
 	/* Check extent size hints. */
 	if ((fa->fsx_xflags & FS_XFLAG_EXTSIZE) && !S_ISREG(inode->i_mode))
@@ -646,12 +649,16 @@ static int fileattr_set_prepare(struct inode *inode,
 	if ((fa->fsx_xflags & FS_XFLAG_DAX) &&
 	    !(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)))
 		return -EINVAL;
+	pr_err("%s3 fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d fsx_extsize=%d\n",
+		__func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid, fa->fsx_extsize);
 
 	/* Extent size hints of zero turn off the flags. */
 	if (fa->fsx_extsize == 0)
 		fa->fsx_xflags &= ~(FS_XFLAG_EXTSIZE | FS_XFLAG_EXTSZINHERIT);
+	pr_err("%s4 fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d\n", __func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid);
 	if (fa->fsx_cowextsize == 0)
 		fa->fsx_xflags &= ~FS_XFLAG_COWEXTSIZE;
+	pr_err("%s10 out fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d\n", __func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid);
 
 	return 0;
 }
@@ -679,6 +686,8 @@ int vfs_fileattr_set(struct mnt_idmap *idmap, struct dentry *dentry,
 	struct fileattr old_ma = {};
 	int err;
 
+	pr_err("%s fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d fsx_valid=%d\n",
+		__func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid, fa->fsx_valid);
 	if (!inode->i_op->fileattr_set)
 		return -ENOIOCTLCMD;
 
@@ -689,10 +698,14 @@ int vfs_fileattr_set(struct mnt_idmap *idmap, struct dentry *dentry,
 	err = vfs_fileattr_get(dentry, &old_ma);
 	if (!err) {
 		/* initialize missing bits from old_ma */
+		pr_err("%s1 fa->fsx_extsize=%d fa->fsx_xflags=0x%x flags_valid=%d\n", __func__, fa->fsx_extsize, fa->fsx_xflags, fa->flags_valid);
+		pr_err("%s1.0 old_ma.fsx_extsize=%d old_ma.fsx_xflags=0x%x flags_valid=%d\n", __func__, old_ma.fsx_extsize, old_ma.fsx_xflags, old_ma.flags_valid);
 		if (fa->flags_valid) {
+			pr_err("%s1.1 fa->fsx_extsize=%d fa->fsx_xflags=0x%x\n", __func__, fa->fsx_extsize, fa->fsx_xflags);
 			fa->fsx_xflags |= old_ma.fsx_xflags & ~FS_XFLAG_COMMON;
+			pr_err("%s1.2 fa->fsx_extsize=%d fa->fsx_xflags=0x%x\n", __func__, fa->fsx_extsize, fa->fsx_xflags);
 			fa->fsx_extsize = old_ma.fsx_extsize;
-			pr_err("%s fa->fsx_extsize=%d\n", __func__, fa->fsx_extsize);
+			pr_err("%s2 flags_valid set fa->fsx_extsize=%d fa->fsx_xflags=0x%x\n", __func__, fa->fsx_extsize, fa->fsx_xflags);
 			fa->fsx_nextents = old_ma.fsx_nextents;
 			fa->fsx_projid = old_ma.fsx_projid;
 			fa->fsx_cowextsize = old_ma.fsx_cowextsize;
@@ -700,8 +713,11 @@ int vfs_fileattr_set(struct mnt_idmap *idmap, struct dentry *dentry,
 			fa->flags |= old_ma.flags & ~FS_COMMON_FL;
 		}
 		err = fileattr_set_prepare(inode, &old_ma, fa);
-		if (!err)
+		if (!err) {
+			pr_err("%s3 calling fileattr_set=%pS fa->fsx_extsize=%d fa->fsx_xflags=0x%x\n",
+				__func__, inode->i_op->fileattr_set, fa->fsx_extsize, fa->fsx_xflags);
 			err = inode->i_op->fileattr_set(idmap, dentry, fa);
+		}
 	}
 	inode_unlock(inode);
 
@@ -763,8 +779,9 @@ static int ioctl_fssetxattr(struct file *file, void __user *argp)
 	struct dentry *dentry = file->f_path.dentry;
 	struct fileattr fa;
 	int err;
-
+	pr_err("%s calling copy_fsxattr_from_user\n", __func__);
 	err = copy_fsxattr_from_user(&fa, argp);
+	pr_err("%s2 called copy_fsxattr_from_user, err=%d, calling vfs_fileattr_set eventually if no errors\n", __func__, err);
 	if (!err) {
 		err = mnt_want_write_file(file);
 		if (!err) {

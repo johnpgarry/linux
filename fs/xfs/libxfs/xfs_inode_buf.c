@@ -662,6 +662,7 @@ xfs_inode_validate_extsize(
 	inherit_flag = (flags & XFS_DIFLAG_EXTSZINHERIT);
 	extsize_bytes = XFS_FSB_TO_B(mp, extsize);
 
+
 	/*
 	 * This comment describes a historic gap in this verifier function.
 	 *
@@ -692,6 +693,9 @@ xfs_inode_validate_extsize(
 		blocksize_bytes = XFS_FSB_TO_B(mp, mp->m_sb.sb_rextsize);
 	else
 		blocksize_bytes = mp->m_sb.sb_blocksize;
+
+	pr_err("%s extsize=%d extsize_bytes=%d rt_flag=%d hint_flag=%d blocksize_bytes=%d\n",
+		__func__, extsize, extsize_bytes, rt_flag, hint_flag, blocksize_bytes);
 
 	if ((hint_flag || inherit_flag) && !(S_ISDIR(mode) || S_ISREG(mode)))
 		return __this_address;
