@@ -1140,19 +1140,30 @@ xfs_ioctl_setattr_xflags(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	bool			rtflag = (fa->fsx_xflags & FS_XFLAG_REALTIME);
+	bool			atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
 
-	if (rtflag != XFS_IS_REALTIME_INODE(ip)) {
-		/* Can't change realtime flag if any extents are allocated. */
-		if (ip->i_df.if_nextents || ip->i_delayed_blks)
+	pr_err("%s fa->fsx_xflags=0x%x REALTIME=%d ATOMICWRITES=%d\n",
+		__func__, fa->fsx_xflags,
+		!!(fa->fsx_xflags & FS_XFLAG_REALTIME),
+		!!(fa->fsx_xflags & FS_XFLAG_ATOMICWRITES)); 
+	if (rtflag != XFS_IS_REALTIME_INODE(ip) ||
+		atomic_writes != xfs_inode_atomicwrites(ip)) {
+		/* Can't change realtime or atomic writes flags if any extents are allocated. */
+		if (ip->i_df.if_nextents || ip->i_delayed_blks) {
+			pr_err("%s rtflag != XFS_IS_REALTIME_INODE(ip) or ATOMICS ip->i_df.if_nextents || ip->i_delayed_blks\n", __func__);
 			return -EINVAL;
+		}
 	}
 
 	if (rtflag) {
 		/* If realtime flag is set then must have realtime device */
 		if (mp->m_sb.sb_rblocks == 0 || mp->m_sb.sb_rextsize == 0 ||
-		    xfs_extlen_to_rtxmod(mp, ip->i_extsize))
+		    xfs_extlen_to_rtxmod(mp, ip->i_extsize)) {
+			pr_err("%s rtflag mp->m_sb.sb_rblocks (%lld) == 0 || mp->m_sb.sb_rextsize (%d) == 0 || xfs_extlen_to_rtxmod()=%d i_extsize=%d\n",
+				__func__, mp->m_sb.sb_rblocks, mp->m_sb.sb_rextsize, xfs_extlen_to_rtxmod(mp, ip->i_extsize), ip->i_extsize);
 			return -EINVAL;
+		}
 
 		/* Clear reflink if we are actually able to set the rt flag. */
 		if (xfs_is_reflink_inode(ip))
@@ -1161,21 +1172,24 @@ xfs_ioctl_setattr_xflags(
 
 	/* diflags2 only valid for v3 inodes. */
 	i_flags2 = xfs_flags2diflags2(ip, fa->fsx_xflags);
-	if (i_flags2 && !xfs_has_v3inodes(mp))
+	if (i_flags2 && !xfs_has_v3inodes(mp)) {
+		pr_err("%s !xfs_has_v3inodes\n", __func__);
 		return -EINVAL;
+	}
 
 	pr_err("%s fa->fsx_xflags & FS_XFLAG_ATOMICWRITES=%d, FS_XFLAG_REALTIME=%d XFS_IS_REALTIME_INODE=%d mp->m_sb.sb_rextsize=%d\n",
 		__func__, !!(fa->fsx_xflags & FS_XFLAG_ATOMICWRITES), !!(fa->fsx_xflags & FS_XFLAG_REALTIME), XFS_IS_REALTIME_INODE(ip), mp->m_sb.sb_rextsize);
-	if (fa->fsx_xflags & FS_XFLAG_ATOMICWRITES) {
-		if (!XFS_IS_REALTIME_INODE(ip))
+	if (atomic_writes) {
+		if (!rtflag) {
+			pr_err("%s atomic_writes && !rtflag\n", __func__);
 			return -EINVAL;
+		}
 
-		if (!is_power_of_2(mp->m_sb.sb_rextsize))
+		if (!is_power_of_2(mp->m_sb.sb_rextsize)) {
+			pr_err("%s atomic_writes && !is_power_of_2(mp->m_sb.sb_rextsize\n", __func__);
 			return -EINVAL;
+		}
 
-		/* We will probably want this later for !RT */
-		if (ip->i_df.if_nextents || ip->i_delayed_blks)
-			return -EINVAL;
 		/*
 		if (!xfs_has_forcealign(mp))
 			return -EINVAL;
