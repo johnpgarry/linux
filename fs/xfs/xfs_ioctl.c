@@ -1180,6 +1180,11 @@ xfs_ioctl_setattr_xflags(
 	pr_err("%s fa->fsx_xflags & FS_XFLAG_ATOMICWRITES=%d, FS_XFLAG_REALTIME=%d XFS_IS_REALTIME_INODE=%d mp->m_sb.sb_rextsize=%d\n",
 		__func__, !!(fa->fsx_xflags & FS_XFLAG_ATOMICWRITES), !!(fa->fsx_xflags & FS_XFLAG_REALTIME), XFS_IS_REALTIME_INODE(ip), mp->m_sb.sb_rextsize);
 	if (atomic_writes) {
+		if (!xfs_has_atomicwrites(mp)) {
+			pr_err("%s !xfs_has_atomicwrites\n", __func__);
+			return -EINVAL;
+		}
+
 		if (!rtflag) {
 			pr_err("%s atomic_writes && !rtflag\n", __func__);
 			return -EINVAL;
@@ -1190,17 +1195,7 @@ xfs_ioctl_setattr_xflags(
 			return -EINVAL;
 		}
 
-		/*
-		if (!xfs_has_forcealign(mp))
-			return -EINVAL;
-		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE)
-			return -EINVAL;
-		if (!(fa->fsx_xflags & (FS_XFLAG_EXTSIZE |
-					FS_XFLAG_EXTSZINHERIT)))
-			return -EINVAL;
-		if (fa->fsx_xflags & FS_XFLAG_REALTIME)
-			return -EINVAL;
-		*/
+
 	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
