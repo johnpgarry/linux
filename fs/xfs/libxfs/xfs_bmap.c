@@ -4410,7 +4410,7 @@ xfs_bmapi_write(
 	if (error)
 		goto error0;
 
-		pr_err("%s1 calling xfs_iext_lookup_extent bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+	pr_err("%s1 calling xfs_iext_lookup_extent bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
@@ -4420,7 +4420,7 @@ xfs_bmapi_write(
 		bma.prev.br_startoff = NULLFILEOFF;
 	bma.minleft = xfs_bmapi_minleft(tp, ip, whichfork);
 
-		pr_err("%s2 going to loop bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+	pr_err("%s2 going to loop bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
@@ -4430,7 +4430,7 @@ xfs_bmapi_write(
 	while (bno < end && n < *nmap) {
 		bool			need_alloc = false, wasdelay = false;
 
-			pr_err("%s3 starting to loop bno=%lld end=%lld bma.length=%d, minlen=%d, total=%d, len=%lld end=%lld n=%d *nmap=%d\n",
+		pr_err("%s3 starting to loop bno=%lld end=%lld bma.length=%d, minlen=%d, total=%d, len=%lld end=%lld n=%d *nmap=%d\n",
 				__func__, bno, end, bma.length, bma.minlen, bma.total, len, end, n, *nmap);
 		/* in hole or beyond EOF? */
 		if (eof || bma.got.br_startoff > bno) {
@@ -4465,13 +4465,13 @@ xfs_bmapi_write(
 			 * xfs_extlen_t and therefore 32 bits. Hence we have to
 			 * check for 32-bit overflows and handle them here.
 			 */
-				pr_err("%s3.1 looping bma.length=%d, minlen=%d, total=%d, len=%lld\n", __func__, bma.length, bma.minlen, bma.total, len);
+			pr_err("%s3.1 looping bma.length=%d, minlen=%d, total=%d, len=%lld\n", __func__, bma.length, bma.minlen, bma.total, len);
 			if (len > (xfs_filblks_t)XFS_MAX_BMBT_EXTLEN)
 				bma.length = XFS_MAX_BMBT_EXTLEN;
 			else
 				bma.length = len;
 
-				pr_err("%s4 looping bma.length=%d, minlen=%d, total=%d\n", __func__, bma.length, bma.minlen, bma.total);
+			pr_err("%s4 looping bma.length=%d, minlen=%d, total=%d\n", __func__, bma.length, bma.minlen, bma.total);
 			ASSERT(len > 0);
 			ASSERT(bma.length > 0);
 			error = xfs_bmapi_allocate(&bma);
@@ -4490,24 +4490,24 @@ xfs_bmapi_write(
 		}
 
 		/* Deal with the allocated space we found.  */
-			pr_err("%s5 outside loop bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+		pr_err("%s5 outside loop bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
-			pr_err("%s5.1 calling xfs_bmapi_trim_map mval->br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld obno=%lld\n",
+		pr_err("%s5.1 calling xfs_bmapi_trim_map mval->br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld obno=%lld\n",
 			__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount, len, obno);
 		xfs_bmapi_trim_map(mval, &bma.got, &bno, len, obno,
 							end, n, flags);
-			pr_err("%s6 called xfs_bmapi_trim_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+		pr_err("%s6 called xfs_bmapi_trim_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
-			pr_err("%s6.1 calling xfs_bmapi_convert_unwritten mval->br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+		pr_err("%s6.1 calling xfs_bmapi_convert_unwritten mval->br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount, len);
 
 		/* Execute unwritten extent conversion if necessary */
 		error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
-			pr_err("%s7 called xfs_bmapi_convert_unwritten bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+		pr_err("%s7 called xfs_bmapi_convert_unwritten bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
@@ -4516,13 +4516,13 @@ xfs_bmapi_write(
 		if (error)
 			goto error0;
 
-			pr_err("%s8 calling xfs_bmapi_update_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+		pr_err("%s8 calling xfs_bmapi_update_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
 		/* update the extent map to return */
 		xfs_bmapi_update_map(&mval, &bno, &len, obno, end, &n, flags);
-			pr_err("%s9 called xfs_bmapi_update_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+		pr_err("%s9 called xfs_bmapi_update_map bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
@@ -4552,7 +4552,7 @@ xfs_bmapi_write(
 	xfs_bmapi_finish(&bma, whichfork, 0);
 	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
 		orig_nmap, *nmap);
-		pr_err("%s10 out bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
+	pr_err("%s10 out bma.length=%d, minlen=%d, total=%d, got.br_startoff=%lld, startblock=%lld, blockcount=%lld len=%lld\n",
 			__func__, bma.length, bma.minlen, bma.total,
 			bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount,
 			len);
