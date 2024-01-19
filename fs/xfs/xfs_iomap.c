@@ -295,7 +295,13 @@ xfs_iomap_write_direct(
 		pr_err("%s2.1 special atomic write handling atomic_write offset_fsb=%lld count_fsb=%lld resaligned=%lld imap->br_state=%d IOMAP_ATOMIC_WRITE=%d\n",
 				__func__, offset_fsb, count_fsb, resaligned, imap->br_state,
 				!!(flags & IOMAP_ATOMIC_WRITE));
-		bmapi_flags = XFS_BMAPI_ZERO;
+		
+		bmapi_flags = XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO;
+		if (imap->br_state == XFS_EXT_UNWRITTEN) {
+		//	force = true;
+		//	nr_exts = XFS_IEXT_WRITE_UNWRITTEN_CNT;
+		//	dblocks = XFS_DIOSTRAT_SPACE_RES(mp, 0) << 1;
+		}
 	}
 
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, dblocks,
