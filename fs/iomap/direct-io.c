@@ -575,6 +575,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (!iomi.len)
 		return NULL;
 
+	if (atomic_write && !iter_is_ubuf(iter))
+		return ERR_PTR(-EINVAL);
+
 	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
 	if (!dio)
 		return ERR_PTR(-ENOMEM);
