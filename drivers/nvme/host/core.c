@@ -949,6 +949,31 @@ static inline blk_status_t nvme_setup_rw(struct nvme_ns *ns,
 	if (req->cmd_flags & REQ_RAHEAD)
 		dsmgmt |= NVME_RW_DSM_FREQ_PREFETCH;
 
+	/*
+	 * Ensure that nothing has been sent which cannot be executed
+	 * atomically.
+	 */
+	if (req->cmd_flags & REQ_ATOMIC) {
+		struct request_queue *q = req->q;
+		u32 boundary_bytes = queue_atomic_write_boundary_bytes(q);
+
+		if (blk_rq_bytes(req) > queue_atomic_write_unit_max_bytes(q))
+			return BLK_STS_IOERR;
+
+		if (boundary_bytes) {
+			u64 mask = boundary_bytes - 1, imask = ~mask;
+			u64 start = blk_rq_pos(req) << SECTOR_SHIFT;
+			u64 end = start + blk_rq_bytes(req) - 1;
+
+			/* If greater then must be crossing a boundary */
+			if (blk_rq_bytes(req) > boundary_bytes)
+				return BLK_STS_IOERR;
+
+			if ((start & imask) != (end & imask))
+				return BLK_STS_IOERR;
+		}
+	}
+
 	cmnd->rw.opcode = op;
 	cmnd->rw.flags = 0;
 	cmnd->rw.nsid = cpu_to_le32(ns->head->ns_id);
