@@ -410,6 +410,7 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 	}
 
+	pr_err("%s calling blk_stack_limits\n", __func__);
 	if (blk_stack_limits(limits, &q->limits,
 			get_start_sect(bdev) + start) < 0)
 		DMWARN("%s: adding target device %pg caused an alignment inconsistency: "
@@ -1727,6 +1728,7 @@ combine_limits:
 		 * Merge this target's queue limits into the overall limits
 		 * for the table.
 		 */
+		pr_err("%s calling blk_stack_limits\n", __func__);
 		if (blk_stack_limits(limits, &ti_limits, 0) < 0)
 			DMWARN("%s: adding target device (start sect %llu len %llu) "
 			       "caused an alignment inconsistency",

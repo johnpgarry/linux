@@ -380,6 +380,8 @@ static bool is_suspended(struct mddev *mddev, struct bio *bio)
 
 void md_handle_request(struct mddev *mddev, struct bio *bio)
 {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 check_suspended:
 	if (is_suspended(mddev, bio)) {
 		DEFINE_WAIT(__wait);
@@ -400,6 +402,8 @@ check_suspended:
 	if (!percpu_ref_tryget_live(&mddev->active_io))
 		goto check_suspended;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s2 REQ_ATOMIC bio=%pS calling make_request=%pS\n", __func__, bio, mddev->pers->make_request);
 	if (!mddev->pers->make_request(mddev, bio)) {
 		percpu_ref_put(&mddev->active_io);
 		goto check_suspended;
@@ -413,6 +417,8 @@ static void md_submit_bio(struct bio *bio)
 {
 	const int rw = bio_data_dir(bio);
 	struct mddev *mddev = bio->bi_bdev->bd_disk->private_data;
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 
 	if (mddev == NULL || mddev->pers == NULL) {
 		bio_io_error(bio);

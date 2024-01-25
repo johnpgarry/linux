@@ -66,6 +66,7 @@ void blk_set_default_limits(struct queue_limits *lim)
 	lim->atomic_write_unit_min_sectors = 0;
 	lim->atomic_write_hw_unit_max_sectors = 0;
 	lim->atomic_write_unit_max_sectors = 0;
+	pr_err("%s lim=%pS\n", __func__, lim);
 }
 
 /**
@@ -89,6 +90,7 @@ void blk_set_stacking_limits(struct queue_limits *lim)
 	lim->max_dev_sectors = UINT_MAX;
 	lim->max_write_zeroes_sectors = UINT_MAX;
 	lim->max_zone_append_sectors = UINT_MAX;
+	pr_err("%s lim=%pS\n", __func__, lim);
 }
 EXPORT_SYMBOL(blk_set_stacking_limits);
 
@@ -661,6 +663,17 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 {
 	unsigned int top, bottom, alignment, ret = 0;
 
+	if (b->atomic_write_hw_max_sectors)
+		pr_err("%s t=%pS b=%pS (atomic_write_hw_max_sectors=%d)\n",
+			__func__, t, b, b->atomic_write_hw_max_sectors);
+
+
+	t->atomic_write_hw_max_sectors = min_not_zero(t->atomic_write_hw_max_sectors, b->atomic_write_hw_max_sectors);
+	t->atomic_write_hw_boundary_sectors = min_not_zero(t->atomic_write_hw_boundary_sectors, b->atomic_write_hw_boundary_sectors);
+	t->atomic_write_hw_unit_min_sectors = min_not_zero(t->atomic_write_hw_unit_min_sectors, b->atomic_write_hw_unit_min_sectors);
+	t->atomic_write_hw_unit_max_sectors = min_not_zero(t->atomic_write_hw_unit_max_sectors, b->atomic_write_hw_unit_max_sectors);
+
+
 	t->max_sectors = min_not_zero(t->max_sectors, b->max_sectors);
 	t->max_hw_sectors = min_not_zero(t->max_hw_sectors, b->max_hw_sectors);
 	t->max_dev_sectors = min_not_zero(t->max_dev_sectors, b->max_dev_sectors);
@@ -811,12 +824,15 @@ void disk_stack_limits(struct gendisk *disk, struct block_device *bdev,
 {
 	struct request_queue *t = disk->queue;
 
+	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS\n", __func__, t, bdev_get_queue(bdev));
 	if (blk_stack_limits(&t->limits, &bdev_get_queue(bdev)->limits,
 			get_start_sect(bdev) + (offset >> 9)) < 0)
 		pr_notice("%s: Warning: Device %pg is misaligned\n",
 			disk->disk_name, bdev);
 
 	disk_update_readahead(disk);
+
+	blk_atomic_writes_update_limits(t);
 }
 EXPORT_SYMBOL(disk_stack_limits);
 

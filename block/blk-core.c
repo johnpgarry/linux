@@ -604,10 +604,14 @@ static void __submit_bio(struct bio *bio)
 		return;
 
 	if (!bio->bi_bdev->bd_has_submit_bio) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC bio=%pS calling blk_mq_submit_bio\n", __func__, bio);
 		blk_mq_submit_bio(bio);
 	} else if (likely(bio_queue_enter(bio) == 0)) {
 		struct gendisk *disk = bio->bi_bdev->bd_disk;
 
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC bio=%pS calling disk->fops->submit_bio=%pS\n", __func__, bio, disk->fops->submit_bio);
 		disk->fops->submit_bio(bio);
 		blk_queue_exit(disk->queue);
 	}
@@ -709,12 +713,19 @@ void submit_bio_noacct_nocheck(struct bio *bio)
 	 * to collect a list of requests submited by a ->submit_bio method while
 	 * it is active, and then process them after it returned.
 	 */
-	if (current->bio_list)
+	if (current->bio_list) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC bio=%pS calling bio_list_add\n", __func__, bio);
 		bio_list_add(&current->bio_list[0], bio);
-	else if (!bio->bi_bdev->bd_has_submit_bio)
+	}else if (!bio->bi_bdev->bd_has_submit_bio) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC bio=%pS calling __submit_bio_noacct_mq\n", __func__, bio);
 		__submit_bio_noacct_mq(bio);
-	else
+	} else {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC bio=%pS calling __submit_bio_noacct\n", __func__, bio);
 		__submit_bio_noacct(bio);
+	}
 }
 
 /**
@@ -731,7 +742,8 @@ void submit_bio_noacct(struct bio *bio)
 	struct block_device *bdev = bio->bi_bdev;
 	struct request_queue *q = bdev_get_queue(bdev);
 	blk_status_t status = BLK_STS_IOERR;
-
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 	might_sleep();
 
 	/*

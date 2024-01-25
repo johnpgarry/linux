@@ -48,6 +48,7 @@ static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos,
 	unsigned int min_bytes = queue_atomic_write_unit_min_bytes(q);
 	unsigned int max_bytes = queue_atomic_write_unit_max_bytes(q);
 
+	pr_err("%s min_bytes=%d\n", __func__, min_bytes);
 	if (!iter_is_ubuf(iter))
 		return false;
 	if (iov_iter_count(iter) & (min_bytes - 1))
@@ -99,8 +100,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	}
 	bio.bi_iter.bi_sector = pos >> SECTOR_SHIFT;
 	bio.bi_ioprio = iocb->ki_ioprio;
-	if (atomic_write)
+	if (atomic_write) {
+		pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, &bio);
 		bio.bi_opf |= REQ_ATOMIC;
+	}
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
 	if (unlikely(ret))

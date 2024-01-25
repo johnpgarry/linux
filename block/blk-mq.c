@@ -2068,6 +2068,8 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 		 */
 		if (nr_budgets)
 			nr_budgets--;
+		if (rq->cmd_flags & REQ_ATOMIC)
+			pr_err("%s REQ_ATOMIC queue_rq=%pS bio=%pS\n", __func__, q->mq_ops->queue_rq, rq->bio);
 		ret = q->mq_ops->queue_rq(hctx, &bd);
 		switch (ret) {
 		case BLK_STS_OK:
@@ -2609,6 +2611,8 @@ static blk_status_t __blk_mq_issue_directly(struct blk_mq_hw_ctx *hctx,
 	 * Any other error (busy), just add it to our list as we
 	 * previously would have done.
 	 */
+	if (rq->cmd_flags & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC queue_rq=%pS rq=%pS\n", __func__, q->mq_ops->queue_rq, rq->bio);
 	ret = q->mq_ops->queue_rq(hctx, &bd);
 	switch (ret) {
 	case BLK_STS_OK:
@@ -2741,6 +2745,7 @@ static void __blk_mq_flush_plug_list(struct request_queue *q,
 {
 	if (blk_queue_quiesced(q))
 		return;
+
 	q->mq_ops->queue_rqs(&plug->mq_list);
 }
 

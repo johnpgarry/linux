@@ -553,7 +553,13 @@ static void raid0_map_submit_bio(struct mddev *mddev, struct bio *bio)
 	sector_t bio_sector = bio->bi_iter.bi_sector;
 	sector_t sector = bio_sector;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS calling md_account_bio\n", __func__, bio);
+
 	md_account_bio(mddev, &bio);
+
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s2 REQ_ATOMIC bio=%pS mddev=%pS\n", __func__, bio, mddev);
 
 	zone = find_zone(mddev->private, &sector);
 	switch (conf->layout) {
@@ -576,6 +582,8 @@ static void raid0_map_submit_bio(struct mddev *mddev, struct bio *bio)
 	}
 
 	bio_set_dev(bio, tmp_dev->bdev);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s3 REQ_ATOMIC bio=%pS tmp_dev->bdev=%pS\n", __func__, bio, tmp_dev->bdev);
 	bio->bi_iter.bi_sector = sector + zone->dev_start +
 		tmp_dev->data_offset;
 
@@ -583,6 +591,8 @@ static void raid0_map_submit_bio(struct mddev *mddev, struct bio *bio)
 		trace_block_bio_remap(bio, disk_devt(mddev->gendisk),
 				      bio_sector);
 	mddev_check_write_zeroes(mddev, bio);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s4 REQ_ATOMIC bio=%pS calling submit_bio_noacct\n", __func__, bio);
 	submit_bio_noacct(bio);
 }
 
@@ -591,6 +601,9 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 	sector_t sector;
 	unsigned chunk_sects;
 	unsigned sectors;
+
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
@@ -613,10 +626,14 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 		struct bio *split = bio_split(bio, sectors, GFP_NOIO,
 					      &mddev->bio_set);
 		bio_chain(split, bio);
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s2 REQ_ATOMIC calling raid0_map_submit_bio for bio=%pS, split=%pS\n", __func__, bio, split);
 		raid0_map_submit_bio(mddev, bio);
 		bio = split;
 	}
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s3 REQ_ATOMIC calling raid0_map_submit_bio bio=%pS\n", __func__, bio);
 	raid0_map_submit_bio(mddev, bio);
 	return true;
 }
