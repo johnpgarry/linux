@@ -8721,6 +8721,8 @@ static void md_clone_bio(struct mddev *mddev, struct bio **bio)
 	struct bio *clone =
 		bio_alloc_clone(bdev, *bio, GFP_NOIO, &mddev->io_clone_set);
 
+	if ((*bio)->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC *bio=%pS clone=%pS\n", __func__, *bio, clone);
 	md_io_clone = container_of(clone, struct md_io_clone, bio_clone);
 	md_io_clone->orig_bio = *bio;
 	md_io_clone->mddev = mddev;

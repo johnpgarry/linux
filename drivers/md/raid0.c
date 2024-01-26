@@ -270,6 +270,8 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		goto abort;
 	}
 
+	pr_err("%s conf->layout=%d (RAID0_ORIG_LAYOUT=%d RAID0_ALT_MULTIZONE_LAYOUT=%d)\n",
+		__func__, conf->layout, RAID0_ORIG_LAYOUT, RAID0_ALT_MULTIZONE_LAYOUT);
 	if (conf->layout == RAID0_ORIG_LAYOUT) {
 		for (i = 1; i < conf->nr_strip_zones; i++) {
 			sector_t first_sector = conf->strip_zone[i-1].zone_end;
@@ -552,16 +554,24 @@ static void raid0_map_submit_bio(struct mddev *mddev, struct bio *bio)
 	struct md_rdev *tmp_dev;
 	sector_t bio_sector = bio->bi_iter.bi_sector;
 	sector_t sector = bio_sector;
+#if 0
+
+	sector_t zone_end;	/* Start of the next zone (in sectors) */
+	sector_t dev_start;	/* Zone offset in real dev (in sectors) */
+	int	 nb_dev;	/* # of devices attached to the zone */
+	int	 disk_shift;	/* start disk for the original layout */
+#endif
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s REQ_ATOMIC bio=%pS calling md_account_bio\n", __func__, bio);
+		pr_err("%s REQ_ATOMIC bio=%pS calling md_account_bio bio_sector=%lld\n", __func__, bio, bio_sector);
 
 	md_account_bio(mddev, &bio);
 
-	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s2 REQ_ATOMIC bio=%pS mddev=%pS\n", __func__, bio, mddev);
 
 	zone = find_zone(mddev->private, &sector);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s2 REQ_ATOMIC bio=%pS mddev=%pS zone zone_end=%lld dev_start=%lld nb_dev=%d disk_shift=%d\n",
+			__func__, bio, mddev, zone->zone_end, zone->dev_start, zone->nb_dev, zone->disk_shift);
 	switch (conf->layout) {
 	case RAID0_ORIG_LAYOUT:
 		tmp_dev = map_sector(mddev, zone, bio_sector, &sector);
@@ -583,7 +593,7 @@ static void raid0_map_submit_bio(struct mddev *mddev, struct bio *bio)
 
 	bio_set_dev(bio, tmp_dev->bdev);
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s3 REQ_ATOMIC bio=%pS tmp_dev->bdev=%pS\n", __func__, bio, tmp_dev->bdev);
+		pr_err("%s3 REQ_ATOMIC bio=%pS tmp_dev->bdev=%pS sector=%lld zone->dev_start=%lld\n", __func__, bio, tmp_dev->bdev, sector, zone->dev_start);
 	bio->bi_iter.bi_sector = sector + zone->dev_start +
 		tmp_dev->data_offset;
 
@@ -621,6 +631,9 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 		(likely(is_power_of_2(chunk_sects))
 		 ? (sector & (chunk_sects-1))
 		 : sector_div(sector, chunk_sects));
+
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s1 REQ_ATOMIC bio=%pS sectors=%d bio_sectors(bio)=%d\n", __func__, bio, sectors, bio_sectors(bio));
 
 	if (sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, sectors, GFP_NOIO,

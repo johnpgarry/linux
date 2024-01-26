@@ -48,7 +48,7 @@ static bool blkdev_atomic_write_valid(struct block_device *bdev, loff_t pos,
 	unsigned int min_bytes = queue_atomic_write_unit_min_bytes(q);
 	unsigned int max_bytes = queue_atomic_write_unit_max_bytes(q);
 
-	pr_err("%s min_bytes=%d\n", __func__, min_bytes);
+	pr_err("%s min_bytes=%d max_bytes=%d iov_iter_count(iter)=%zd\n", __func__, min_bytes, max_bytes, iov_iter_count(iter));
 	if (!iter_is_ubuf(iter))
 		return false;
 	if (iov_iter_count(iter) & (min_bytes - 1))

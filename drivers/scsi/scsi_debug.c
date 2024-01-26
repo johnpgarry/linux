@@ -110,7 +110,7 @@ static const char *sdebug_version_date = "20210520";
 #define ACK_NAK_TO 0x3
 
 /* Default values for driver parameters */
-#define DEF_NUM_HOST   2
+#define DEF_NUM_HOST   3
 #define DEF_NUM_TGTS   1
 #define DEF_MAX_LUNS   1
 /* With these defaults, this driver will make 1 host with 1 target

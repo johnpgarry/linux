@@ -323,6 +323,7 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 	struct bio_vec bv, bvprv, *bvprvp = NULL;
 	struct bvec_iter iter;
 	unsigned nsegs = 0, bytes = 0;
+	struct bio *split_bio;
 
 	bio_for_each_bvec(bv, bio, iter) {
 		/*
@@ -351,6 +352,8 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 	return NULL;
 split:
 	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s split REQ_ATOMIC bio=%pS bi_sector=%lld bi_size=%d max_bytes=%d bi_bdev=%pS\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, max_bytes, bio->bi_bdev);
 		bio->bi_status = BLK_STS_IOERR;
 		bio_endio(bio);
 		return ERR_PTR(-EINVAL);
@@ -380,7 +383,18 @@ split:
 	 * big IO can be trival, disable iopoll when split needed.
 	 */
 	bio_clear_polled(bio);
-	return bio_split(bio, bytes >> SECTOR_SHIFT, GFP_NOIO, bs);
+	split_bio =  bio_split(bio, bytes >> SECTOR_SHIFT, GFP_NOIO, bs);
+
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s2 split REQ_ATOMIC bio=%pS bi_sector=%lld bi_size=%d max_bytes=%d bi_bdev=%pS\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, max_bytes, bio->bi_bdev);
+		pr_err("%s3 split REQ_ATOMIC split_bio=%pS bi_sector=%lld bi_size=%d max_bytes=%d bi_bdev=%pS\n",
+			__func__, split_bio, split_bio->bi_iter.bi_sector, split_bio->bi_iter.bi_size, max_bytes, split_bio->bi_bdev);
+		//bio->bi_status = BLK_STS_IOERR;
+		//bio_endio(bio);
+		//return ERR_PTR(-EINVAL);
+	}
+	return split_bio;
 }
 EXPORT_SYMBOL_GPL(bio_split_rw);
 

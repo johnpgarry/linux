@@ -146,6 +146,8 @@ static void blk_atomic_writes_update_limits(struct request_queue *q)
 		min(limits->atomic_write_hw_unit_min_sectors, unit_limit);
 	limits->atomic_write_unit_max_sectors =
 		min(limits->atomic_write_hw_unit_max_sectors, unit_limit);
+	pr_err("%s limits->max_hw_sectors=%d atomic_write_hw_unit_max_sectors=%d q=%pS\n",
+		__func__, limits->max_hw_sectors, limits->atomic_write_hw_unit_max_sectors, q);
 }
 
 /**
@@ -670,7 +672,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 
 	t->atomic_write_hw_max_sectors = min_not_zero(t->atomic_write_hw_max_sectors, b->atomic_write_hw_max_sectors);
 	t->atomic_write_hw_boundary_sectors = min_not_zero(t->atomic_write_hw_boundary_sectors, b->atomic_write_hw_boundary_sectors);
-	t->atomic_write_hw_unit_min_sectors = min_not_zero(t->atomic_write_hw_unit_min_sectors, b->atomic_write_hw_unit_min_sectors);
+	t->atomic_write_hw_unit_min_sectors = max(t->atomic_write_hw_unit_min_sectors, b->atomic_write_hw_unit_min_sectors);
 	t->atomic_write_hw_unit_max_sectors = min_not_zero(t->atomic_write_hw_unit_max_sectors, b->atomic_write_hw_unit_max_sectors);
 
 
