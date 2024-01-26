@@ -7978,9 +7978,9 @@ static int raid5_run(struct mddev *mddev)
 
 		rdev_for_each(rdev, mddev) {
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
-					  rdev->data_offset << 9);
+					  rdev->data_offset << 9, true);
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
-					  rdev->new_data_offset << 9);
+					  rdev->new_data_offset << 9, true);
 		}
 
 		/*

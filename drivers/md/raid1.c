@@ -1793,7 +1793,7 @@ static int raid1_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 		if (!p->rdev) {
 			if (mddev->gendisk)
 				disk_stack_limits(mddev->gendisk, rdev->bdev,
-						  rdev->data_offset << 9);
+						  rdev->data_offset << 9, true);
 
 			p->head_position = 0;
 			rdev->raid_disk = mirror;
@@ -3125,7 +3125,7 @@ static int raid1_run(struct mddev *mddev)
 		if (!mddev->gendisk)
 			continue;
 		disk_stack_limits(mddev->gendisk, rdev->bdev,
-				  rdev->data_offset << 9);
+				  rdev->data_offset << 9, true);
 	}
 
 	mddev->degraded = 0;

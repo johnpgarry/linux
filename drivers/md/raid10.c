@@ -2133,7 +2133,7 @@ static int raid10_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 
 		if (mddev->gendisk)
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
-					  rdev->data_offset << 9);
+					  rdev->data_offset << 9, true);
 
 		p->head_position = 0;
 		p->recovery_disabled = mddev->recovery_disabled - 1;
@@ -2153,7 +2153,7 @@ static int raid10_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 		err = 0;
 		if (mddev->gendisk)
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
-					  rdev->data_offset << 9);
+					  rdev->data_offset << 9, true);
 		conf->fullsync = 1;
 		WRITE_ONCE(p->replacement, rdev);
 	}
@@ -4083,7 +4083,7 @@ static int raid10_run(struct mddev *mddev)
 
 		if (mddev->gendisk)
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
-					  rdev->data_offset << 9);
+					  rdev->data_offset << 9, true);
 
 		disk->head_position = 0;
 		first = 0;

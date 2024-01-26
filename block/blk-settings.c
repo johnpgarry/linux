@@ -132,13 +132,23 @@ static unsigned int blk_queue_max_guaranteed_bio_sectors(
 	return rounddown_pow_of_two(length >> SECTOR_SHIFT);
 }
 
-static void blk_atomic_writes_update_limits(struct request_queue *q)
+static void blk_atomic_writes_update_limits(struct request_queue *q, bool disable_atomic_writes)
 {
 	struct queue_limits *limits = &q->limits;
 	unsigned int max_hw_sectors =
 		rounddown_pow_of_two(limits->max_hw_sectors);
 	unsigned int unit_limit = min(max_hw_sectors,
 		blk_queue_max_guaranteed_bio_sectors(limits, q));
+
+	if (disable_atomic_writes) {
+		limits->atomic_write_max_sectors = 0;
+		limits->atomic_write_unit_min_sectors = 0;
+		limits->atomic_write_unit_max_sectors = 0;
+		limits->atomic_write_hw_boundary_sectors = 0;
+		pr_err("%s limits->max_hw_sectors=%d atomic_write_hw_unit_max_sectors=%d q=%pS disable_atomic_writes=1\n",
+		__func__, limits->max_hw_sectors, limits->atomic_write_hw_unit_max_sectors, q);
+		return;
+	}
 
 	limits->atomic_write_max_sectors =
 		min(limits->atomic_write_hw_max_sectors, max_hw_sectors);
@@ -194,7 +204,7 @@ void blk_queue_max_hw_sectors(struct request_queue *q, unsigned int max_hw_secto
 				 limits->logical_block_size >> SECTOR_SHIFT);
 	limits->max_sectors = max_sectors;
 
-	blk_atomic_writes_update_limits(q);
+	blk_atomic_writes_update_limits(q, false);
 
 	if (!q->disk)
 		return;
@@ -243,7 +253,7 @@ void blk_queue_atomic_write_max_bytes(struct request_queue *q,
 				      unsigned int bytes)
 {
 	q->limits.atomic_write_hw_max_sectors = bytes >> SECTOR_SHIFT;
-	blk_atomic_writes_update_limits(q);
+	blk_atomic_writes_update_limits(q, false);
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_max_bytes);
 
@@ -271,7 +281,7 @@ void blk_queue_atomic_write_unit_min_sectors(struct request_queue *q,
 {
 
 	q->limits.atomic_write_hw_unit_min_sectors = sectors;
-	blk_atomic_writes_update_limits(q);
+	blk_atomic_writes_update_limits(q, false);
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_unit_min_sectors);
 
@@ -285,7 +295,7 @@ void blk_queue_atomic_write_unit_max_sectors(struct request_queue *q,
 					     unsigned int sectors)
 {
 	q->limits.atomic_write_hw_unit_max_sectors = sectors;
-	blk_atomic_writes_update_limits(q);
+	blk_atomic_writes_update_limits(q, false);
 }
 EXPORT_SYMBOL(blk_queue_atomic_write_unit_max_sectors);
 
@@ -822,11 +832,12 @@ EXPORT_SYMBOL(blk_stack_limits);
  *    block_device.
  */
 void disk_stack_limits(struct gendisk *disk, struct block_device *bdev,
-		       sector_t offset)
+		       sector_t offset, bool disable_atomic_writes)
 {
 	struct request_queue *t = disk->queue;
 
-	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS\n", __func__, t, bdev_get_queue(bdev));
+	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS disable_atomic_writes=%d\n",
+		__func__, t, bdev_get_queue(bdev), disable_atomic_writes);
 	if (blk_stack_limits(&t->limits, &bdev_get_queue(bdev)->limits,
 			get_start_sect(bdev) + (offset >> 9)) < 0)
 		pr_notice("%s: Warning: Device %pg is misaligned\n",
@@ -834,7 +845,7 @@ void disk_stack_limits(struct gendisk *disk, struct block_device *bdev,
 
 	disk_update_readahead(disk);
 
-	blk_atomic_writes_update_limits(t);
+	blk_atomic_writes_update_limits(t, disable_atomic_writes);
 }
 EXPORT_SYMBOL(disk_stack_limits);
 
