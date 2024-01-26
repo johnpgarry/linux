@@ -403,6 +403,7 @@ static int raid0_run(struct mddev *mddev)
 	conf = mddev->private;
 	if (mddev->queue) {
 		struct md_rdev *rdev;
+		bool disable_atomic_writes = !is_power_of_2(mddev->chunk_sectors);
 
 		blk_queue_max_hw_sectors(mddev->queue, mddev->chunk_sectors);
 		blk_queue_max_write_zeroes_sectors(mddev->queue, mddev->chunk_sectors);
@@ -412,8 +413,10 @@ static int raid0_run(struct mddev *mddev)
 				 (mddev->chunk_sectors << 9) * mddev->raid_disks);
 
 		rdev_for_each(rdev, mddev) {
+			pr_err("%s mddev=%pS chunksize=%ld chunk_sectors=%d calling disk_stack_limits for rdev=%pS\n",
+				__func__, mddev, mddev->bitmap_info.chunksize, mddev->chunk_sectors, rdev);
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
-					  rdev->data_offset << 9);
+					  rdev->data_offset << 9, disable_atomic_writes);
 		}
 	}
 
