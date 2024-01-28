@@ -447,6 +447,7 @@ static inline void bio_release_page(struct bio *bio, struct page *page)
 		unpin_user_page(page);
 }
 
+int blk_validate_limits(struct queue_limits *lim);
 struct request_queue *blk_alloc_queue(int node_id);
 
 int disk_scan_partitions(struct gendisk *disk, blk_mode_t mode);
