@@ -11,10 +11,10 @@
 struct scatterlist {
 	unsigned long	page_link;
 	unsigned int	offset;
-	unsigned int	length;
+	unsigned int	length1;
 	dma_addr_t	dma_address;
 #ifdef CONFIG_NEED_SG_DMA_LENGTH
-	unsigned int	dma_length;
+	unsigned int	dma_length1;
 #endif
 #ifdef CONFIG_NEED_SG_DMA_FLAGS
 	unsigned int    dma_flags;
@@ -31,9 +31,9 @@ struct scatterlist {
 #define sg_dma_address(sg)	((sg)->dma_address)
 
 #ifdef CONFIG_NEED_SG_DMA_LENGTH
-#define sg_dma_len(sg)		((sg)->dma_length)
+#define sg_dma_len(sg)		((sg)->dma_length1)
 #else
-#define sg_dma_len(sg)		((sg)->length)
+#define sg_dma_len(sg)		((sg)->length1)
 #endif
 
 struct sg_table {
@@ -138,7 +138,7 @@ static inline void sg_set_page(struct scatterlist *sg, struct page *page,
 {
 	sg_assign_page(sg, page);
 	sg->offset = offset;
-	sg->length = len;
+	sg->length1 = len;
 }
 
 /**
@@ -162,7 +162,7 @@ static inline void sg_set_folio(struct scatterlist *sg, struct folio *folio,
 	WARN_ON_ONCE(offset > UINT_MAX);
 	sg_assign_page(sg, &folio->page);
 	sg->offset = offset;
-	sg->length = len;
+	sg->length1 = len;
 }
 
 static inline struct page *sg_page(struct scatterlist *sg)
@@ -216,7 +216,7 @@ static inline void __sg_chain(struct scatterlist *chain_sg,
 	 * offset and length are unused for chain entry. Clear them.
 	 */
 	chain_sg->offset = 0;
-	chain_sg->length = 0;
+	chain_sg->length1 = 0;
 
 	/*
 	 * Set lowest bit to indicate a link pointer, and make sure to clear
