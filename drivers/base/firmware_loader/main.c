@@ -38,7 +38,7 @@
 #include <linux/zstd.h>
 #include <linux/xz.h>
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #include "../base.h"
 #include "firmware.h"
@@ -469,12 +469,16 @@ static int fw_decompress_xz(struct device *dev, struct fw_priv *fw_priv,
 
 /* direct firmware loading support */
 static char fw_path_para[256];
-static const char * const fw_path[] = {
-	fw_path_para,
-	"/lib/firmware/updates/" UTS_RELEASE,
-	"/lib/firmware/updates",
-	"/lib/firmware/" UTS_RELEASE,
-	"/lib/firmware"
+
+static const struct fw_path_s {
+	const char *path;
+	bool append; /* Append UTS_RELEASE, path must end in '/' */
+} fw_paths[] = {
+	{ fw_path_para, false},
+	{ "/lib/firmware/updates/", true},
+	{ "/lib/firmware/updates", false},
+	{ "/lib/firmware/", true},
+	{ "/lib/firmware", false},
 };
 
 /*
@@ -496,7 +500,7 @@ fw_get_filesystem_firmware(struct device *device, struct fw_priv *fw_priv,
 	size_t size;
 	int i, len, maxlen = 0;
 	int rc = -ENOENT;
-	char *path, *nt = NULL;
+	char *path, *fw_path_string, *nt = NULL;
 	size_t msize = INT_MAX;
 	void *buffer = NULL;
 
@@ -510,25 +514,40 @@ fw_get_filesystem_firmware(struct device *device, struct fw_priv *fw_priv,
 	if (!path)
 		return -ENOMEM;
 
+	fw_path_string = __getname();
+	if (!fw_path_string) {
+		__putname(path);
+		return -ENOMEM;
+	}
+
 	wait_for_initramfs();
-	for (i = 0; i < ARRAY_SIZE(fw_path); i++) {
+	for (i = 0; i < ARRAY_SIZE(fw_paths); i++) {
+		const struct fw_path_s *fw_path = &fw_paths[i];
 		size_t file_size = 0;
 		size_t *file_size_ptr = NULL;
 
 		/* skip the unset customized path */
-		if (!fw_path[i][0])
+		if (!fw_path->path[0])
 			continue;
 
+		len = snprintf(fw_path_string, PATH_MAX, "%s%s",
+			fw_path->path, fw_path->append ?
+			init_utsname()->release : "");
+		if (len >= PATH_MAX) {
+			rc = -ENAMETOOLONG;
+			break;
+		}
+
 		/* strip off \n from customized path */
-		maxlen = strlen(fw_path[i]);
+		maxlen = strlen(fw_path_string);
 		if (i == 0) {
-			nt = strchr(fw_path[i], '\n');
+			nt = strchr(fw_path_string, '\n');
 			if (nt)
-				maxlen = nt - fw_path[i];
+				maxlen = nt - fw_path_string;
 		}
 
 		len = snprintf(path, PATH_MAX, "%.*s/%s%s",
-			       maxlen, fw_path[i],
+			       maxlen, fw_path_string,
 			       fw_priv->fw_name, suffix);
 		if (len >= PATH_MAX) {
 			rc = -ENAMETOOLONG;
@@ -589,6 +608,7 @@ fw_get_filesystem_firmware(struct device *device, struct fw_priv *fw_priv,
 		break;
 	}
 	__putname(path);
+	__putname(fw_path_string);
 
 	return rc;
 }
