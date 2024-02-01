@@ -68,8 +68,7 @@
 #include <linux/nospec.h>
 
 #include <linux/kmsg_dump.h>
-/* Move somewhere else to avoid recompiling? */
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #include <linux/uaccess.h>
 #include <asm/io.h>
@@ -1282,7 +1281,7 @@ static int override_release(char __user *release, size_t len)
 	int ret = 0;
 
 	if (current->personality & UNAME26) {
-		const char *rest = UTS_RELEASE;
+		const char *rest = uts_release;
 		char buf[65] = { 0 };
 		int ndots = 0;
 		unsigned v;
