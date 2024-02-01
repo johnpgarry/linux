@@ -13,7 +13,7 @@
 #include "msm_gpu_trace.h"
 #include "adreno/adreno_gpu.h"
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 #include <linux/string_helpers.h>
 #include <linux/devcoredump.h>
 #include <linux/sched/task.h>
@@ -195,7 +195,7 @@ static ssize_t msm_gpu_devcoredump_read(char *buffer, loff_t offset,
 	p = drm_coredump_printer(&iter);
 
 	drm_printf(&p, "---\n");
-	drm_printf(&p, "kernel: " UTS_RELEASE "\n");
+	drm_printf(&p, "kernel: %s\n", uts_release);
 	drm_printf(&p, "module: " KBUILD_MODNAME "\n");
 	drm_printf(&p, "time: %lld.%09ld\n",
 		state->time.tv_sec, state->time.tv_nsec);
