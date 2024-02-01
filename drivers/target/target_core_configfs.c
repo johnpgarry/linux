@@ -15,7 +15,6 @@
 #include <linux/kstrtox.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
-#include <generated/utsrelease.h>
 #include <linux/utsname.h>
 #include <linux/init.h>
 #include <linux/fs.h>
@@ -89,8 +88,9 @@ static ssize_t target_core_item_version_show(struct config_item *item,
 		char *page)
 {
 	return sprintf(page, "Target Engine Core ConfigFS Infrastructure %s"
-		" on %s/%s on "UTS_RELEASE"\n", TARGET_CORE_VERSION,
-		utsname()->sysname, utsname()->machine);
+		" on %s/%s on %s\n", TARGET_CORE_VERSION,
+		utsname()->sysname, utsname()->machine,
+		uts_release);
 }
 
 CONFIGFS_ATTR_RO(target_core_item_, version);
@@ -3659,8 +3659,9 @@ static int __init target_core_init_configfs(void)
 	int ret;
 
 	pr_debug("TARGET_CORE[0]: Loading Generic Kernel Storage"
-		" Engine: %s on %s/%s on "UTS_RELEASE"\n",
-		TARGET_CORE_VERSION, utsname()->sysname, utsname()->machine);
+		" Engine: %s on %s/%s on %s\n",
+		TARGET_CORE_VERSION, utsname()->sysname, utsname()->machine,
+		uts_release);
 
 	config_group_init(&subsys->su_group);
 	mutex_init(&subsys->su_mutex);
@@ -3716,7 +3717,8 @@ static int __init target_core_init_configfs(void)
 	}
 	pr_debug("TARGET_CORE[0]: Initialized ConfigFS Fabric"
 		" Infrastructure: "TARGET_CORE_VERSION" on %s/%s"
-		" on "UTS_RELEASE"\n", utsname()->sysname, utsname()->machine);
+		" on %s\n", utsname()->sysname, utsname()->machine,
+		uts_release);
 	/*
 	 * Register built-in RAMDISK subsystem logic for virtual LUN 0
 	 */

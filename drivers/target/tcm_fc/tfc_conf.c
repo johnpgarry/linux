@@ -15,7 +15,6 @@
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
-#include <generated/utsrelease.h>
 #include <linux/utsname.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -368,8 +367,8 @@ static void ft_del_wwn(struct se_wwn *wwn)
 
 static ssize_t ft_wwn_version_show(struct config_item *item, char *page)
 {
-	return sprintf(page, "TCM FC " FT_VERSION " on %s/%s on "
-		""UTS_RELEASE"\n",  utsname()->sysname, utsname()->machine);
+	return sprintf(page, "TCM FC " FT_VERSION " on %s/%s on %s\n",
+		utsname()->sysname, utsname()->machine, uts_release);
 }
 
 CONFIGFS_ATTR_RO(ft_wwn_, version);
