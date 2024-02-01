@@ -8,7 +8,6 @@
 #include <linux/rculist.h>
 #include <linux/part_stat.h>
 
-#include <generated/utsrelease.h>
 #include <asm/unaligned.h>
 #include "nvmet.h"
 

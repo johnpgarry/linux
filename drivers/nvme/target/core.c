@@ -10,7 +10,7 @@
 #include <linux/pci-p2pdma.h>
 #include <linux/scatterlist.h>
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -1564,7 +1564,7 @@ struct nvmet_subsys *nvmet_subsys_alloc(const char *subsysnqn,
 
 	subsys->ieee_oui = 0;
 
-	subsys->firmware_rev = kstrndup(UTS_RELEASE, NVMET_FR_MAX_SIZE, GFP_KERNEL);
+	subsys->firmware_rev = kstrndup(uts_release, NVMET_FR_MAX_SIZE, GFP_KERNEL);
 	if (!subsys->firmware_rev) {
 		ret = -ENOMEM;
 		goto free_mn;

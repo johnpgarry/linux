@@ -5,7 +5,7 @@
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/slab.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 #include "nvmet.h"
 
 struct nvmet_subsys *nvmet_disc_subsys;
@@ -271,7 +271,7 @@ static void nvmet_execute_disc_identify(struct nvmet_req *req)
 	memcpy_and_pad(id->mn, sizeof(id->mn), ctrl->subsys->model_number,
 		       strlen(ctrl->subsys->model_number), ' ');
 	memcpy_and_pad(id->fr, sizeof(id->fr),
-		       UTS_RELEASE, strlen(UTS_RELEASE), ' ');
+		       uts_release, strlen(uts_release), ' ');
 
 	id->cntrltype = NVME_CTRL_DISC;
 
