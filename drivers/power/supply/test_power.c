@@ -16,7 +16,7 @@
 #include <linux/power_supply.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 enum test_power_id {
 	TEST_AC,
@@ -78,7 +78,7 @@ static int test_power_get_battery_property(struct power_supply *psy,
 		val->strval = "Linux";
 		break;
 	case POWER_SUPPLY_PROP_SERIAL_NUMBER:
-		val->strval = UTS_RELEASE;
+		val->strval = uts_release;
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = battery_status;
