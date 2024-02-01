@@ -13,7 +13,7 @@
 #include <linux/slab.h>
 #include <net/sock.h>
 #include <net/af_rxrpc.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 #include "ar-internal.h"
 
 static char rxrpc_version_string[65]; // "linux-" UTS_RELEASE " AF_RXRPC";
@@ -24,7 +24,7 @@ static char rxrpc_version_string[65]; // "linux-" UTS_RELEASE " AF_RXRPC";
 void rxrpc_gen_version_string(void)
 {
 	snprintf(rxrpc_version_string, sizeof(rxrpc_version_string),
-		 "linux-%.49s AF_RXRPC", UTS_RELEASE);
+		 "linux-%.49s AF_RXRPC", uts_release);
 }
 
 /*
