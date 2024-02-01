@@ -16,7 +16,7 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/ima.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #include "ima.h"
 
@@ -151,7 +151,7 @@ int __init ima_init(void)
 	ima_init_key_queue();
 
 	ima_measure_critical_data("kernel_info", "kernel_version",
-				  UTS_RELEASE, strlen(UTS_RELEASE), false,
+				  uts_release, strlen(uts_release), false,
 				  NULL, 0);
 
 	return rc;
