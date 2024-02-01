@@ -11,7 +11,6 @@
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
-#include <generated/utsrelease.h>
 #include <linux/utsname.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -2556,9 +2555,9 @@ static void vhost_scsi_drop_tport(struct se_wwn *wwn)
 static ssize_t
 vhost_scsi_wwn_version_show(struct config_item *item, char *page)
 {
-	return sysfs_emit(page, "TCM_VHOST fabric module %s on %s/%s"
-		"on "UTS_RELEASE"\n", VHOST_SCSI_VERSION, utsname()->sysname,
-		utsname()->machine);
+	return sysfs_emit(page, "TCM_VHOST fabric module %s on %s/%s on %s\n",
+		VHOST_SCSI_VERSION, utsname()->sysname,
+		utsname()->machine, uts_release);
 }
 
 CONFIGFS_ATTR_RO(vhost_scsi_wwn_, version);
@@ -2607,9 +2606,9 @@ static int __init vhost_scsi_init(void)
 {
 	int ret = -ENOMEM;
 
-	pr_debug("TCM_VHOST fabric module %s on %s/%s"
-		" on "UTS_RELEASE"\n", VHOST_SCSI_VERSION, utsname()->sysname,
-		utsname()->machine);
+	pr_debug("TCM_VHOST fabric module %s on %s/%s on %s\n",
+		VHOST_SCSI_VERSION, utsname()->sysname,
+		utsname()->machine, uts_release);
 
 	ret = vhost_scsi_register();
 	if (ret < 0)
