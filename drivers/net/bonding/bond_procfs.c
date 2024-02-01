@@ -2,6 +2,7 @@
 #include <linux/proc_fs.h>
 #include <linux/ethtool.h>
 #include <linux/export.h>
+#include <linux/utsname.h>
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 #include <net/bonding.h>
@@ -265,7 +266,7 @@ static void bond_info_show_slave(struct seq_file *seq,
 static int bond_info_seq_show(struct seq_file *seq, void *v)
 {
 	if (v == SEQ_START_TOKEN) {
-		seq_printf(seq, "%s\n", bond_version);
+		seq_printf(seq, DRV_DESCRIPTION ": v%s\n", uts_release);
 		bond_info_show_master(seq);
 	} else
 		bond_info_show_slave(seq, v);
