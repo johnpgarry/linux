@@ -43,7 +43,7 @@
 #include <drm/drm_sysfs.h>
 #include <drm/ttm/ttm_range_manager.h>
 #include <drm/ttm/ttm_placement.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #ifdef CONFIG_X86
 #include <asm/hypervisor.h>
@@ -1142,7 +1142,7 @@ static int vmw_driver_load(struct vmw_private *dev_priv, u32 pci_id)
 	vmw_print_sm_type(dev_priv);
 	vmw_host_printf("vmwgfx: Module Version: %d.%d.%d (kernel: %s)",
 			VMWGFX_DRIVER_MAJOR, VMWGFX_DRIVER_MINOR,
-			VMWGFX_DRIVER_PATCHLEVEL, UTS_RELEASE);
+			VMWGFX_DRIVER_PATCHLEVEL, uts_release);
 	vmw_write_driver_id(dev_priv);
 
 	dev_priv->pm_nb.notifier_call = vmwgfx_pm_notifier;

@@ -7,7 +7,7 @@
 #include "xe_devcoredump_types.h"
 
 #include <linux/devcoredump.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #include "xe_device.h"
 #include "xe_exec_queue.h"
@@ -81,7 +81,7 @@ static ssize_t xe_devcoredump_read(char *buffer, loff_t offset,
 	p = drm_coredump_printer(&iter);
 
 	drm_printf(&p, "**** Xe Device Coredump ****\n");
-	drm_printf(&p, "kernel: " UTS_RELEASE "\n");
+	drm_printf(&p, "kernel: %s\n", uts_release);
 	drm_printf(&p, "module: " KBUILD_MODNAME "\n");
 
 	ts = ktime_to_timespec64(ss->snapshot_time);
