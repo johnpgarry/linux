@@ -28,7 +28,7 @@
 #include <linux/bpf_trace.h>
 #include <linux/atomic.h>
 #include <linux/numa.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 #include <scsi/fc/fc_fcoe.h>
 #include <net/udp_tunnel.h>
 #include <net/pkt_cls.h>
@@ -11179,8 +11179,8 @@ skip_sriov:
 	 */
 	if (hw->mac.ops.set_fw_drv_ver)
 		hw->mac.ops.set_fw_drv_ver(hw, 0xFF, 0xFF, 0xFF, 0xFF,
-					   sizeof(UTS_RELEASE) - 1,
-					   UTS_RELEASE);
+					   strlen(uts_release),
+					   uts_release);
 
 	/* add san mac addr to netdev */
 	ixgbe_add_sanmac_netdev(netdev);

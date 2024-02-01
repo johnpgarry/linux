@@ -5,7 +5,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 #include <linux/crash_dump.h>
 #include "ice.h"
 #include "ice_base.h"
@@ -4313,7 +4313,7 @@ static int ice_send_version(struct ice_pf *pf)
 	dv.minor_ver = 0xff;
 	dv.build_ver = 0xff;
 	dv.subbuild_ver = 0;
-	strscpy((char *)dv.driver_string, UTS_RELEASE,
+	strscpy((char *)dv.driver_string, uts_release,
 		sizeof(dv.driver_string));
 	return ice_aq_send_driver_ver(&pf->hw, &dv, NULL);
 }

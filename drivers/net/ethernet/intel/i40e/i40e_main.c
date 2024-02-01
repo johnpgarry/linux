@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright(c) 2013 - 2021 Intel Corporation. */
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 #include <linux/crash_dump.h>
 #include <linux/if_bridge.h>
 #include <linux/if_macvlan.h>
@@ -10771,7 +10771,7 @@ static void i40e_send_version(struct i40e_pf *pf)
 	dv.minor_version = 0xff;
 	dv.build_version = 0xff;
 	dv.subbuild_version = 0;
-	strscpy(dv.driver_string, UTS_RELEASE, sizeof(dv.driver_string));
+	strscpy(dv.driver_string, uts_release, sizeof(dv.driver_string));
 	i40e_aq_send_driver_version(&pf->hw, &dv, NULL);
 }
 

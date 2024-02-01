@@ -6,7 +6,6 @@
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/utsname.h>
-#include <generated/utsrelease.h>
 #include <linux/ctype.h>
 
 #include "ionic.h"
@@ -538,7 +537,7 @@ int ionic_identify(struct ionic *ionic)
 	memset(ident, 0, sizeof(*ident));
 
 	ident->drv.os_type = cpu_to_le32(IONIC_OS_TYPE_LINUX);
-	strscpy(ident->drv.driver_ver_str, UTS_RELEASE,
+	strscpy(ident->drv.driver_ver_str, uts_release,
 		sizeof(ident->drv.driver_ver_str));
 
 	mutex_lock(&ionic->dev_cmd_lock);
