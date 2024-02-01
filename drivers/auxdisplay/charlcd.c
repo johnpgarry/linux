@@ -17,7 +17,7 @@
 #include <linux/uaccess.h>
 #include <linux/workqueue.h>
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #include "charlcd.h"
 
@@ -546,12 +546,6 @@ static void charlcd_puts(struct charlcd *lcd, const char *s)
 	}
 }
 
-#ifdef CONFIG_PANEL_BOOT_MESSAGE
-#define LCD_INIT_TEXT CONFIG_PANEL_BOOT_MESSAGE
-#else
-#define LCD_INIT_TEXT "Linux-" UTS_RELEASE "\n"
-#endif
-
 #ifdef CONFIG_CHARLCD_BL_ON
 #define LCD_INIT_BL "\x1b[L+"
 #elif defined(CONFIG_CHARLCD_BL_FLASH)
@@ -564,7 +558,18 @@ static void charlcd_puts(struct charlcd *lcd, const char *s)
 static int charlcd_init(struct charlcd *lcd)
 {
 	struct charlcd_priv *priv = charlcd_to_priv(lcd);
-	int ret;
+	char init_text[256];
+	int ret, len;
+
+	#ifdef CONFIG_PANEL_BOOT_MESSAGE
+	len = snprintf(init_text, sizeof(init_text),
+		"%s", CONFIG_PANEL_BOOT_MESSAGE);
+	#else
+	len = snprintf(init_text, sizeof(init_text),
+		"Linux %s       ", uts_release);
+	#endif
+	if (len >= sizeof(init_text))
+		return -ENOMEM;
 
 	priv->flags = ((lcd->height > 1) ? LCD_FLAG_N : 0) | LCD_FLAG_D |
 		      LCD_FLAG_C | LCD_FLAG_B;
@@ -586,7 +591,8 @@ static int charlcd_init(struct charlcd *lcd)
 		return ret;
 
 	/* display a short message */
-	charlcd_puts(lcd, "\x1b[Lc\x1b[Lb" LCD_INIT_BL LCD_INIT_TEXT);
+	charlcd_puts(lcd, "\x1b[Lc\x1b[Lb" LCD_INIT_BL);
+	charlcd_puts(lcd, init_text);
 
 	/* clear the display on the next device opening */
 	priv->must_clear = true;

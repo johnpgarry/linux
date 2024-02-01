@@ -8,7 +8,7 @@
  * Copyright (C) 2021 Glider bv
  */
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -207,7 +207,8 @@ int linedisp_register(struct linedisp *linedisp, struct device *parent,
 		      void (*update)(struct linedisp *linedisp))
 {
 	static atomic_t linedisp_id = ATOMIC_INIT(-1);
-	int err;
+	char message[256];
+	int err, len;
 
 	memset(linedisp, 0, sizeof(*linedisp));
 	linedisp->dev.parent = parent;
@@ -216,6 +217,11 @@ int linedisp_register(struct linedisp *linedisp, struct device *parent,
 	linedisp->buf = buf;
 	linedisp->num_chars = num_chars;
 	linedisp->scroll_rate = DEFAULT_SCROLL_RATE;
+
+	len = snprintf(message, sizeof(message),
+		"Linux %s       ", uts_release);
+	if (len >= sizeof(message))
+		return -ENOMEM;
 
 	device_initialize(&linedisp->dev);
 	dev_set_name(&linedisp->dev, "linedisp.%lu",
@@ -229,7 +235,7 @@ int linedisp_register(struct linedisp *linedisp, struct device *parent,
 		goto out_del_timer;
 
 	/* display a default message */
-	err = linedisp_display(linedisp, "Linux " UTS_RELEASE "       ", -1);
+	err = linedisp_display(linedisp, message, -1);
 	if (err)
 		goto out_del_dev;
 

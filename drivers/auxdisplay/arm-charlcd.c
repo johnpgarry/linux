@@ -17,7 +17,7 @@
 #include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #define DRIVERNAME "arm-charlcd"
 #define CHARLCD_TIMEOUT (msecs_to_jiffies(1000))
@@ -254,7 +254,7 @@ static void charlcd_4bit_init(struct charlcd *lcd)
 	charlcd_4bit_command(lcd, HD_HOME);
 	/* Put something useful in the display */
 	charlcd_4bit_print(lcd, 0, "ARM Linux");
-	charlcd_4bit_print(lcd, 1, UTS_RELEASE);
+	charlcd_4bit_print(lcd, 1, uts_release);
 }
 
 static void charlcd_init_work(struct work_struct *work)
