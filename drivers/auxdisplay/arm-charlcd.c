@@ -14,6 +14,7 @@
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 #include <generated/utsrelease.h>
