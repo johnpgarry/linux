@@ -45,7 +45,7 @@
 #include <linux/spinlock.h>
 #include <linux/configfs.h>
 
-#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 
 #include <scsi/scsi_host.h> /* SG_ALL */
 
@@ -1706,9 +1706,9 @@ static struct configfs_attribute *scsiback_tpg_attrs[] = {
 static ssize_t
 scsiback_wwn_version_show(struct config_item *item, char *page)
 {
-	return sprintf(page, "xen-pvscsi fabric module %s on %s/%s on "
-		UTS_RELEASE"\n",
-		VSCSI_VERSION, utsname()->sysname, utsname()->machine);
+	return sprintf(page, "xen-pvscsi fabric module %s on %s/%s on %s\n",
+		VSCSI_VERSION, utsname()->sysname, utsname()->machine,
+		uts_release);
 }
 
 CONFIGFS_ATTR_RO(scsiback_wwn_, version);
@@ -1856,8 +1856,9 @@ static int __init scsiback_init(void)
 	if (!xen_domain())
 		return -ENODEV;
 
-	pr_debug("xen-pvscsi: fabric module %s on %s/%s on "UTS_RELEASE"\n",
-		 VSCSI_VERSION, utsname()->sysname, utsname()->machine);
+	pr_debug("xen-pvscsi: fabric module %s on %s/%s on %s\n",
+		 VSCSI_VERSION, utsname()->sysname, utsname()->machine,
+		 uts_release);
 
 	ret = xenbus_register_backend(&scsiback_driver);
 	if (ret)
