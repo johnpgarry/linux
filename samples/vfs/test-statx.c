@@ -44,6 +44,8 @@ struct statx_timestamp;
 #define STATX_WRITE_ATOMIC	0x00008000U	/* Want/got atomic_write_* fields */
 #define STATX_ATTR_WRITE_ATOMIC		0x00400000 /* File supports atomic write operations */
 
+extern int open(const char *path, int flags, ...);
+
 static __attribute__((unused))
 ssize_t statx(int dfd, const char *filename, unsigned flags,
 	      unsigned int mask, struct statx *buffer)
@@ -230,7 +232,8 @@ static void dump_hex(unsigned long long *data, int from, int to)
 int main(int argc, char **argv)
 {
 	struct statx stx;
-	int ret, raw = 0, atflag = AT_SYMLINK_NOFOLLOW;
+	int ret, raw = 0, atflag = AT_SYMLINK_NOFOLLOW, use_fd = 0, fd = -1;
+	int o_flags = O_RDWR;
 
 	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
 
@@ -265,10 +268,33 @@ int main(int argc, char **argv)
 			raw = 1;
 			continue;
 		}
+		if (strcmp(*argv, "-f") == 0) {
+			use_fd = 1;
+			atflag |= AT_EMPTY_PATH;
+			continue;
+		}
+		if (strcmp(*argv, "-d") == 0) {
+			o_flags |= O_DIRECT;
+			continue;
+		}
 
 		memset(&stx, 0xbf, sizeof(stx));
-		ret = statx(AT_FDCWD, *argv, atflag, mask, &stx);
+		printf("%s use_fd=%d o_flags=0x%x (O_DIRECT=%d)\n",
+			__func__, use_fd, o_flags, !!(o_flags & O_DIRECT));
+		if (use_fd) {
+			char *file = *argv;
+			fd = open(file, o_flags, 777);
+			if (fd < 0) {
+				printf("could not open %s\n", file);
+				return -1;
+			}
+			ret = statx(fd, "", atflag, mask, &stx);
+		} else {
+			ret = statx(AT_FDCWD, *argv, atflag, mask, &stx);
+		}
 		printf("statx(%s) = %d\n", *argv, ret);
+		if (fd >= 0)
+			close(fd);
 		if (ret < 0) {
 			perror(*argv);
 			exit(1);
