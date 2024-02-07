@@ -269,7 +269,7 @@ xfs_file_dio_read(
 	ret = xfs_ilock_iocb(iocb, XFS_IOLOCK_SHARED);
 	if (ret)
 		return ret;
-	ret = iomap_dio_rw(iocb, to, &xfs_read_iomap_ops, NULL, 0, NULL, 0);
+	ret = iomap_dio_rw(iocb, to, &xfs_read_iomap_ops, NULL, 0, NULL, 0, 0, 0);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	return ret;
@@ -586,7 +586,11 @@ xfs_file_dio_write_aligned(
 	struct iov_iter		*from)
 {
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
+	unsigned int		awu_min = 0, awu_max = 0;
 	ssize_t			ret;
+
+	if (iocb->ki_flags & IOCB_ATOMIC)
+		xfs_get_atomic_write_attr(ip, &awu_min, &awu_max);
 
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
@@ -606,7 +610,7 @@ xfs_file_dio_write_aligned(
 	}
 	trace_xfs_file_direct_write(iocb, from);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
-			   &xfs_dio_write_ops, 0, NULL, 0);
+			   &xfs_dio_write_ops, 0, NULL, 0, awu_min, awu_max);
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);
@@ -684,7 +688,7 @@ retry_exclusive:
 
 	trace_xfs_file_direct_write(iocb, from);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
-			   &xfs_dio_write_ops, flags, NULL, 0);
+			   &xfs_dio_write_ops, flags, NULL, 0, 0, 0);
 
 	/*
 	 * Retry unaligned I/O with exclusive blocking semantics if the DIO

@@ -385,10 +385,14 @@ struct iomap_dio_ops {
 
 ssize_t iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
-		unsigned int dio_flags, void *private, size_t done_before);
+		unsigned int dio_flags, void *private, size_t done_before,
+		unsigned int atomic_write_unit_min,
+		unsigned int atomic_write_unit_max);
 struct iomap_dio *__iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
-		unsigned int dio_flags, void *private, size_t done_before);
+		unsigned int dio_flags, void *private, size_t done_before,
+		unsigned int atomic_write_unit_min,
+		unsigned int atomic_write_unit_max);
 ssize_t iomap_dio_complete(struct iomap_dio *dio);
 void iomap_dio_bio_end_io(struct bio *bio);
 

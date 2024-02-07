@@ -829,14 +829,17 @@ xfs_direct_write_iomap_begin(
 		pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
 			__func__, offset, length, offset_fsb, offset_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
-			error = -EINVAL;
-			goto out_unlock;
+			pr_err("%s2 !imap_spans_range\n", __func__);
+		//	error = -EINVAL;
+		//	goto out_unlock;
 		}
 
 		if ((offset & mp->m_blockmask) ||
 		    (length & mp->m_blockmask)) {
-			error = -EINVAL;
-			goto out_unlock;
+			//error = -EINVAL;
+			//goto out_unlock;
+
+			pr_err("%s3 !offset & mp->m_blockmask || !length & mp->m_blockmask\n", __func__);
 		}
 
 		if (imap.br_blockcount == unit_min_fsb ||
@@ -844,17 +847,21 @@ xfs_direct_write_iomap_begin(
 			/* ok if exactly min or max */
 		} else if (imap.br_blockcount < unit_min_fsb ||
 			   imap.br_blockcount > unit_max_fsb) {
-			error = -EINVAL;
-			goto out_unlock;
+			pr_err("%s4 imap.br_blockcount < unit_min_fsb || imap.br_blockcount > unit_max_fsb\n", __func__);
+			//error = -EINVAL;
+			//goto out_unlock;
 		} else if (!is_power_of_2(imap.br_blockcount)) {
-			error = -EINVAL;
-			goto out_unlock;
+			pr_err("%s5 is_power_of_2\n", __func__);
+			//error = -EINVAL;
+			//goto out_unlock;
 		}
 
 		if (imap.br_startoff &&
 		    imap.br_startoff & (imap.br_blockcount - 1)) {
-			error = -EINVAL;
-			goto out_unlock;
+
+			pr_err("%s6  imap.br_startoff & (imap.br_blockcount - 1)\n", __func__);
+			//error = -EINVAL;
+			//goto out_unlock;
 		}
 	}
 

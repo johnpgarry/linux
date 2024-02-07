@@ -387,8 +387,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 					  GFP_KERNEL);
 		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
 		bio->bi_ioprio = dio->iocb->ki_ioprio;
-		if (atomic_write)
+		if (atomic_write) {
 			bio->bi_opf |= REQ_ATOMIC;
+		}
 
 		bio->bi_private = dio;
 		bio->bi_end_io = iomap_dio_bio_end_io;
@@ -406,8 +407,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		n = bio->bi_iter.bi_size;
-		if (atomic_write && n != iter_len) {
+		if (atomic_write && ((n != iter_len) || (bio->bi_iter.bi_sector % (n >> SECTOR_SHIFT)))) {
 			/* This bio should have covered the complete length */
+			pr_err("%s error n=%zd iter_len=%zd bio->bi_iter.bi_sector=%lld\n", __func__, n, iter_len, bio->bi_iter.bi_sector);
+			pr_err("%s2 error bio->bi_iter.bi_sector per (n >> SECTOR_SHIFT) = %lld\n", __func__, bio->bi_iter.bi_sector % (n >> SECTOR_SHIFT));
 			ret = -EINVAL;
 			bio_put(bio);
 			goto out;
@@ -554,7 +557,9 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 struct iomap_dio *
 __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
-		unsigned int dio_flags, void *private, size_t done_before)
+		unsigned int dio_flags, void *private, size_t done_before,
+		unsigned int awu_min,
+		unsigned int awu_max)
 {
 	struct inode *inode = file_inode(iocb->ki_filp);
 	struct iomap_iter iomi = {
@@ -574,15 +579,24 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
 
-	if (atomic_write) {
-		pr_err("%s pos=%lld length=%zd iomap=%pS\n", __func__, iocb->ki_pos, iov_iter_count(iter), iomap);
-	}
-
 	if (!iomi.len)
 		return NULL;
 
-	if (atomic_write && !iter_is_ubuf(iter))
-		return ERR_PTR(-EINVAL);
+	if (atomic_write) {
+		pr_err("%s pos=%lld length=%zd iomap=%pS awu_min=%d, max=%d\n",
+			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, awu_min, awu_max);
+
+		if (!iter_is_ubuf(iter))
+			return ERR_PTR(-EINVAL);
+		if (iov_iter_count(iter) < awu_min)
+			return ERR_PTR(-EINVAL);
+		if (!is_power_of_2(iov_iter_count(iter)))
+			return ERR_PTR(-EINVAL);
+		if (iocb->ki_pos & (iov_iter_count(iter) - 1))
+			return ERR_PTR(-EINVAL);
+		if (iov_iter_count(iter) > awu_max)
+			return ERR_PTR(-EINVAL);
+	}
 
 	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
 	if (!dio)
@@ -780,12 +794,15 @@ EXPORT_SYMBOL_GPL(__iomap_dio_rw);
 ssize_t
 iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
-		unsigned int dio_flags, void *private, size_t done_before)
+		unsigned int dio_flags, void *private, size_t done_before,
+		unsigned int atomic_write_unit_min,
+		unsigned int atomic_write_unit_max)
 {
 	struct iomap_dio *dio;
 
 	dio = __iomap_dio_rw(iocb, iter, ops, dops, dio_flags, private,
-			     done_before);
+			     done_before, atomic_write_unit_min,
+			    atomic_write_unit_max);
 	if (IS_ERR_OR_NULL(dio))
 		return PTR_ERR_OR_ZERO(dio);
 	return iomap_dio_complete(dio);
