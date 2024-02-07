@@ -298,6 +298,26 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
 
+	if (atomic_write) {
+#if 0
+u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
+	struct block_device	*bdev;	/* block device for I/O */
+	struct dax_device	*dax_dev; /* dax_dev for dax operations */
+	void			*inline_data;
+	void			*private; /* filesystem private */
+	const struct iomap_folio_ops *folio_ops;
+	u64			validity_cookie; /* used with .iomap_valid() */
+#endif
+	//	pr_err("%s atomic_write iomap->addr=%lld offset=%lld length=%lld\n",
+	//		__func__, iomap->addr, iomap->offset, iomap->length);
+	}
+
+
+
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
 		need_zeroout = true;
@@ -586,16 +606,11 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		pr_err("%s pos=%lld length=%zd iomap=%pS awu_min=%d, max=%d\n",
 			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, awu_min, awu_max);
 
-		if (!iter_is_ubuf(iter))
+		if (!atomic_write_valid(iocb->ki_pos, iter, awu_min, awu_max)) {
+			pr_err("%s2 not valid pos=%lld length=%zd iomap=%pS awu_min=%d, max=%d\n",
+				__func__, iocb->ki_pos, iov_iter_count(iter), iomap, awu_min, awu_max);
 			return ERR_PTR(-EINVAL);
-		if (iov_iter_count(iter) < awu_min)
-			return ERR_PTR(-EINVAL);
-		if (!is_power_of_2(iov_iter_count(iter)))
-			return ERR_PTR(-EINVAL);
-		if (iocb->ki_pos & (iov_iter_count(iter) - 1))
-			return ERR_PTR(-EINVAL);
-		if (iov_iter_count(iter) > awu_max)
-			return ERR_PTR(-EINVAL);
+		}
 	}
 
 	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
