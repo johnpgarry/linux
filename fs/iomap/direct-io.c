@@ -290,6 +290,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
+	if (atomic_write) {
+		pr_err("%s pos=%lld length=%lld\n", __func__, pos, length);
+	}
+
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
@@ -566,8 +570,13 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct iomap_dio *dio;
 	loff_t ret = 0;
 	bool atomic_write = iocb->ki_flags & IOCB_ATOMIC;
+	struct iomap *iomap = &iomi.iomap;
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
+
+	if (atomic_write) {
+		pr_err("%s pos=%lld length=%zd iomap=%pS\n", __func__, iocb->ki_pos, iov_iter_count(iter), iomap);
+	}
 
 	if (!iomi.len)
 		return NULL;
@@ -674,8 +683,20 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+		loff_t jpos = iomi.pos;
+		sector_t bi_sector = iomap_sector(iomap, jpos);
+		pr_err("%s2 after iomap_iter() -> xfs_direct_write_iomap_begin(), calling iomap_dio_iter() pos=%lld length=%ld\n", __func__, iocb->ki_pos, iov_iter_count(iter));
+		pr_err("%s2.1 after iomap_iter() ... iomap->addr=%lld, offset=%lld, length=%lld pos=%lld bi_sector=%lld\n",
+			__func__, iomap->addr, iomap->offset, iomap->length, jpos, bi_sector);
 		iomi.processed = iomap_dio_iter(&iomi, dio);
-
+#if 0
+	u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
+	struct block_device	*bdev;	/* block device for I/O */
+#endif
 		/*
 		 * We can only poll for single bio I/Os.
 		 */
