@@ -817,11 +817,17 @@ xfs_direct_write_iomap_begin(
 	if (flags & IOMAP_ATOMIC) {
 		xfs_filblks_t unit_min_fsb, unit_max_fsb;
 		unsigned int unit_min, unit_max;
-
+#if 0
+	xfs_fileoff_t	br_startoff;	/* starting file offset */   //jpg offset in extent of start of write
+	xfs_fsblock_t	br_startblock;	/* starting block number */  //jpg physical block of start of write
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+#endif
 		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
 		unit_min_fsb = XFS_B_TO_FSBT(mp, unit_min);
 		unit_max_fsb = XFS_B_TO_FSBT(mp, unit_max);
-
+		pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, offset, length, offset_fsb, offset_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
 			error = -EINVAL;
 			goto out_unlock;
