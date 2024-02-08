@@ -577,9 +577,7 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 struct iomap_dio *
 __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
-		unsigned int dio_flags, void *private, size_t done_before,
-		unsigned int awu_min,
-		unsigned int awu_max)
+		unsigned int dio_flags, void *private, size_t done_before)
 {
 	struct inode *inode = file_inode(iocb->ki_filp);
 	struct iomap_iter iomi = {
@@ -596,6 +594,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	loff_t ret = 0;
 	bool atomic_write = iocb->ki_flags & IOCB_ATOMIC;
 	struct iomap *iomap = &iomi.iomap;
+	unsigned int awu_min = 0, awu_max = 0;
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
 
@@ -603,6 +602,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		return NULL;
 
 	if (atomic_write) {
+		iomap_atomicwrite_awu(&iomi, ops, &awu_min, &awu_max);
 		pr_err("%s pos=%lld length=%zd iomap=%pS awu_min=%d, max=%d\n",
 			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, awu_min, awu_max);
 
@@ -809,15 +809,12 @@ EXPORT_SYMBOL_GPL(__iomap_dio_rw);
 ssize_t
 iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
-		unsigned int dio_flags, void *private, size_t done_before,
-		unsigned int atomic_write_unit_min,
-		unsigned int atomic_write_unit_max)
+		unsigned int dio_flags, void *private, size_t done_before)
 {
 	struct iomap_dio *dio;
 
 	dio = __iomap_dio_rw(iocb, iter, ops, dops, dio_flags, private,
-			     done_before, atomic_write_unit_min,
-			    atomic_write_unit_max);
+			     done_before);
 	if (IS_ERR_OR_NULL(dio))
 		return PTR_ERR_OR_ZERO(dio);
 	return iomap_dio_complete(dio);
