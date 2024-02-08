@@ -966,8 +966,14 @@ out_unlock:
 	return error;
 }
 
+static void xfs_atomicwrite_awu(struct inode *inode, unsigned int *min, unsigned int *max)
+{
+	xfs_get_atomic_write_attr(XFS_I(inode), min, max);
+}
+
 const struct iomap_ops xfs_direct_write_iomap_ops = {
 	.iomap_begin		= xfs_direct_write_iomap_begin,
+	.iomap_atomicwrite_awu = xfs_atomicwrite_awu,
 };
 
 static int
