@@ -33,7 +33,7 @@
 #include <linux/mount.h>
 
 static const struct vm_operations_struct xfs_file_vm_ops;
-
+extern bool atomic_writing;
 /*
  * Decide if the given file range is aligned to the size of the fundamental
  * allocation unit for the file.
@@ -533,7 +533,13 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
-		error = xfs_iomap_write_unwritten(ip, offset, size, true);
+		if (1)
+			pr_err("%s calling xfs_iomap_write_unwritten() offset=%lld size=%zd\n",
+				__func__, offset, size);
+		if (0)
+			error = xfs_iomap_write_unwritten(ip, 0, 16384, true);
+		else
+			error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}
 
@@ -587,7 +593,12 @@ xfs_file_dio_write_aligned(
 {
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	ssize_t			ret;
+	unsigned int dio_flags = 0;
+	bool is_read = iov_iter_rw(from) == READ;
+	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
 
+	if (atomic_write && 0)
+			dio_flags |= IOMAP_DIO_OVERWRITE_ONLY;
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -606,7 +617,7 @@ xfs_file_dio_write_aligned(
 	}
 	trace_xfs_file_direct_write(iocb, from);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
-			   &xfs_dio_write_ops, 0, NULL, 0);
+			   &xfs_dio_write_ops, dio_flags, NULL, 0);
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);
@@ -641,6 +652,7 @@ xfs_file_dio_write_unaligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	unsigned int		flags = IOMAP_DIO_OVERWRITE_ONLY;
 	ssize_t			ret;
+	pr_err("%s isize=%zd count=%zd\n", __func__, isize, count);
 
 	/*
 	 * Extending writes need exclusivity because of the sub-block zeroing

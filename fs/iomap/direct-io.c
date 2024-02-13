@@ -87,6 +87,8 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 	loff_t offset = iocb->ki_pos;
 	ssize_t ret = dio->error;
 
+	pr_err("%s dops=%pS end_io=%pS offset=%lld dio->size=%lld\n",
+		__func__, dops, dops ? dops->end_io : NULL, offset, dio->size);
 	if (dops && dops->end_io)
 		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
 
@@ -238,6 +240,7 @@ static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 	struct inode *inode = file_inode(dio->iocb->ki_filp);
 	struct page *page = ZERO_PAGE(0);
 	struct bio *bio;
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
 
 	bio = iomap_dio_alloc_bio(iter, dio, 1, REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
 	fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
@@ -278,7 +281,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bool atomic_write = iter->flags & IOMAP_ATOMIC;
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
-	unsigned int fs_block_size = i_blocksize(inode), pad;
+	unsigned int fs_block_size = 16384/*i_blocksize(inode) */, pad;
 	loff_t length = iomap_length(iter);
 	const size_t iter_len = iter->len;
 	loff_t pos = iter->pos;
@@ -291,12 +294,23 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	if (atomic_write) {
-		pr_err("%s pos=%lld length=%lld\n", __func__, pos, length);
+		pr_err("%s pos=%lld length=%lld iomap->type=%d (IOMAP_UNWRITTEN=%d, IOMAP_MAPPED=%d) use_fua=%d\n",
+			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua);
+		pr_err("%s0.1 iomap->flags=0x%x (NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d)\n",
+			__func__, iomap->flags, IOMAP_F_NEW, IOMAP_F_DIRTY, IOMAP_F_SHARED, IOMAP_F_MERGED);
 	}
+/*
+#define IOMAP_F_NEW		(1U << 0)
+#define IOMAP_F_DIRTY		(1U << 1)
+#define IOMAP_F_SHARED		(1U << 2)
+#define IOMAP_F_MERGED		(1U << 3)
 
+	*/
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
-	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
+	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter)) {
+		pr_err("%s0.2 error\n", __func__);
 		return -EINVAL;
+	}
 
 	if (atomic_write) {
 #if 0
@@ -321,6 +335,8 @@ u64			addr; /* disk offset of mapping, bytes */
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
 		need_zeroout = true;
+		if (1)
+			pr_err("%s0 type=IOMAP_UNWRITTEN, so set need_zeroout\n", __func__);
 	}
 
 	if (iomap->flags & IOMAP_F_SHARED)
@@ -328,7 +344,11 @@ u64			addr; /* disk offset of mapping, bytes */
 
 	if (iomap->flags & IOMAP_F_NEW) {
 		need_zeroout = true;
+		if (1)
+			pr_err("%s1 type=IOMAP_F_NEW, so set need_zeroout\n", __func__);
 	} else if (iomap->type == IOMAP_MAPPED) {
+		if (atomic_write)
+			pr_err("%s11 type=IOMAP_MAPPED\n", __func__);
 		/*
 		 * Use a FUA write if we need datasync semantics, this is a pure
 		 * data IO that doesn't require any metadata updates (including
@@ -356,8 +376,10 @@ u64			addr; /* disk offset of mapping, bytes */
 	orig_count = iov_iter_count(dio->submit.iter);
 	iov_iter_truncate(dio->submit.iter, length);
 
-	if (!iov_iter_count(dio->submit.iter))
+	if (!iov_iter_count(dio->submit.iter)) {
+		pr_err("%s0.3 error\n", __func__);
 		goto out;
+	}
 
 	/*
 	 * We can only do deferred completion for pure overwrites that
@@ -379,9 +401,11 @@ u64			addr; /* disk offset of mapping, bytes */
 	if (!(dio->flags & (IOMAP_DIO_INLINE_COMP|IOMAP_DIO_CALLER_COMP)))
 		dio->iocb->ki_flags &= ~IOCB_HIPRI;
 
+	pr_err("%s0.2 need_zeroout=%d pos=%lld fs_block_size=%d\n", __func__, need_zeroout, pos, fs_block_size);
 	if (need_zeroout) {
 		/* zero out from the start of the block to the write offset */
 		pad = pos & (fs_block_size - 1);
+		pr_err("%s0.3 need_zeroout=%d pos=%lld fs_block_size=%d pad=%d\n", __func__, need_zeroout, pos, fs_block_size, pad);
 		if (pad)
 			iomap_dio_zero(iter, dio, pos - pad, pad);
 	}
@@ -399,6 +423,7 @@ u64			addr; /* disk offset of mapping, bytes */
 		if (dio->error) {
 			iov_iter_revert(dio->submit.iter, copied);
 			copied = ret = 0;
+			pr_err("%s0.4 error\n", __func__);
 			goto out;
 		}
 
@@ -423,6 +448,7 @@ u64			addr; /* disk offset of mapping, bytes */
 			 * the block we haven't written data to.
 			 */
 			bio_put(bio);
+			pr_err("%s0.5 error\n", __func__);
 			goto zero_tail;
 		}
 
@@ -431,9 +457,9 @@ u64			addr; /* disk offset of mapping, bytes */
 			/* This bio should have covered the complete length */
 			pr_err("%s error n=%zd iter_len=%zd bio->bi_iter.bi_sector=%lld\n", __func__, n, iter_len, bio->bi_iter.bi_sector);
 			pr_err("%s2 error bio->bi_iter.bi_sector per (n >> SECTOR_SHIFT) = %lld\n", __func__, bio->bi_iter.bi_sector % (n >> SECTOR_SHIFT));
-			ret = -EINVAL;
-			bio_put(bio);
-			goto out;
+			//ret = -EINVAL;
+			//bio_put(bio);
+			//goto out;
 		}
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);
@@ -463,16 +489,21 @@ u64			addr; /* disk offset of mapping, bytes */
 	 * reads of the EOF block.
 	 */
 zero_tail:
+	pr_err("%s3 zero_tail: need_zeroout=%d pos=%lld fs_block_size=%d i_size_read=%lld\n", 
+		__func__, need_zeroout, pos, fs_block_size, i_size_read(inode));
 	if (need_zeroout ||
 	    ((dio->flags & IOMAP_DIO_WRITE) && pos >= i_size_read(inode))) {
 		/* zero out from the end of the write to the end of the block */
 		pad = pos & (fs_block_size - 1);
+		pr_err("%s3.1 need_zeroout=%d pos=%lld fs_block_size=%d pad=%d\n", 
+			__func__, need_zeroout, pos, fs_block_size, pad);
 		if (pad)
 			iomap_dio_zero(iter, dio, pos, fs_block_size - pad);
 	}
 out:
 	/* Undo iter limitation to current extent */
 	iov_iter_reexpand(dio->submit.iter, orig_count - copied);
+	pr_err("%s10 out ret=%d copied=%zd\n", __func__, ret, copied);
 	if (copied)
 		return copied;
 	return ret;
@@ -613,6 +644,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		}
 	}
 
+	pr_err("%s2.1 pos=%lld length=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));
 	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
 	if (!dio)
 		return ERR_PTR(-ENOMEM);
@@ -664,8 +696,11 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		if (dio_flags & IOMAP_DIO_OVERWRITE_ONLY) {
 			ret = -EAGAIN;
 			if (iomi.pos >= dio->i_size ||
-			    iomi.pos + iomi.len > dio->i_size)
+			    iomi.pos + iomi.len > dio->i_size) {
+				pr_err("%s2.2 error pos=%lld length=%zd iomi.pos=%lld, .len=%lld dio->i_size=%lld\n",
+					__func__, iocb->ki_pos, iov_iter_count(iter), iomi.pos, iomi.len, dio->i_size);
 				goto out_free_dio;
+			}
 			iomi.flags |= IOMAP_OVERWRITE_ONLY;
 		}
 
@@ -698,13 +733,16 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 								iomi.len);
 				ret = -ENOTBLK;
 			}
+			pr_err("%s2.3 error pos=%lld length=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));
 			goto out_free_dio;
 		}
 
 		if (!wait_for_completion && !inode->i_sb->s_dio_done_wq) {
 			ret = sb_init_dio_done_wq(inode->i_sb);
-			if (ret < 0)
+			if (ret < 0) {
+				pr_err("%s2.4 error pos=%lld length=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));
 				goto out_free_dio;
+			}
 		}
 	}
 
@@ -799,6 +837,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	return dio;
 
 out_free_dio:
+	pr_err("%s10 out_free_dio ret=%lld error pos=%lld length=%zd\n", __func__, ret, iocb->ki_pos, iov_iter_count(iter));
 	kfree(dio);
 	if (ret)
 		return ERR_PTR(ret);
