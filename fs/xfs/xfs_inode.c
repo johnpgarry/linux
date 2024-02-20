@@ -76,14 +76,10 @@ xfs_extlen_t
 xfs_get_extsz(
 	struct xfs_inode	*ip)
 {
-	/*
-	 * No point in aligning allocations if we need to COW to actually
-	 * write to them.
-	 */
-	if (xfs_is_always_cow_inode(ip))
-		return 0;
+	pr_err("%s XFS_IS_REALTIME_INODE=%d xfs_inode_force_align=%d\n",
+		__func__, XFS_IS_REALTIME_INODE(ip), xfs_inode_force_align(ip));
 
-	if (XFS_IS_REALTIME_INODE(ip))
+	if (XFS_IS_REALTIME_INODE(ip) || xfs_inode_force_align(ip))
 		return ip->i_mount->m_sb.sb_rextsize;
 
 	return 1;
