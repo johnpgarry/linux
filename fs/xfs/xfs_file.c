@@ -592,11 +592,7 @@ xfs_file_dio_write_aligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	ssize_t			ret;
 	unsigned int dio_flags = 0;
-	bool is_read = iov_iter_rw(from) == READ;
-	bool atomic_write = (iocb->ki_flags & IOCB_ATOMIC) && !is_read;
 
-	if (atomic_write && 0)
-			dio_flags |= IOMAP_DIO_OVERWRITE_ONLY;
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -731,7 +727,8 @@ xfs_file_dio_write(
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
-	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
+	if (((iocb->ki_pos | count) & ip->i_mount->m_blockmask) ||
+		xfs_inode_forcealign(ip))
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
