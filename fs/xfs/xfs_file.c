@@ -221,6 +221,8 @@ xfs_ilock_iocb_for_write(
 {
 	ssize_t			ret;
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
+	pr_err("%s *lock_mode=%d (XFS_IOLOCK_EXCL=%d, XFS_IOLOCK_SHARED=%d)\n",
+		__func__, *lock_mode, XFS_IOLOCK_EXCL, XFS_IOLOCK_SHARED);
 
 	ret = xfs_ilock_iocb(iocb, *lock_mode);
 	if (ret)
@@ -533,13 +535,9 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
-		if (1)
-			pr_err("%s calling xfs_iomap_write_unwritten() offset=%lld size=%zd\n",
+		pr_err("%s calling xfs_iomap_write_unwritten() offset=%lld size=%zd\n",
 				__func__, offset, size);
-		if (0)
-			error = xfs_iomap_write_unwritten(ip, 0, 16384, true);
-		else
-			error = xfs_iomap_write_unwritten(ip, offset, size, true);
+		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}
 
@@ -652,7 +650,8 @@ xfs_file_dio_write_unaligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	unsigned int		flags = IOMAP_DIO_OVERWRITE_ONLY;
 	ssize_t			ret;
-	pr_err("%s isize=%zd count=%zd\n", __func__, isize, count);
+	pr_err("%s iocb->ki_pos=%lld isize=%zd count=%zd\n",
+		__func__, iocb->ki_pos, isize, count);
 
 	/*
 	 * Extending writes need exclusivity because of the sub-block zeroing
@@ -665,6 +664,9 @@ xfs_file_dio_write_unaligned(
 retry_exclusive:
 		iolock = XFS_IOLOCK_EXCL;
 		flags = IOMAP_DIO_FORCE_WAIT;
+
+		pr_err("%s2 XFS_IOLOCK_EXCL iocb->ki_pos=%lld isize=%zd count=%zd\n",
+			__func__, iocb->ki_pos, isize, count);
 	}
 
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
@@ -704,6 +706,8 @@ retry_exclusive:
 	 * nonblocking user I/O, propagate the error.
 	 */
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT)) {
+		pr_err("%s3 Retry unaligned I/O with exclusive blocking iocb->ki_pos=%lld isize=%zd count=%zd\n",
+			__func__, iocb->ki_pos, isize, count);
 		ASSERT(flags & IOMAP_DIO_OVERWRITE_ONLY);
 		xfs_iunlock(ip, iolock);
 		goto retry_exclusive;

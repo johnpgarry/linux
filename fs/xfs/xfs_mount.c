@@ -619,7 +619,7 @@ xfs_agbtree_compute_maxlevels(
 	levels = max(levels, mp->m_rmap_maxlevels);
 	mp->m_agbtree_maxlevels = max(levels, mp->m_refc_maxlevels);
 }
-
+struct super_block *xfs_sb;
 /*
  * This function does the following on an initial mount of a file system:
  *	- reads the superblock from disk and init the mount struct
@@ -640,8 +640,13 @@ xfs_mountfs(
 	uint			quotamount = 0;
 	uint			quotaflags = 0;
 	int			error = 0;
+	struct super_block	*sb = mp->m_super;
 
 	xfs_sb_mount_common(mp, sbp);
+	pr_err("%s sb=%pS\n", __func__, sb);
+	if (xfs_sb == NULL) {
+		xfs_sb = sb;
+	}
 
 	/*
 	 * Check for a mismatched features2 values.  Older kernels read & wrote

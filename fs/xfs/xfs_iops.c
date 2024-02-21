@@ -222,7 +222,7 @@ xfs_generic_create(
 			goto out_cleanup_inode;
 	}
 
-	xfs_setup_iops(ip);
+	xfs_setup_iops(ip); 
 
 	if (tmpfile) {
 		/*
@@ -1236,6 +1236,7 @@ xfs_inode_supports_dax(
 	struct xfs_inode	*ip)
 {
 	struct xfs_mount	*mp = ip->i_mount;
+	pr_err("%s\n", __func__);
 
 	/* Only supported on regular files. */
 	if (!S_ISREG(VFS_I(ip)->i_mode))
@@ -1253,6 +1254,7 @@ static bool
 xfs_inode_should_enable_dax(
 	struct xfs_inode *ip)
 {
+	pr_err("%s\n", __func__);
 	if (!IS_ENABLED(CONFIG_FS_DAX))
 		return false;
 	if (xfs_has_dax_never(ip->i_mount))
@@ -1289,9 +1291,18 @@ xfs_diflags_to_iflags(
 		flags |= S_DAX;
 
 	/*
+
 	 * S_DAX can only be set during inode initialization and is never set by
 	 * the VFS, so we cannot mask off S_DAX in i_flags.
 	 */
+	pr_err("%s inode=%pS xflags=0x%x (FS_XFLAG_EXTSIZE=%d, EXTSZINHERIT=%d, FORCEALIGN=%d, ATOMICWRITES=%d)\n",
+		__func__, inode, xflags,
+		!!(xflags &FS_XFLAG_EXTSIZE),
+		!!(xflags &FS_XFLAG_EXTSZINHERIT),
+		!!(xflags &FS_XFLAG_FORCEALIGN),
+		!!(xflags &FS_XFLAG_ATOMICWRITES)
+		);
+	//WARN_ON(xflags &FS_XFLAG_FORCEALIGN);
 	inode->i_flags &= ~(S_IMMUTABLE | S_APPEND | S_SYNC | S_NOATIME);
 	inode->i_flags |= flags;
 }

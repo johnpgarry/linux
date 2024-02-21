@@ -281,7 +281,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bool atomic_write = iter->flags & IOMAP_ATOMIC;
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
-	unsigned int fs_block_size = 16384/*i_blocksize(inode) */, pad;
+	unsigned int fs_block_size = i_atomicblocksize(inode), pad;
 	loff_t length = iomap_length(iter);
 	const size_t iter_len = iter->len;
 	loff_t pos = iter->pos;
@@ -336,7 +336,7 @@ u64			addr; /* disk offset of mapping, bytes */
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
 		need_zeroout = true;
 		if (1)
-			pr_err("%s0 type=IOMAP_UNWRITTEN, so set need_zeroout\n", __func__);
+			pr_err("%s0 type=IOMAP_UNWRITTEN, so set need_zeroout and set IOMAP_DIO_UNWRITTEN\n", __func__);
 	}
 
 	if (iomap->flags & IOMAP_F_SHARED)
@@ -457,9 +457,9 @@ u64			addr; /* disk offset of mapping, bytes */
 			/* This bio should have covered the complete length */
 			pr_err("%s error n=%zd iter_len=%zd bio->bi_iter.bi_sector=%lld\n", __func__, n, iter_len, bio->bi_iter.bi_sector);
 			pr_err("%s2 error bio->bi_iter.bi_sector per (n >> SECTOR_SHIFT) = %lld\n", __func__, bio->bi_iter.bi_sector % (n >> SECTOR_SHIFT));
-			//ret = -EINVAL;
-			//bio_put(bio);
-			//goto out;
+			ret = -EINVAL;
+			bio_put(bio);
+			goto out;
 		}
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);

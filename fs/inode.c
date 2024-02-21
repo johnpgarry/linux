@@ -152,6 +152,7 @@ static int no_open(struct inode *inode, struct file *file)
  * These are initializations that need to be done on every inode
  * allocation as the fields are not initialised by slab allocation.
  */
+extern struct super_block *xfs_sb;
 int inode_init_always(struct super_block *sb, struct inode *inode)
 {
 	static const struct inode_operations empty_iops;
@@ -159,7 +160,9 @@ int inode_init_always(struct super_block *sb, struct inode *inode)
 	struct address_space *const mapping = &inode->i_data;
 
 	inode->i_sb = sb;
-	inode->i_blkbits = sb->s_blocksize_bits;
+	WARN_ON_ONCE(sb == xfs_sb);
+	pr_err_once("%s inode=%pS\n", __func__, inode);
+	inode->i_blkbits = inode->i_atomicblkbits = sb->s_blocksize_bits;
 	inode->i_flags = 0;
 	atomic64_set(&inode->i_sequence, 0);
 	atomic_set(&inode->i_count, 1);

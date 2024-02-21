@@ -3750,6 +3750,11 @@ xfs_bmap_btalloc(
 	if (error)
 		return error;
 
+	pr_err("%s9 args.fsbno=%lld, agbno=%d, total=%d, alignment=%d, len=%d\n",
+		__func__, args.fsbno, args.agbno, args.total, args.alignment, args.len);
+	pr_err("%s9.1 ap->offset=%lld, length=%d, blkno=%lld, total=%d, minlen=%d, minleft=%d\n",
+		__func__, ap->offset, ap->length, ap->blkno, ap->total, ap->minlen, ap->minleft);
+
 	if (args.fsbno != NULLFSBLOCK) {
 		xfs_bmap_process_allocated_extent(ap, &args, orig_offset,
 			orig_length);
