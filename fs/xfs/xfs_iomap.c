@@ -849,58 +849,6 @@ xfs_direct_write_iomap_begin(
 		goto out_unlock;
 	}
 
-	if (flags & IOMAP_ATOMIC) {
-		xfs_filblks_t unit_min_fsb, unit_max_fsb;
-		unsigned int unit_min, unit_max;
-		atomic_writing = 1;
-#if 0
-	xfs_fileoff_t	br_startoff;	/* starting file offset */   //jpg offset in extent of start of write
-	xfs_fsblock_t	br_startblock;	/* starting block number */  //jpg physical block of start of write
-	xfs_filblks_t	br_blockcount;	/* number of blocks */
-	xfs_exntst_t	br_state;	/* extent state */
-#endif
-		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
-		unit_min_fsb = XFS_B_TO_FSBT(mp, unit_min);
-		unit_max_fsb = XFS_B_TO_FSBT(mp, unit_max);
-		pr_err("%s4 offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
-			__func__, offset, length, offset_fsb, offset_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
-			pr_err("%s2 !imap_spans_range\n", __func__);
-		//	error = -EINVAL;
-		//	goto out_unlock;
-		}
-
-		if ((offset & mp->m_blockmask) ||
-		    (length & mp->m_blockmask)) {
-			//error = -EINVAL;
-			//goto out_unlock;
-
-			pr_err("%s5 !offset & mp->m_blockmask || !length & mp->m_blockmask\n", __func__);
-		}
-
-		if (imap.br_blockcount == unit_min_fsb ||
-		    imap.br_blockcount == unit_max_fsb) {
-			/* ok if exactly min or max */
-		} else if (imap.br_blockcount < unit_min_fsb ||
-			   imap.br_blockcount > unit_max_fsb) {
-			pr_err("%s6 imap.br_blockcount < unit_min_fsb || imap.br_blockcount > unit_max_fsb\n", __func__);
-			//error = -EINVAL;
-			//goto out_unlock;
-		} else if (!is_power_of_2(imap.br_blockcount)) {
-			pr_err("%s7 is_power_of_2\n", __func__);
-			//error = -EINVAL;
-			//goto out_unlock;
-		}
-
-		if (imap.br_startoff &&
-		    imap.br_startoff & (imap.br_blockcount - 1)) {
-
-			pr_err("%s7.1  imap.br_startoff & (imap.br_blockcount - 1)\n", __func__);
-			//error = -EINVAL;
-			//goto out_unlock;
-		}
-	}
-
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;
 		if (flags & IOMAP_NOWAIT)
@@ -1017,14 +965,8 @@ out_unlock:
 	return error;
 }
 
-static void xfs_atomicwrite_awu(struct inode *inode, unsigned int *min, unsigned int *max)
-{
-	xfs_get_atomic_write_attr(XFS_I(inode), min, max);
-}
-
 const struct iomap_ops xfs_direct_write_iomap_ops = {
 	.iomap_begin		= xfs_direct_write_iomap_begin,
-	.iomap_atomicwrite_awu = xfs_atomicwrite_awu,
 };
 
 static int

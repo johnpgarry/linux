@@ -72,10 +72,10 @@ xfs_extlen_t
 xfs_get_extsz(
 	struct xfs_inode	*ip)
 {
-	pr_err("%s XFS_IS_REALTIME_INODE=%d xfs_inode_force_align=%d\n",
-		__func__, XFS_IS_REALTIME_INODE(ip), xfs_inode_force_align(ip));
+	pr_err("%s XFS_IS_REALTIME_INODE=%d xfs_inode_forcealign=%d\n",
+		__func__, XFS_IS_REALTIME_INODE(ip), xfs_inode_forcealign(ip));
 
-	if (XFS_IS_REALTIME_INODE(ip) || xfs_inode_force_align(ip))
+	if (XFS_IS_REALTIME_INODE(ip) || xfs_inode_forcealign(ip))
 		return ip->i_mount->m_sb.sb_rextsize;
 
 	return 1;

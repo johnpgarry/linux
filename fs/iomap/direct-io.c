@@ -299,13 +299,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		pr_err("%s0.1 iomap->flags=0x%x (NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d)\n",
 			__func__, iomap->flags, IOMAP_F_NEW, IOMAP_F_DIRTY, IOMAP_F_SHARED, IOMAP_F_MERGED);
 	}
-/*
-#define IOMAP_F_NEW		(1U << 0)
-#define IOMAP_F_DIRTY		(1U << 1)
-#define IOMAP_F_SHARED		(1U << 2)
-#define IOMAP_F_MERGED		(1U << 3)
 
-	*/
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter)) {
 		pr_err("%s0.2 error\n", __func__);
@@ -625,7 +619,6 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	loff_t ret = 0;
 	bool atomic_write = iocb->ki_flags & IOCB_ATOMIC;
 	struct iomap *iomap = &iomi.iomap;
-	unsigned int awu_min = 0, awu_max = 0;
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
 
@@ -633,13 +626,12 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		return NULL;
 
 	if (atomic_write) {
-		iomap_atomicwrite_awu(&iomi, ops, &awu_min, &awu_max);
-		pr_err("%s pos=%lld length=%zd iomap=%pS awu_min=%d, max=%d\n",
-			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, awu_min, awu_max);
+		pr_err("%s pos=%lld length=%zd iomap=%pS i_blocksize=%d, i_atomicblocksize=%d\n",
+			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, i_blocksize(inode), i_atomicblocksize(inode));
 
-		if (!atomic_write_valid(iocb->ki_pos, iter, awu_min, awu_max)) {
-			pr_err("%s2 not valid pos=%lld length=%zd iomap=%pS awu_min=%d, max=%d\n",
-				__func__, iocb->ki_pos, iov_iter_count(iter), iomap, awu_min, awu_max);
+		if (!generic_atomic_write_valid(iocb->ki_pos, iter, i_blocksize(inode), i_atomicblocksize(inode))) {
+			pr_err("%s2 not valid pos=%lld length=%zd\n",
+				__func__, iocb->ki_pos, iov_iter_count(iter));
 			return ERR_PTR(-EINVAL);
 		}
 	}

@@ -1603,6 +1603,14 @@ static inline bool bdev_can_atomic_write(struct block_device *bdev)
 	return true;
 }
 
+static inline bool bdev_can_atomic_write_size(struct block_device *bdev, unsigned int size)
+{
+	if (!bdev_can_atomic_write(bdev))
+		return false;
+
+	return queue_atomic_write_unit_max_bytes(bdev->bd_queue) >= size;
+}
+
 #define DEFINE_IO_COMP_BATCH(name)	struct io_comp_batch name = { }
 
 #endif /* _LINUX_BLKDEV_H */
