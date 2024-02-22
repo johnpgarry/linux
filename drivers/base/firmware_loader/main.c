@@ -499,7 +499,8 @@ fw_get_filesystem_firmware(struct device *device, struct fw_priv *fw_priv,
 	char *path, *nt = NULL;
 	size_t msize = INT_MAX;
 	void *buffer = NULL;
-
+	dev_err(device, "%s suffix=%s\n", __func__, suffix);
+	WARN_ON_ONCE(1);
 	/* Already populated data member means we're loading into a buffer */
 	if (!decompress && fw_priv->data) {
 		buffer = fw_priv->data;
@@ -514,6 +515,7 @@ fw_get_filesystem_firmware(struct device *device, struct fw_priv *fw_priv,
 	for (i = 0; i < ARRAY_SIZE(fw_path); i++) {
 		size_t file_size = 0;
 		size_t *file_size_ptr = NULL;
+		dev_err(device, "%s2 suffix=%s fw_path[i][0]=%s\n", __func__, suffix, fw_path[i]);
 
 		/* skip the unset customized path */
 		if (!fw_path[i][0])
@@ -534,6 +536,7 @@ fw_get_filesystem_firmware(struct device *device, struct fw_priv *fw_priv,
 			rc = -ENAMETOOLONG;
 			break;
 		}
+		dev_err(device, "%s3 suffix=%s path=%s len=%d\n", __func__, suffix, path, len);
 
 		fw_priv->size = 0;
 
