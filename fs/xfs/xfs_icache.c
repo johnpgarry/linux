@@ -88,12 +88,12 @@ xfs_inode_alloc(
 	/* VFS doesn't initialise i_mode or i_state! */
 	VFS_I(ip)->i_mode = 0;
 	VFS_I(ip)->i_state = 0;
-	VFS_I(ip)->i_atomicblkbits = ffs(mp->m_sb.sb_blocksize * mp->m_sb.sb_rextsize) - 1;
-	pr_err("%s i_atomicblkbits=%d i_blkbits=%d sb_blocksize=%d sb_rextsize=%d\n",
+	VFS_I(ip)->i_atomicblkbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
+	pr_err("%s i_atomicblkbits=%d i_blkbits=%d sb_blocksize=%d xfs_get_extsz(ip)=%d\n",
 		__func__, VFS_I(ip)->i_atomicblkbits,
 		VFS_I(ip)->i_blkbits,
 		mp->m_sb.sb_blocksize,
-		mp->m_sb.sb_rextsize);
+		xfs_get_extsz(ip));
 	mapping_set_large_folios(VFS_I(ip)->i_mapping);
 
 	XFS_STATS_INC(mp, vn_active);

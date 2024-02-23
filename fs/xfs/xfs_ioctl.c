@@ -1182,6 +1182,8 @@ xfs_ioctl_setattr_xflags(
 			pr_err("%s error FS_XFLAG_REALTIME\n", __func__);
 			return -EINVAL;
 		}
+		pr_err("%s FS_XFLAG_FORCEALIGN xfs_get_extsz=%d\n", __func__, xfs_get_extsz(ip));
+		VFS_I(ip)->i_atomicblkbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
 	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
