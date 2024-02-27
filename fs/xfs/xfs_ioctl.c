@@ -1137,7 +1137,7 @@ xfs_ioctl_setattr_xflags(
 	bool			atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s VFS_I(ip)=%pS ip=%pS\n", __func__, VFS_I(ip), ip);
 	if (rtflag != XFS_IS_REALTIME_INODE(ip) ||
 	    atomic_writes != xfs_inode_atomicwrites(ip)) {
 		if (ip->i_df.if_nextents || ip->i_delayed_blks)
@@ -1164,6 +1164,9 @@ xfs_ioctl_setattr_xflags(
 	 * Force-align requires a nonzero extent size hint and a zero cow
 	 * extent size hint.  It doesn't apply to realtime files.
 	 */
+	pr_err("%s2 ip=%pS FS_XFLAG_FORCEALIGN=%d VFS_I(ip)=%pS ip=%pS\n",
+		__func__, ip, !!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN),
+		VFS_I(ip), ip);
 	if (fa->fsx_xflags & FS_XFLAG_FORCEALIGN) {
 		if (!xfs_has_forcealign(mp)) {
 			pr_err("%s1.1 error !xfs_has_forcealign\n", __func__);
@@ -1182,8 +1185,9 @@ xfs_ioctl_setattr_xflags(
 			pr_err("%s1.4 error FS_XFLAG_REALTIME\n", __func__);
 			return -EINVAL;
 		}
-		pr_err("%s1.5 FS_XFLAG_FORCEALIGN xfs_get_extsz=%d setting i_extentbits\n", __func__, xfs_get_extsz(ip));
-		VFS_I(ip)->i_extentbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
+		pr_err("%s1.5 FS_XFLAG_FORCEALIGN xfs_get_extsz=%d setting i_extentbits VFS_I(ip)=%pS ip=%pS\n",
+			__func__, xfs_get_extsz(ip), VFS_I(ip), ip);
+		
 	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
@@ -1442,10 +1446,17 @@ xfs_fileattr_set(
 	 * extent size hint should be set on the inode. If no extent size flags
 	 * are set on the inode then unconditionally clear the extent size hint.
 	 */
-	pr_err("%s\n", __func__);
+	pr_err("%s VFS_I(ip)=%pS ip=%pS XFS_DIFLAG_EXTSIZE=%d XFS_DIFLAG_EXTSZINHERIT=%d\n",
+		__func__,
+		VFS_I(ip), ip,
+		!!(ip->i_diflags & XFS_DIFLAG_EXTSIZE),
+		!!(ip->i_diflags & XFS_DIFLAG_EXTSZINHERIT));
 	if (ip->i_diflags & (XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT)) {
 		ip->i_extsize = XFS_B_TO_FSB(mp, fa->fsx_extsize);
-		pr_err("%s2 setting ip->i_extsize=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set\n", __func__, ip->i_extsize);
+
+		VFS_I(ip)->i_extentbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
+		pr_err("%s2 setting ip->i_extsize=%d i_extentbits=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set VFS_I(ip)=%pS ip=%pS\n",
+			__func__, ip->i_extsize, VFS_I(ip)->i_extentbits, VFS_I(ip), ip);
 	} else {
 		ip->i_extsize = 0;
 	}
