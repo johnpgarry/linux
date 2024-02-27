@@ -578,8 +578,8 @@ xfs_iomap_write_unwritten(
 
 	trace_xfs_unwritten_convert(ip, offset, count);
 
-	pr_err("%s offset=%lld count=%lld xfs_inode_atomicwrites(ip)=%d sb_blocklog=%d\n",
-		__func__, offset, count, xfs_inode_atomicwrites(ip), mp->m_sb.sb_blocklog);
+	pr_err("%s offset=%lld count=%lld xfs_inode_atomicwrites(ip)=%d sb_blocklog=%d m_blockmask=0x%x\n",
+		__func__, offset, count, xfs_inode_atomicwrites(ip), mp->m_sb.sb_blocklog, mp->m_blockmask);
 	if (xfs_inode_atomicwrites(ip)) {
 		xfs_off_t xlen_bytes = i_extentsize(inode);
 		xfs_off_t	end = round_up(offset + count, xlen_bytes);
@@ -590,6 +590,21 @@ xfs_iomap_write_unwritten(
 	
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
+
+	pr_err_once("%s XFS_B_TO_FSBT(0)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 0));
+	pr_err_once("%s XFS_B_TO_FSB(0)=%lld\n", __func__, XFS_B_TO_FSB(mp, 0));
+	pr_err_once("%s XFS_B_TO_FSBT(1)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 1));
+	pr_err_once("%s XFS_B_TO_FSB(1)=%lld\n", __func__, XFS_B_TO_FSB(mp, 1));
+	pr_err_once("%s XFS_B_TO_FSBT(4000)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 4000));
+	pr_err_once("%s XFS_B_TO_FSB(4000)=%lld\n", __func__, XFS_B_TO_FSB(mp, 4000));
+	pr_err_once("%s XFS_B_TO_FSBT(4095)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 4095));
+	pr_err_once("%s XFS_B_TO_FSB(4095)=%lld\n", __func__, XFS_B_TO_FSB(mp, 4095));
+	pr_err_once("%s XFS_B_TO_FSBT(4096)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 4096));
+	pr_err_once("%s XFS_B_TO_FSB(4096)=%lld\n", __func__, XFS_B_TO_FSB(mp, 4096));
+	pr_err_once("%s XFS_B_TO_FSBT(4097)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 4097));
+	pr_err_once("%s XFS_B_TO_FSB(4097)=%lld\n", __func__, XFS_B_TO_FSB(mp, 4097));
+	pr_err_once("%s XFS_B_TO_FSBT(20000)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 20000));
+	pr_err_once("%s XFS_B_TO_FSB(20000)=%lld\n", __func__, XFS_B_TO_FSB(mp, 20000));
 
 	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 	pr_err("%s1 offset_fsb=%lld count_fsb=%lld offset=%lld count=%lld xfs_inode_atomicwrites(ip)=%d sb_blocklog=%d\n",

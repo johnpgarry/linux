@@ -75,7 +75,7 @@ xfs_get_extsz(
 	//pr_err("%s XFS_IS_REALTIME_INODE=%d xfs_inode_forcealign=%d i_extsize=%d\n",
 //		__func__, XFS_IS_REALTIME_INODE(ip), xfs_inode_forcealign(ip), ip->i_extsize);
 
-	if (xfs_inode_forcealign(ip))
+	if (xfs_inode_forcealign(ip) && ip->i_extsize)
 		return ip->i_extsize;
 
 	return 1;
