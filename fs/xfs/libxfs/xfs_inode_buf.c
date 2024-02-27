@@ -664,6 +664,7 @@ xfs_inode_validate_extsize(
 	bool				inherit_flag;
 	uint32_t			extsize_bytes;
 	uint32_t			blocksize_bytes;
+	pr_err("%s extsize=%d\n", __func__, extsize);
 
 	rt_flag = (flags & XFS_DIFLAG_REALTIME);
 	hint_flag = (flags & XFS_DIFLAG_EXTSIZE);

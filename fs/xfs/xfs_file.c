@@ -646,8 +646,8 @@ xfs_file_dio_write_unaligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	unsigned int		flags = IOMAP_DIO_OVERWRITE_ONLY;
 	ssize_t			ret;
-	pr_err("%s iocb->ki_pos=%lld isize=%zd count=%zd\n",
-		__func__, iocb->ki_pos, isize, count);
+	pr_err("%s iocb->ki_pos=%lld isize=%zd count=%zd xfs_is_cow_inode=%d\n",
+		__func__, iocb->ki_pos, isize, count, xfs_is_cow_inode(ip));
 
 	/*
 	 * Extending writes need exclusivity because of the sub-block zeroing

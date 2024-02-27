@@ -1137,7 +1137,7 @@ xfs_ioctl_setattr_xflags(
 	bool			atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
 
-
+	pr_err("%s\n", __func__);
 	if (rtflag != XFS_IS_REALTIME_INODE(ip) ||
 	    atomic_writes != xfs_inode_atomicwrites(ip)) {
 		if (ip->i_df.if_nextents || ip->i_delayed_blks)
@@ -1166,23 +1166,23 @@ xfs_ioctl_setattr_xflags(
 	 */
 	if (fa->fsx_xflags & FS_XFLAG_FORCEALIGN) {
 		if (!xfs_has_forcealign(mp)) {
-			pr_err("%s error !xfs_has_forcealign\n", __func__);
+			pr_err("%s1.1 error !xfs_has_forcealign\n", __func__);
 			return -EINVAL;
 		}
 		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE) {
-			pr_err("%s error FS_XFLAG_COWEXTSIZE\n", __func__);
+			pr_err("%s1.2 error FS_XFLAG_COWEXTSIZE\n", __func__);
 			return -EINVAL;
 		}
 		if (!(fa->fsx_xflags & (FS_XFLAG_EXTSIZE |
 					FS_XFLAG_EXTSZINHERIT))) {
-			pr_err("%s error FS_XFLAG_EXTSIZE | FS_XFLAG_EXTSZINHERIT\n", __func__);
+			pr_err("%s1.3 error FS_XFLAG_EXTSIZE | FS_XFLAG_EXTSZINHERIT\n", __func__);
 			return -EINVAL;
 		}
 		if (fa->fsx_xflags & FS_XFLAG_REALTIME) {
-			pr_err("%s error FS_XFLAG_REALTIME\n", __func__);
+			pr_err("%s1.4 error FS_XFLAG_REALTIME\n", __func__);
 			return -EINVAL;
 		}
-		pr_err("%s FS_XFLAG_FORCEALIGN xfs_get_extsz=%d\n", __func__, xfs_get_extsz(ip));
+		pr_err("%s1.5 FS_XFLAG_FORCEALIGN xfs_get_extsz=%d setting i_atomicblkbits\n", __func__, xfs_get_extsz(ip));
 		VFS_I(ip)->i_atomicblkbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
 	}
 
@@ -1273,6 +1273,7 @@ xfs_ioctl_setattr_check_extsize(
 	xfs_failaddr_t		failaddr;
 	uint16_t		new_diflags;
 
+	pr_err("%s fa->fsx_valid=0x%x\n", __func__, fa->fsx_valid);
 	if (!fa->fsx_valid)
 		return 0;
 
@@ -1444,7 +1445,7 @@ xfs_fileattr_set(
 	pr_err("%s\n", __func__);
 	if (ip->i_diflags & (XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT)) {
 		ip->i_extsize = XFS_B_TO_FSB(mp, fa->fsx_extsize);
-		pr_err("%s2 setting i_extsize=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set\n", __func__, ip->i_extsize);
+		pr_err("%s2 setting ip->i_extsize=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set\n", __func__, ip->i_extsize);
 	} else {
 		ip->i_extsize = 0;
 	}

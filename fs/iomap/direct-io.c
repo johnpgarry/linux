@@ -294,8 +294,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	if (atomic_write) {
-		pr_err("%s pos=%lld length=%lld iomap->type=%d (IOMAP_UNWRITTEN=%d, IOMAP_MAPPED=%d) use_fua=%d\n",
-			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua);
+		pr_err("%s pos=%lld length=%lld iomap->type=%d (IOMAP_UNWRITTEN=%d, IOMAP_MAPPED=%d) use_fua=%d fs_block_size=%d\n",
+			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua, fs_block_size);
 		pr_err("%s0.1 iomap->flags=0x%x (NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d)\n",
 			__func__, iomap->flags, IOMAP_F_NEW, IOMAP_F_DIRTY, IOMAP_F_SHARED, IOMAP_F_MERGED);
 	}
