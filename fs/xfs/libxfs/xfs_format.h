@@ -475,7 +475,7 @@ xfs_is_quota_inode(struct xfs_sb *sbp, xfs_ino_t ino)
 #define XFS_B_TO_FSBE_INT(ip,b)	\
 	(((((uint64_t)(b)) + I_EXTMASK(ip)) >> ((VFS_I(ip)->i_extentbits))))
 #define XFS_B_TO_FSBE(ip,b) ((XFS_B_TO_FSBE_INT(ip,b)) << (XFS_EXT_DIFF_BITS(ip)))
-#define XFS_B_TO_FSBET(ip,b)	(((uint64_t)(b)) >> (VFS_I(ip)->i_extentbits))
+#define XFS_B_TO_FSBET(ip,b)	((((uint64_t)(b)) >> (VFS_I(ip)->i_extentbits)) << (XFS_EXT_DIFF_BITS(ip)))
 
 
 /*

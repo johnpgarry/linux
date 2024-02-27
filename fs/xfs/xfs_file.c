@@ -592,6 +592,13 @@ xfs_file_dio_write_aligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	ssize_t			ret;
 	unsigned int dio_flags = 0;
+	size_t			count = iov_iter_count(from);
+	size_t			isize = i_size_read(VFS_I(ip));
+	
+	bool atomic_write = iocb->ki_flags & IOCB_ATOMIC;
+	if (atomic_write)
+		pr_err("%s iocb->ki_pos=%lld isize=%zd count=%zd xfs_is_cow_inode=%d atomic_write=%d\n",
+			__func__, iocb->ki_pos, isize, count, xfs_is_cow_inode(ip), atomic_write);
 
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
@@ -646,8 +653,9 @@ xfs_file_dio_write_unaligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	unsigned int		flags = IOMAP_DIO_OVERWRITE_ONLY;
 	ssize_t			ret;
-	pr_err("%s iocb->ki_pos=%lld isize=%zd count=%zd xfs_is_cow_inode=%d\n",
-		__func__, iocb->ki_pos, isize, count, xfs_is_cow_inode(ip));
+	bool atomic_write = iocb->ki_flags & IOCB_ATOMIC;
+	pr_err("%s iocb->ki_pos=%lld isize=%zd count=%zd xfs_is_cow_inode=%d atomic_write=%d\n",
+		__func__, iocb->ki_pos, isize, count, xfs_is_cow_inode(ip), atomic_write);
 
 	/*
 	 * Extending writes need exclusivity because of the sub-block zeroing
@@ -727,9 +735,12 @@ xfs_file_dio_write(
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
-	if (((iocb->ki_pos | count) & ip->i_mount->m_blockmask) ||
-		xfs_inode_forcealign(ip))
+	if (((iocb->ki_pos | count) & ip->i_mount->m_blockmask))
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
+	if (((iocb->ki_pos | count) & I_EXTMASK(ip))) {
+		pr_err("%s calling xfs_file_dio_write_unaligned for I_EXTMASK=%d\n", __func__, I_EXTMASK(ip));
+		return xfs_file_dio_write_unaligned(ip, iocb, from);
+	}
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
 

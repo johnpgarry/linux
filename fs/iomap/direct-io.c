@@ -298,6 +298,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua, fs_extent_size);
 		pr_err("%s0.1 iomap->flags=0x%x (NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d)\n",
 			__func__, iomap->flags, IOMAP_F_NEW, IOMAP_F_DIRTY, IOMAP_F_SHARED, IOMAP_F_MERGED);
+
+		if (!generic_atomic_write_valid(pos, dio->submit.iter, i_blocksize(inode), i_extentsize(inode))) {
+			pr_err("%s2 not valid pos=%lld length=%zd\n",
+				__func__, pos, iov_iter_count(dio->submit.iter));
+			return -EINVAL;
+		}
 	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
@@ -628,12 +634,6 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (atomic_write) {
 		pr_err("%s pos=%lld length=%zd iomap=%pS i_blocksize=%d, i_extentsize=%d\n",
 			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, i_blocksize(inode), i_extentsize(inode));
-
-		if (!generic_atomic_write_valid(iocb->ki_pos, iter, i_blocksize(inode), i_extentsize(inode))) {
-			pr_err("%s2 not valid pos=%lld length=%zd\n",
-				__func__, iocb->ki_pos, iov_iter_count(iter));
-			return ERR_PTR(-EINVAL);
-		}
 	}
 
 	pr_err("%s2.1 pos=%lld length=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));
