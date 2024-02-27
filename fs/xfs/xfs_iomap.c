@@ -581,7 +581,7 @@ xfs_iomap_write_unwritten(
 	pr_err("%s offset=%lld count=%lld xfs_inode_atomicwrites(ip)=%d sb_blocklog=%d\n",
 		__func__, offset, count, xfs_inode_atomicwrites(ip), mp->m_sb.sb_blocklog);
 	if (xfs_inode_atomicwrites(ip)) {
-		xfs_off_t xlen_bytes = i_atomicblocksize(inode);
+		xfs_off_t xlen_bytes = i_extentsize(inode);
 		xfs_off_t	end = round_up(offset + count, xlen_bytes);
 
 		offset = round_down(offset, xlen_bytes);

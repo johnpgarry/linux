@@ -281,7 +281,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bool atomic_write = iter->flags & IOMAP_ATOMIC;
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
-	unsigned int fs_block_size = i_atomicblocksize(inode), pad;
+	unsigned int fs_extent_size = i_extentsize(inode), pad;
 	loff_t length = iomap_length(iter);
 	const size_t iter_len = iter->len;
 	loff_t pos = iter->pos;
@@ -294,8 +294,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	if (atomic_write) {
-		pr_err("%s pos=%lld length=%lld iomap->type=%d (IOMAP_UNWRITTEN=%d, IOMAP_MAPPED=%d) use_fua=%d fs_block_size=%d\n",
-			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua, fs_block_size);
+		pr_err("%s pos=%lld length=%lld iomap->type=%d (IOMAP_UNWRITTEN=%d, IOMAP_MAPPED=%d) use_fua=%d fs_extent_size=%d\n",
+			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua, fs_extent_size);
 		pr_err("%s0.1 iomap->flags=0x%x (NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d)\n",
 			__func__, iomap->flags, IOMAP_F_NEW, IOMAP_F_DIRTY, IOMAP_F_SHARED, IOMAP_F_MERGED);
 	}
@@ -395,11 +395,11 @@ u64			addr; /* disk offset of mapping, bytes */
 	if (!(dio->flags & (IOMAP_DIO_INLINE_COMP|IOMAP_DIO_CALLER_COMP)))
 		dio->iocb->ki_flags &= ~IOCB_HIPRI;
 
-	pr_err("%s0.2 need_zeroout=%d pos=%lld fs_block_size=%d\n", __func__, need_zeroout, pos, fs_block_size);
+	pr_err("%s0.2 need_zeroout=%d pos=%lld fs_extent_size=%d\n", __func__, need_zeroout, pos, fs_extent_size);
 	if (need_zeroout) {
 		/* zero out from the start of the block to the write offset */
-		pad = pos & (fs_block_size - 1);
-		pr_err("%s0.3 need_zeroout=%d pos=%lld fs_block_size=%d pad=%d\n", __func__, need_zeroout, pos, fs_block_size, pad);
+		pad = pos & (fs_extent_size - 1);
+		pr_err("%s0.3 need_zeroout=%d pos=%lld fs_extent_size=%d pad=%d\n", __func__, need_zeroout, pos, fs_extent_size, pad);
 		if (pad)
 			iomap_dio_zero(iter, dio, pos - pad, pad);
 	}
@@ -483,16 +483,16 @@ u64			addr; /* disk offset of mapping, bytes */
 	 * reads of the EOF block.
 	 */
 zero_tail:
-	pr_err("%s3 zero_tail: need_zeroout=%d pos=%lld fs_block_size=%d i_size_read=%lld\n", 
-		__func__, need_zeroout, pos, fs_block_size, i_size_read(inode));
+	pr_err("%s3 zero_tail: need_zeroout=%d pos=%lld fs_extent_size=%d i_size_read=%lld\n", 
+		__func__, need_zeroout, pos, fs_extent_size, i_size_read(inode));
 	if (need_zeroout ||
 	    ((dio->flags & IOMAP_DIO_WRITE) && pos >= i_size_read(inode))) {
 		/* zero out from the end of the write to the end of the block */
-		pad = pos & (fs_block_size - 1);
-		pr_err("%s3.1 need_zeroout=%d pos=%lld fs_block_size=%d pad=%d\n", 
-			__func__, need_zeroout, pos, fs_block_size, pad);
+		pad = pos & (fs_extent_size - 1);
+		pr_err("%s3.1 need_zeroout=%d pos=%lld fs_extent_size=%d pad=%d\n", 
+			__func__, need_zeroout, pos, fs_extent_size, pad);
 		if (pad)
-			iomap_dio_zero(iter, dio, pos, fs_block_size - pad);
+			iomap_dio_zero(iter, dio, pos, fs_extent_size - pad);
 	}
 out:
 	/* Undo iter limitation to current extent */
@@ -626,10 +626,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		return NULL;
 
 	if (atomic_write) {
-		pr_err("%s pos=%lld length=%zd iomap=%pS i_blocksize=%d, i_atomicblocksize=%d\n",
-			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, i_blocksize(inode), i_atomicblocksize(inode));
+		pr_err("%s pos=%lld length=%zd iomap=%pS i_blocksize=%d, i_extentsize=%d\n",
+			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, i_blocksize(inode), i_extentsize(inode));
 
-		if (!generic_atomic_write_valid(iocb->ki_pos, iter, i_blocksize(inode), i_atomicblocksize(inode))) {
+		if (!generic_atomic_write_valid(iocb->ki_pos, iter, i_blocksize(inode), i_extentsize(inode))) {
 			pr_err("%s2 not valid pos=%lld length=%zd\n",
 				__func__, iocb->ki_pos, iov_iter_count(iter));
 			return ERR_PTR(-EINVAL);
