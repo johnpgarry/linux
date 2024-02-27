@@ -643,7 +643,7 @@ xfs_mountfs(
 	struct super_block	*sb = mp->m_super;
 
 	xfs_sb_mount_common(mp, sbp);
-	pr_err("%s sb=%pS\n", __func__, sb);
+	pr_err_once("%s sb=%pS\n", __func__, sb);
 	if (xfs_sb == NULL) {
 		xfs_sb = sb;
 	}

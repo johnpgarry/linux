@@ -1236,7 +1236,7 @@ xfs_inode_supports_dax(
 	struct xfs_inode	*ip)
 {
 	struct xfs_mount	*mp = ip->i_mount;
-	pr_err("%s\n", __func__);
+	pr_err_once("%s\n", __func__);
 
 	/* Only supported on regular files. */
 	if (!S_ISREG(VFS_I(ip)->i_mode))
@@ -1254,7 +1254,7 @@ static bool
 xfs_inode_should_enable_dax(
 	struct xfs_inode *ip)
 {
-	pr_err("%s\n", __func__);
+	pr_err_once("%s\n", __func__);
 	if (!IS_ENABLED(CONFIG_FS_DAX))
 		return false;
 	if (xfs_has_dax_never(ip->i_mount))

@@ -1438,7 +1438,7 @@ xfs_bmap_add_extent_delay_real(
 #define	RIGHT		r[1]
 #define	PREV		r[2]
 
-	pr_err("%s maybe calling xfs_iext_update_extent() later\n", __func__);
+	pr_err_once("%s maybe calling xfs_iext_update_extent() later\n", __func__);
 	/*
 	 * Set up a bunch of variables to make the tests simpler.
 	 */
@@ -1978,7 +1978,7 @@ xfs_bmap_add_extent_unwritten_real(
 
 	*logflagsp = 0;
 
-	pr_err("%s maybe calling xfs_iext_update_extent() later\n", __func__);
+	pr_err_once("%s maybe calling xfs_iext_update_extent() later\n", __func__);
 	cur = *curp;
 	ifp = xfs_ifork_ptr(ip, whichfork);
 
@@ -2508,7 +2508,7 @@ xfs_bmap_add_extent_hole_delay(
 	ifp = xfs_ifork_ptr(ip, whichfork);
 	ASSERT(isnullstartblock(new->br_startblock));
 
-	pr_err("%s maybe calling xfs_iext_update_extent() later\n", __func__);
+	pr_err_once("%s maybe calling xfs_iext_update_extent() later\n", __func__);
 	/*
 	 * Check and set flags if this segment has a left neighbor
 	 */
@@ -2653,7 +2653,7 @@ xfs_bmap_add_extent_hole_real(
 	uint32_t		state = xfs_bmap_fork_to_state(whichfork);
 	struct xfs_bmbt_irec	old;
 
-	pr_err("%s maybe calling xfs_iext_update_extent() later\n", __func__);
+	pr_err_once("%s maybe calling xfs_iext_update_extent() later\n", __func__);
 	ASSERT(!isnullstartblock(new->br_startblock));
 	ASSERT(!cur || !(cur->bc_ino.flags & XFS_BTCUR_BMBT_WASDEL));
 
@@ -3750,9 +3750,9 @@ xfs_bmap_btalloc(
 	if (error)
 		return error;
 
-	pr_err("%s9 args.fsbno=%lld, agbno=%d, total=%d, alignment=%d, len=%d\n",
+	pr_err_once("%s9 args.fsbno=%lld, agbno=%d, total=%d, alignment=%d, len=%d\n",
 		__func__, args.fsbno, args.agbno, args.total, args.alignment, args.len);
-	pr_err("%s9.1 ap->offset=%lld, length=%d, blkno=%lld, total=%d, minlen=%d, minleft=%d\n",
+	pr_err_once("%s9.1 ap->offset=%lld, length=%d, blkno=%lld, total=%d, minlen=%d, minleft=%d\n",
 		__func__, ap->offset, ap->length, ap->blkno, ap->total, ap->minlen, ap->minleft);
 
 	if (args.fsbno != NULLFSBLOCK) {
@@ -3943,7 +3943,7 @@ xfs_bmapi_read(
 
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &icur, &got))
 		eof = true;
-	pr_err("%s got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d bno=%lld\n",
+	pr_err_once("%s got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d bno=%lld\n",
 			__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno);
 	end = bno + len;
 	obno = bno;
@@ -4856,7 +4856,7 @@ xfs_bmap_del_extent_delay(
 	int			error = 0;
 	bool			isrt;
 
-	pr_err("%s maybe calling xfs_iext_update_extent() later\n", __func__);
+	pr_err_once("%s maybe calling xfs_iext_update_extent() later\n", __func__);
 	XFS_STATS_INC(mp, xs_del_exlist);
 
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
@@ -5660,7 +5660,7 @@ xfs_bmse_merge(
 	xfs_filblks_t			blockcount;
 	int				error, i;
 	struct xfs_mount		*mp = ip->i_mount;
-	pr_err("%s maybe calling xfs_iext_update_extent() later\n", __func__);
+	pr_err_once("%s maybe calling xfs_iext_update_extent() later\n", __func__);
 
 	blockcount = left->br_blockcount + got->br_blockcount;
 
@@ -5758,7 +5758,7 @@ xfs_bmap_shift_update_extent(
 		*logflags |= XFS_ILOG_DEXT;
 	}
 
-	pr_err("%s calling xfs_iext_update_extent()\n", __func__);
+	pr_err_once("%s calling xfs_iext_update_extent()\n", __func__);
 	xfs_iext_update_extent(ip, xfs_bmap_fork_to_state(whichfork), icur,
 			got);
 
@@ -6043,7 +6043,7 @@ xfs_bmap_split_extent(
 	}
 
 	got.br_blockcount = gotblkcnt;
-	pr_err("%s calling xfs_iext_update_extent()\n", __func__);
+	pr_err_once("%s calling xfs_iext_update_extent()\n", __func__);
 	xfs_iext_update_extent(ip, xfs_bmap_fork_to_state(whichfork), &icur,
 			&got);
 

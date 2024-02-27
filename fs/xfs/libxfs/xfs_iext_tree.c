@@ -657,7 +657,7 @@ xfs_iext_insert_raw(
 
 	for (i = nr_entries; i > cur->pos; i--)
 		cur->leaf->recs[i] = cur->leaf->recs[i - 1];
-	pr_err("%s calling xfs_iext_set irec->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+	pr_err_once("%s calling xfs_iext_set irec->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
 			__func__, irec->br_startoff, irec->br_startblock,irec->br_blockcount, irec->br_state);
 	xfs_iext_set(cur_rec(cur), irec);
 	ifp->if_bytes += sizeof(struct xfs_iext_rec);
@@ -675,7 +675,7 @@ xfs_iext_insert(
 {
 	struct xfs_ifork	*ifp = xfs_iext_state_to_fork(ip, state);
 
-	pr_err("%s calling xfs_iext_insert_raw()", __func__);
+	pr_err_once("%s calling xfs_iext_insert_raw()", __func__);
 	//WARN_ON(atomic_writing);
 	xfs_iext_insert_raw(ifp, cur, irec);
 	trace_xfs_iext_insert(ip, cur, state, _RET_IP_);
@@ -950,7 +950,7 @@ xfs_iext_lookup_extent(
 		if (xfs_iext_rec_is_empty(rec))
 			break;
 		if (xfs_iext_rec_cmp(rec, offset) >= 0) {
-			pr_err("%s found rec lo=%lld hi=%lld cur=%pS cur->pos=%d\n", __func__, rec->lo, rec->hi, cur, cur->pos);
+			pr_err_once("%s found rec lo=%lld hi=%lld cur=%pS cur->pos=%d\n", __func__, rec->lo, rec->hi, cur, cur->pos);
 			goto found;
 		}
 	}
@@ -1012,7 +1012,7 @@ xfs_iext_update_extent(
 	}
 
 	trace_xfs_bmap_pre_update(ip, cur, state, _RET_IP_);
-	pr_err("%s calling xfs_iext_set new->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+	pr_err_once("%s calling xfs_iext_set new->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
 			__func__, new->br_startoff, new->br_startblock, new->br_blockcount, new->br_state);
 	xfs_iext_set(cur_rec(cur), new);
 	trace_xfs_bmap_post_update(ip, cur, state, _RET_IP_);
