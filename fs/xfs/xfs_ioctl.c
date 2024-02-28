@@ -1276,8 +1276,9 @@ xfs_ioctl_setattr_check_extsize(
 	struct xfs_mount	*mp = ip->i_mount;
 	xfs_failaddr_t		failaddr;
 	uint16_t		new_diflags;
+	uint16_t		new_diflags2;
 
-	pr_err("%s fa->fsx_valid=0x%x\n", __func__, fa->fsx_valid);
+	pr_err("%s fa->fsx_valid=0x%x fsx_extsize=0x%x\n", __func__, fa->fsx_valid, fa->fsx_extsize);
 	if (!fa->fsx_valid)
 		return 0;
 
@@ -1289,6 +1290,7 @@ xfs_ioctl_setattr_check_extsize(
 		return -EINVAL;
 
 	new_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
+	new_diflags2 = xfs_flags2diflags2(ip, fa->fsx_xflags);
 
 	/*
 	 * Inode verifiers do not check that the extent size hint is an integer
@@ -1307,7 +1309,7 @@ xfs_ioctl_setattr_check_extsize(
 
 	failaddr = xfs_inode_validate_extsize(ip->i_mount,
 			XFS_B_TO_FSB(mp, fa->fsx_extsize),
-			VFS_I(ip)->i_mode, new_diflags);
+			VFS_I(ip)->i_mode, new_diflags, new_diflags2);
 	return failaddr != NULL ? -EINVAL : 0;
 }
 
@@ -1454,9 +1456,9 @@ xfs_fileattr_set(
 	if (ip->i_diflags & (XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT)) {
 		ip->i_extsize = XFS_B_TO_FSB(mp, fa->fsx_extsize);
 
-		VFS_I(ip)->i_extentbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
-		pr_err("%s2 setting ip->i_extsize=%d i_extentbits=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set VFS_I(ip)=%pS ip=%pS\n",
-			__func__, ip->i_extsize, VFS_I(ip)->i_extentbits, VFS_I(ip), ip);
+		//VFS_I(ip)->i_extentbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
+		pr_err("%s2 setting ip->i_extsize=%d XFS_DIFLAG_EXTSIZE | XFS_DIFLAG_EXTSZINHERIT set VFS_I(ip)=%pS ip=%pS\n",
+			__func__, ip->i_extsize, VFS_I(ip), ip);
 	} else {
 		ip->i_extsize = 0;
 	}

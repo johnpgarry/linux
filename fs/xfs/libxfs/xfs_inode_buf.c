@@ -576,7 +576,7 @@ xfs_dinode_verify(
 
 	/* extent size hint validation */
 	fa = xfs_inode_validate_extsize(mp, be32_to_cpu(dip->di_extsize),
-			mode, flags);
+			mode, flags, flags2);
 	if (fa)
 		return fa;
 
@@ -651,25 +651,29 @@ xfs_dinode_calc_crc(
  * 8. For non-realtime files, the extent size hint must be limited
  *    to half the AG size to avoid alignment extending the extent beyond the
  *    limits of the AG.
+ * 9. If forcealign writes, must be a power-of-2
  */
 xfs_failaddr_t
 xfs_inode_validate_extsize(
 	struct xfs_mount		*mp,
 	uint32_t			extsize,
 	uint16_t			mode,
-	uint16_t			flags)
+	uint16_t			flags,
+	uint16_t			flags2)
 {
 	bool				rt_flag;
 	bool				hint_flag;
 	bool				inherit_flag;
+	bool				forcealign_flag;
 	uint32_t			extsize_bytes;
 	uint32_t			blocksize_bytes;
-	pr_err("%s extsize=%d\n", __func__, extsize);
 
 	rt_flag = (flags & XFS_DIFLAG_REALTIME);
 	hint_flag = (flags & XFS_DIFLAG_EXTSIZE);
 	inherit_flag = (flags & XFS_DIFLAG_EXTSZINHERIT);
 	extsize_bytes = XFS_FSB_TO_B(mp, extsize);
+	forcealign_flag = (flags2 & XFS_DIFLAG2_FORCEALIGN);
+	pr_err("%s extsize=%d extsize_bytes=%d forcealign_flag=%d\n", __func__, extsize, extsize_bytes, forcealign_flag);
 
 	/*
 	 * This comment describes a historic gap in this verifier function.
@@ -725,6 +729,9 @@ xfs_inode_validate_extsize(
 		return __this_address;
 
 	if (!rt_flag && extsize > mp->m_sb.sb_agblocks / 2)
+		return __this_address;
+
+	if (forcealign_flag && !is_power_of_2(extsize_bytes))
 		return __this_address;
 
 	return NULL;

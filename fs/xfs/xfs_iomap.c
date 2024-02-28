@@ -98,9 +98,10 @@ xfs_bmbt_to_iomap(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	xfs_extlen_t extsz = xfs_get_extsz(ip);
 
-	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
-			__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
+	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d ip->i_extsize=%d\n",
+			__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, ip->i_extsize);
 	if (unlikely(!xfs_valid_startblock(ip, imap->br_startblock)))
 		return xfs_alert_fsblock_zero(ip, imap);
 
@@ -146,6 +147,14 @@ xfs_bmbt_to_iomap(
 
 	iomap->validity_cookie = sequence_cookie;
 	iomap->folio_ops = &xfs_iomap_folio_ops;
+	if (extsz > 1)
+		iomap->extent_shift = ffs(extsz) - 1;
+	pr_err("%s xfs_get_extsz(ip)=%d\n", __func__, xfs_get_extsz(ip));
+	pr_err_once("%s ffs(0)=%d\n", __func__, ffs(0));
+	pr_err_once("%s ffs(1)=%d\n", __func__, ffs(1));
+	pr_err_once("%s ffs(2)=%d\n", __func__, ffs(2));
+	pr_err_once("%s ffs(4)=%d\n", __func__, ffs(4));
+	pr_err_once("%s ffs(8)=%d\n", __func__, ffs(8));
 	return 0;
 }
 
@@ -567,8 +576,6 @@ xfs_iomap_write_unwritten(
 	xfs_mount_t	*mp = ip->i_mount;
 	xfs_fileoff_t	offset_fsb;
 	xfs_filblks_t	count_fsb;
-	xfs_fileoff_t	offset_fsb1;
-	xfs_filblks_t	count_fsb1;
 	xfs_filblks_t	numblks_fsb;
 	int		nimaps;
 	xfs_trans_t	*tp;
@@ -577,38 +584,25 @@ xfs_iomap_write_unwritten(
 	xfs_fsize_t	i_size;
 	uint		resblks;
 	int		error;
-	const xfs_off_t	count_orig = count;
-	const xfs_off_t	offset_orig = offset;
+	xfs_extlen_t extsz = xfs_get_extsz(ip);
 
 	trace_xfs_unwritten_convert(ip, offset, count);
 
-	pr_err("%s offset=%lld count=%lld xfs_inode_atomicwrites(ip)=%d sb_blocklog=%d m_blockmask=0x%x I_EXTMASK(ip)=%d ip=%pS VFS_I(ip)=%pS i_extentbits=%d\n",
-		__func__, offset, count, xfs_inode_atomicwrites(ip), mp->m_sb.sb_blocklog, mp->m_blockmask, I_EXTMASK(ip), ip, VFS_I(ip), VFS_I(ip)->i_extentbits);
-	offset_fsb1 = XFS_B_TO_FSBET(ip, offset);
-	count_fsb1 = XFS_B_TO_FSBE(ip, (xfs_ufsize_t)offset + count);
-	if (xfs_inode_atomicwrites(ip)) {
-		xfs_off_t xlen_bytes = i_extentsize(inode);
-		xfs_off_t	end = round_up(offset + count, xlen_bytes);
+	pr_err("%s offset=%lld count=%lld xfs_inode_atomicwrites(ip)=%d sb_blocklog=%d m_blockmask=0x%x extsz=%d ip=%pS\n",
+		__func__, offset, count, xfs_inode_atomicwrites(ip), mp->m_sb.sb_blocklog, mp->m_blockmask, extsz, ip);
 
-		offset = round_down(offset, xlen_bytes);
-		count = end - offset;
+	if (extsz > 1) {
+		xfs_extlen_t extsize_bytes = XFS_FSB_TO_B(mp, extsz);
+
+		offset_fsb = XFS_B_TO_FSBT(mp, round_down(offset, extsize_bytes));
+		count_fsb = XFS_B_TO_FSB(mp, round_up(offset + count, extsize_bytes));
+	} else {
+		offset_fsb = XFS_B_TO_FSBT(mp, offset);
+		count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
 	}
 
-	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
-
-	if (offset_fsb1 != offset_fsb) {
-		pr_err("%s1 ERROR offset_fsb=%lld offset_fsb1=%lld count_orig=%lld offset_orig=%lld ip=%pS VFS_I(ip)=%pS\n",
-			__func__, offset_fsb, offset_fsb1, count_orig, offset_orig, ip, VFS_I(ip));
-		BUG();
-	
-	}
-	if (count_fsb1 != count_fsb) {
-		pr_err("%s2 ERROR count_fsb=%lld count_fsb1=%lld count_orig=%lld offset_orig=%lld ip=%pS VFS_I(ip)=%pS\n",
-			__func__, count_fsb, count_fsb1, count_orig, offset_orig, ip, VFS_I(ip));
-		BUG();
-		
-	}
+	pr_err("%s2 offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld ip=%pS\n",
+		__func__, offset, count, offset_fsb, count_fsb, ip);
 
 	pr_err_once("%s XFS_B_TO_FSBT(0)=%lld\n", __func__, XFS_B_TO_FSBT(mp, 0));
 	pr_err_once("%s XFS_B_TO_FSB(0)=%lld\n", __func__, XFS_B_TO_FSB(mp, 0));

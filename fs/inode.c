@@ -162,7 +162,7 @@ int inode_init_always(struct super_block *sb, struct inode *inode)
 	inode->i_sb = sb;
 	//WARN_ON_ONCE(sb == xfs_sb);
 	pr_err_once("%s inode=%pS\n", __func__, inode);
-	inode->i_blkbits = inode->i_extentbits = sb->s_blocksize_bits;
+	inode->i_blkbits = sb->s_blocksize_bits;
 	inode->i_flags = 0;
 	atomic64_set(&inode->i_sequence, 0);
 	atomic_set(&inode->i_count, 1);

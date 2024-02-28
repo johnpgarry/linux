@@ -729,18 +729,21 @@ xfs_file_dio_write(
 	struct iov_iter		*from)
 {
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
+	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+	uint32_t			extsize = xfs_get_extsz(ip);
+	uint32_t			extsize_bytes = XFS_FSB_TO_B(mp, extsize);
+	uint                    mask = mp->m_blockmask | (extsize_bytes - 1);
+
+	pr_err("%s ip=%pS extsize=%d extsize_bytes=%d mask=0x%x\n", __func__,
+		ip, extsize, extsize_bytes, mask);
 
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
-	if (((iocb->ki_pos | count) & ip->i_mount->m_blockmask))
+	if ((iocb->ki_pos | count) & mask)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
-	if (((iocb->ki_pos | count) & I_EXTMASK(ip))) {
-		pr_err("%s calling xfs_file_dio_write_unaligned for I_EXTMASK=%d\n", __func__, I_EXTMASK(ip));
-		return xfs_file_dio_write_unaligned(ip, iocb, from);
-	}
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
 

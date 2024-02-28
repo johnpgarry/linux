@@ -281,7 +281,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bool atomic_write = iter->flags & IOMAP_ATOMIC;
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
-	unsigned int fs_extent_size = i_extentsize(inode), pad;
+	unsigned int fs_extent_size = i_blocksize(inode) << iomap->extent_shift, pad;
 	loff_t length = iomap_length(iter);
 	const size_t iter_len = iter->len;
 	loff_t pos = iter->pos;
@@ -294,12 +294,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	if (atomic_write) {
-		pr_err("%s pos=%lld length=%lld iomap->type=%d (IOMAP_UNWRITTEN=%d, IOMAP_MAPPED=%d) use_fua=%d fs_extent_size=%d\n",
-			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua, fs_extent_size);
+		pr_err("%s pos=%lld length=%lld iomap->type=%d (IOMAP_UNWRITTEN=%d, IOMAP_MAPPED=%d) use_fua=%d fs_extent_size=%d iomap->extent_shift=%d\n",
+			__func__, pos, length, iomap->type, IOMAP_UNWRITTEN, IOMAP_MAPPED, use_fua, fs_extent_size, iomap->extent_shift);
 		pr_err("%s0.1 iomap->flags=0x%x (NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d)\n",
 			__func__, iomap->flags, IOMAP_F_NEW, IOMAP_F_DIRTY, IOMAP_F_SHARED, IOMAP_F_MERGED);
 
-		if (!generic_atomic_write_valid(pos, dio->submit.iter, i_blocksize(inode), i_extentsize(inode))) {
+		if (!generic_atomic_write_valid(pos, dio->submit.iter, i_blocksize(inode), fs_extent_size)) {
 			pr_err("%s2 not valid pos=%lld length=%zd\n",
 				__func__, pos, iov_iter_count(dio->submit.iter));
 			return -EINVAL;
@@ -632,8 +632,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		return NULL;
 
 	if (atomic_write) {
-		pr_err("%s pos=%lld length=%zd iomap=%pS i_blocksize=%d, i_extentsize=%d\n",
-			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, i_blocksize(inode), i_extentsize(inode));
+		pr_err("%s pos=%lld length=%zd iomap=%pS i_blocksize=%d\n",
+			__func__, iocb->ki_pos, iov_iter_count(iter), iomap, i_blocksize(inode));
 	}
 
 	pr_err("%s2.1 pos=%lld length=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));

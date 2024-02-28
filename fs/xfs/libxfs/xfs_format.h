@@ -467,16 +467,20 @@ xfs_is_quota_inode(struct xfs_sb *sbp, xfs_ino_t ino)
 	((((uint64_t)(b)) + (mp)->m_blockmask) >> (mp)->m_sb.sb_blocklog)
 #define XFS_B_TO_FSBT(mp,b)	(((uint64_t)(b)) >> (mp)->m_sb.sb_blocklog)
 
+#if 0
 // XFS_B_TO_FSB gives fs blocks to hold bytes
 // XFS_B_TO_FSBT is fs block index for byte offset
+//#define I_EXTSIZE_FSB(ip) (1 * (ip)->i_extsize)
+//#define I_EXTSIZE_B(ip) (1 << ((ip)->i_extsize + ((ip)->i_mount)->m_sb.sb_blocklog))
+//#define I_EXTMASK_FSB(ip) (I_EXTMASK(ip) - 1)
+//#define I_EXTMASK_B(ip) (I_EXTSIZE_B(ip) - 1)
 
-#define I_EXTMASK(ip) (i_extentsize(VFS_I(ip)) - 1)
-#define XFS_EXT_DIFF_BITS(ip) ((VFS_I(ip)->i_extentbits) - (VFS_I(ip)->i_blkbits))
+//#define XFS_EXT_DIFF_BITS(ip) ((VFS_I(ip)->i_extentbits) - (VFS_I(ip)->i_blkbits))
 #define XFS_B_TO_FSBE_INT(ip,b)	\
 	(((((uint64_t)(b)) + I_EXTMASK(ip)) >> ((VFS_I(ip)->i_extentbits))))
-#define XFS_B_TO_FSBE(ip,b) ((XFS_B_TO_FSBE_INT(ip,b)) << (XFS_EXT_DIFF_BITS(ip)))
-#define XFS_B_TO_FSBET(ip,b)	((((uint64_t)(b)) >> (VFS_I(ip)->i_extentbits)) << (XFS_EXT_DIFF_BITS(ip)))
-
+//#define XFS_B_TO_FSBE(ip,b) ((XFS_B_TO_FSBE_INT(ip,b)) << (XFS_EXT_DIFF_BITS(ip)))
+//#define XFS_B_TO_FSBET(ip,b)	((((uint64_t)(b)) >> (VFS_I(ip)->i_extentbits)) << (XFS_EXT_DIFF_BITS(ip)))
+#endif
 
 /*
  * Allocation group header

@@ -66,7 +66,8 @@ xfs_get_extsz_hint(
 }
 
 /*
- * helper function to extract extent size
+ * Helper function to extract extent size. It will return a power-of-2,
+ * as forcealign requires this.
  */
 xfs_extlen_t
 xfs_get_extsz(
@@ -756,7 +757,7 @@ xfs_inode_inherit_flags(
 	 * that we don't let broken hints propagate.
 	 */
 	failaddr = xfs_inode_validate_extsize(ip->i_mount, ip->i_extsize,
-			VFS_I(ip)->i_mode, ip->i_diflags);
+			VFS_I(ip)->i_mode, ip->i_diflags, ip->i_diflags2);
 	if (failaddr) {
 		ip->i_diflags &= ~(XFS_DIFLAG_EXTSIZE |
 				   XFS_DIFLAG_EXTSZINHERIT);

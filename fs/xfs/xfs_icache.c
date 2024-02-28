@@ -88,9 +88,8 @@ xfs_inode_alloc(
 	/* VFS doesn't initialise i_mode or i_state! */
 	VFS_I(ip)->i_mode = 0;
 	VFS_I(ip)->i_state = 0;
-	VFS_I(ip)->i_extentbits = ffs(mp->m_sb.sb_blocksize * xfs_get_extsz(ip)) - 1;
-	pr_err("%s i_extentbits=%d i_blkbits=%d sb_blocksize=%d xfs_get_extsz(ip)=%d ip=%pS VFS_I(ip)=%pS\n",
-		__func__, VFS_I(ip)->i_extentbits,
+	pr_err("%s i_blkbits=%d sb_blocksize=%d xfs_get_extsz(ip)=%d ip=%pS VFS_I(ip)=%pS\n",
+		__func__, 
 		VFS_I(ip)->i_blkbits,
 		mp->m_sb.sb_blocksize,
 		xfs_get_extsz(ip),

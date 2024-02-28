@@ -754,7 +754,6 @@ struct inode {
 	struct fsverity_info	*i_verity_info;
 #endif
 
-	u8			i_extentbits;
 	void			*i_private; /* fs or device private pointer */
 } __randomize_layout;
 
@@ -763,11 +762,6 @@ struct timespec64 timestamp_truncate(struct timespec64 t, struct inode *inode);
 static inline unsigned int i_blocksize(const struct inode *node)
 {
 	return (1 << node->i_blkbits);
-}
-
-static inline unsigned int i_extentsize(const struct inode *node)
-{
-	return (1 << node->i_extentbits);
 }
 
 static inline int inode_unhashed(struct inode *inode)
