@@ -1257,9 +1257,6 @@ static bool xfs_file_open_can_atomicwrite(
 	struct xfs_inode *ip = XFS_I(inode);
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct block_device *bdev = target->bt_bdev;
-	xfs_extlen_t		extsz = xfs_get_extsz(ip);
-	struct xfs_mount	*mp = ip->i_mount;
-	unsigned int		extsz_bytes = extsz * mp->m_sb.sb_blocksize;
 
 	if (!(file->f_flags & O_DIRECT))
 		return false;
@@ -1268,7 +1265,7 @@ static bool xfs_file_open_can_atomicwrite(
 		return false;
 
 	/* iomap code relies being able to write extsz_bytes atomically */
-	if (!bdev_can_atomic_write_size(bdev, extsz_bytes))
+	if (!bdev_can_atomic_write(bdev))
 		return false;
 
 	return true;
