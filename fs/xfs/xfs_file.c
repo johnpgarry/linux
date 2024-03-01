@@ -620,18 +620,19 @@ out_unlock:
  * Handle block unaligned direct I/O writes
  *
  * In most cases direct I/O writes will be done holding IOLOCK_SHARED, allowing
- * them to be done in parallel with reads and other direct I/O writes.  However,
- * if the I/O is not aligned to filesystem blocks, the direct I/O layer may need
- * to do sub-block zeroing and that requires serialisation against other direct
- * I/O to the same block.  In this case we need to serialise the submission of
- * the unaligned I/O so that we don't get racing block zeroing in the dio layer.
- * In the case where sub-block zeroing is not required, we can do concurrent
- * sub-block dios to the same block successfully.
+ * them to be done in parallel with reads and other direct I/O writes.
+ * However if the I/O is not aligned to filesystem blocks/extent, the direct
+ * I/O layer may need to do sub-block/extent zeroing and that requires
+ * serialisation against other direct I/O to the same block/extent.  In this
+ * case we need to serialise the submission of the unaligned I/O so that we
+ * don't get racing block/extent zeroing in the dio layer.
+ * In the case where sub-block/extent zeroing is not required, we can do
+ * concurrent sub-block/extent dios to the same block/extent successfully.
  *
  * Optimistically submit the I/O using the shared lock first, but use the
  * IOMAP_DIO_OVERWRITE_ONLY flag to tell the lower layers to return -EAGAIN
- * if block allocation or partial block zeroing would be required.  In that case
- * we try again with the exclusive lock.
+ * if block/extent allocation or partial block/extent zeroing would be
+ * required.  In that case we try again with the exclusive lock.
  */
 static noinline ssize_t
 xfs_file_dio_write_unaligned(
@@ -646,9 +647,9 @@ xfs_file_dio_write_unaligned(
 	ssize_t			ret;
 
 	/*
-	 * Extending writes need exclusivity because of the sub-block zeroing
-	 * that the DIO code always does for partial tail blocks beyond EOF, so
-	 * don't even bother trying the fast path in this case.
+	 * Extending writes need exclusivity because of the sub-block/extent
+	 * zeroing that the DIO code always does for partial tail blocks
+	 * beyond EOF, so don't even bother trying the fast path in this case.
 	 */
 	if (iocb->ki_pos > isize || iocb->ki_pos + count >= isize) {
 		if (iocb->ki_flags & IOCB_NOWAIT)
@@ -712,13 +713,21 @@ xfs_file_dio_write(
 	struct iov_iter		*from)
 {
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
+	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+	unsigned int		blockmask;
 
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
-	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
+
+	if (xfs_inode_has_forcealign(ip) && ip->i_extsize > 1)
+		blockmask = XFS_FSB_TO_B(mp, ip->i_extsize) - 1;
+	else
+		blockmask = mp->m_blockmask;
+
+	if ((iocb->ki_pos | count) & blockmask)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
