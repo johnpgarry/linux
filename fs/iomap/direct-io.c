@@ -275,10 +275,12 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		struct iomap_dio *dio)
 {
+	bool is_atomic = dio->iocb->ki_flags & IOCB_ATOMIC;
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
 	unsigned int zeroing_size, pad;
 	loff_t length = iomap_length(iter);
+	const size_t iter_len = iter->len;
 	loff_t pos = iter->pos;
 	blk_opf_t bio_opf;
 	struct bio *bio;
@@ -289,6 +291,13 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	zeroing_size = i_blocksize(inode) << iomap->extent_shift;
+
+	if (is_atomic) {
+		if (!generic_atomic_write_valid(pos, dio->submit.iter,
+			i_blocksize(inode), zeroing_size)) {
+			return -EINVAL;
+		}
+	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -330,6 +339,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 * we are done.
 	 */
 	orig_count = iov_iter_count(dio->submit.iter);
+	if (is_atomic)
+		BUG_ON(orig_count != iter_len);
 	iov_iter_truncate(dio->submit.iter, length);
 
 	if (!iov_iter_count(dio->submit.iter))
@@ -383,6 +394,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 					  GFP_KERNEL);
 		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
 		bio->bi_ioprio = dio->iocb->ki_ioprio;
+		if (is_atomic)
+			bio->bi_opf |= REQ_ATOMIC;
+
 		bio->bi_private = dio;
 		bio->bi_end_io = iomap_dio_bio_end_io;
 
@@ -399,6 +413,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		n = bio->bi_iter.bi_size;
+		if (is_atomic && (n != iter_len)) {
+			/* This bio should have covered the complete length */
+			ret = -EINVAL;
+			bio_put(bio);
+			goto out;
+		}
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);
 		} else {
