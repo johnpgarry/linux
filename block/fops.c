@@ -51,6 +51,7 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 		unsigned int nr_pages)
 {
 	struct bio_vec inline_vecs[DIO_INLINE_BIO_VECS], *vecs;
+	bool atomic = iocb->ki_flags & IOCB_ATOMIC;
 	loff_t pos = iocb->ki_pos;
 	bool should_dirty = false;
 	struct bio bio;
@@ -75,7 +76,7 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bio.bi_iter.bi_sector = pos >> SECTOR_SHIFT;
 	bio.bi_write_hint = file_inode(iocb->ki_filp)->i_write_hint;
 	bio.bi_ioprio = iocb->ki_ioprio;
-	if (iocb->ki_flags & IOCB_ATOMIC)
+	if (atomic)
 		bio.bi_opf |= REQ_ATOMIC;
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
@@ -89,7 +90,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		bio.bi_opf |= REQ_NOWAIT;
 
-	submit_bio_wait(&bio);
+	if (atomic)
+		ret = blkdev_issue_atomic_write_bio(&bio, true);
+	else
+		submit_bio_wait(&bio);
 
 	bio_release_pages(&bio, should_dirty);
 	if (unlikely(bio.bi_status))
@@ -305,6 +309,7 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 {
 	bool is_read = iov_iter_rw(iter) == READ;
 	blk_opf_t opf = is_read ? REQ_OP_READ : dio_bio_write_op(iocb);
+	bool atomic = iocb->ki_flags & IOCB_ATOMIC;
 	struct blkdev_dio *dio;
 	struct bio *bio;
 	loff_t pos = iocb->ki_pos;
@@ -348,7 +353,7 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 		task_io_account_write(bio->bi_iter.bi_size);
 	}
 
-	if (iocb->ki_flags & IOCB_ATOMIC)
+	if (atomic)
 		bio->bi_opf |= REQ_ATOMIC;
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
@@ -356,10 +361,20 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 
 	if (iocb->ki_flags & IOCB_HIPRI) {
 		bio->bi_opf |= REQ_POLLED;
-		submit_bio(bio);
+		if (atomic) {
+			ret = blkdev_issue_atomic_write_bio(bio, false);
+			if (ret)
+				return ret;
+		} else
+			submit_bio(bio);
 		WRITE_ONCE(iocb->private, bio);
 	} else {
-		submit_bio(bio);
+		if (atomic) {
+			ret = blkdev_issue_atomic_write_bio(bio, false);
+			if (ret)
+				return ret;
+		} else
+			submit_bio(bio);
 	}
 	return -EIOCBQUEUED;
 }

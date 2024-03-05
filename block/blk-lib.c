@@ -35,6 +35,24 @@ static sector_t bio_discard_limit(struct block_device *bdev, sector_t sector)
 	return round_down(UINT_MAX, discard_granularity) >> SECTOR_SHIFT;
 }
 
+int blkdev_issue_atomic_write_bio(struct bio *bio, bool wait)
+{
+	struct request_queue *q = bdev_get_queue(bio->bi_bdev);
+
+	if (bio->bi_iter.bi_size > queue_atomic_write_unit_max_bytes(q))
+		return -EINVAL;
+
+	if (bio->bi_iter.bi_size % queue_atomic_write_unit_min_bytes(q))
+		return -EINVAL;
+
+	if (wait)
+		submit_bio(bio);
+	else
+		submit_bio(bio);
+	return 0;
+}
+EXPORT_SYMBOL(blkdev_issue_atomic_write_bio);
+
 int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 		sector_t nr_sects, gfp_t gfp_mask, struct bio **biop)
 {
