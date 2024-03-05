@@ -98,6 +98,41 @@ static int blk_validate_zoned_limits(struct queue_limits *lim)
 }
 
 /*
+ * Returns max guaranteed bytes which we can fit in a bio.
+ *
+ * We always assume that we can fit in at least PAGE_SIZE in a segment, apart
+ * from first and last segments.
+ */
+static
+unsigned int blk_queue_max_guaranteed_bio(struct queue_limits *limits)
+{
+	unsigned int max_segments = min(BIO_MAX_VECS, limits->max_segments);
+	unsigned int length;
+
+	length = min(max_segments, 2) * limits->logical_block_size;
+	if (max_segments > 2)
+		length += (max_segments - 2) * PAGE_SIZE;
+
+	return length;
+}
+
+static void blk_atomic_writes_update_limits(struct queue_limits *limits)
+{
+	unsigned int unit_limit = min(limits->max_hw_sectors << SECTOR_SHIFT,
+					blk_queue_max_guaranteed_bio(limits));
+
+	unit_limit = rounddown_pow_of_two(unit_limit);
+
+	limits->atomic_write_max_sectors =
+		min(limits->atomic_write_hw_max >> SECTOR_SHIFT,
+			limits->max_hw_sectors);
+	limits->atomic_write_unit_min =
+		min(limits->atomic_write_hw_unit_min, unit_limit);
+	limits->atomic_write_unit_max =
+		min(limits->atomic_write_hw_unit_max, unit_limit);
+}
+
+/*
  * Check that the limits in lim are valid, initialize defaults for unset
  * values, and cap values based on others where needed.
  */
@@ -220,6 +255,23 @@ static int blk_validate_limits(struct queue_limits *lim)
 		lim->alignment_offset &= (lim->physical_block_size - 1);
 		lim->misaligned = 0;
 	}
+
+	/*
+	 * The atomic write boundary size just needs to be a multiple of
+	 * unit_max (and not necessarily a power-of-2), so this following check
+	 * could be relaxed in future.
+	 * Furthermore, if needed, unit_max could be reduced so that the
+	 * boundary size was compliant (with a !power-of-2 boundary).
+	 */
+	if (lim->atomic_write_hw_boundary &&
+	    !is_power_of_2(lim->atomic_write_hw_boundary)) {
+
+		lim->atomic_write_hw_max = 0;
+		lim->atomic_write_hw_boundary = 0;
+		lim->atomic_write_hw_unit_min = 0;
+		lim->atomic_write_hw_unit_max = 0;
+	}
+	blk_atomic_writes_update_limits(lim);
 
 	return blk_validate_zoned_limits(lim);
 }
@@ -344,6 +396,8 @@ void blk_queue_max_hw_sectors(struct request_queue *q, unsigned int max_hw_secto
 				 limits->logical_block_size >> SECTOR_SHIFT);
 	limits->max_sectors = max_sectors;
 
+	blk_atomic_writes_update_limits(limits);
+
 	if (!q->disk)
 		return;
 	q->disk->bdi->io_pages = max_sectors >> (PAGE_SHIFT - 9);
@@ -383,6 +437,61 @@ void blk_queue_max_discard_sectors(struct request_queue *q,
 		min(max_discard_sectors, lim->max_user_discard_sectors);
 }
 EXPORT_SYMBOL(blk_queue_max_discard_sectors);
+
+/**
+ * blk_queue_atomic_write_max_bytes - set max bytes supported by
+ * the device for atomic write operations.
+ * @q:  the request queue for the device
+ * @bytes: maximum bytes supported
+ */
+void blk_queue_atomic_write_max_bytes(struct request_queue *q,
+				      unsigned int bytes)
+{
+	q->limits.atomic_write_hw_max = bytes;
+	blk_atomic_writes_update_limits(&q->limits);
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_max_bytes);
+
+/**
+ * blk_queue_atomic_write_boundary_bytes - Device's logical block address space
+ * which an atomic write should not cross.
+ * @q:  the request queue for the device
+ * @bytes: must be a power-of-two.
+ */
+void blk_queue_atomic_write_boundary_bytes(struct request_queue *q,
+					   unsigned int bytes)
+{
+	q->limits.atomic_write_hw_boundary = bytes;
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_boundary_bytes);
+
+/**
+ * blk_queue_atomic_write_unit_min_bytes - smallest unit that can be written
+ * atomically to the device.
+ * @q:  the request queue for the device
+ * @bytes: must be a power-of-two.
+ */
+void blk_queue_atomic_write_unit_min_bytes(struct request_queue *q,
+					     unsigned int bytes)
+{
+	q->limits.atomic_write_hw_unit_min = bytes;
+	blk_atomic_writes_update_limits(&q->limits);
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_unit_min_bytes);
+
+/*
+ * blk_queue_atomic_write_unit_max_bytes - largest unit that can be written
+ * atomically to the device.
+ * @q: the request queue for the device
+ * @bytes: must be a power-of-two.
+ */
+void blk_queue_atomic_write_unit_max_bytes(struct request_queue *q,
+					     unsigned int bytes)
+{
+	q->limits.atomic_write_hw_unit_max = bytes;
+	blk_atomic_writes_update_limits(&q->limits);
+}
+EXPORT_SYMBOL(blk_queue_atomic_write_unit_max_bytes);
 
 /**
  * blk_queue_max_secure_erase_sectors - set max sectors for a secure erase
