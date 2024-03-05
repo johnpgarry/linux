@@ -126,9 +126,7 @@ static inline int sas_ata_add_dev(struct domain_device *parent, struct ex_phy *p
 	return -ENODEV;
 }
 
-static const struct attribute_group sas_ata_sdev_attr_group = {
-	.attrs = NULL,
-};
+#define sas_ata_sdev_attr_group (struct attribute_group) {}
 #endif
 
 #endif /* _SAS_ATA_H_ */
