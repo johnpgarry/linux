@@ -547,6 +547,7 @@ xfs_can_free_eofblocks(
 	if (xfs_get_extsz(ip) > 1) {
 		end_fsb = roundup_64(end_fsb, xfs_get_extsz(ip));
 	} else if (XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1) {
+		pr_err("%s sb_rextsize\n", __func__);
 		end_fsb = xfs_rtb_roundup_rtx(mp, end_fsb);
 	}
 
@@ -849,6 +850,7 @@ xfs_free_file_space(
 	endoffset_fsb = XFS_B_TO_FSBT(mp, offset + len);
 
 	/* We can only free complete realtime extents. */
+	pr_err("%s checking sb_rextsize\n", __func__);
 	if (XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1) {
 		startoffset_fsb = xfs_rtb_roundup_rtx(mp, startoffset_fsb);
 		endoffset_fsb = xfs_rtb_rounddown_rtx(mp, endoffset_fsb);

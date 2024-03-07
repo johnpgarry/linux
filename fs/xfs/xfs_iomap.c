@@ -567,7 +567,6 @@ xfs_iomap_write_unwritten(
 	xfs_extlen_t	extsz = xfs_get_extsz(ip);
 
 	trace_xfs_unwritten_convert(ip, offset, count);
-
 	if (extsz > 1) {
 		xfs_extlen_t extsize_bytes = XFS_FSB_TO_B(mp, extsz);
 
@@ -579,6 +578,8 @@ xfs_iomap_write_unwritten(
 	}
 	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 
+	pr_err("%s offset=%lld count=%lld count_fsb=%lld offset_fsb=%lld\n",
+		__func__, offset, count, count_fsb, offset_fsb);
 	/*
 	 * Reserve enough blocks in this transaction for two complete extent
 	 * btree splits.  We may be converting the middle part of an unwritten

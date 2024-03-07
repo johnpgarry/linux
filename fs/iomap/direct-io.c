@@ -68,6 +68,8 @@ static void iomap_dio_submit_bio(const struct iomap_iter *iter,
 
 	atomic_inc(&dio->ref);
 
+	pr_err("%s bio=%pS pos=%lld bi_sector=%lld bi_size=%d\n",
+		__func__, bio, pos, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	/* Sync dio can't be polled reliably */
 	if ((iocb->ki_flags & IOCB_HIPRI) && !is_sync_kiocb(iocb)) {
 		bio_set_polled(bio, iocb);
@@ -161,6 +163,7 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	struct iomap_dio *dio = bio->bi_private;
 	bool should_dirty = (dio->flags & IOMAP_DIO_DIRTY);
 	struct kiocb *iocb = dio->iocb;
+	pr_err("%s bio=%pS\n", __func__, bio);
 
 	if (bio->bi_status)
 		iomap_dio_set_error(dio, blk_status_to_errno(bio->bi_status));
@@ -174,6 +177,7 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	if (dio->wait_for_completion) {
 		struct task_struct *waiter = dio->submit.waiter;
 
+		pr_err("%s2 bio=%pS wait_for_completion set\n", __func__, bio);
 		WRITE_ONCE(dio->submit.waiter, NULL);
 		blk_wake_io_task(waiter);
 		goto release_bio;
@@ -184,6 +188,7 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	 */
 	if (dio->flags & IOMAP_DIO_INLINE_COMP) {
 		WRITE_ONCE(iocb->private, NULL);
+		pr_err("%s3 bio=%pS IOMAP_DIO_INLINE_COMP set\n", __func__, bio);
 		iomap_dio_complete_work(&dio->aio.work);
 		goto release_bio;
 	}
@@ -209,6 +214,8 @@ void iomap_dio_bio_end_io(struct bio *bio)
 		 * will be gotten from dio_complete when that is run by the
 		 * issuer.
 		 */
+		pr_err("%s4 bio=%pS IOMAP_DIO_CALLER_COMP set, calling ki_complete=%pS\n",
+			__func__, bio, iocb->ki_complete);
 		iocb->ki_complete(iocb, 0);
 		goto release_bio;
 	}
@@ -219,10 +226,12 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	 * more IO to be issued to finalise filesystem metadata changes or
 	 * guarantee data integrity.
 	 */
+	pr_err("%s5 bio=%pS Async DIO completion\n", __func__, bio);
 	INIT_WORK(&dio->aio.work, iomap_dio_complete_work);
 	queue_work(file_inode(iocb->ki_filp)->i_sb->s_dio_done_wq,
 			&dio->aio.work);
 release_bio:
+	pr_err("%s8 release_bio bio=%pS\n", __func__, bio);
 	if (should_dirty) {
 		bio_check_pages_dirty(bio);
 	} else {
@@ -246,6 +255,7 @@ static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 	bio->bi_private = dio;
 	bio->bi_end_io = iomap_dio_bio_end_io;
 
+	pr_err("%s bio=%pS pos=%lld len=%d bi_sector=%lld\n", __func__, bio, pos, len, bio->bi_iter.bi_sector);
 	__bio_add_page(bio, page, len, 0);
 	iomap_dio_submit_bio(iter, dio, bio, pos);
 }
@@ -290,6 +300,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	zeroing_size = i_blocksize(inode) << iomap->extent_shift;
+
+	pr_err("%s iocb=%pS pos=%lld length=%lld zeroing_size=%d\n",
+		__func__, dio->iocb, dio->iocb->ki_pos, length, zeroing_size);
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -383,6 +396,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
 					  GFP_KERNEL);
 		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
+		pr_err("%s2 main bio=%pS bi_sector=%lld\n", __func__, bio, bio->bi_iter.bi_sector);
 		bio->bi_ioprio = dio->iocb->ki_ioprio;
 		if (is_atomic)
 			bio->bi_opf |= REQ_ATOMIC;
@@ -566,6 +580,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct blk_plug plug;
 	struct iomap_dio *dio;
 	loff_t ret = 0;
+	pr_err("%s iocb=%pS pos=%lld len=%zd\n",
+		__func__, iocb, iocb->ki_pos, iov_iter_count(iter));
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
 
@@ -732,8 +748,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 		for (;;) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			if (!READ_ONCE(dio->submit.waiter))
+			if (!READ_ONCE(dio->submit.waiter)) {
+				pr_err("%s dio=%pS now released\n", __func__, dio);
 				break;
+			}
 
 			blk_io_schedule();
 		}

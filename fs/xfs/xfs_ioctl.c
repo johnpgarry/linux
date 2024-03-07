@@ -1171,6 +1171,10 @@ xfs_ioctl_setattr_xflags(
 	if (atomic_writes) {
 		if (!xfs_has_atomicwrites(mp))
 			return -EINVAL;
+		if (xfs_inode_atomicwrites(ip)) {
+		//	pr_err("%s xfs_inode_atomicwrites already set\n", __func__);
+		//	return -EINVAL;
+		}
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
 	}

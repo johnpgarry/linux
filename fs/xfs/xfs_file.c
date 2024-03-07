@@ -48,6 +48,7 @@ xfs_is_falloc_aligned(
 	uint64_t		mask;
 
 	if (XFS_IS_REALTIME_INODE(ip)) {
+		pr_err("%s checking sb_rextsize\n", __func__);
 		if (!is_power_of_2(mp->m_sb.sb_rextsize)) {
 			u64	rextbytes;
 			u32	mod;
@@ -496,6 +497,7 @@ xfs_dio_write_end_io(
 	struct xfs_inode	*ip = XFS_I(inode);
 	loff_t			offset = iocb->ki_pos;
 	unsigned int		nofs_flag;
+	pr_err("%s iocb=%pS\n", __func__, iocb);
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
@@ -533,6 +535,8 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
+		pr_err("%s2 iocb=%pS IOMAP_DIO_UNWRITTEN offset=%lld size=%zd calling xfs_iomap_write_unwritten\n",
+			__func__, iocb, offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}
@@ -587,6 +591,7 @@ xfs_file_dio_write_aligned(
 {
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	ssize_t			ret;
+	pr_err("%s iocb=%pS\n", __func__, iocb);
 
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
@@ -642,6 +647,7 @@ xfs_file_dio_write_unaligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	unsigned int		flags = IOMAP_DIO_OVERWRITE_ONLY;
 	ssize_t			ret;
+	pr_err("%s iocb=%pS\n", __func__, iocb);
 
 	/*
 	 * Extending writes need exclusivity because of the sub-block/extent

@@ -25,6 +25,7 @@ xfs_rtx_to_rtb(
 	if (mp->m_rtxblklog >= 0)
 		return rtx << mp->m_rtxblklog;
 
+	pr_err("%s checking sb_rextsize\n", __func__);
 	return rtx * mp->m_sb.sb_rextsize;
 }
 
@@ -36,6 +37,7 @@ xfs_rtxlen_to_extlen(
 	if (mp->m_rtxblklog >= 0)
 		return rtxlen << mp->m_rtxblklog;
 
+	pr_err("%s checking sb_rextsize\n", __func__);
 	return rtxlen * mp->m_sb.sb_rextsize;
 }
 
@@ -45,6 +47,7 @@ xfs_extlen_to_rtxmod(
 	struct xfs_mount	*mp,
 	xfs_extlen_t		len)
 {
+	pr_err("%s checking sb_rextsize\n", __func__);
 	if (mp->m_rtxblklog >= 0)
 		return len & mp->m_rtxblkmask;
 
@@ -56,6 +59,7 @@ xfs_extlen_to_rtxlen(
 	struct xfs_mount	*mp,
 	xfs_extlen_t		len)
 {
+	pr_err("%s checking sb_rextsize\n", __func__);
 	if (mp->m_rtxblklog >= 0)
 		return len >> mp->m_rtxblklog;
 
@@ -68,6 +72,7 @@ xfs_rtb_to_rtx(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
+		pr_err("%s checking sb_rextsize\n", __func__);
 	if (likely(mp->m_rtxblklog >= 0))
 		return rtbno >> mp->m_rtxblklog;
 
@@ -80,6 +85,8 @@ xfs_rtb_to_rtxoff(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
+	pr_err("%s checking sb_rextsize mp->m_rtxblklog(%d) >= 0=%d m_rtxblkmask=0x%llx\n",
+		__func__, mp->m_rtxblklog, mp->m_rtxblklog >= 0, mp->m_rtxblkmask);
 	if (likely(mp->m_rtxblklog >= 0))
 		return rtbno & mp->m_rtxblkmask;
 
@@ -96,6 +103,7 @@ xfs_rtb_to_rtxrem(
 	xfs_rtblock_t		rtbno,
 	xfs_extlen_t		*off)
 {
+		pr_err("%s checking sb_rextsize\n", __func__);
 	if (likely(mp->m_rtxblklog >= 0)) {
 		*off = rtbno & mp->m_rtxblkmask;
 		return rtbno >> mp->m_rtxblklog;
@@ -119,6 +127,7 @@ xfs_rtb_to_rtxup(
 		return rtbno >> mp->m_rtxblklog;
 	}
 
+		pr_err("%s checking sb_rextsize\n", __func__);
 	if (do_div(rtbno, mp->m_sb.sb_rextsize))
 		rtbno++;
 	return rtbno;
@@ -130,6 +139,7 @@ xfs_rtb_roundup_rtx(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
+		pr_err("%s checking sb_rextsize\n", __func__);
 	return roundup_64(rtbno, mp->m_sb.sb_rextsize);
 }
 
@@ -139,6 +149,7 @@ xfs_rtb_rounddown_rtx(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
+		pr_err("%s checking sb_rextsize\n", __func__);
 	return rounddown_64(rtbno, mp->m_sb.sb_rextsize);
 }
 

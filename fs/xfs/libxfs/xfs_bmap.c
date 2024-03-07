@@ -5252,6 +5252,7 @@ __xfs_bunmapi(
 	struct xfs_bmbt_irec	got;		/* current extent record */
 	struct xfs_ifork	*ifp;		/* inode fork pointer */
 	int			isrt;		/* freeing in rt area */
+	int			isforcealign;		/* freeing in rt area */
 	int			logflags;	/* transaction logging flags */
 	xfs_extlen_t		mod;		/* rt extent offset */
 	struct xfs_mount	*mp = ip->i_mount;
@@ -5265,6 +5266,7 @@ __xfs_bunmapi(
 
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
 
+	pr_err("%s start=%lld\n", __func__, start);
 	whichfork = xfs_bmapi_whichfork(flags);
 	ASSERT(whichfork != XFS_COW_FORK);
 	ifp = xfs_ifork_ptr(ip, whichfork);
@@ -5287,10 +5289,12 @@ __xfs_bunmapi(
 	}
 	XFS_STATS_INC(mp, xs_blk_unmap);
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
+	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip);
 	end = start + len;
 
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
 		*rlen = 0;
+		pr_err("%s1 start=%lld *rlen=0\n", __func__, start);
 		return 0;
 	}
 	end--;
@@ -5303,7 +5307,7 @@ __xfs_bunmapi(
 	} else
 		cur = NULL;
 
-	if (isrt) {
+	if (isrt || isforcealign) {
 		/*
 		 * Synchronize by locking the bitmap inode.
 		 */
@@ -5320,6 +5324,7 @@ __xfs_bunmapi(
 		 * Is the found extent after a hole in which end lives?
 		 * Just back up to the previous extent, if so.
 		 */
+		pr_err("%s1 end=%lld start=%lld len=%lld\n", __func__, end, start, len);
 		if (got.br_startoff > end &&
 		    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 			done = true;
@@ -5340,20 +5345,29 @@ __xfs_bunmapi(
 		del = got;
 		wasdel = isnullstartblock(del.br_startblock);
 
+		pr_err("%s1.0 end=%lld start=%lld len=%lld isrt=%d del.br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, start, len, isrt, del.br_startblock, del.br_blockcount);
 		if (got.br_startoff < start) {
 			del.br_startoff = start;
 			del.br_blockcount -= start - got.br_startoff;
 			if (!wasdel)
 				del.br_startblock += start - got.br_startoff;
 		}
+		pr_err("%s1.0.0 end=%lld start=%lld len=%lld isrt=%d del.br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, start, len, isrt, del.br_startblock, del.br_blockcount);
 		if (del.br_startoff + del.br_blockcount > end + 1)
 			del.br_blockcount = end + 1 - del.br_startoff;
 
-		if (!isrt)
+		pr_err("%s1.1 end=%lld start=%lld len=%lld isrt=%d del.br_startblock=%lld, br_blockcount=%lld isforcealign=%d\n",
+			__func__, end, start, len, isrt, del.br_startblock, del.br_blockcount, isforcealign);
+		if (!isrt && !isforcealign) 
 			goto delete;
 
-		mod = xfs_rtb_to_rtxoff(mp,
-				del.br_startblock + del.br_blockcount);
+		if (isrt)
+			mod = xfs_rtb_to_rtxoff(mp,
+					del.br_startblock + del.br_blockcount);
+
+		pr_err("%s2 end=%lld start=%lld len=%lld mod=%d \n", __func__, end, start, len, mod);
 		if (mod) {
 			/*
 			 * Realtime extent not lined up at the end.
@@ -5367,6 +5381,7 @@ __xfs_bunmapi(
 				 * This piece is unwritten, or we're not
 				 * using unwritten extents.  Skip over it.
 				 */
+				pr_err("%s3 XFS_EXT_UNWRITTEN end=%lld start=%lld len=%lld mod=%d\n", __func__, end, start, len, mod);
 				ASSERT(end >= mod);
 				end -= mod > del.br_blockcount ?
 					del.br_blockcount : mod;
@@ -5393,6 +5408,7 @@ __xfs_bunmapi(
 				del.br_blockcount = mod;
 			}
 			del.br_state = XFS_EXT_UNWRITTEN;
+			pr_err("%s4 calling xfs_bmap_add_extent_unwritten_real end=%lld start=%lld len=%lld mod=%d\n", __func__, end, start, len, mod);
 			error = xfs_bmap_add_extent_unwritten_real(tp, ip,
 					whichfork, &icur, &cur, &del,
 					&logflags);
@@ -5402,8 +5418,11 @@ __xfs_bunmapi(
 		}
 
 		mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+		pr_err("%s4 mod=%d\n", __func__, mod);
 		if (mod) {
+			pr_err("%s5 checking sb_rextsize\n", __func__);
 			xfs_extlen_t off = mp->m_sb.sb_rextsize - mod;
+			WARN_ON_ONCE(1);
 
 			/*
 			 * Realtime extent is lined up at the end but not
@@ -5555,7 +5574,7 @@ xfs_bunmapi(
 	int			*done)
 {
 	int			error;
-
+	pr_err("%s calling __xfs_bunmapi\n", __func__);
 	error = __xfs_bunmapi(tp, ip, bno, &len, flags, nexts);
 	*done = (len == 0);
 	return error;
@@ -6241,6 +6260,7 @@ xfs_bunmapi_range(
 
 	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL));
 
+	pr_err("%s unmap_len=%lld\n", __func__, unmap_len);
 	while (unmap_len > 0) {
 		ASSERT((*tpp)->t_highest_agno == NULLAGNUMBER);
 		error = __xfs_bunmapi(*tpp, ip, startoff, &unmap_len, flags,

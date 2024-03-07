@@ -835,6 +835,7 @@ xfs_growfs_rt(
 		return -EINVAL;
 
 	/* Can only change rt extent size when adding rt volume. */
+	pr_err("%s checking sb_rextsize\n", __func__);
 	if (sbp->sb_rblocks > 0 && in->extsize != sbp->sb_rextsize)
 		return -EINVAL;
 
@@ -1422,6 +1423,7 @@ retry:
 	xfs_rtbuf_cache_relse(&args);
 
 	if (error == -ENOSPC) {
+		pr_err("%s sb_rextsize\n", __func__);
 		if (align > mp->m_sb.sb_rextsize) {
 			/*
 			 * We previously enlarged the request length to try to

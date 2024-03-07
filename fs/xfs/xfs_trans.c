@@ -535,6 +535,7 @@ xfs_trans_apply_sb_deltas(
 		whole = 1;
 	}
 	if (tp->t_rextsize_delta) {
+		pr_err("%s checking sb_rextsize\n", __func__);
 		be32_add_cpu(&sbp->sb_rextsize, tp->t_rextsize_delta);
 		whole = 1;
 	}

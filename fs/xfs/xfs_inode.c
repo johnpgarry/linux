@@ -60,8 +60,10 @@ xfs_get_extsz_hint(
 		return 0;
 	if ((ip->i_diflags & XFS_DIFLAG_EXTSIZE) && ip->i_extsize)
 		return ip->i_extsize;
-	if (XFS_IS_REALTIME_INODE(ip))
+	if (XFS_IS_REALTIME_INODE(ip)) {
+		pr_err("%s sb_rextsize\n", __func__);
 		return ip->i_mount->m_sb.sb_rextsize;
+	}
 	return 0;
 }
 
@@ -1370,6 +1372,8 @@ xfs_itruncate_extents_flags(
 	xfs_fileoff_t		first_unmap_block;
 	int			error = 0;
 
+	pr_err("%s\n", __func__);
+
 	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL));
 	ASSERT(!atomic_read(&VFS_I(ip)->i_count) ||
 	       xfs_isilocked(ip, XFS_IOLOCK_EXCL));
@@ -1394,6 +1398,7 @@ xfs_itruncate_extents_flags(
 	 * the page cache can't scale that far.
 	 */
 	first_unmap_block = XFS_B_TO_FSB(mp, (xfs_ufsize_t)new_size);
+	pr_err("%s2 new_size=%lld\n", __func__, new_size);
 	if (!xfs_verify_fileoff(mp, first_unmap_block)) {
 		WARN_ON_ONCE(first_unmap_block > XFS_MAX_FILEOFF);
 		return 0;
