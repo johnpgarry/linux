@@ -5652,7 +5652,7 @@ static void scsi_debug_slave_destroy(struct scsi_device *sdp)
 	sdp->hostdata = NULL;
 }
 
-/* Returns true if we require the queued memory to be freed by the caller. */
+/* Returns true if the queued command memory should be freed by the caller. */
 static bool stop_qc_helper(struct sdebug_defer *sd_dp,
 			   enum sdeb_defer_type defer_t)
 {
@@ -5668,11 +5668,8 @@ static bool stop_qc_helper(struct sdebug_defer *sd_dp,
 			return true;
 		}
 	} else if (defer_t == SDEB_DEFER_WQ) {
-		/* Cancel if pending */
-		if (cancel_work_sync(&sd_dp->ew.work))
-			return true;
-		/* Was not pending, so it must have run */
-		return false;
+		/* The caller must free qcmd if cancellation succeeds. */
+		return cancel_work(&sd_dp->ew.work);
 	} else if (defer_t == SDEB_DEFER_POLL) {
 		return true;
 	}
