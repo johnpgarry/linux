@@ -1226,8 +1226,7 @@ config SCSI_WD719X
 
 config SCSI_DEBUG
 	tristate "SCSI debugging host and device simulator"
-	depends on SCSI
-	select CRC_T10DIF
+	depends on SCSI && (m || CRC_T10DIF = y)
 	help
 	  This pseudo driver simulates one or more hosts (SCSI initiators),
 	  each with one or more targets, each with one or more logical units.

@@ -30,13 +30,11 @@
 #include <linux/moduleparam.h>
 #include <linux/scatterlist.h>
 #include <linux/blkdev.h>
-#include <linux/crc-t10dif.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/atomic.h>
 #include <linux/hrtimer.h>
 #include <linux/uuid.h>
-#include <linux/t10-pi.h>
 #include <linux/msdos_partition.h>
 #include <linux/random.h>
 #include <linux/xarray.h>
@@ -44,8 +42,6 @@
 #include <linux/debugfs.h>
 #include <linux/async.h>
 #include <linux/cleanup.h>
-
-#include <net/checksum.h>
 
 #include <asm/unaligned.h>
 
@@ -59,6 +55,7 @@
 #include <scsi/scsi_dbg.h>
 
 #include "sd.h"
+#include "scsi_debug_dif.h"
 #include "scsi_logging.h"
 
 /* make sure inq_product_rev string corresponds to this version */
@@ -120,13 +117,10 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_DEV_SIZE_PRE_INIT   0
 #define DEF_DEV_SIZE_MB   8
 #define DEF_ZBC_DEV_SIZE_MB   128
-#define DEF_DIF 0
-#define DEF_DIX 0
 #define DEF_PER_HOST_STORE false
 #define DEF_D_SENSE   0
 #define DEF_EVERY_NTH   0
 #define DEF_FAKE_RW	0
-#define DEF_GUARD 0
 #define DEF_HOST_LOCK 0
 #define DEF_LBPU 0
 #define DEF_LBPWS 0
@@ -365,14 +359,6 @@ struct sdebug_host_info {
 	struct Scsi_Host *shost;
 	struct device dev;
 	struct list_head dev_info_list;
-};
-
-/* There is an xarray of pointers to this struct's objects, one per host */
-struct sdeb_store_info {
-	rwlock_t macc_lck;	/* for atomic media access on this store */
-	u8 *storep;		/* user data storage (ram) */
-	struct t10_pi_tuple *dif_storep; /* protection info */
-	void *map_storep;	/* provisioning map */
 };
 
 #define dev_to_sdebug_host(d)	\
@@ -785,12 +771,9 @@ static int sdebug_ato = DEF_ATO;
 static int sdebug_cdb_len = DEF_CDB_LEN;
 static int sdebug_jdelay = DEF_JDELAY;	/* if > 0 then unit is jiffies */
 static int sdebug_dev_size_mb = DEF_DEV_SIZE_PRE_INIT;
-static int sdebug_dif = DEF_DIF;
-static int sdebug_dix = DEF_DIX;
 static int sdebug_dsense = DEF_D_SENSE;
 static int sdebug_every_nth = DEF_EVERY_NTH;
 static int sdebug_fake_rw = DEF_FAKE_RW;
-static unsigned int sdebug_guard = DEF_GUARD;
 static int sdebug_host_max_queue;	/* per host */
 static int sdebug_lowest_aligned = DEF_LOWEST_ALIGNED;
 static int sdebug_max_luns = DEF_MAX_LUNS;
@@ -808,7 +791,7 @@ static int sdebug_physblk_exp = DEF_PHYSBLK_EXP;
 static int sdebug_opt_xferlen_exp = DEF_OPT_XFERLEN_EXP;
 static int sdebug_ptype = DEF_PTYPE; /* SCSI peripheral device type */
 static int sdebug_scsi_level = DEF_SCSI_LEVEL;
-static int sdebug_sector_size = DEF_SECTOR_SIZE;
+int sdebug_sector_size = DEF_SECTOR_SIZE;
 static int sdeb_tur_ms_to_ready = DEF_TUR_MS_TO_READY;
 static int sdebug_virtual_gb = DEF_VIRTUAL_GB;
 static int sdebug_vpd_use_hostno = DEF_VPD_USE_HOSTNO;
@@ -850,7 +833,7 @@ enum sam_lun_addr_method {SAM_LUN_AM_PERIPHERAL = 0x0,
 static enum sam_lun_addr_method sdebug_lun_am = SAM_LUN_AM_PERIPHERAL;
 static int sdebug_lun_am_i = (int)SAM_LUN_AM_PERIPHERAL;
 
-static unsigned int sdebug_store_sectors;
+unsigned int sdebug_store_sectors;
 static sector_t sdebug_capacity;	/* in sectors */
 
 /* old BIOS stuff, kernel may get rid of them but some mode sense pages
@@ -863,7 +846,7 @@ static LIST_HEAD(sdebug_host_list);
 static DEFINE_MUTEX(sdebug_host_list_mutex);
 
 static struct xarray per_store_arr;
-static struct xarray *per_store_ap = &per_store_arr;
+struct xarray *const per_store_ap = &per_store_arr;
 static int sdeb_first_idx = -1;		/* invalid index ==> none created */
 static int sdeb_most_recent_idx = -1;
 static DEFINE_RWLOCK(sdeb_fake_rw_lck);	/* need a RW lock when fake_rw=1 */
@@ -874,9 +857,6 @@ static int num_dev_resets;
 static int num_target_resets;
 static int num_bus_resets;
 static int num_host_resets;
-static int dix_writes;
-static int dix_reads;
-static int dif_errors;
 
 /* ZBC global data */
 static bool sdeb_zbc_in_use;	/* true for host-aware and host-managed disks */
@@ -1176,27 +1156,6 @@ static inline bool scsi_debug_lbp(void)
 {
 	return 0 == sdebug_fake_rw &&
 		(sdebug_lbpu || sdebug_lbpws || sdebug_lbpws10);
-}
-
-static void *lba2fake_store(struct sdeb_store_info *sip,
-			    unsigned long long lba)
-{
-	struct sdeb_store_info *lsip = sip;
-
-	lba = do_div(lba, sdebug_store_sectors);
-	if (!sip || !sip->storep) {
-		WARN_ON_ONCE(true);
-		lsip = xa_load(per_store_ap, 0);  /* should never be NULL */
-	}
-	return lsip->storep + lba * sdebug_sector_size;
-}
-
-static struct t10_pi_tuple *dif_store(struct sdeb_store_info *sip,
-				      sector_t sector)
-{
-	sector = sector_div(sector, sdebug_store_sectors);
-
-	return sip->dif_storep + sector;
 }
 
 static void sdebug_max_tgts_luns(void)
@@ -3357,8 +3316,8 @@ static inline int check_device_access_params
  * that access any of the "stores" in struct sdeb_store_info should call this
  * function with bug_if_fake_rw set to true.
  */
-static inline struct sdeb_store_info *devip2sip(struct sdebug_dev_info *devip,
-						bool bug_if_fake_rw)
+struct sdeb_store_info *devip2sip(struct sdebug_dev_info *devip,
+				  bool bug_if_fake_rw)
 {
 	if (sdebug_fake_rw) {
 		BUG_ON(bug_if_fake_rw);	/* See note above */
@@ -3459,131 +3418,6 @@ static bool comp_write_worker(struct sdeb_store_info *sip, u64 lba, u32 num,
 	if (rest)
 		memcpy(fsp, arr + ((num - rest) * lb_size), rest * lb_size);
 	return res;
-}
-
-static __be16 dif_compute_csum(const void *buf, int len)
-{
-	__be16 csum;
-
-	if (sdebug_guard)
-		csum = (__force __be16)ip_compute_csum(buf, len);
-	else
-		csum = cpu_to_be16(crc_t10dif(buf, len));
-
-	return csum;
-}
-
-static int dif_verify(struct t10_pi_tuple *sdt, const void *data,
-		      sector_t sector, u32 ei_lba)
-{
-	__be16 csum = dif_compute_csum(data, sdebug_sector_size);
-
-	if (sdt->guard_tag != csum) {
-		pr_err("GUARD check failed on sector %lu rcvd 0x%04x, data 0x%04x\n",
-			(unsigned long)sector,
-			be16_to_cpu(sdt->guard_tag),
-			be16_to_cpu(csum));
-		return 0x01;
-	}
-	if (sdebug_dif == T10_PI_TYPE1_PROTECTION &&
-	    be32_to_cpu(sdt->ref_tag) != (sector & 0xffffffff)) {
-		pr_err("REF check failed on sector %lu\n",
-			(unsigned long)sector);
-		return 0x03;
-	}
-	if (sdebug_dif == T10_PI_TYPE2_PROTECTION &&
-	    be32_to_cpu(sdt->ref_tag) != ei_lba) {
-		pr_err("REF check failed on sector %lu\n",
-			(unsigned long)sector);
-		return 0x03;
-	}
-	return 0;
-}
-
-static void dif_copy_prot(struct scsi_cmnd *scp, sector_t sector,
-			  unsigned int sectors, bool read)
-{
-	size_t resid;
-	void *paddr;
-	struct sdeb_store_info *sip = devip2sip((struct sdebug_dev_info *)
-						scp->device->hostdata, true);
-	struct t10_pi_tuple *dif_storep = sip->dif_storep;
-	const void *dif_store_end = dif_storep + sdebug_store_sectors;
-	struct sg_mapping_iter miter;
-
-	/* Bytes of protection data to copy into sgl */
-	resid = sectors * sizeof(*dif_storep);
-
-	sg_miter_start(&miter, scsi_prot_sglist(scp),
-		       scsi_prot_sg_count(scp), SG_MITER_ATOMIC |
-		       (read ? SG_MITER_TO_SG : SG_MITER_FROM_SG));
-
-	while (sg_miter_next(&miter) && resid > 0) {
-		size_t len = min_t(size_t, miter.length, resid);
-		void *start = dif_store(sip, sector);
-		size_t rest = 0;
-
-		if (dif_store_end < start + len)
-			rest = start + len - dif_store_end;
-
-		paddr = miter.addr;
-
-		if (read)
-			memcpy(paddr, start, len - rest);
-		else
-			memcpy(start, paddr, len - rest);
-
-		if (rest) {
-			if (read)
-				memcpy(paddr + len - rest, dif_storep, rest);
-			else
-				memcpy(dif_storep, paddr + len - rest, rest);
-		}
-
-		sector += len / sizeof(*dif_storep);
-		resid -= len;
-	}
-	sg_miter_stop(&miter);
-}
-
-static int prot_verify_read(struct scsi_cmnd *scp, sector_t start_sec,
-			    unsigned int sectors, u32 ei_lba)
-{
-	int ret = 0;
-	unsigned int i;
-	sector_t sector;
-	struct sdeb_store_info *sip = devip2sip((struct sdebug_dev_info *)
-						scp->device->hostdata, true);
-	struct t10_pi_tuple *sdt;
-
-	for (i = 0; i < sectors; i++, ei_lba++) {
-		sector = start_sec + i;
-		sdt = dif_store(sip, sector);
-
-		if (sdt->app_tag == cpu_to_be16(0xffff))
-			continue;
-
-		/*
-		 * Because scsi_debug acts as both initiator and
-		 * target we proceed to verify the PI even if
-		 * RDPROTECT=3. This is done so the "initiator" knows
-		 * which type of error to return. Otherwise we would
-		 * have to iterate over the PI twice.
-		 */
-		if (scp->cmnd[1] >> 5) { /* RDPROTECT */
-			ret = dif_verify(sdt, lba2fake_store(sip, sector),
-					 sector, ei_lba);
-			if (ret) {
-				dif_errors++;
-				break;
-			}
-		}
-	}
-
-	dif_copy_prot(scp, start_sec, sectors, true);
-	dix_reads++;
-
-	return ret;
 }
 
 static inline void
@@ -3791,78 +3625,6 @@ static int resp_read_dt0(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 		}
 	}
 	return 0;
-}
-
-static int prot_verify_write(struct scsi_cmnd *SCpnt, sector_t start_sec,
-			     unsigned int sectors, u32 ei_lba)
-{
-	int ret;
-	struct t10_pi_tuple *sdt;
-	void *daddr;
-	sector_t sector = start_sec;
-	int ppage_offset;
-	int dpage_offset;
-	struct sg_mapping_iter diter;
-	struct sg_mapping_iter piter;
-
-	BUG_ON(scsi_sg_count(SCpnt) == 0);
-	BUG_ON(scsi_prot_sg_count(SCpnt) == 0);
-
-	sg_miter_start(&piter, scsi_prot_sglist(SCpnt),
-			scsi_prot_sg_count(SCpnt),
-			SG_MITER_ATOMIC | SG_MITER_FROM_SG);
-	sg_miter_start(&diter, scsi_sglist(SCpnt), scsi_sg_count(SCpnt),
-			SG_MITER_ATOMIC | SG_MITER_FROM_SG);
-
-	/* For each protection page */
-	while (sg_miter_next(&piter)) {
-		dpage_offset = 0;
-		if (WARN_ON(!sg_miter_next(&diter))) {
-			ret = 0x01;
-			goto out;
-		}
-
-		for (ppage_offset = 0; ppage_offset < piter.length;
-		     ppage_offset += sizeof(struct t10_pi_tuple)) {
-			/* If we're at the end of the current
-			 * data page advance to the next one
-			 */
-			if (dpage_offset >= diter.length) {
-				if (WARN_ON(!sg_miter_next(&diter))) {
-					ret = 0x01;
-					goto out;
-				}
-				dpage_offset = 0;
-			}
-
-			sdt = piter.addr + ppage_offset;
-			daddr = diter.addr + dpage_offset;
-
-			if (SCpnt->cmnd[1] >> 5 != 3) { /* WRPROTECT */
-				ret = dif_verify(sdt, daddr, sector, ei_lba);
-				if (ret)
-					goto out;
-			}
-
-			sector++;
-			ei_lba++;
-			dpage_offset += sdebug_sector_size;
-		}
-		diter.consumed = dpage_offset;
-		sg_miter_stop(&diter);
-	}
-	sg_miter_stop(&piter);
-
-	dif_copy_prot(SCpnt, start_sec, sectors, false);
-	dix_writes++;
-
-	return 0;
-
-out:
-	dif_errors++;
-	sg_miter_stop(&diter);
-	sg_miter_stop(&piter);
-	return ret;
 }
 
 static unsigned long lba_to_map_index(sector_t lba)
@@ -6195,8 +5957,6 @@ module_param_named(cdb_len, sdebug_cdb_len, int, 0644);
 module_param_named(clustering, sdebug_clustering, bool, S_IRUGO | S_IWUSR);
 module_param_named(delay, sdebug_jdelay, int, S_IRUGO | S_IWUSR);
 module_param_named(dev_size_mb, sdebug_dev_size_mb, int, S_IRUGO);
-module_param_named(dif, sdebug_dif, int, S_IRUGO);
-module_param_named(dix, sdebug_dix, int, S_IRUGO);
 module_param_named(dsense, sdebug_dsense, int, S_IRUGO | S_IWUSR);
 module_param_named(every_nth, sdebug_every_nth, int, S_IRUGO | S_IWUSR);
 module_param_named(fake_rw, sdebug_fake_rw, int, S_IRUGO | S_IWUSR);
@@ -6272,8 +6032,6 @@ MODULE_PARM_DESC(cdb_len, "suggest CDB lengths to drivers (def=10)");
 MODULE_PARM_DESC(clustering, "when set enables larger transfers (def=0)");
 MODULE_PARM_DESC(delay, "response delay (def=1 jiffy); 0:imm, -1,-2:tiny");
 MODULE_PARM_DESC(dev_size_mb, "size in MiB of ram shared by devs(def=8)");
-MODULE_PARM_DESC(dif, "data integrity field type: 0-3 (def=0)");
-MODULE_PARM_DESC(dix, "data integrity extensions mask (def=0)");
 MODULE_PARM_DESC(dsense, "use descriptor sense format(def=0 -> fixed)");
 MODULE_PARM_DESC(every_nth, "timeout every nth command(def=0)");
 MODULE_PARM_DESC(fake_rw, "fake reads/writes instead of copying (def=0)");
