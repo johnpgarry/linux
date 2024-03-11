@@ -380,11 +380,13 @@ int filemap_fdatawrite_wbc(struct address_space *mapping,
 {
 	int ret;
 
+	pr_err("%s mapping=%pS wbc=%pS\n", __func__, mapping, wbc);
 	if (!mapping_can_writeback(mapping) ||
 	    !mapping_tagged(mapping, PAGECACHE_TAG_DIRTY))
 		return 0;
 
 	wbc_attach_fdatawrite_inode(wbc, mapping->host);
+	pr_err("%s2 calling do_writepages mapping=%pS wbc=%pS\n", __func__, mapping, wbc);
 	ret = do_writepages(mapping, wbc);
 	wbc_detach_inode(wbc);
 	return ret;
@@ -418,17 +420,20 @@ int __filemap_fdatawrite_range(struct address_space *mapping, loff_t start,
 		.range_end = end,
 	};
 
+	pr_err("%s mapping=%pS start=%lld end=%lld calling filemap_fdatawrite_wbc\n", __func__, mapping, start, end);
 	return filemap_fdatawrite_wbc(mapping, &wbc);
 }
 
 static inline int __filemap_fdatawrite(struct address_space *mapping,
 	int sync_mode)
 {
+	pr_err("%s mapping=%pS sync_mode=%d calling __filemap_fdatawrite_range\n", __func__, mapping, sync_mode);
 	return __filemap_fdatawrite_range(mapping, 0, LLONG_MAX, sync_mode);
 }
 
 int filemap_fdatawrite(struct address_space *mapping)
 {
+	pr_err("%s mapping=%pS calling __filemap_fdatawrite\n", __func__, mapping);
 	return __filemap_fdatawrite(mapping, WB_SYNC_ALL);
 }
 EXPORT_SYMBOL(filemap_fdatawrite);
@@ -436,6 +441,7 @@ EXPORT_SYMBOL(filemap_fdatawrite);
 int filemap_fdatawrite_range(struct address_space *mapping, loff_t start,
 				loff_t end)
 {
+	pr_err("%s mapping=%pS calling __filemap_fdatawrite_range\n", __func__, mapping);
 	return __filemap_fdatawrite_range(mapping, start, end, WB_SYNC_ALL);
 }
 EXPORT_SYMBOL(filemap_fdatawrite_range);
@@ -633,6 +639,7 @@ bool filemap_range_has_writeback(struct address_space *mapping,
 	pgoff_t max = end_byte >> PAGE_SHIFT;
 	struct folio *folio;
 
+	pr_err("%s mapping=%pS start_byte=%lld end_byte=%lld\n", __func__, mapping, start_byte, end_byte);
 	if (end_byte < start_byte)
 		return false;
 
@@ -669,6 +676,7 @@ int filemap_write_and_wait_range(struct address_space *mapping,
 {
 	int err = 0, err2;
 
+	pr_err("%s mapping=%pS lstart=%lld lend=%lld\n", __func__, mapping, lstart, lend);
 	if (lend < lstart)
 		return 0;
 
@@ -772,16 +780,19 @@ int file_write_and_wait_range(struct file *file, loff_t lstart, loff_t lend)
 	int err = 0, err2;
 	struct address_space *mapping = file->f_mapping;
 
+	pr_err("%s mapping=%pS lstart=%lld lend=%lld\n", __func__, mapping, lstart, lend);
 	if (lend < lstart)
 		return 0;
 
 	if (mapping_needs_writeback(mapping)) {
+		pr_err("%s2 calling __filemap_fdatawrite_range mapping=%pS lstart=%lld lend=%lld\n", __func__, mapping, lstart, lend);
 		err = __filemap_fdatawrite_range(mapping, lstart, lend,
 						 WB_SYNC_ALL);
 		/* See comment of filemap_write_and_wait() */
 		if (err != -EIO)
 			__filemap_fdatawait_range(mapping, lstart, lend);
 	}
+	pr_err("%s3 calling file_check_and_advance_wb_err mapping=%pS lstart=%lld lend=%lld\n", __func__, mapping, lstart, lend);
 	err2 = file_check_and_advance_wb_err(file);
 	if (!err)
 		err = err2;
@@ -2680,6 +2691,7 @@ int kiocb_write_and_wait(struct kiocb *iocb, size_t count)
 	loff_t pos = iocb->ki_pos;
 	loff_t end = pos + count - 1;
 
+	pr_err("%s iocb=%pS count=%zd\n", __func__, iocb, count);
 	if (iocb->ki_flags & IOCB_NOWAIT) {
 		if (filemap_range_needs_writeback(mapping, pos, end))
 			return -EAGAIN;
@@ -2744,7 +2756,9 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	size_t count = iov_iter_count(iter);
 	ssize_t retval = 0;
+	WARN_ON_ONCE(1);
 
+	pr_err("%s iocb=%pS iter=%pS count=%zd\n", __func__, iocb, iter, count);
 	if (!count)
 		return 0; /* skip atime */
 
@@ -3827,6 +3841,7 @@ void kiocb_invalidate_post_direct_write(struct kiocb *iocb, size_t count)
 {
 	struct address_space *mapping = iocb->ki_filp->f_mapping;
 
+	pr_err("%s iocb=%pS count=%zd\n", __func__, iocb, count);
 	if (mapping->nrpages &&
 	    invalidate_inode_pages2_range(mapping,
 			iocb->ki_pos >> PAGE_SHIFT,
@@ -3840,7 +3855,7 @@ generic_file_direct_write(struct kiocb *iocb, struct iov_iter *from)
 	struct address_space *mapping = iocb->ki_filp->f_mapping;
 	size_t write_len = iov_iter_count(from);
 	ssize_t written;
-
+	pr_err("%s iocb=%pS from=%pS\n", __func__, iocb, from);
 	/*
 	 * If a page can not be invalidated, return 0 to fall back
 	 * to buffered write.
@@ -3899,6 +3914,7 @@ ssize_t generic_perform_write(struct kiocb *iocb, struct iov_iter *i)
 	long status = 0;
 	ssize_t written = 0;
 
+	pr_err_once("%s iocb=%pS pos=%lld\n", __func__, iocb, pos);
 	do {
 		struct page *page;
 		unsigned long offset;	/* Offset into pagecache page */
@@ -3998,7 +4014,7 @@ ssize_t __generic_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	ssize_t ret;
-
+	pr_err("%s iocb=%pS from=%pS\n", __func__, iocb, from);
 	ret = file_remove_privs(file);
 	if (ret)
 		return ret;
@@ -4045,6 +4061,7 @@ ssize_t generic_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	struct inode *inode = file->f_mapping->host;
 	ssize_t ret;
 
+	pr_err("%s iocb=%pS iter=%pS\n", __func__, iocb, from);
 	inode_lock(inode);
 	ret = generic_write_checks(iocb, from);
 	if (ret > 0)

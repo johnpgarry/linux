@@ -2737,6 +2737,10 @@ static inline bool iocb_is_dsync(const struct kiocb *iocb)
  */
 static inline ssize_t generic_write_sync(struct kiocb *iocb, ssize_t count)
 {
+	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
+
+	if (is_atomic)
+		pr_err("%s iocb=%pS iocb_is_dsync=%d\n", __func__, iocb, iocb_is_dsync(iocb));
 	if (iocb_is_dsync(iocb)) {
 		int ret = vfs_fsync_range(iocb->ki_filp,
 				iocb->ki_pos - count, iocb->ki_pos - 1,

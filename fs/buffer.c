@@ -598,7 +598,7 @@ int generic_buffers_fsync_noflush(struct file *file, loff_t start, loff_t end,
 	struct inode *inode = file->f_mapping->host;
 	int err;
 	int ret;
-
+	pr_err("%s calling file_write_and_wait_range\n", __func__);
 	err = file_write_and_wait_range(file, start, end);
 	if (err)
 		return err;

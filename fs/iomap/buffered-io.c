@@ -387,6 +387,7 @@ static loff_t iomap_readpage_iter(const struct iomap_iter *iter,
 		if (!ctx->bio) {
 			ctx->bio = bio_alloc(iomap->bdev, 1, REQ_OP_READ,
 					     orig_gfp);
+			pr_err("%s offset=%lld sector=%lld ctx->bio=%pS\n", __func__, offset, sector, ctx->bio);
 		}
 		if (ctx->rac)
 			ctx->bio->bi_opf |= REQ_RAHEAD;
@@ -642,6 +643,12 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	size_t from = offset_in_folio(folio, pos), to = from + len;
 	size_t poff, plen;
 
+	bool is_atomic = iter->flags & IOMAP_ATOMIC;
+
+	if (is_atomic) {
+		pr_err("%s len=%zd pos=%lld folio=%pS folio_get_private=%pS\n",
+			__func__, len, pos, folio, folio_get_private(folio));
+	}
 	/*
 	 * If the write or zeroing completely overlaps the current folio, then
 	 * entire folio will be dirtied so there is no need for
@@ -662,6 +669,12 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	folio_clear_error(folio);
 
 	do {
+
+
+		pr_err("%s call iomap_adjust_read_range len=%zd pos=%lld folio=%pS folio_get_private=%pS block_end=%lld block_start=%lld\n",
+			__func__, len, pos, folio, folio_get_private(folio),
+			block_end, block_start);
+
 		iomap_adjust_read_range(iter->inode, folio, &block_start,
 				block_end - block_start, &poff, &plen);
 		if (plen == 0)
@@ -817,6 +830,12 @@ out_unlock:
 static size_t __iomap_write_end(struct inode *inode, loff_t pos, size_t len,
 		size_t copied, struct folio *folio)
 {
+	bool is_atomic = 1;
+
+	if (is_atomic) {
+		pr_err("%s len=%zd pos=%lld copied=%zd folio=%pS folio_get_private=%pS\n",
+			__func__, len, pos, copied, folio, folio_get_private(folio));
+	}
 	flush_dcache_folio(folio);
 
 	/*
@@ -834,6 +853,10 @@ static size_t __iomap_write_end(struct inode *inode, loff_t pos, size_t len,
 		return 0;
 	iomap_set_range_uptodate(folio, offset_in_folio(folio, pos), len);
 	iomap_set_range_dirty(folio, offset_in_folio(folio, pos), copied);
+	if (is_atomic) {
+		pr_err("%s4 calling filemap_dirty_folio len=%zd pos=%lld copied=%zd folio=%pS folio_get_private=%pS\n",
+			__func__, len, pos, copied, folio, folio_get_private(folio));
+	}
 	filemap_dirty_folio(inode->i_mapping, folio);
 	return copied;
 }
@@ -1735,10 +1758,10 @@ iomap_alloc_ioend(struct inode *inode, struct iomap_writepage_ctx *wpc,
 {
 	struct iomap_ioend *ioend;
 	struct bio *bio;
-
 	bio = bio_alloc_bioset(wpc->iomap.bdev, BIO_MAX_VECS,
 			       REQ_OP_WRITE | wbc_to_write_flags(wbc),
 			       GFP_NOFS, &iomap_ioend_bioset);
+	pr_err("%s inode=%pS offset=%lld sector=%lld bio=%pS\n", __func__, inode, offset, sector, bio);
 	bio->bi_iter.bi_sector = sector;
 	wbc_init_bio(wbc, bio);
 
@@ -1812,15 +1835,20 @@ iomap_add_to_ioend(struct inode *inode, loff_t pos, struct folio *folio,
 	sector_t sector = iomap_sector(&wpc->iomap, pos);
 	unsigned len = i_blocksize(inode);
 	size_t poff = offset_in_folio(folio, pos);
-
+	pr_err("%s inode=%pS pos=%lld folio=%pS wpc->ioend=%pS\n",
+		__func__, inode, pos, folio, wpc->ioend);
 	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, pos, sector)) {
 		if (wpc->ioend)
 			list_add(&wpc->ioend->io_list, iolist);
 		wpc->ioend = iomap_alloc_ioend(inode, wpc, pos, sector, wbc);
+		pr_err("%s1 inode=%pS pos=%lld folio=%pS wpc->ioend=%pS\n",
+			__func__, inode, pos, folio, wpc->ioend);
 	}
 
 	if (!bio_add_folio(wpc->ioend->io_bio, folio, len, poff)) {
 		wpc->ioend->io_bio = iomap_chain_bio(wpc->ioend->io_bio);
+		pr_err("%s2 inode=%pS pos=%lld sector=%lld wpc->ioend->io_bio=%pS\n",
+			__func__, inode, pos, sector, wpc->ioend->io_bio);
 		bio_add_folio_nofail(wpc->ioend->io_bio, folio, len, poff);
 	}
 
@@ -1858,6 +1886,9 @@ iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 	u64 pos = folio_pos(folio);
 	int error = 0, count = 0, i;
 	LIST_HEAD(submit_list);
+
+	pr_err("%s folio=%pS end_pos=%lld inode=%pS wpc=%pS ifs=%pS nblocks=%d len=%d\n",
+		__func__, folio, end_pos, inode, wpc, ifs, nblocks, len);
 
 	WARN_ON_ONCE(end_pos <= pos);
 
@@ -1966,6 +1997,7 @@ static int iomap_do_writepage(struct folio *folio,
 	struct inode *inode = folio->mapping->host;
 	u64 end_pos, isize;
 
+	pr_err("%s folio=%pS inode=%pS wbc=%pS wpc=%pS\n", __func__, folio, inode, wbc, wpc);
 	trace_iomap_writepage(inode, folio_pos(folio), folio_size(folio));
 
 	/*
@@ -2045,6 +2077,7 @@ static int iomap_do_writepage(struct folio *folio,
 		end_pos = isize;
 	}
 
+	pr_err("%s8 calling iomap_writepage_map folio=%pS inode=%pS wbc=%pS wpc=%pS\n", __func__, folio, inode, wbc, wpc);
 	return iomap_writepage_map(wpc, wbc, inode, folio, end_pos);
 
 redirty:
@@ -2062,6 +2095,7 @@ iomap_writepages(struct address_space *mapping, struct writeback_control *wbc,
 	int			ret;
 
 	wpc->ops = ops;
+	pr_err("%s mapping=%pS wbc=%pS wpc=%pS ops=%pS\n", __func__, mapping, wbc, wpc, ops);
 	ret = write_cache_pages(mapping, wbc, iomap_do_writepage, wpc);
 	if (!wpc->ioend)
 		return ret;

@@ -148,7 +148,8 @@ xfs_file_fsync(
 	int			log_flushed = 0;
 
 	trace_xfs_file_fsync(ip);
-
+	//WARN_ON(1);
+	pr_err("%s file=%pS start=%lld end=%lld datasync=%d calling file_write_and_wait_range\n", __func__, file, start, end, datasync);
 	error = file_write_and_wait_range(file, start, end);
 	if (error)
 		return error;
@@ -789,6 +790,11 @@ xfs_file_buffered_write(
 	bool			cleared_space = false;
 	unsigned int		iolock;
 
+	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
+
+	if (is_atomic)
+		pr_err("%s iocb=%pS from=%pS\n", __func__, iocb, from);
+
 write_retry:
 	iolock = XFS_IOLOCK_EXCL;
 	ret = xfs_ilock_iocb(iocb, iolock);
@@ -800,8 +806,12 @@ write_retry:
 		goto out;
 
 	trace_xfs_file_buffered_write(iocb, from);
+	if (is_atomic)
+		pr_err("%s1 iocb=%pS from=%pS calling iomap_file_buffered_write\n", __func__, iocb, from);
 	ret = iomap_file_buffered_write(iocb, from,
 			&xfs_buffered_write_iomap_ops);
+	if (is_atomic)
+		pr_err("%s2 iocb=%pS from=%pS called iomap_file_buffered_write\n", __func__, iocb, from);
 
 	/*
 	 * If we hit a space limit, try to free up some lingering preallocated
@@ -831,11 +841,15 @@ write_retry:
 	}
 
 out:
+	if (is_atomic)
+		pr_err("%s8 out iocb=%pS from=%pS called iomap_file_buffered_write\n", __func__, iocb, from);
 	if (iolock)
 		xfs_iunlock(ip, iolock);
 
 	if (ret > 0) {
 		XFS_STATS_ADD(ip->i_mount, xs_write_bytes, ret);
+		if (is_atomic)
+			pr_err("%s9 calling generic_write_sync iocb=%pS from=%pS\n", __func__, iocb, from);
 		/* Handle various SYNC-type writes */
 		ret = generic_write_sync(iocb, ret);
 	}
@@ -851,7 +865,10 @@ xfs_file_write_iter(
 	struct xfs_inode	*ip = XFS_I(inode);
 	ssize_t			ret;
 	size_t			ocount = iov_iter_count(from);
+	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
 
+	if (is_atomic)
+		pr_err("%s iocb=%pS from=%pS\n", __func__, iocb, from);
 	XFS_STATS_INC(ip->i_mount, xs_write_calls);
 
 	if (ocount == 0)
@@ -1246,9 +1263,6 @@ static bool xfs_file_open_can_atomicwrite(
 {
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
-
-	if (!(file->f_flags & O_DIRECT))
-		return false;
 
 	if (!xfs_inode_atomicwrites(ip))
 		return false;

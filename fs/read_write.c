@@ -948,6 +948,11 @@ static ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
 	size_t tot_len;
 	ssize_t ret = 0;
 
+	bool is_atomic = flags & RWF_ATOMIC;
+
+	if (is_atomic)
+		pr_err("%s vlen=%ld\n", __func__, vlen);
+
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 	if (!(file->f_mode & FMODE_CAN_WRITE))
@@ -973,6 +978,8 @@ static ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
 		ret = do_loop_readv_writev(file, &iter, pos, WRITE, flags);
 	if (ret > 0)
 		fsnotify_modify(file);
+	if (is_atomic)
+		pr_err("%s calling file_end_write vlen=%ld\n", __func__, vlen);
 	file_end_write(file);
 out:
 	kfree(iov);

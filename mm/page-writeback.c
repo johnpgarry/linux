@@ -2544,6 +2544,7 @@ int do_writepages(struct address_space *mapping, struct writeback_control *wbc)
 	int ret;
 	struct bdi_writeback *wb;
 
+	pr_err("%s mapping=%pS wbc=%pS\n", __func__, mapping, wbc);
 	if (wbc->nr_to_write <= 0)
 		return 0;
 	wb = inode_to_wb_wbc(mapping->host, wbc);
