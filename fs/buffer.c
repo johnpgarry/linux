@@ -1092,7 +1092,7 @@ static bool grow_buffers(struct block_device *bdev, sector_t block,
 		unsigned size, gfp_t gfp)
 {
 	loff_t pos;
-
+	pr_err("%s bdev=%pS\n", __func__, bdev);
 	/*
 	 * Check for a block which lies outside our maximum possible
 	 * pagecache index.
@@ -1144,7 +1144,7 @@ __getblk_slow(struct block_device *bdev, sector_t block,
  *
  * At all times, the dirtiness of the buffers represents the dirtiness of
  * subsections of the page.  If the page has buffers, the page dirty bit is
- * merely a hint about the true dirty state.
+ * merely a hint about the true dirty state.w
  *
  * When a page is set dirty in its entirety, all its buffers are marked dirty
  * (if the page has buffers).
@@ -2076,7 +2076,7 @@ int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
 	int err = 0;
 	size_t blocksize;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh=wait;
-
+	pr_err("%s folio=%pS folio_get_private=%pS len=%d pos=%lld\n", __func__, folio, folio_get_private(folio), len, pos);
 	BUG_ON(!folio_test_locked(folio));
 	BUG_ON(to > folio_size(folio));
 	BUG_ON(from > to);
@@ -2085,6 +2085,8 @@ int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
 	blocksize = head->b_size;
 	block = div_u64(folio_pos(folio), blocksize);
 
+	pr_err("%s2 folio=%pS folio_get_private=%pS len=%d pos=%lld head=%pS blocksize=%zd\n",
+		__func__, folio, folio_get_private(folio), len, pos, head, blocksize);
 	for (bh = head, block_start = 0; bh != head || !block_start;
 	    block++, block_start=block_end, bh = bh->b_this_page) {
 		block_end = block_start + blocksize;
@@ -2143,6 +2145,8 @@ int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
 	}
 	if (unlikely(err))
 		folio_zero_new_buffers(folio, from, to);
+	pr_err("%s10 out err=%d folio=%pS folio_get_private=%pS len=%d pos=%lld head=%pS blocksize=%zd\n",
+		__func__, err, folio, folio_get_private(folio), len, pos, head, blocksize);
 	return err;
 }
 
@@ -2164,12 +2168,17 @@ static void __block_commit_write(struct folio *folio, size_t from, size_t to)
 	bh = head = folio_buffers(folio);
 	blocksize = bh->b_size;
 
+	pr_err("%s from=%zd to=%zd blocksize=%d bh=%pS folio=%pS folio_get_private=%pS\n",
+		__func__, from, to, blocksize, bh, folio, folio_get_private(folio));
 	block_start = 0;
 	do {
 		block_end = block_start + blocksize;
+		pr_err("%s1 block_start=%zd block_end=%zd from=%zd to=%zd bh=%pS\n", __func__, block_start, block_end, from, to, bh);
 		if (block_end <= from || block_start >= to) {
-			if (!buffer_uptodate(bh))
+			if (!buffer_uptodate(bh)) {
+				pr_err("%s3  block_start=%zd block_end=%zd from=%zd to=%zd partial=true\n", __func__, block_start, block_end, from, to);
 				partial = true;
+			}
 		} else {
 			set_buffer_uptodate(bh);
 			mark_buffer_dirty(bh);
@@ -2226,7 +2235,8 @@ int block_write_end(struct file *file, struct address_space *mapping,
 {
 	struct folio *folio = page_folio(page);
 	size_t start = pos - folio_pos(folio);
-
+	pr_err("%s folio=%pS folio_get_private=%pS page=%ps file=%pS pos=%lld len=%d copied=%d\n",
+		__func__, folio, folio_get_private(folio), page, file, pos, len, copied);
 	if (unlikely(copied < len)) {
 		/*
 		 * The buffers that were written will now be uptodate, so
@@ -2243,6 +2253,8 @@ int block_write_end(struct file *file, struct address_space *mapping,
 		if (!folio_test_uptodate(folio))
 			copied = 0;
 
+		pr_err("%s2 calling folio_zero_new_buffers folio=%pS folio_buffers=%pS page=%ps file=%pS pos=%lld len=%d copied=%d\n",
+			__func__, folio, folio_buffers(folio), page, file, pos, len, copied);
 		folio_zero_new_buffers(folio, start+copied, start+len);
 	}
 	flush_dcache_folio(folio);

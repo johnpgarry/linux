@@ -459,6 +459,7 @@ static void blkdev_readahead(struct readahead_control *rac)
 static int blkdev_write_begin(struct file *file, struct address_space *mapping,
 		loff_t pos, unsigned len, struct page **pagep, void **fsdata)
 {
+	pr_err("%s pos=%lld len=%d file=%pS\n", __func__, pos, len, file);
 	return block_write_begin(mapping, pos, len, pagep, blkdev_get_block);
 }
 
@@ -467,6 +468,7 @@ static int blkdev_write_end(struct file *file, struct address_space *mapping,
 		void *fsdata)
 {
 	int ret;
+	pr_err("%s pos=%lld len=%d file=%pS copied=%d\n", __func__, pos, len, file, copied);
 	ret = block_write_end(file, mapping, pos, len, copied, page, fsdata);
 
 	unlock_page(page);
@@ -636,8 +638,11 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	if (bdev_nowait(handle->bdev))
 		filp->f_mode |= FMODE_NOWAIT;
 
-	if (bdev_can_atomic_write(handle->bdev) && filp->f_flags & O_DIRECT)
+	if (bdev_can_atomic_write(handle->bdev)) {
+		pr_err("%s inode=%pS bdev->bd_inode=%pS FMODE_CAN_ATOMIC_WRITE filp=%pS\n",
+			__func__, inode, handle->bdev->bd_inode, filp);
 		filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
+	}
 
 	filp->f_mapping = handle->bdev->bd_inode->i_mapping;
 	filp->f_wb_err = filemap_sample_wb_err(filp->f_mapping);
