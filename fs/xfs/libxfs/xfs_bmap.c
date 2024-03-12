@@ -39,6 +39,21 @@
 
 struct kmem_cache		*xfs_bmap_intent_cache;
 
+static xfs_extlen_t
+xfs_rtb_to_rtxoff_forcealign(
+	struct xfs_inode	*ip,
+	xfs_fsblock_t		bno)
+{
+	int m_rtxblklog = 2; // bodge for 16kb
+	int m_rtxblkmask = 3;  // bodge for 16kb
+	pr_err("%s checking sb_rextsize mp->m_rtxblklog(%d) >= 0, if so return val & m_rtxblkmask (0x%x) FIXME bno=%lld ip->i_extsize=%d FIXME\n",
+		__func__, m_rtxblklog, m_rtxblkmask, bno, ip->i_extsize);
+	if (likely(m_rtxblklog >= 0))
+		return bno & m_rtxblkmask;
+
+	return do_div(bno, ip->i_extsize);
+}
+
 /*
  * Miscellaneous helper functions
  */
@@ -4810,10 +4825,13 @@ xfs_bmap_del_extent_delay(
 	uint32_t		state = xfs_bmap_fork_to_state(whichfork);
 	int			error = 0;
 	bool			isrt;
+	bool 	isforcealign;
 
 	XFS_STATS_INC(mp, xs_del_exlist);
 
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
+
+	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip);
 	del_endoff = del->br_startoff + del->br_blockcount;
 	got_endoff = got->br_startoff + got->br_blockcount;
 	da_old = startblockval(got->br_startblock);
@@ -4824,6 +4842,8 @@ xfs_bmap_del_extent_delay(
 	ASSERT(got_endoff >= del_endoff);
 
 	if (isrt)
+		xfs_mod_frextents(mp, xfs_rtb_to_rtx(mp, del->br_blockcount));
+	else if (isforcealign)
 		xfs_mod_frextents(mp, xfs_rtb_to_rtx(mp, del->br_blockcount));
 
 	/*
@@ -5252,6 +5272,7 @@ __xfs_bunmapi(
 	struct xfs_bmbt_irec	got;		/* current extent record */
 	struct xfs_ifork	*ifp;		/* inode fork pointer */
 	int			isrt;		/* freeing in rt area */
+	int			isforcealign;		/* freeing in rt area */
 	int			logflags;	/* transaction logging flags */
 	xfs_extlen_t		mod;		/* rt extent offset */
 	struct xfs_mount	*mp = ip->i_mount;
@@ -5287,6 +5308,7 @@ __xfs_bunmapi(
 	}
 	XFS_STATS_INC(mp, xs_blk_unmap);
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
+	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip);
 	end = start + len;
 
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
@@ -5303,7 +5325,7 @@ __xfs_bunmapi(
 	} else
 		cur = NULL;
 
-	if (isrt) {
+	if (isrt || isforcealign) {
 		/*
 		 * Synchronize by locking the bitmap inode.
 		 */
@@ -5349,11 +5371,19 @@ __xfs_bunmapi(
 		if (del.br_startoff + del.br_blockcount > end + 1)
 			del.br_blockcount = end + 1 - del.br_startoff;
 
-		if (!isrt)
+		pr_err("%s1.1 end=%lld start=%lld len=%lld isrt=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld isforcealign=%d\n",
+			__func__, end, start, len, isrt, del.br_startoff, del.br_startblock, del.br_blockcount, isforcealign);
+		if (!isrt && !isforcealign) 
 			goto delete;
 
-		mod = xfs_rtb_to_rtxoff(mp,
-				del.br_startblock + del.br_blockcount);
+		if (isrt)
+			mod = xfs_rtb_to_rtxoff(mp,
+					del.br_startblock + del.br_blockcount);
+		else if (isforcealign)
+			mod = xfs_rtb_to_rtxoff_forcealign(ip,
+					del.br_startblock + del.br_blockcount);
+		pr_err("%s2 end=%lld start=%lld len=%lld mod=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, start, len, mod, del.br_startoff, del.br_startblock, del.br_blockcount);
 		if (mod) {
 			/*
 			 * Realtime extent not lined up at the end.
@@ -5401,10 +5431,28 @@ __xfs_bunmapi(
 			goto nodelete;
 		}
 
-		mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+		if (isrt) {
+			mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+			pr_err("%s4 isrt mod=%d del.br_startblock=%lld\n", __func__, mod, del.br_startblock);
+		} else if (isforcealign) {
+			mod = xfs_rtb_to_rtxoff_forcealign(ip, del.br_startblock);
+			pr_err("%s4 isforcealign mod=%d del.br_startblock=%lld\n", __func__, mod, del.br_startblock);
+		}
 		if (mod) {
-			xfs_extlen_t off = mp->m_sb.sb_rextsize - mod;
+			pr_err("%s5 mod is set del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld sb_rextsize=%d ip->i_extsize=%d\n",
+				__func__, del.br_startoff, del.br_startblock, del.br_blockcount, mp->m_sb.sb_rextsize, ip->i_extsize);
+			xfs_extlen_t off;
 
+			if (isrt)
+				off = mp->m_sb.sb_rextsize - mod;
+			else if (isforcealign) {
+				off = ip->i_extsize - mod;
+				//pr_err("%s FIXME\n", __func__);
+			}
+			//WARN_ON_ONCE(1);
+
+			pr_err("%s5.1 off=%d del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld sb_rextsize=%d ip->i_extsize=%d\n",
+				__func__, off, del.br_startoff, del.br_startblock, del.br_blockcount, mp->m_sb.sb_rextsize, ip->i_extsize);
 			/*
 			 * Realtime extent is lined up at the end but not
 			 * at the front.  We'll get rid of full extents if
