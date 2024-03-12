@@ -3561,8 +3561,10 @@ xfs_bmap_btalloc_low_space(
 {
 	int			error;
 
+	pr_err("%s\n", __func__);
 	if (args->alignment > 1 && (args->datatype & XFS_ALLOC_FORCEALIGN)) {
 		args->fsbno = NULLFSBLOCK;
+		pr_err("%s0 exiting\n", __func__);
 		return 0;
 	}
 
@@ -3724,8 +3726,11 @@ xfs_bmap_btalloc(
 		error = xfs_bmap_btalloc_filestreams(ap, &args);
 	else
 		error = xfs_bmap_btalloc_best_length(ap, &args);
+	pr_err("%s error=%d args->alignment=%d, fsbno=%lld, total=%d, len=%d\n",
+		__func__, error, args.alignment, args.fsbno, args.total, args.len);
 	if (error)
 		return error;
+
 
 	if (args.fsbno != NULLFSBLOCK) {
 		xfs_bmap_process_allocated_extent(ap, &args, orig_offset,
