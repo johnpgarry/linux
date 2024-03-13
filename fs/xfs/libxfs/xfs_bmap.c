@@ -39,6 +39,22 @@
 
 struct kmem_cache		*xfs_bmap_intent_cache;
 
+
+static xfs_extlen_t
+xfs_rtb_to_rtxoff_forcealign(
+	struct xfs_inode	*ip,
+	xfs_fsblock_t		bno)
+{
+	int m_rtxblklog = 2; // bodge for 16kb
+	int m_rtxblkmask = 3;  // bodge for 16kb
+	pr_err("%s checking sb_rextsize mp->m_rtxblklog(%d) >= 0, if so return val & m_rtxblkmask (0x%x) FIXME bno=%lld ip->i_extsize=%d FIXME\n",
+		__func__, m_rtxblklog, m_rtxblkmask, bno, ip->i_extsize);
+	if (likely(m_rtxblklog >= 0))
+		return bno & m_rtxblkmask;
+
+	return do_div(bno, ip->i_extsize);
+}
+
 /*
  * Miscellaneous helper functions
  */
@@ -3308,6 +3324,7 @@ xfs_bmap_alloc_account(
 		 * to that of a delalloc extent.
 		 */
 		ap->ip->i_delayed_blks += ap->length;
+		pr_err("%s fixme isrt\n", __func__);
 		xfs_trans_mod_dquot_byino(ap->tp, ap->ip, isrt ?
 				XFS_TRANS_DQ_RES_RTBLKS : XFS_TRANS_DQ_RES_BLKS,
 				-(long)ap->length);
@@ -3317,6 +3334,7 @@ xfs_bmap_alloc_account(
 	/* data/attr fork only */
 	ap->ip->i_nblocks += ap->length;
 	xfs_trans_log_inode(ap->tp, ap->ip, XFS_ILOG_CORE);
+	pr_err("%s fixme2 isrt\n", __func__);
 	if (ap->wasdel) {
 		ap->ip->i_delayed_blks -= ap->length;
 		xfs_mod_delalloc(ap->ip->i_mount, -(int64_t)ap->length);
@@ -4810,10 +4828,13 @@ xfs_bmap_del_extent_delay(
 	uint32_t		state = xfs_bmap_fork_to_state(whichfork);
 	int			error = 0;
 	bool			isrt;
+	bool 	isforcealign;
 
 	XFS_STATS_INC(mp, xs_del_exlist);
 
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
+
+	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip);
 	del_endoff = del->br_startoff + del->br_blockcount;
 	got_endoff = got->br_startoff + got->br_blockcount;
 	da_old = startblockval(got->br_startblock);
@@ -4822,9 +4843,11 @@ xfs_bmap_del_extent_delay(
 	ASSERT(del->br_blockcount > 0);
 	ASSERT(got->br_startoff <= del->br_startoff);
 	ASSERT(got_endoff >= del_endoff);
-
+	BUG();
 	if (isrt)
 		xfs_mod_frextents(mp, xfs_rtb_to_rtx(mp, del->br_blockcount));
+//	else if (isforcealign)
+//		xfs_mod_frextents(mp, xfs_rtb_to_rtx(mp, del->br_blockcount));
 
 	/*
 	 * Update the inode delalloc counter now and wait to update the
@@ -5252,6 +5275,7 @@ __xfs_bunmapi(
 	struct xfs_bmbt_irec	got;		/* current extent record */
 	struct xfs_ifork	*ifp;		/* inode fork pointer */
 	int			isrt;		/* freeing in rt area */
+	int			isforcealign;		/* freeing in rt area */
 	int			logflags;	/* transaction logging flags */
 	xfs_extlen_t		mod;		/* rt extent offset */
 	struct xfs_mount	*mp = ip->i_mount;
@@ -5287,12 +5311,15 @@ __xfs_bunmapi(
 	}
 	XFS_STATS_INC(mp, xs_blk_unmap);
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
+	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip);
 	end = start + len;
 
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
 		*rlen = 0;
+		pr_err("%s1 start=%lld *rlen=0\n", __func__, start);
 		return 0;
 	}
+	pr_err("%s1.1 start=%lld *rlen=%lld\n", __func__, start, *rlen);
 	end--;
 
 	logflags = 0;
@@ -5303,7 +5330,7 @@ __xfs_bunmapi(
 	} else
 		cur = NULL;
 
-	if (isrt) {
+	if (isrt || isforcealign) {
 		/*
 		 * Synchronize by locking the bitmap inode.
 		 */
@@ -5346,14 +5373,33 @@ __xfs_bunmapi(
 			if (!wasdel)
 				del.br_startblock += start - got.br_startoff;
 		}
+		pr_err("%s1.0.0 end=%lld start=%lld len=%lld isrt=%d del.br_startoff=%lld, del.br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, start, len, isrt, del.br_startoff, del.br_startblock, del.br_blockcount);
 		if (del.br_startoff + del.br_blockcount > end + 1)
 			del.br_blockcount = end + 1 - del.br_startoff;
 
-		if (!isrt)
+		pr_err("%s1.1 end=%lld start=%lld len=%lld isrt=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld isforcealign=%d\n",
+			__func__, end, start, len, isrt, del.br_startoff, del.br_startblock, del.br_blockcount, isforcealign);
+		if (!isrt && !isforcealign) 
 			goto delete;
 
-		mod = xfs_rtb_to_rtxoff(mp,
-				del.br_startblock + del.br_blockcount);
+		if (isrt)
+			mod = xfs_rtb_to_rtxoff(mp,
+					del.br_startblock + del.br_blockcount);
+		else if (isforcealign)
+			mod = xfs_rtb_to_rtxoff_forcealign(ip,
+					del.br_startblock + del.br_blockcount);
+#if 0
+
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+
+#endif
+		pr_err("%s2 end=%lld start=%lld len=%lld mod=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, start, len, mod, del.br_startoff, del.br_startblock, del.br_blockcount);
 		if (mod) {
 			/*
 			 * Realtime extent not lined up at the end.
@@ -5367,6 +5413,8 @@ __xfs_bunmapi(
 				 * This piece is unwritten, or we're not
 				 * using unwritten extents.  Skip over it.
 				 */
+				pr_err("%s3 XFS_EXT_UNWRITTEN end=%lld start=%lld len=%lld mod=%d del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, end, start, len, mod, del.br_startoff, del.br_startblock, del.br_blockcount);
 				ASSERT(end >= mod);
 				end -= mod > del.br_blockcount ?
 					del.br_blockcount : mod;
@@ -5393,6 +5441,8 @@ __xfs_bunmapi(
 				del.br_blockcount = mod;
 			}
 			del.br_state = XFS_EXT_UNWRITTEN;
+			pr_err("%s4 calling xfs_bmap_add_extent_unwritten_real end=%lld start=%lld len=%lld mod=%d del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+				__func__, end, start, len, mod, del.br_startoff, del.br_startblock, del.br_blockcount);
 			error = xfs_bmap_add_extent_unwritten_real(tp, ip,
 					whichfork, &icur, &cur, &del,
 					&logflags);
@@ -5401,10 +5451,30 @@ __xfs_bunmapi(
 			goto nodelete;
 		}
 
-		mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+		if (isrt) {
+			mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+			pr_err("%s4 isrt mod=%d del.br_startblock=%lld\n", __func__, mod, del.br_startblock);
+		} else if (isforcealign) {
+			mod = xfs_rtb_to_rtxoff_forcealign(ip, del.br_startblock);
+			pr_err("%s4 isforcealign mod=%d del.br_startblock=%lld\n", __func__, mod, del.br_startblock);
+		} else {
+			pr_err("%s4.1 mod=%d del.br_startblock=%lld\n", __func__, mod, del.br_startblock);
+		}
 		if (mod) {
-			xfs_extlen_t off = mp->m_sb.sb_rextsize - mod;
+			pr_err("%s5 mod is set del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld sb_rextsize=%d ip->i_extsize=%d\n",
+				__func__, del.br_startoff, del.br_startblock, del.br_blockcount, mp->m_sb.sb_rextsize, ip->i_extsize);
+			xfs_extlen_t off;
 
+			if (isrt)
+				off = mp->m_sb.sb_rextsize - mod;
+			else if (isforcealign) {
+				off = ip->i_extsize - mod;
+				//pr_err("%s FIXME\n", __func__);
+			}
+			//WARN_ON_ONCE(1);
+
+			pr_err("%s5.1 off=%d del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld sb_rextsize=%d ip->i_extsize=%d\n",
+				__func__, off, del.br_startoff, del.br_startblock, del.br_blockcount, mp->m_sb.sb_rextsize, ip->i_extsize);
 			/*
 			 * Realtime extent is lined up at the end but not
 			 * at the front.  We'll get rid of full extents if
@@ -5414,6 +5484,8 @@ __xfs_bunmapi(
 				del.br_blockcount -= off;
 				del.br_startoff += off;
 				del.br_startblock += off;
+
+				pr_err("%s5.1 del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 			} else if (del.br_startoff == start &&
 				   (del.br_state == XFS_EXT_UNWRITTEN ||
 				    tp->t_blk_res == 0)) {
@@ -5426,12 +5498,15 @@ __xfs_bunmapi(
 				if (got.br_startoff > end &&
 				    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 					done = true;
+					pr_err("%s5.2 del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 					break;
 				}
+				pr_err("%s5.3 del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 				continue;
 			} else if (del.br_state == XFS_EXT_UNWRITTEN) {
 				struct xfs_bmbt_irec	prev;
 				xfs_fileoff_t		unwrite_start;
+				pr_err("%s5.3 XFS_EXT_UNWRITTEN del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 
 				/*
 				 * This one is already unwritten.
@@ -5460,6 +5535,7 @@ __xfs_bunmapi(
 					goto error0;
 				goto nodelete;
 			} else {
+				pr_err("%s5.4 !XFS_EXT_UNWRITTEN del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 				ASSERT(del.br_state == XFS_EXT_NORM);
 				del.br_state = XFS_EXT_UNWRITTEN;
 				error = xfs_bmap_add_extent_unwritten_real(tp,
@@ -5472,6 +5548,8 @@ __xfs_bunmapi(
 		}
 
 delete:
+		pr_err("%s6 delete: wasdel=%d del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld end=%lld\n",
+			__func__, wasdel, del.br_startoff, del.br_startblock, del.br_blockcount, end);
 		if (wasdel) {
 			error = xfs_bmap_del_extent_delay(ip, whichfork, &icur,
 					&got, &del);
@@ -5482,11 +5560,17 @@ delete:
 			logflags |= tmp_logflags;
 		}
 
+		pr_err("%s6.1 del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 		if (error)
 			goto error0;
 
 		end = del.br_startoff - 1;
+		pr_err("%s6.2 del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld end=%lld\n",
+			__func__, del.br_startoff, del.br_startblock, del.br_blockcount, end);
 nodelete:
+		pr_err("%s7 nodelete: del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld end=%lld\n",
+			__func__, del.br_startoff, del.br_startblock, del.br_blockcount, end);
 		/*
 		 * If not done go on to the next (previous) record.
 		 */
@@ -5500,6 +5584,8 @@ nodelete:
 			extno++;
 		}
 	}
+	pr_err("%s7.1 del.br_sartoff=%lld, br_startblock=%lld, br_blockcount=%lld end=%lld *rlen=%lld\n",
+			__func__, del.br_startoff, del.br_startblock, del.br_blockcount, end, *rlen);
 	if (done || end == (xfs_fileoff_t)-1 || end < start)
 		*rlen = 0;
 	else
@@ -5519,6 +5605,7 @@ nodelete:
 	}
 
 error0:
+
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent records if we've converted to btree format.
@@ -5555,7 +5642,7 @@ xfs_bunmapi(
 	int			*done)
 {
 	int			error;
-
+	pr_err("%s calling __xfs_bunmapi\n", __func__);
 	error = __xfs_bunmapi(tp, ip, bno, &len, flags, nexts);
 	*done = (len == 0);
 	return error;

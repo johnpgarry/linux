@@ -80,6 +80,8 @@ xfs_rtb_to_rtxoff(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
+	pr_err("%s mp->m_rtxblklog=%d m_rtxblkmask=0x%llx sb_rextsize=%d\n", __func__, mp->m_rtxblklog, mp->m_rtxblkmask, mp->m_sb.sb_rextsize);
+
 	if (likely(mp->m_rtxblklog >= 0))
 		return rtbno & mp->m_rtxblkmask;
 
