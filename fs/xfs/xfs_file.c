@@ -61,7 +61,11 @@ xfs_is_falloc_aligned(
 		}
 		mask = XFS_FSB_TO_B(mp, mp->m_sb.sb_rextsize) - 1;
 	} else {
-		mask = mp->m_sb.sb_blocksize - 1;
+		if (xfs_inode_has_forcealign(ip))
+			mask = (mp->m_sb.sb_blocksize * ip->i_extsize) - 1;
+		else
+			mask = mp->m_sb.sb_blocksize - 1;
+		pr_err("%s2 forcealign mask=0x%llx\n", __func__, mask);
 	}
 
 	return !((pos | len) & mask);
