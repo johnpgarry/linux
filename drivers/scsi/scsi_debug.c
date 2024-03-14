@@ -5520,6 +5520,7 @@ static void scsi_debug_slave_destroy(struct scsi_device *sdp)
 static bool stop_qc_helper(struct sdebug_defer *sd_dp,
 			   enum sdeb_defer_type defer_t)
 {
+	pr_err("%s sd_dp=%pS defer_t=%d (SDEB_DEFER_WQ=%d)\n", __func__, sd_dp, defer_t, SDEB_DEFER_WQ);
 	if (defer_t == SDEB_DEFER_HRT) {
 		int res = hrtimer_try_to_cancel(&sd_dp->hrt);
 
@@ -5554,11 +5555,13 @@ static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 
 	lockdep_assert_held(&sdsc->lock);
 
+	pr_err("%s scmd=%pS sdsc=%pS sqcp=%pS\n", __func__, cmnd, sdsc, sqcp);
 	if (!sqcp)
 		return false;
 	sd_dp = &sqcp->sd_dp;
 	l_defer_t = READ_ONCE(sd_dp->defer_t);
 	ASSIGN_QUEUED_CMD(cmnd, NULL);
+	pr_err("%s2 scmd=%pS sdsc=%pS sqcp=%pS sd_dp=%pS l_defer_t=%d\n", __func__, cmnd, sdsc, sqcp, sd_dp, l_defer_t);
 
 	if (stop_qc_helper(sd_dp, l_defer_t))
 		sdebug_free_queued_cmd(sqcp);
@@ -5574,7 +5577,7 @@ static bool scsi_debug_abort_cmnd(struct scsi_cmnd *cmnd)
 	struct sdebug_scsi_cmd *sdsc = scsi_cmd_priv(cmnd);
 	unsigned long flags;
 	bool res;
-
+	pr_err("%s scmd=%pS\n", __func__, cmnd);
 	spin_lock_irqsave(&sdsc->lock, flags);
 	res = scsi_debug_stop_cmnd(cmnd);
 	spin_unlock_irqrestore(&sdsc->lock, flags);
@@ -5930,6 +5933,7 @@ static bool inject_on_this_cmd(void)
 
 void sdebug_free_queued_cmd(struct sdebug_queued_cmd *sqcp)
 {
+	pr_err("%s sqcp=%pS\n", __func__, sqcp);
 	if (sqcp)
 		kmem_cache_free(queued_cmd_cache, sqcp);
 }
