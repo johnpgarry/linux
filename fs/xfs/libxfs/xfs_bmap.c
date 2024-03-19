@@ -5301,8 +5301,8 @@ __xfs_bunmapi(
 	{ XFS_BMAPI_NORMAP,	"NORMAP" }
 
 	#endif
-	pr_err("%s start=%lld *rlen=%lld nexts=%lld flags=0x%x\n", __func__,
-		start, *rlen, nexts, flags);
+	pr_err("%s start=%lld *rlen=%lld nexts=%lld flags=0x%x ip=%pS (i_ino=%lld)\n", __func__,
+		start, *rlen, nexts, flags, ip, ip->i_ino);
 	pr_err("%s0 ENTIRE=%d, METADATA=%d, ATTRFORK=%d, PREALLOC=%d, CONTIG=%d, CONVERT=%d, ZERO=%d, REMAP=%d, COWFORK=%d, NODISCARD=%d, NORMAP=%d\n", __func__,
 		!!(flags & XFS_BMAPI_ENTIRE),
 		!!(flags & XFS_BMAPI_METADATA),
@@ -5317,7 +5317,6 @@ __xfs_bunmapi(
 		!!(flags & XFS_BMAPI_NORMAP));
 
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
-	WARN_ON_ONCE(start == 16777216);
 
 	whichfork = xfs_bmapi_whichfork(flags);
 	ASSERT(whichfork != XFS_COW_FORK);
@@ -5344,6 +5343,7 @@ __xfs_bunmapi(
 	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip);
 	end = start + len;
 
+	WARN_ONCE(start == 16777216, "xfs_inode_has_forcealign=%d isforcealign=%d\n", xfs_inode_has_forcealign(ip), isforcealign);
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
 		*rlen = 0;
 		pr_err("%s1 start=%lld *rlen=0\n", __func__, start);

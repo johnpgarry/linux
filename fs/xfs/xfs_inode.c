@@ -2521,6 +2521,9 @@ xfs_remove(
 	int                     error = 0;
 	uint			resblks;
 
+	pr_err("%s dp=%pS (i_ino=%lld) name->name=%s ip=%pS (i_ino=%lld)\n",
+		__func__,  dp, dp->i_ino, name->name, ip, ip->i_ino);
+
 	trace_xfs_remove(dp, name);
 
 	if (xfs_is_shutdown(mp))

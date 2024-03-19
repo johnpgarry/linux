@@ -441,6 +441,7 @@ xfs_dir_removename(
 	ASSERT(S_ISDIR(VFS_I(dp)->i_mode));
 	XFS_STATS_INC(dp->i_mount, xs_dir_remove);
 
+	pr_err("%s dp=%pS (i_ino=%lld) name->name=%s ino=%lld\n", __func__, dp, dp->i_ino, name->name, ino);
 	args = kmem_zalloc(sizeof(*args), KM_NOFS);
 	if (!args)
 		return -ENOMEM;
