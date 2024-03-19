@@ -5334,6 +5334,8 @@ __xfs_bunmapi(
 		/*
 		 * Synchronize by locking the bitmap inode.
 		 */
+		pr_err("%s mp->m_rbmip->i_ino=%lld mp->m_rsumip=%lld\n",
+			__func__, mp->m_rbmip->i_ino, mp->m_rsumip->i_ino);
 		xfs_ilock(mp->m_rbmip, XFS_ILOCK_EXCL|XFS_ILOCK_RTBITMAP);
 		xfs_trans_ijoin(tp, mp->m_rbmip, XFS_ILOCK_EXCL);
 		xfs_ilock(mp->m_rsumip, XFS_ILOCK_EXCL|XFS_ILOCK_RTSUM);
