@@ -5286,8 +5286,38 @@ __xfs_bunmapi(
 	xfs_fileoff_t		end;
 	struct xfs_iext_cursor	icur;
 	bool			done = false;
+#if 0
+#define XFS_BMAPI_FLAGS \
+	{ XFS_BMAPI_ENTIRE,	"ENTIRE" }, \
+	{ XFS_BMAPI_METADATA,	"METADATA" }, \
+	{ XFS_BMAPI_ATTRFORK,	"ATTRFORK" }, \
+	{ XFS_BMAPI_PREALLOC,	"PREALLOC" }, \
+	{ XFS_BMAPI_CONTIG,	"CONTIG" }, \
+	{ XFS_BMAPI_CONVERT,	"CONVERT" }, \
+	{ XFS_BMAPI_ZERO,	"ZERO" }, \
+	{ XFS_BMAPI_REMAP,	"REMAP" }, \
+	{ XFS_BMAPI_COWFORK,	"COWFORK" }, \
+	{ XFS_BMAPI_NODISCARD,	"NODISCARD" }, \
+	{ XFS_BMAPI_NORMAP,	"NORMAP" }
+
+	#endif
+	pr_err("%s start=%lld *rlen=%lld nexts=%lld flags=0x%x\n", __func__,
+		start, *rlen, nexts, flags);
+	pr_err("%s0 ENTIRE=%d, METADATA=%d, ATTRFORK=%d, PREALLOC=%d, CONTIG=%d, CONVERT=%d, ZERO=%d, REMAP=%d, COWFORK=%d, NODISCARD=%d, NORMAP=%d\n", __func__,
+		!!(flags & XFS_BMAPI_ENTIRE),
+		!!(flags & XFS_BMAPI_METADATA),
+		!!(flags & XFS_BMAPI_ATTRFORK),
+		!!(flags & XFS_BMAPI_PREALLOC),
+		!!(flags & XFS_BMAPI_CONTIG),
+		!!(flags & XFS_BMAPI_CONVERT),
+		!!(flags & XFS_BMAPI_ZERO),
+		!!(flags & XFS_BMAPI_REMAP),
+		!!(flags & XFS_BMAPI_COWFORK),
+		!!(flags & XFS_BMAPI_NODISCARD),
+		!!(flags & XFS_BMAPI_NORMAP));
 
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
+	WARN_ON_ONCE(start == 16777216);
 
 	whichfork = xfs_bmapi_whichfork(flags);
 	ASSERT(whichfork != XFS_COW_FORK);
