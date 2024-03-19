@@ -5330,7 +5330,7 @@ __xfs_bunmapi(
 	} else
 		cur = NULL;
 
-	if (isrt || isforcealign) {
+	if (isrt) {
 		/*
 		 * Synchronize by locking the bitmap inode.
 		 */
