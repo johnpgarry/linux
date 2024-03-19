@@ -73,7 +73,7 @@ xfs_extlen_t
 xfs_get_extsz(
 	struct xfs_inode	*ip)
 {
-	if (xfs_inode_has_forcealign(ip) && ip->i_extsize)
+	if (xfs_inode_has_forcealign(ip) && (ip->i_diflags & XFS_DIFLAG_EXTSIZE) && ip->i_extsize)
 		return ip->i_extsize;
 
 	return 1;

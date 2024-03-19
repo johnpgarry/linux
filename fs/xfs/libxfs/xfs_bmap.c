@@ -49,6 +49,8 @@ xfs_rtb_to_rtxoff_forcealign(
 	int m_rtxblkmask = 3;  // bodge for 16kb
 	pr_err("%s checking sb_rextsize mp->m_rtxblklog(%d) >= 0, if so return val & m_rtxblkmask (0x%x) FIXME bno=%lld ip->i_extsize=%d FIXME\n",
 		__func__, m_rtxblklog, m_rtxblkmask, bno, ip->i_extsize);
+
+	BUG_ON(!(ip->i_diflags & XFS_DIFLAG_EXTSIZE));
 	if (likely(m_rtxblklog >= 0))
 		return bno & m_rtxblkmask;
 
