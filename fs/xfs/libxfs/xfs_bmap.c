@@ -5342,10 +5342,11 @@ __xfs_bunmapi(
 	}
 	XFS_STATS_INC(mp, xs_blk_unmap);
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
-	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip);
+	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip) && xfs_inode_has_extsize(ip);
 	end = start + len;
 
-	WARN_ONCE(start == 16777216, "xfs_inode_has_forcealign=%d isforcealign=%d\n", xfs_inode_has_forcealign(ip), isforcealign);
+	WARN_ONCE(start == 16777216, "xfs_inode_has_forcealign=%d isforcealign=%d xfs_inode_has_extsize(ip)=%d\n",
+		xfs_inode_has_forcealign(ip), isforcealign, xfs_inode_has_extsize(ip));
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
 		*rlen = 0;
 		pr_err("%s1 start=%lld *rlen=0\n", __func__, start);
