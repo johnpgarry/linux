@@ -242,6 +242,7 @@ xfs_inode_from_disk(
 					   be64_to_cpu(from->di_changecount));
 		ip->i_crtime = xfs_inode_from_disk_ts(from, from->di_crtime);
 		ip->i_diflags2 = be64_to_cpu(from->di_flags2);
+		WARN_ONCE(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN, "inode->i_ino=%ld ip->i_ino=%lld\n", inode->i_ino, ip->i_ino);
 		ip->i_cowextsize = be32_to_cpu(from->di_cowextsize);
 	}
 

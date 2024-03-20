@@ -849,7 +849,12 @@ xfs_free_file_space(
 	endoffset_fsb = XFS_B_TO_FSBT(mp, offset + len);
 
 	/* We can only free complete realtime extents. */
-	if (XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1) {
+	if (xfs_get_extsz(ip) > 1) {
+		pr_err("%s1 before startoffset_fsb=%lld endoffset_fsb=%lld\n", __func__, startoffset_fsb, endoffset_fsb);
+		startoffset_fsb = roundup_64(startoffset_fsb, xfs_get_extsz(ip));
+		endoffset_fsb = rounddown_64(endoffset_fsb, xfs_get_extsz(ip));
+		pr_err("%s2 after startoffset_fsb=%lld endoffset_fsb=%lld\n", __func__, startoffset_fsb, endoffset_fsb);
+	} else if (XFS_IS_REALTIME_INODE(ip) && mp->m_sb.sb_rextsize > 1) {
 		startoffset_fsb = xfs_rtb_roundup_rtx(mp, startoffset_fsb);
 		endoffset_fsb = xfs_rtb_rounddown_rtx(mp, endoffset_fsb);
 	}
