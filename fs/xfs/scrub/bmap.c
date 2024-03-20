@@ -923,7 +923,7 @@ xchk_bmap(
 	/* Non-existent forks can be ignored. */
 	if (!ifp)
 		return -ENOENT;
-
+	BUG();
 	info.is_rt = whichfork == XFS_DATA_FORK && XFS_IS_REALTIME_INODE(ip);
 	info.whichfork = whichfork;
 	info.is_shared = whichfork == XFS_DATA_FORK && xfs_is_reflink_inode(ip);

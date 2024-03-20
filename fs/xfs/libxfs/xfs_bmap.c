@@ -3081,6 +3081,7 @@ xfs_bmap_adjacent(
 	mp = ap->ip->i_mount;
 	rt = XFS_IS_REALTIME_INODE(ap->ip) &&
 		(ap->datatype & XFS_ALLOC_USERDATA);
+	BUG();
 	/*
 	 * If allocating at eof, and there's a previous real block,
 	 * try to use its last block as our starting point.
@@ -5074,6 +5075,7 @@ xfs_bmap_del_extent_real(
 		return -ENOSPC;
 
 	*logflagsp = XFS_ILOG_CORE;
+	BUG();
 	if (whichfork == XFS_DATA_FORK && XFS_IS_REALTIME_INODE(ip)) {
 		if (!(bflags & XFS_BMAPI_REMAP)) {
 			error = xfs_rtfree_blocks(tp, del->br_startblock,

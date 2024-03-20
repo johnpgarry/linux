@@ -706,6 +706,7 @@ xfs_alloc_file_space(
 		 */
 		resblks = min_t(xfs_fileoff_t, (e - s),
 				(XFS_MAX_BMBT_EXTLEN * nimaps));
+		BUG();
 		if (unlikely(rt)) {
 			dblocks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
 			rblocks = resblks;
