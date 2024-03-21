@@ -3069,19 +3069,20 @@ xfs_bmap_adjacent(
 {
 	xfs_fsblock_t	adjust;		/* adjustment to block numbers */
 	xfs_mount_t	*mp;		/* mount point structure */
-	int		rt;		/* true if inode is realtime */
+	int		rtq;		/* true if inode is realtime */
 
 #define	ISVALID(x,y)	\
-	(rt ? \
+	(rtq ? \
 		(x) < mp->m_sb.sb_rblocks : \
 		XFS_FSB_TO_AGNO(mp, x) == XFS_FSB_TO_AGNO(mp, y) && \
 		XFS_FSB_TO_AGNO(mp, x) < mp->m_sb.sb_agcount && \
 		XFS_FSB_TO_AGBNO(mp, x) < mp->m_sb.sb_agblocks)
 
 	mp = ap->ip->i_mount;
-	rt = XFS_IS_REALTIME_INODE(ap->ip) &&
+	rtq = XFS_IS_REALTIME_INODE(ap->ip) &&
 		(ap->datatype & XFS_ALLOC_USERDATA);
-	BUG();
+	//BUG(); i think that we just check for valid block for RTvol,
+	// and not a problem for forcealign
 	/*
 	 * If allocating at eof, and there's a previous real block,
 	 * try to use its last block as our starting point.
@@ -5075,7 +5076,8 @@ xfs_bmap_del_extent_real(
 		return -ENOSPC;
 
 	*logflagsp = XFS_ILOG_CORE;
-	BUG();
+	// BUG(); I think that this is ok, as it is just for freeing
+	// rt block, and no impact for forcealign
 	if (whichfork == XFS_DATA_FORK && XFS_IS_REALTIME_INODE(ip)) {
 		if (!(bflags & XFS_BMAPI_REMAP)) {
 			error = xfs_rtfree_blocks(tp, del->br_startblock,
