@@ -39,7 +39,7 @@
 
 struct kmem_cache		*xfs_bmap_intent_cache;
 
-
+/* Return the offset of an rt block number within an rt extent. */
 static xfs_extlen_t
 xfs_rtb_to_rtxoff_forcealign(
 	struct xfs_inode	*ip,
@@ -47,8 +47,21 @@ xfs_rtb_to_rtxoff_forcealign(
 {
 	int m_rtxblklog = 2; // bodge for 16kb
 	int m_rtxblkmask = 3;  // bodge for 16kb
-	pr_err("%s checking sb_rextsize mp->m_rtxblklog(%d) >= 0, if so return val & m_rtxblkmask (0x%x) FIXME bno=%lld ip->i_extsize=%d FIXME\n",
+
+	if (!(ip->i_diflags & XFS_DIFLAG_EXTSIZE))
+		return 0;
+
+	m_rtxblklog = ffs(ip->i_extsize) - 1;
+	pr_err("%s m_rtxblklog=%d i_extsize=%d ffs(1)=%d\n", __func__, m_rtxblklog, ip->i_extsize, ffs(1));
+
+	m_rtxblkmask = (1 << m_rtxblklog) - 1;
+	pr_err("%s2 m_rtxblkmask=0x%x\n", __func__, m_rtxblkmask);
+
+	pr_err("%s2 checking sb_rextsize mp->m_rtxblklog(%d) >= 0, if so return val & m_rtxblkmask (0x%x) FIXME bno=%lld ip->i_extsize=%d FIXME\n",
 		__func__, m_rtxblklog, m_rtxblkmask, bno, ip->i_extsize);
+
+	if (!(ip->i_diflags & XFS_DIFLAG_EXTSIZE))
+		return 0;
 
 	BUG_ON(!(ip->i_diflags & XFS_DIFLAG_EXTSIZE));
 	if (likely(m_rtxblklog >= 0))
@@ -5346,7 +5359,8 @@ __xfs_bunmapi(
 	}
 	XFS_STATS_INC(mp, xs_blk_unmap);
 	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
-	isforcealign = (whichfork == XFS_DATA_FORK) && xfs_inode_has_forcealign(ip) && xfs_inode_has_extsize(ip);
+	isforcealign = (whichfork == XFS_DATA_FORK) &&
+		xfs_inode_has_forcealign(ip) && xfs_inode_has_extsize(ip) && ip->i_extsize > 1;
 	end = start + len;
 
 	WARN_ONCE(start == 16777216, "xfs_inode_has_forcealign=%d isforcealign=%d xfs_inode_has_extsize(ip)=%d\n",
