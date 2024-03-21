@@ -242,7 +242,7 @@ xfs_inode_from_disk(
 					   be64_to_cpu(from->di_changecount));
 		ip->i_crtime = xfs_inode_from_disk_ts(from, from->di_crtime);
 		ip->i_diflags2 = be64_to_cpu(from->di_flags2);
-		WARN_ONCE(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN, "inode->i_ino=%ld ip->i_ino=%lld\n", inode->i_ino, ip->i_ino);
+	//	WARN_ONCE(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN, "inode->i_ino=%ld ip->i_ino=%lld\n", inode->i_ino, ip->i_ino);
 		ip->i_cowextsize = be32_to_cpu(from->di_cowextsize);
 	}
 
@@ -797,6 +797,7 @@ xfs_inode_validate_forcealign(
 	uint32_t		cowextsize)
 {
 	/* superblock rocompat feature flag */
+	pr_err("%s mp=%pS Validate the forcealign inode flag extsize=%d\n", __func__, mp, extsize);
 	if (!xfs_has_forcealign(mp))
 		return __this_address;
 
@@ -808,8 +809,10 @@ xfs_inode_validate_forcealign(
 	if (flags & XFS_DIFLAG_REALTIME)
 		return __this_address;
 
+	pr_err("%s2 m_dalign=%d (stripe unit) m_swidth=%d (stripe width)\n",
+		__func__, mp->m_dalign, mp->m_swidth);
 	/* Requires a non-zero power-of-2 extent size hint */
-	if (extsize == 0 || !is_power_of_2(extsize))
+	if (extsize == 0 || !is_power_of_2(extsize) || (mp->m_sb.sb_agblocks % extsize))
 		return __this_address;
 
 	/* Requires no cow extent size hint */

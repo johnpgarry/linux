@@ -1157,6 +1157,8 @@ xfs_ioctl_setattr_xflags(
 	 * extent size hint.  It doesn't apply to realtime files.
 	 */
 	if (fa->fsx_xflags & FS_XFLAG_FORCEALIGN) {
+		pr_err("%s xfs_has_forcealign=%d fa->fsx_extsize=%d m_sb.sb_agblocks=%d\n",
+			__func__, xfs_has_forcealign(mp), fa->fsx_extsize, mp->m_sb.sb_agblocks);
 		if (!xfs_has_forcealign(mp))
 			return -EINVAL;
 		if (fa->fsx_xflags & FS_XFLAG_COWEXTSIZE)
@@ -1298,6 +1300,7 @@ xfs_ioctl_setattr_check_extsize(
 		return -EINVAL;
 
 	if (new_diflags2 & XFS_DIFLAG2_FORCEALIGN) {
+		pr_err("%s calling xfs_inode_validate_forcealign for ip=%pS\n", __func__, ip);
 		failaddr = xfs_inode_validate_forcealign(ip->i_mount,
 				VFS_I(ip)->i_mode, new_diflags,
 				XFS_B_TO_FSB(mp, fa->fsx_extsize),
@@ -1401,7 +1404,7 @@ xfs_fileattr_set(
 		error = PTR_ERR(tp);
 		goto error_free_dquots;
 	}
-
+	pr_err("%s calling xfs_ioctl_setattr_check_extsize\n", __func__);
 	error = xfs_ioctl_setattr_check_extsize(ip, fa);
 	if (error)
 		goto error_trans_cancel;
@@ -1410,6 +1413,7 @@ xfs_fileattr_set(
 	if (error)
 		goto error_trans_cancel;
 
+	pr_err("%s2 calling xfs_ioctl_setattr_xflags\n", __func__);
 	error = xfs_ioctl_setattr_xflags(tp, ip, fa);
 	if (error)
 		goto error_trans_cancel;
