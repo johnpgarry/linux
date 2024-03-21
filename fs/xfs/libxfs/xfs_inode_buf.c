@@ -809,10 +809,18 @@ xfs_inode_validate_forcealign(
 	if (flags & XFS_DIFLAG_REALTIME)
 		return __this_address;
 
-	pr_err("%s2 m_dalign=%d (stripe unit) m_swidth=%d (stripe width)\n",
-		__func__, mp->m_dalign, mp->m_swidth);
+	pr_err("%s2 m_dalign=%d (stripe unit) m_swidth=%d (stripe width) sb_agblocks=%d per extsize=%d=%d (bad if non-zero)\n",
+		__func__, mp->m_dalign, mp->m_swidth, mp->m_sb.sb_agblocks, extsize, mp->m_sb.sb_agblocks % extsize);
 	/* Requires a non-zero power-of-2 extent size hint */
 	if (extsize == 0 || !is_power_of_2(extsize) || (mp->m_sb.sb_agblocks % extsize))
+		return __this_address;
+
+
+	if (mp->m_dalign)
+		pr_err("%s3 m_dalign=%d per extsize=%d=%d (bad if non-zero)\n",
+			__func__, mp->m_dalign, extsize, mp->m_dalign % extsize);
+	/* Requires stripe unit+width (if set) be a multiple of extsize */
+	if ((mp->m_dalign && (mp->m_dalign % extsize)) || (mp->m_swidth && (mp->m_swidth % extsize)))
 		return __this_address;
 
 	/* Requires no cow extent size hint */
