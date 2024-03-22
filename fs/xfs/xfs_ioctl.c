@@ -1169,7 +1169,13 @@ xfs_ioctl_setattr_xflags(
 	}
 
 	if (atomic_writes) {
+		struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+		pr_err("%s ip=%pS atomic_writes set FS_XFLAG_FORCEALIGN=%d xfs_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
+			__func__, ip, !!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN), xfs_has_atomicwrites(mp),
+			bdev_can_atomic_write(target->bt_bdev));
 		if (!xfs_has_atomicwrites(mp))
+			return -EINVAL;
+		if (!bdev_can_atomic_write(target->bt_bdev))
 			return -EINVAL;
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
