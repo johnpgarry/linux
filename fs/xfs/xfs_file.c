@@ -720,6 +720,7 @@ xfs_file_dio_write(
 	unsigned int		blockmask;
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s ip=%pS i_ino=%lld\n", __func__, ip, ip->i_ino);
 		if (!generic_atomic_write_valid(iocb->ki_pos, from,
 			i_blocksize(inode),
 			XFS_FSB_TO_B(mp, ip->i_extsize))) {
@@ -1252,12 +1253,13 @@ static bool xfs_file_open_can_atomicwrite(
 
 	if (!(file->f_flags & O_DIRECT))
 		return false;
-
+	pr_err("%s xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
+		__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev));
 	if (!xfs_inode_has_atomicwrites(ip))
 		return false;
 
-	if (!bdev_can_atomic_write(target->bt_bdev))
-		return false;
+//	if (!bdev_can_atomic_write(target->bt_bdev))
+//		return false;
 
 	return true;
 }

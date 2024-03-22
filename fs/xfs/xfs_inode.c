@@ -668,6 +668,7 @@ xfs_inode_inherit_flags(
 	unsigned int		di_flags = 0;
 	xfs_failaddr_t		failaddr;
 	umode_t			mode = VFS_I(ip)->i_mode;
+	pr_err("%s ip=%pS i_ino=%lld S_ISDIR=%d\n", __func__, ip, ip->i_ino, S_ISDIR(mode));
 
 	if (S_ISDIR(mode)) {
 		if (pip->i_diflags & XFS_DIFLAG_RTINHERIT)
@@ -717,6 +718,8 @@ xfs_inode_inherit_flags(
 	 * trip the verifiers.  Validate the hint settings in the new file so
 	 * that we don't let broken hints propagate.
 	 */
+	pr_err("%s calling ip=%pS i_ino=%lld xfs_inode_validate_extsize\n",
+		__func__, ip, ip->i_ino);
 	failaddr = xfs_inode_validate_extsize(ip->i_mount, ip->i_extsize,
 			VFS_I(ip)->i_mode, ip->i_diflags);
 	if (failaddr) {
@@ -751,6 +754,9 @@ xfs_inode_inherit_flags2(
 		ip->i_cowextsize = 0;
 	}
 
+	pr_err("%s XFS_DIFLAG2_FORCEALIGN set=%d XFS_DIFLAG2_ATOMICWRITES set=%d maybe calling xfs_inode_validate_forcealign\n",
+		__func__, !!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN),
+		!!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN));
 	if (ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN) {
 		failaddr = xfs_inode_validate_forcealign(ip->i_mount,
 				VFS_I(ip)->i_mode, ip->i_diflags, ip->i_extsize,
