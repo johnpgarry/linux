@@ -745,6 +745,8 @@ xfs_inode_inherit_flags2(
 		ip->i_diflags2 |= XFS_DIFLAG2_DAX;
 	if (pip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN)
 		ip->i_diflags2 |= XFS_DIFLAG2_FORCEALIGN;
+	if (pip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES)
+		ip->i_diflags2 |= XFS_DIFLAG2_ATOMICWRITES;
 
 	/* Don't let invalid cowextsize hints propagate. */
 	failaddr = xfs_inode_validate_cowextsize(ip->i_mount, ip->i_cowextsize,
@@ -754,15 +756,31 @@ xfs_inode_inherit_flags2(
 		ip->i_cowextsize = 0;
 	}
 
-	pr_err("%s XFS_DIFLAG2_FORCEALIGN set=%d XFS_DIFLAG2_ATOMICWRITES set=%d maybe calling xfs_inode_validate_forcealign\n",
-		__func__, !!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN),
-		!!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN));
+	pr_err("%s ip=%pS i_ino=%lld XFS_DIFLAG2_FORCEALIGN set=%d XFS_DIFLAG2_ATOMICWRITES set=%d maybe calling xfs_inode_validate_forcealign\n",
+		__func__, ip, ip->i_ino,
+		!!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN),
+		!!(ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES));
 	if (ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN) {
 		failaddr = xfs_inode_validate_forcealign(ip->i_mount,
 				VFS_I(ip)->i_mode, ip->i_diflags, ip->i_extsize,
 				ip->i_cowextsize);
 		if (failaddr)
 			ip->i_diflags2 &= ~XFS_DIFLAG2_FORCEALIGN;
+	}
+	pr_err("%s2 ip=%pS i_ino=%lld XFS_DIFLAG2_FORCEALIGN set=%d XFS_DIFLAG2_ATOMICWRITES set=%d maybe calling xfs_inode_validate_atomicwrites\n",
+		__func__, ip, ip->i_ino,
+		!!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN),
+		!!(ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES));
+	if (ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES) {
+
+		failaddr = xfs_inode_validate_atomicwrites(ip->i_mount,
+				!!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN),
+				xfs_inode_buftarg(ip));
+		if (failaddr) {
+			pr_err("%s2 ip=%pS i_ino=%lld disabling XFS_DIFLAG2_ATOMICWRITES\n", __func__,
+				ip, ip->i_ino);
+			ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
+		}
 	}
 }
 

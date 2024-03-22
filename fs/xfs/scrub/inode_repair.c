@@ -620,6 +620,7 @@ xrep_dinode_extsize_hints(
 
 	trace_xrep_dinode_extsize_hints(sc, dip);
 
+	pr_err("%s calling xfs_inode_validate_extsize\n", __func__);
 	fa = xfs_inode_validate_extsize(mp, be32_to_cpu(dip->di_extsize),
 			mode, flags);
 	if (fa) {

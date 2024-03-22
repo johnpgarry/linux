@@ -219,6 +219,7 @@ xchk_inode_extsize(
 	xfs_failaddr_t		fa;
 	uint32_t		value = be32_to_cpu(dip->di_extsize);
 
+	pr_err("%s calling xfs_inode_validate_extsize\n", __func__);
 	fa = xfs_inode_validate_extsize(sc->mp, value, mode, flags);
 	if (fa)
 		xchk_ino_set_corrupt(sc, ino);

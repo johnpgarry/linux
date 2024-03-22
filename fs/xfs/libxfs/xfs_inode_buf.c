@@ -633,7 +633,7 @@ xfs_dinode_verify(
 	}
 
 	if (flags & XFS_DIFLAG2_ATOMICWRITES) {
-		fa = xfs_inode_validate_atomicwrites(mp, mode, flags,
+		fa = xfs_inode_validate_atomicwrites(mp, 
 				!!(flags2 & XFS_DIFLAG2_FORCEALIGN),
 				mp->m_ddev_targp);
 		if (fa)
@@ -854,16 +854,19 @@ xfs_inode_validate_forcealign(
 xfs_failaddr_t
 xfs_inode_validate_atomicwrites(
 	struct xfs_mount	*mp,
-	uint16_t		mode,
-	uint16_t		flags,
 	uint32_t		forcealign,
 	struct xfs_buftarg *m_ddev_targp)
 {
 
 	pr_err("%s bdev_can_atomic_write(m_ddev_targp->bt_bdev)=%d\n", __func__,
 		bdev_can_atomic_write(m_ddev_targp->bt_bdev));
+
 	/* superblock rocompat feature flag */
 	if (!xfs_has_atomicwrites(mp))
+		return __this_address;
+
+	/* bdev does not support atomic writes, so don't waste time trying to atomic write */
+	if (!bdev_can_atomic_write(m_ddev_targp->bt_bdev))
 		return __this_address;
 
 	/* forcealign is required */

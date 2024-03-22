@@ -106,8 +106,8 @@ xfs_inode_alloc(
 	ip->i_flags = 0;
 	ip->i_delayed_blks = 0;
 	ip->i_diflags2 = mp->m_ino_geo.new_diflags2;
-	pr_err("%s ino=%lld i_diflags2=0x%x XFS_DIFLAG2_ATOMICWRITES set=%d\n", __func__, ino, ip->i_diflags2, !!(ip->i_diflags2 && XFS_DIFLAG2_ATOMICWRITES));
-	WARN_ON(ino == 131);
+	pr_err("%s ino=%lld i_diflags2=0x%llx XFS_DIFLAG2_ATOMICWRITES set=%d\n", __func__, ino, ip->i_diflags2, !!(ip->i_diflags2 && XFS_DIFLAG2_ATOMICWRITES));
+	//WARN_ON(ino == 131);
 	ip->i_nblocks = 0;
 	ip->i_forkoff = 0;
 	ip->i_sick = 0;
