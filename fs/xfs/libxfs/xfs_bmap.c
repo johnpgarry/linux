@@ -5380,6 +5380,15 @@ xfs_bmap_del_extent_real(
 	return 0;
 }
 
+/* Return the offset of an block number within an extent for forcealign. */
+static xfs_extlen_t
+xfs_forcealign_extent_offset(
+	struct xfs_inode	*ip,
+	xfs_fsblock_t		bno)
+{
+	return bno & (ip->i_extsize - 1);
+}
+
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -5402,6 +5411,7 @@ __xfs_bunmapi(
 	struct xfs_bmbt_irec	got;		/* current extent record */
 	struct xfs_ifork	*ifp;		/* inode fork pointer */
 	int			isrt;		/* freeing in rt area */
+	int			isforcealign;	/* freeing for file inode with forcealign */
 	int			logflags;	/* transaction logging flags */
 	xfs_extlen_t		mod;		/* rt extent offset */
 	struct xfs_mount	*mp = ip->i_mount;
@@ -5438,7 +5448,10 @@ __xfs_bunmapi(
 		return 0;
 	}
 	XFS_STATS_INC(mp, xs_blk_unmap);
-	isrt = xfs_ifork_is_realtime(ip, whichfork);
+	isrt = (whichfork == XFS_DATA_FORK) && XFS_IS_REALTIME_INODE(ip);
+	isforcealign = (whichfork == XFS_DATA_FORK) &&
+			xfs_inode_has_forcealign(ip) &&
+			xfs_inode_has_extsize(ip) && ip->i_extsize > 1;
 	end = start + len;
 
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
@@ -5490,11 +5503,15 @@ __xfs_bunmapi(
 		if (del.br_startoff + del.br_blockcount > end + 1)
 			del.br_blockcount = end + 1 - del.br_startoff;
 
-		if (!isrt || (flags & XFS_BMAPI_REMAP))
+		if ((!isrt && !isforcealign) || (flags & XFS_BMAPI_REMAP))
 			goto delete;
 
-		mod = xfs_rtb_to_rtxoff(mp,
-				del.br_startblock + del.br_blockcount);
+		if (isrt)
+			mod = xfs_rtb_to_rtxoff(mp,
+					del.br_startblock + del.br_blockcount);
+		else if (isforcealign)
+			mod = xfs_forcealign_extent_offset(ip,
+					del.br_startblock + del.br_blockcount);
 		if (mod) {
 			/*
 			 * Realtime extent not lined up at the end.
@@ -5542,9 +5559,19 @@ __xfs_bunmapi(
 			goto nodelete;
 		}
 
-		mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+		if (isrt)
+			mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+		else if (isforcealign)
+			mod = xfs_forcealign_extent_offset(ip,
+					del.br_startblock);
+
 		if (mod) {
-			xfs_extlen_t off = mp->m_sb.sb_rextsize - mod;
+			xfs_extlen_t off;
+
+			if (isrt)
+				off = mp->m_sb.sb_rextsize - mod;
+			else if (isforcealign)
+				off = ip->i_extsize - mod;
 
 			/*
 			 * Realtime extent is lined up at the end but not
