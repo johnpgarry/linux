@@ -106,6 +106,8 @@ xfs_inode_alloc(
 	ip->i_flags = 0;
 	ip->i_delayed_blks = 0;
 	ip->i_diflags2 = mp->m_ino_geo.new_diflags2;
+	pr_err("%s ino=%lld i_diflags2=0x%llx XFS_DIFLAG2_ATOMICWRITES set=%d\n", __func__, ino, ip->i_diflags2, !!(ip->i_diflags2 && XFS_DIFLAG2_ATOMICWRITES));
+	WARN_ON(ino == 131);
 	ip->i_nblocks = 0;
 	ip->i_forkoff = 0;
 	ip->i_sick = 0;
@@ -732,9 +734,8 @@ out_destroy:
  * in the cache held in each AG.  If the inode is found in the cache, initialise
  * the vfs inode if necessary.
  *
- * If it is not in core, read it in from the file system's device, add it to the
- * cache and initialise the vfs inode.
- *
+ * If iti_diflags2 initialise the vfs inode.
+ *i_diflags2
  * The inode is locked according to the value of the lock_flags parameter.
  * Inode lookup is only done during metadata operations and not as part of the
  * data IO path. Hence we only allow locking of the XFS_ILOCK during lookup.
