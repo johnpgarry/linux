@@ -3648,4 +3648,16 @@ bool generic_atomic_write_valid(loff_t pos, struct iov_iter *iter)
 	return true;
 }
 
+static inline
+bool generic_atomic_write_valid_size(loff_t pos, struct iov_iter *iter,
+				unsigned int unit_min, unsigned unit_max)
+{
+	size_t len = iov_iter_count(iter);
+
+	if (len < unit_min || len > unit_max)
+		return -EINVAL;
+
+	return generic_atomic_write_valid(pos, iter);
+}
+
 #endif /* _LINUX_FS_H */
