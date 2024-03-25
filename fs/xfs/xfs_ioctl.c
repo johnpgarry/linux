@@ -1170,13 +1170,14 @@ xfs_ioctl_setattr_xflags(
 
 	if (atomic_writes) {
 		struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
-		pr_err("%s ip=%pS atomic_writes set FS_XFLAG_FORCEALIGN=%d xfs_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
-			__func__, ip, !!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN), xfs_has_atomicwrites(mp),
+		pr_err("%s ip=%pS ip->i_ino=%lld atomic_writes set FS_XFLAG_FORCEALIGN=%d xfs_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
+			__func__, ip, ip->i_ino,
+			!!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN), xfs_has_atomicwrites(mp),
 			bdev_can_atomic_write(target->bt_bdev));
 		if (!xfs_has_atomicwrites(mp))
 			return -EINVAL;
-		if (!bdev_can_atomic_write(target->bt_bdev))
-			return -EINVAL;
+	//	if (!bdev_can_atomic_write(target->bt_bdev))
+	//		return -EINVAL;
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
 	}
@@ -1297,13 +1298,19 @@ xfs_ioctl_setattr_check_extsize(
 			return -EINVAL;
 	}
 
+	pr_err("%s calling ip=%pS i_ino=%lld xfs_inode_validate_extsize\n",
+		__func__, ip, ip->i_ino);
 	failaddr = xfs_inode_validate_extsize(ip->i_mount,
 			XFS_B_TO_FSB(mp, fa->fsx_extsize),
 			VFS_I(ip)->i_mode, new_diflags);
 	if (failaddr)
 		return -EINVAL;
 
-	if (new_diflags2 & XFS_DIFLAG2_FORCEALIGN) {
+	pr_err("%s2 ip=%pS i_ino=%lld XFS_DIFLAG2_FORCEALIGN set=%d XFS_DIFLAG2_ATOMICWRITES set=%d maybe calling xfs_inode_validate_forcealign\n",
+		__func__, ip, ip->i_ino,
+		!!(new_diflags2 & XFS_DIFLAG2_FORCEALIGN),
+		!!(new_diflags2 & XFS_DIFLAG2_FORCEALIGN));
+	if (new_diflags2 & XFS_DIFLAG2_ATOMICWRITES) {
 		failaddr = xfs_inode_validate_forcealign(ip->i_mount,
 				VFS_I(ip)->i_mode, new_diflags,
 				XFS_B_TO_FSB(mp, fa->fsx_extsize),

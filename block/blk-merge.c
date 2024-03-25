@@ -822,7 +822,10 @@ void blk_rq_set_mixed_merge(struct request *rq)
 	}
 	rq->rq_flags |= RQF_MIXED_MERGE;
 }
-
+#if 0
+#define REQ_FAILFAST_MASK \
+	(REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER)
+#endif
 static inline blk_opf_t bio_failfast(const struct bio *bio)
 {
 	if (bio->bi_opf & REQ_RAHEAD)
