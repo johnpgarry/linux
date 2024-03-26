@@ -445,6 +445,8 @@ xfs_alloc_fix_len(
 	rlen = args->len;
 	ASSERT(rlen >= args->minlen);
 	ASSERT(rlen <= args->maxlen);
+	if (rlen == args->maxlen)
+		WARN(rlen % args->prod != args->mod, "rlen=%d args->prod=%d, mod=%d\n", rlen, args->prod, args->mod);
 	if (args->prod <= 1 || rlen < args->mod || rlen == args->maxlen ||
 	    (args->mod == 0 && rlen < args->prod))
 		return;
