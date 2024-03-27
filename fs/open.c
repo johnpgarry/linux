@@ -914,6 +914,12 @@ static int do_dentry_open(struct file *f,
 	f->f_wb_err = filemap_sample_wb_err(f->f_mapping);
 	f->f_sb_err = file_sample_sb_err(f);
 
+	if (f->f_flags & O_ATOMIC) {
+		pr_err("%s1 O_ATOMIC set\n", __func__);
+	}
+	if (f->f_flags & O_DIRECT) {
+		pr_err("%s1 O_DIRECT set\n", __func__);
+	}
 	if (unlikely(f->f_flags & O_PATH)) {
 		f->f_mode = FMODE_PATH | FMODE_OPENED;
 		f->f_op = &empty_fops;
@@ -929,6 +935,8 @@ static int do_dentry_open(struct file *f,
 		f->f_mode |= FMODE_WRITER;
 	}
 
+	if (f->f_flags & O_ATOMIC)
+		pr_err("%s2 O_ATOMIC set\n", __func__);
 	/* POSIX.1-2008/SUSv4 Section XSI 2.9.7 */
 	if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode))
 		f->f_mode |= FMODE_ATOMIC_POS;
@@ -947,6 +955,8 @@ static int do_dentry_open(struct file *f,
 	if (error)
 		goto cleanup_all;
 
+	if (f->f_flags & O_ATOMIC)
+		pr_err("%s3 O_ATOMIC set\n", __func__);
 	/* normally all 3 are set; ->open() can clear them if needed */
 	f->f_mode |= FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	if (!open)
@@ -970,10 +980,19 @@ static int do_dentry_open(struct file *f,
 
 	f->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
 	f->f_iocb_flags = iocb_flags(f);
+	if (f->f_flags & O_ATOMIC)
+		pr_err("%s4 O_ATOMIC set f_iocb_flags=0x%x IOCB_ATOMIC set=%d\n", __func__, f->f_iocb_flags, !!(f->f_iocb_flags & IOCB_ATOMIC));
 
 	file_ra_state_init(&f->f_ra, f->f_mapping->host->i_mapping);
-
+	pr_err_once("%s O_DIRECT=0x%x O_ATOMIC=0x%x\n", __func__, O_DIRECT, O_ATOMIC);
+	if (f->f_flags & O_DIRECT)
+		pr_err("%s5 O_DIRECT set\n", __func__);
 	if ((f->f_flags & O_DIRECT) && !(f->f_mode & FMODE_CAN_ODIRECT))
+		return -EINVAL;
+
+	if (f->f_flags & O_ATOMIC)
+		pr_err("%s6 O_ATOMIC set\n", __func__);
+	if ((f->f_flags & O_ATOMIC) && !(f->f_mode & FMODE_CAN_ATOMIC_WRITE))
 		return -EINVAL;
 
 	/*

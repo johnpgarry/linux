@@ -3411,6 +3411,8 @@ static inline int iocb_flags(struct file *file)
 		res |= IOCB_DSYNC;
 	if (file->f_flags & __O_SYNC)
 		res |= IOCB_SYNC;
+	if (file->f_flags & O_ATOMIC)
+		res |= IOCB_ATOMIC;
 	return res;
 }
 
@@ -3435,6 +3437,7 @@ static inline int kiocb_set_rw_flags(struct kiocb *ki, rwf_t flags,
 		kiocb_flags |= IOCB_NOIO;
 	}
 	if (flags & RWF_ATOMIC) {
+		pr_err("%s RWF_ATOMIC ki->ki_flags=0x%x\n", __func__, ki->ki_flags);
 		if (rw_type != WRITE)
 			return -EOPNOTSUPP;
 		if (!(ki->ki_filp->f_mode & FMODE_CAN_ATOMIC_WRITE))

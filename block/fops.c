@@ -623,8 +623,11 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	if (!bdev)
 		return -ENXIO;
 
-	if (bdev_can_atomic_write(bdev) && filp->f_flags & O_DIRECT)
+	if (bdev_can_atomic_write(bdev) && filp->f_flags & O_DIRECT) {
+		pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS O_ATOMIC set=%d\n",
+			__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & O_ATOMIC));
 		filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
+	}
 
 	ret = bdev_open(bdev, mode, filp->private_data, NULL, filp);
 	if (ret)
