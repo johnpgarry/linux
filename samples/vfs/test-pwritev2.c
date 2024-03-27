@@ -37,7 +37,7 @@ struct statx_timestamp;
 
 #define DEFAULT_WRITE_SIZE 1024
 #define RWF_ATOMIC      (0x00000040)
-
+#define O_ATOMIC	0x800000
 int main(int argc, char **argv)
 {
 	struct iovec *iov = NULL;
@@ -69,8 +69,8 @@ int main(int argc, char **argv)
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
 		file = *argv_orig;
 	}
-
-	while ((opt = getopt(argc, argv, "l:p:PadmhS:vH")) != -1) {
+	printf("%s O_DIRECT=0x%x\n", __func__, O_DIRECT);
+	while ((opt = getopt(argc, argv, "l:p:PaAdmhS:vH")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
@@ -87,6 +87,9 @@ int main(int argc, char **argv)
 				break;
 			case 'a':
 				rw_flags |= RWF_ATOMIC;
+				break;
+			case 'A':
+				o_flags |= O_ATOMIC;
 				break;
 			case 'd':
 				if (write_size % 512) {
@@ -131,6 +134,7 @@ int main(int argc, char **argv)
 				printf("p: write offset\n");
 				printf("m: multi-vectors\n");
 				printf("a: atomic\n");
+				printf("A: use O_ATOMIC\n");
 				printf("d: direct I/O\n");
 				printf("S: vector size\n");
 				printf("P: middle start+end align to 4096\n");
