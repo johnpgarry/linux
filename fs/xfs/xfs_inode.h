@@ -321,6 +321,11 @@ static inline bool xfs_inode_has_extsize(struct xfs_inode *ip)
 	return ip->i_diflags & XFS_DIFLAG_EXTSIZE;
 }
 
+static inline bool xfs_inode_has_atomicwrites(struct xfs_inode *ip)
+{
+	return ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES;
+}
+
 /*
  * Return the buftarg used for data allocations on a given inode.
  */
