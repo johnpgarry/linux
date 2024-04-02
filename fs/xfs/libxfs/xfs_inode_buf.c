@@ -261,6 +261,13 @@ xfs_inode_from_disk(
 	}
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
+
+	if (xfs_inode_has_atomicwrites(ip) &&
+	    !bdev_can_atomic_write(ip->i_mount->m_ddev_targp->bt_bdev)) {
+
+		ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
+	}
+
 	return 0;
 
 out_destroy_data_fork:
@@ -460,6 +467,25 @@ xfs_dinode_verify_nrext64(
 	return NULL;
 }
 
+static xfs_failaddr_t
+xfs_inode_validate_atomicwrites(
+	struct xfs_mount	*mp,
+	bool			forcealign)
+{
+	/* superblock rocompat feature flag */
+	if (!xfs_has_atomicwrites(mp))
+		return __this_address;
+
+	/*
+	* forcealign is required, so rely on sanity checks in
+	* xfs_inode_validate_forcealign()
+	*/
+	if (!forcealign)
+		return __this_address;
+
+	return NULL;
+}
+
 xfs_failaddr_t
 xfs_dinode_verify(
 	struct xfs_mount	*mp,
@@ -620,6 +646,13 @@ xfs_dinode_verify(
 		fa = xfs_inode_validate_forcealign(mp, mode, flags,
 				be32_to_cpu(dip->di_extsize),
 				be32_to_cpu(dip->di_cowextsize));
+		if (fa)
+			return fa;
+	}
+
+	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		fa = xfs_inode_validate_atomicwrites(mp,
+			flags2 & XFS_DIFLAG2_FORCEALIGN);
 		if (fa)
 			return fa;
 	}

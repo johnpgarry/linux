@@ -1710,6 +1710,10 @@ xfs_fs_fill_super(
 		xfs_warn(mp,
 "EXPERIMENTAL forced data extent alignment feature in use. Use at your own risk!");
 
+	if (xfs_has_atomicwrites(mp))
+		xfs_warn(mp,
+"EXPERIMENTAL atomicwrites feature in use. Use at your own risk!");
+
 	if (xfs_has_reflink(mp)) {
 		if (mp->m_sb.sb_rblocks) {
 			xfs_alert(mp,
