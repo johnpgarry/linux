@@ -2060,6 +2060,8 @@ int
 xfs_init_buftarg(
 	struct xfs_buftarg		*btp,
 	size_t				logical_sectorsize,
+	unsigned int			awu_min,
+	unsigned int			awu_max,
 	const char			*descr)
 {
 	/* Set up device logical sector size mask */
@@ -2086,6 +2088,9 @@ xfs_init_buftarg(
 	btp->bt_shrinker->scan_objects = xfs_buftarg_shrink_scan;
 	btp->bt_shrinker->private_data = btp;
 	shrinker_register(btp->bt_shrinker);
+
+	btp->bt_bdev_awu_min = awu_min;
+	btp->bt_bdev_awu_max = awu_max;
 	return 0;
 
 out_destroy_io_count:
@@ -2102,6 +2107,7 @@ xfs_alloc_buftarg(
 {
 	struct xfs_buftarg	*btp;
 	const struct dax_holder_operations *ops = NULL;
+	unsigned int awu_min = 0, awu_max = 0;
 
 #if defined(CONFIG_FS_DAX) && defined(CONFIG_MEMORY_FAILURE)
 	ops = &xfs_dax_holder_operations;
@@ -2115,6 +2121,13 @@ xfs_alloc_buftarg(
 	btp->bt_daxdev = fs_dax_get_by_bdev(btp->bt_bdev, &btp->bt_dax_part_off,
 					    mp, ops);
 
+	if (bdev_can_atomic_write(btp->bt_bdev)) {
+		struct request_queue *q = bdev_get_queue(btp->bt_bdev);
+
+		awu_min = queue_atomic_write_unit_min_bytes(q);
+		awu_max = queue_atomic_write_unit_max_bytes(q);
+	}
+
 	/*
 	 * When allocating the buftargs we have not yet read the super block and
 	 * thus don't know the file system sector size yet.
@@ -2122,7 +2135,7 @@ xfs_alloc_buftarg(
 	if (xfs_setsize_buftarg(btp, bdev_logical_block_size(btp->bt_bdev)))
 		goto error_free;
 	if (xfs_init_buftarg(btp, bdev_logical_block_size(btp->bt_bdev),
-			mp->m_super->s_id))
+			awu_min, awu_max, mp->m_super->s_id))
 		goto error_free;
 
 	return btp;
