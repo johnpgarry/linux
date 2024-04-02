@@ -527,6 +527,8 @@ xfs_flags2diflags2(
 		di_flags2 |= XFS_DIFLAG2_COWEXTSIZE;
 	if (xflags & FS_XFLAG_FORCEALIGN)
 		di_flags2 |= XFS_DIFLAG2_FORCEALIGN;
+	if (xflags & FS_XFLAG_ATOMICWRITES)
+		di_flags2 |= XFS_DIFLAG2_ATOMICWRITES;
 
 	return di_flags2;
 }
@@ -537,12 +539,16 @@ xfs_ioctl_setattr_xflags(
 	struct xfs_inode	*ip,
 	struct fileattr		*fa)
 {
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_sb		*sbp = &mp->m_sb;
 	bool			rtflag = (fa->fsx_xflags & FS_XFLAG_REALTIME);
+	bool			atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
 
-	if (rtflag != XFS_IS_REALTIME_INODE(ip)) {
-		/* Can't change realtime flag if any extents are allocated. */
+	/* Can't change RT or atomic flags if any extents are allocated. */
+	if (rtflag != XFS_IS_REALTIME_INODE(ip) ||
+	    atomic_writes != xfs_inode_has_atomicwrites(ip)) {
 		if (ip->i_df.if_nextents || ip->i_delayed_blks)
 			return -EINVAL;
 	}
@@ -576,6 +582,17 @@ xfs_ioctl_setattr_xflags(
 					FS_XFLAG_EXTSZINHERIT)))
 			return -EINVAL;
 		if (fa->fsx_xflags & FS_XFLAG_REALTIME)
+			return -EINVAL;
+	}
+
+	if (atomic_writes) {
+		if (!xfs_has_atomicwrites(mp))
+			return -EINVAL;
+		if (target->bt_bdev_awu_min > sbp->sb_blocksize)
+			return -EINVAL;
+		if (target->bt_bdev_awu_max < fa->fsx_extsize)
+			return -EINVAL;
+		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
 	}
 

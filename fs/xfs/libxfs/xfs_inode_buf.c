@@ -178,7 +178,10 @@ xfs_inode_from_disk(
 	struct xfs_inode	*ip,
 	struct xfs_dinode	*from)
 {
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct inode		*inode = VFS_I(ip);
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_sb		*sbp = &mp->m_sb;
 	int			error;
 	xfs_failaddr_t		fa;
 
@@ -261,6 +264,13 @@ xfs_inode_from_disk(
 	}
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
+
+	if (xfs_inode_has_atomicwrites(ip)) {
+		if (sbp->sb_blocksize < target->bt_bdev_awu_min ||
+		    sbp->sb_blocksize * ip->i_extsize > target->bt_bdev_awu_max)
+			ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
+	}
+
 	return 0;
 
 out_destroy_data_fork:
@@ -480,6 +490,25 @@ xfs_dinode_verify_nrext64(
 	return NULL;
 }
 
+static xfs_failaddr_t
+xfs_inode_validate_atomicwrites(
+	struct xfs_mount	*mp,
+	bool			forcealign)
+{
+	/* superblock rocompat feature flag */
+	if (!xfs_has_atomicwrites(mp))
+		return __this_address;
+
+	/*
+	 * forcealign is required, so rely on sanity checks in
+	 * xfs_inode_validate_forcealign()
+	 */
+	if (!forcealign)
+		return __this_address;
+
+	return NULL;
+}
+
 xfs_failaddr_t
 xfs_dinode_verify(
 	struct xfs_mount	*mp,
@@ -634,7 +663,8 @@ xfs_dinode_verify(
 		return __this_address;
 
 	/* further extent size hint validation for di_flags2 */
-	fa = xfs_inode_validate_extsize2(be32_to_cpu(dip->di_extsize), flags2);
+	fa = xfs_inode_validate_extsize2(mp, be32_to_cpu(dip->di_extsize),
+			flags2);
 	if (fa)
 		return fa;
 
@@ -651,6 +681,13 @@ xfs_dinode_verify(
 
 	if (flags2 & XFS_DIFLAG2_FORCEALIGN) {
 		fa = xfs_inode_validate_forcealign(mp, mode, flags2);
+		if (fa)
+			return fa;
+	}
+
+	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		fa = xfs_inode_validate_atomicwrites(mp,
+			flags2 & XFS_DIFLAG2_FORCEALIGN);
 		if (fa)
 			return fa;
 	}
@@ -773,16 +810,35 @@ xfs_inode_validate_extsize(
  */
 xfs_failaddr_t
 xfs_inode_validate_extsize2(
+	struct xfs_mount		*mp,
 	uint32_t			extsize,
 	uint16_t			flags2)
 {
 	bool				forcealign_flag;
+	bool				atomicwrites_flag;
 
 	forcealign_flag = (flags2 & XFS_DIFLAG2_FORCEALIGN);
+	atomicwrites_flag = (flags2 & XFS_DIFLAG2_ATOMICWRITES);
 
 	/* non-zero extsize required */
-	if (forcealign_flag && extsize == 0)
+	if ((forcealign_flag || atomicwrites_flag) && extsize == 0)
 		return __this_address;
+
+	if (atomicwrites_flag) {
+		if (!is_power_of_2(extsize))
+			return __this_address;
+
+		/* Required to guarnatee data block alignment */
+		if (mp->m_sb.sb_agblocks % extsize)
+			return __this_address;
+
+		/* Requires stripe unit+width be a multiple of extsize */
+		if (mp->m_dalign && (mp->m_dalign % extsize))
+			return __this_address;
+
+		if (mp->m_swidth && (mp->m_swidth % extsize))
+			return __this_address;
+	}
 
 	return NULL;
 }

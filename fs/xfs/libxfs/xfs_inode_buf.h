@@ -30,8 +30,8 @@ xfs_failaddr_t xfs_dinode_verify(struct xfs_mount *mp, xfs_ino_t ino,
 			   struct xfs_dinode *dip);
 xfs_failaddr_t xfs_inode_validate_extsize(struct xfs_mount *mp,
 		uint32_t extsize, uint16_t mode, uint16_t flags);
-xfs_failaddr_t xfs_inode_validate_extsize2(uint32_t extsize,
-		uint16_t flags2);
+xfs_failaddr_t xfs_inode_validate_extsize2(struct xfs_mount *mp,
+		uint32_t extsize, uint16_t flags2);
 xfs_failaddr_t xfs_inode_validate_cowextsize(struct xfs_mount *mp,
 		uint32_t cowextsize, uint16_t mode, uint16_t flags,
 		uint64_t flags2);
