@@ -351,7 +351,7 @@ xfs_iwalk_run_callbacks(
 	int				*has_more)
 {
 	struct xfs_mount		*mp = iwag->mp;
-	struct xfs_inobt_rec_incore	*irec;
+	struct xfs_inobt_rec_incore __maybe_unused	*irec;
 	xfs_agino_t			next_agino;
 	int				error;
 
