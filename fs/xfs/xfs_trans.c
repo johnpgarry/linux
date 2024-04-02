@@ -598,7 +598,7 @@ xfs_trans_unreserve_and_mod_sb(
 	int64_t			rtxdelta = 0;
 	int64_t			idelta = 0;
 	int64_t			ifreedelta = 0;
-	int			error;
+	__maybe_unused int			error;
 
 	/* calculate deltas */
 	if (tp->t_blk_res > 0)
