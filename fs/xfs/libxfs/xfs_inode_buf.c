@@ -182,6 +182,8 @@ xfs_inode_from_disk(
 	int			error;
 	xfs_failaddr_t		fa;
 
+	pr_err("%s ip=%pS i_ino=%lld\n", __func__, ip, ip->i_ino);
+
 	ASSERT(ip->i_cowfp == NULL);
 
 	fa = xfs_dinode_verify(ip->i_mount, ip->i_ino, from);
@@ -248,6 +250,7 @@ xfs_inode_from_disk(
 					   be64_to_cpu(from->di_changecount));
 		ip->i_crtime = xfs_inode_from_disk_ts(from, from->di_crtime);
 		ip->i_diflags2 = be64_to_cpu(from->di_flags2);
+		pr_err("%s2 ip=%pS i_ino=%lld set i_diflags2\n", __func__, ip, ip->i_ino);
 		ip->i_cowextsize = be32_to_cpu(from->di_cowextsize);
 	}
 
@@ -342,6 +345,7 @@ xfs_inode_to_disk(
 		to->di_changecount = cpu_to_be64(inode_peek_iversion(inode));
 		to->di_crtime = xfs_inode_to_disk_ts(ip, ip->i_crtime);
 		to->di_flags2 = cpu_to_be64(ip->i_diflags2);
+		pr_err("%s setting to->di_flags2\n", __func__);
 		to->di_cowextsize = cpu_to_be32(ip->i_cowextsize);
 		to->di_ino = cpu_to_be64(ip->i_ino);
 		to->di_lsn = cpu_to_be64(lsn);
@@ -474,7 +478,7 @@ xfs_dinode_verify(
 	xfs_extnum_t		nextents;
 	xfs_extnum_t		naextents;
 	xfs_filblks_t		nblocks;
-
+	pr_err("%s ino=%lld\n", __func__, ino);
 	if (dip->di_magic != cpu_to_be16(XFS_DINODE_MAGIC))
 		return __this_address;
 
@@ -581,6 +585,8 @@ xfs_dinode_verify(
 	}
 
 	/* extent size hint validation */
+	pr_err("%s4 calling ino=%lld xfs_inode_validate_extsize\n",
+		__func__, ino);
 	fa = xfs_inode_validate_extsize(mp, be32_to_cpu(dip->di_extsize),
 			mode, flags);
 	if (fa)
@@ -616,12 +622,20 @@ xfs_dinode_verify(
 	    !xfs_has_bigtime(mp))
 		return __this_address;
 
+	pr_err("%s5 ino=%lld XFS_DIFLAG2_FORCEALIGN set=%d XFS_DIFLAG2_ATOMICWRITES set=%d maybe calling xfs_inode_validate_forcealign\n",
+		__func__, ino,
+		!!(flags2 & XFS_DIFLAG2_FORCEALIGN),
+		!!(flags2 & XFS_DIFLAG2_ATOMICWRITES));
 	if (flags2 & XFS_DIFLAG2_FORCEALIGN) {
 		fa = xfs_inode_validate_forcealign(mp, mode, flags,
 				be32_to_cpu(dip->di_extsize),
 				be32_to_cpu(dip->di_cowextsize));
 		if (fa)
 			return fa;
+	}
+
+	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		pr_err("%s6 would call xfs_inode_validate_atomicwrites\n", __func__);
 	}
 
 	return NULL;
@@ -675,6 +689,7 @@ xfs_inode_validate_extsize(
 	hint_flag = (flags & XFS_DIFLAG_EXTSIZE);
 	inherit_flag = (flags & XFS_DIFLAG_EXTSZINHERIT);
 	extsize_bytes = XFS_FSB_TO_B(mp, extsize);
+	pr_err("%s\n", __func__);
 
 	/*
 	 * This comment describes a historic gap in this verifier function.
@@ -801,6 +816,7 @@ xfs_inode_validate_forcealign(
 	uint32_t		extsize,
 	uint32_t		cowextsize)
 {
+	pr_err("%s\n", __func__);
 	/* superblock rocompat feature flag */
 	if (!xfs_has_forcealign(mp))
 		return __this_address;

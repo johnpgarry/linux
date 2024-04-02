@@ -1252,7 +1252,8 @@ static bool xfs_file_open_can_atomicwrite(
 
 	if (!(file->f_flags & O_DIRECT))
 		return false;
-
+	pr_err("%s xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
+		__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev));
 	if (!xfs_inode_has_atomicwrites(ip))
 		return false;
 

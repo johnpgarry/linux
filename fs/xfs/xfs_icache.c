@@ -106,6 +106,7 @@ xfs_inode_alloc(
 	ip->i_flags = 0;
 	ip->i_delayed_blks = 0;
 	ip->i_diflags2 = mp->m_ino_geo.new_diflags2;
+	pr_err("%s setting i_diflags2\n", __func__);
 	ip->i_nblocks = 0;
 	ip->i_forkoff = 0;
 	ip->i_sick = 0;

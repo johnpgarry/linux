@@ -668,6 +668,7 @@ xfs_inode_inherit_flags(
 	unsigned int		di_flags = 0;
 	xfs_failaddr_t		failaddr;
 	umode_t			mode = VFS_I(ip)->i_mode;
+	pr_err("%s ip=%pS i_ino=%lld S_ISDIR=%d\n", __func__, ip, ip->i_ino, S_ISDIR(mode));
 
 	if (S_ISDIR(mode)) {
 		if (pip->i_diflags & XFS_DIFLAG_RTINHERIT)
@@ -717,6 +718,8 @@ xfs_inode_inherit_flags(
 	 * trip the verifiers.  Validate the hint settings in the new file so
 	 * that we don't let broken hints propagate.
 	 */
+	pr_err("%s calling ip=%pS i_ino=%lld xfs_inode_validate_extsize\n",
+		__func__, ip, ip->i_ino);
 	failaddr = xfs_inode_validate_extsize(ip->i_mount, ip->i_extsize,
 			VFS_I(ip)->i_mode, ip->i_diflags);
 	if (failaddr) {
@@ -742,7 +745,7 @@ xfs_inode_inherit_flags2(
 		ip->i_diflags2 |= XFS_DIFLAG2_DAX;
 	if (pip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN)
 		ip->i_diflags2 |= XFS_DIFLAG2_FORCEALIGN;
-
+	pr_err("%s inherit atomic? XFS_DIFLAG2_FORCEALIGN for pip=%d\n", __func__, !!(pip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN));
 	/* Don't let invalid cowextsize hints propagate. */
 	failaddr = xfs_inode_validate_cowextsize(ip->i_mount, ip->i_cowextsize,
 			VFS_I(ip)->i_mode, ip->i_diflags, ip->i_diflags2);
@@ -751,6 +754,9 @@ xfs_inode_inherit_flags2(
 		ip->i_cowextsize = 0;
 	}
 
+	pr_err("%s2 XFS_DIFLAG2_FORCEALIGN set=%d XFS_DIFLAG2_ATOMICWRITES set=%d maybe calling xfs_inode_validate_forcealign\n",
+		__func__, !!(ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN),
+		!!(ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES));
 	if (ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN) {
 		failaddr = xfs_inode_validate_forcealign(ip->i_mount,
 				VFS_I(ip)->i_mode, ip->i_diflags, ip->i_extsize,
@@ -2505,6 +2511,7 @@ xfs_ifree(
 	VFS_I(ip)->i_mode = 0;		/* mark incore inode as free */
 	ip->i_diflags = 0;
 	ip->i_diflags2 = mp->m_ino_geo.new_diflags2;
+	pr_err("%s setting i_diflags2\n", __func__);
 	ip->i_forkoff = 0;		/* mark the attr fork not in use */
 	ip->i_df.if_format = XFS_DINODE_FMT_EXTENTS;
 	if (xfs_iflags_test(ip, XFS_IPRESERVE_DM_FIELDS))
