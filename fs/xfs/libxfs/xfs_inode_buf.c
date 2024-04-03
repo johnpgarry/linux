@@ -182,7 +182,7 @@ xfs_inode_from_disk(
 	int			error;
 	xfs_failaddr_t		fa;
 
-	pr_err("%s ip=%pS i_ino=%lld\n", __func__, ip, ip->i_ino);
+	pr_err("%s ip=%pS i_ino=%lld calling xfs_dinode_verify\n", __func__, ip, ip->i_ino);
 
 	ASSERT(ip->i_cowfp == NULL);
 

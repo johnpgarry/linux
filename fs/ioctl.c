@@ -467,6 +467,9 @@ void fileattr_fill_xflags(struct fileattr *fa, u32 xflags)
 	memset(fa, 0, sizeof(*fa));
 	fa->fsx_valid = true;
 	fa->fsx_xflags = xflags;
+	pr_err("%s FS_XFLAG_FORCEALIGN set=%d FS_XFLAG_ATOMICWRITES set=%d\n",
+		__func__, !!(xflags & FS_XFLAG_FORCEALIGN),
+		!!(xflags & FS_XFLAG_ATOMICWRITES));
 	if (fa->fsx_xflags & FS_XFLAG_IMMUTABLE)
 		fa->flags |= FS_IMMUTABLE_FL;
 	if (fa->fsx_xflags & FS_XFLAG_APPEND)

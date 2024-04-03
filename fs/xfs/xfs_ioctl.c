@@ -994,6 +994,7 @@ xfs_fill_fsxattr(
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, whichfork);
 
+	pr_err("%s calling fileattr_fill_xflags ip=%pS\n", __func__, ip);
 	fileattr_fill_xflags(fa, xfs_ip2xflags(ip));
 
 	if (ip->i_diflags & XFS_DIFLAG_EXTSIZE) {
@@ -1128,7 +1129,7 @@ xfs_ioctl_setattr_xflags(
 	bool			rtflag = (fa->fsx_xflags & FS_XFLAG_REALTIME);
 	bool			atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
-
+	pr_err("%s\n", __func__);
 	/* Can't change RT or atomic flags if any extents are allocated. */
 	if (rtflag != XFS_IS_REALTIME_INODE(ip) ||
 	    atomic_writes != xfs_inode_has_atomicwrites(ip)) {
@@ -1170,7 +1171,7 @@ xfs_ioctl_setattr_xflags(
 
 	if (atomic_writes) {
 		struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
-		pr_err("%s ip=%pS ip->i_ino=%lld atomic_writes set FS_XFLAG_FORCEALIGN=%d xfs_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
+		pr_err("%s2 ip=%pS ip->i_ino=%lld atomic_writes set FS_XFLAG_FORCEALIGN=%d xfs_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
 			__func__, ip, ip->i_ino,
 			!!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN), xfs_has_atomicwrites(mp),
 			bdev_can_atomic_write(target->bt_bdev));

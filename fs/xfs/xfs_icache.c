@@ -616,6 +616,7 @@ xfs_iget_cache_miss(
 	xfs_agino_t		agino = XFS_INO_TO_AGINO(mp, ino);
 	int			iflags;
 
+	pr_err("%s calling xfs_inode_alloc\n", __func__);
 	ip = xfs_inode_alloc(mp, ino);
 	if (!ip)
 		return -ENOMEM;
@@ -644,8 +645,10 @@ xfs_iget_cache_miss(
 		if (error)
 			goto out_destroy;
 
+		pr_err("%s2 calling xfs_inode_from_disk\n", __func__);
 		error = xfs_inode_from_disk(ip,
 				xfs_buf_offset(bp, ip->i_imap.im_boffset));
+		pr_err("%s2.1 called xfs_inode_from_disk\n", __func__);
 		if (!error)
 			xfs_buf_set_ref(bp, XFS_INO_REF);
 		else
