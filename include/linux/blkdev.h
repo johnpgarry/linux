@@ -1648,7 +1648,7 @@ static inline bool bdev_can_atomic_write(struct block_device *bdev)
 		unsigned int alignment =
 			max(limits->atomic_write_unit_min,
 			    limits->atomic_write_hw_boundary);
-		if (!IS_ALIGNED(bd_start_sect, alignment))
+		if (!IS_ALIGNED(bd_start_sect, alignment >> SECTOR_SHIFT))
 			return false;
 	}
 
