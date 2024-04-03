@@ -1257,9 +1257,6 @@ static bool xfs_file_open_can_atomicwrite(
 	if (!xfs_inode_has_atomicwrites(ip))
 		return false;
 
-	if (!bdev_can_atomic_write(target->bt_bdev))
-		return false;
-
 	return true;
 }
 
