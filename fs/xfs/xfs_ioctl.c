@@ -1176,6 +1176,8 @@ xfs_ioctl_setattr_xflags(
 			bdev_can_atomic_write(target->bt_bdev));
 		if (!xfs_has_atomicwrites(mp))
 			return -EINVAL;
+		if (!bdev_can_atomic_write(target->bt_bdev))
+			return -EINVAL;
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
 	}
