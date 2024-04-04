@@ -124,6 +124,8 @@ struct xfs_buftarg {
 	struct percpu_counter	bt_io_count;
 	struct ratelimit_state	bt_ioerror_rl;
 
+	unsigned int		awu_min, awu_max; /* from bt_bdev only */
+
 	/* built-in cache, if we're not using the perag one */
 	struct xfs_buf_cache	bt_cache[];
 };
@@ -393,6 +395,8 @@ bool xfs_verify_magic16(struct xfs_buf *bp, __be16 dmagic);
 
 /* for xfs_buf_mem.c only: */
 int xfs_init_buftarg(struct xfs_buftarg *btp, size_t logical_sectorsize,
+		unsigned int awu_min,
+		unsigned int awu_max,
 		const char *descr);
 void xfs_destroy_buftarg(struct xfs_buftarg *btp);
 

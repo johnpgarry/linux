@@ -2057,6 +2057,8 @@ int
 xfs_init_buftarg(
 	struct xfs_buftarg		*btp,
 	size_t				logical_sectorsize,
+	unsigned int			awu_min,
+	unsigned int			awu_max,
 	const char			*descr)
 {
 	/* Set up device logical sector size mask */
@@ -2083,6 +2085,9 @@ xfs_init_buftarg(
 	btp->bt_shrinker->scan_objects = xfs_buftarg_shrink_scan;
 	btp->bt_shrinker->private_data = btp;
 	shrinker_register(btp->bt_shrinker);
+
+	btp->awu_min = awu_min;
+	btp->awu_max = awu_max;
 	return 0;
 
 out_destroy_io_count:
@@ -2119,6 +2124,8 @@ xfs_alloc_buftarg(
 	if (xfs_setsize_buftarg(btp, bdev_logical_block_size(btp->bt_bdev)))
 		goto error_free;
 	if (xfs_init_buftarg(btp, bdev_logical_block_size(btp->bt_bdev),
+			queue_atomic_write_unit_min_bytes(bdev_get_queue(btp->bt_bdev)),
+			queue_atomic_write_unit_max_bytes(bdev_get_queue(btp->bt_bdev)),
 			mp->m_super->s_id))
 		goto error_free;
 

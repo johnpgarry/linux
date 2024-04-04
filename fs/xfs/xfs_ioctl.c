@@ -1173,6 +1173,8 @@ xfs_ioctl_setattr_xflags(
 			return -EINVAL;
 		if (!bdev_can_atomic_write(xfs_inode_buftarg(ip)->bt_bdev))
 			return -EINVAL;
+		pr_err("%s xfs_inode_buftarg(ip) awu_min=%d, max=%d\n",
+			__func__, xfs_inode_buftarg(ip)->awu_min, xfs_inode_buftarg(ip)->awu_max);
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
 	}

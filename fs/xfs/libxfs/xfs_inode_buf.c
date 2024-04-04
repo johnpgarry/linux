@@ -262,6 +262,9 @@ xfs_inode_from_disk(
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
 
+	if (xfs_inode_has_atomicwrites(ip))
+		pr_err("%s xfs_inode_buftarg(ip) awu_min=%d, max=%d\n",
+			__func__, xfs_inode_buftarg(ip)->awu_min, xfs_inode_buftarg(ip)->awu_max);
 	if (xfs_inode_has_atomicwrites(ip) &&
 	    !bdev_can_atomic_write(ip->i_mount->m_ddev_targp->bt_bdev)) {
 
@@ -651,6 +654,7 @@ xfs_dinode_verify(
 	}
 
 	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		pr_err("%s calling xfs_inode_validate_atomicwrites\n", __func__);
 		fa = xfs_inode_validate_atomicwrites(mp,
 			flags2 & XFS_DIFLAG2_FORCEALIGN);
 		if (fa)
