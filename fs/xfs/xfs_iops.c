@@ -553,8 +553,6 @@ xfs_get_atomic_write_attr(
 	unsigned int		*unit_max)
 {
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
-	struct block_device	*bdev = target->bt_bdev;
-	struct request_queue	*q = bdev->bd_queue;
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_sb		*sbp = &mp->m_sb;
 	unsigned int		extsz_bytes = XFS_FSB_TO_B(mp, ip->i_extsize);
@@ -566,11 +564,8 @@ xfs_get_atomic_write_attr(
 	}
 
 	/* Floor at FS block size */
-	*unit_min = max(queue_atomic_write_unit_min_bytes(q),
-			sbp->sb_blocksize);
-	
-	*unit_max = min(queue_atomic_write_unit_max_bytes(q),
-			extsz_bytes);
+	*unit_min = max(target->bt_bdev_awu_min, sbp->sb_blocksize);
+	*unit_max = min(target->bt_bdev_awu_max, extsz_bytes);
 }
 
 STATIC int

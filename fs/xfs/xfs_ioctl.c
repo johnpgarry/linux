@@ -1125,6 +1125,7 @@ xfs_ioctl_setattr_xflags(
 	struct fileattr		*fa)
 {
 	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_sb		*sbp = &mp->m_sb;
 	bool			rtflag = (fa->fsx_xflags & FS_XFLAG_REALTIME);
 	bool			atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
@@ -1176,10 +1177,12 @@ xfs_ioctl_setattr_xflags(
 			bdev_can_atomic_write(target->bt_bdev));
 		if (!xfs_has_atomicwrites(mp))
 			return -EINVAL;
-		if (!bdev_can_atomic_write(xfs_inode_buftarg(ip)->bt_bdev))
+		pr_err("%s2 xfs_inode_buftarg(ip) awu_min=%d, max=%d\n",
+			__func__, xfs_inode_buftarg(ip)->bt_bdev_awu_min, xfs_inode_buftarg(ip)->bt_bdev_awu_max);
+		if (xfs_inode_buftarg(ip)->bt_bdev_awu_min > sbp->sb_blocksize)
 			return -EINVAL;
-		pr_err("%s xfs_inode_buftarg(ip) awu_min=%d, max=%d\n",
-			__func__, xfs_inode_buftarg(ip)->awu_min, xfs_inode_buftarg(ip)->awu_max);
+		if (sbp->sb_blocksize > xfs_inode_buftarg(ip)->bt_bdev_awu_max)
+			return -EINVAL;
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
 	}

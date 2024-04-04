@@ -124,7 +124,7 @@ struct xfs_buftarg {
 	struct percpu_counter	bt_io_count;
 	struct ratelimit_state	bt_ioerror_rl;
 
-	unsigned int		awu_min, awu_max; /* from bt_bdev only */
+	unsigned int		bt_bdev_awu_min, bt_bdev_awu_max;
 
 	/* built-in cache, if we're not using the perag one */
 	struct xfs_buf_cache	bt_cache[];

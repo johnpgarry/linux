@@ -181,6 +181,8 @@ xfs_inode_from_disk(
 	struct inode		*inode = VFS_I(ip);
 	int			error;
 	xfs_failaddr_t		fa;
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_sb		*sbp = &mp->m_sb;
 
 	pr_err("%s ip=%pS i_ino=%lld\n", __func__, ip, ip->i_ino);
 
@@ -265,13 +267,16 @@ xfs_inode_from_disk(
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
 
-	if (xfs_inode_has_atomicwrites(ip))
-		pr_err("%s xfs_inode_buftarg(ip) awu_min=%d, max=%d\n",
-			__func__, xfs_inode_buftarg(ip)->awu_min, xfs_inode_buftarg(ip)->awu_max);
-	if (xfs_inode_has_atomicwrites(ip) &&
-	    !bdev_can_atomic_write(ip->i_mount->m_ddev_targp->bt_bdev)) {
+	if (xfs_inode_has_atomicwrites(ip)) {
 
-		ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
+		pr_err("%s3 has_atomicwrites = 1, xfs_inode_buftarg(ip) bt_bdev_awu_min=%d, bt_bdev_awu_max=%d\n",
+			__func__, xfs_inode_buftarg(ip)->bt_bdev_awu_min, xfs_inode_buftarg(ip)->bt_bdev_awu_max);
+
+	    if (sbp->sb_blocksize > xfs_inode_buftarg(ip)->bt_bdev_awu_max ||
+			xfs_inode_buftarg(ip)->bt_bdev_awu_min > sbp->sb_blocksize) {
+			ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
+			pr_err("%s4 clearing XFS_DIFLAG2_ATOMICWRITES\n", __func__);
+	    }
 	}
 
 	return 0;
@@ -664,7 +669,7 @@ xfs_dinode_verify(
 	}
 
 	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
-		pr_err("%s calling xfs_inode_validate_atomicwrites\n", __func__);
+		pr_err("%s6 calling xfs_inode_validate_atomicwrites\n", __func__);
 		fa = xfs_inode_validate_atomicwrites(mp,
 			flags2 & XFS_DIFLAG2_FORCEALIGN);
 		if (fa)
