@@ -308,6 +308,8 @@ xfs_file_buffered_read(
 {
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	ssize_t			ret;
+	pr_err("%s iocb=%pS pos=%lld to=%pS len=%zd\n",
+		__func__, iocb, iocb->ki_pos, to, iov_iter_count(to));
 
 	trace_xfs_file_buffered_read(iocb, to);
 
@@ -791,8 +793,12 @@ xfs_file_buffered_write(
 	ssize_t			ret;
 	bool			cleared_space = false;
 	unsigned int		iolock;
+	int mycount = 0;
 
 write_retry:
+	pr_err("%s count=%d write_retry: iocb=%pS pos=%lld from=%pS len=%zd\n",
+		__func__, mycount, iocb, iocb->ki_pos, from, iov_iter_count(from));
+	mycount++;
 	iolock = XFS_IOLOCK_EXCL;
 	ret = xfs_ilock_iocb(iocb, iolock);
 	if (ret)

@@ -1007,12 +1007,17 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *i,
 		.flags		= IOMAP_WRITE,
 	};
 	ssize_t ret;
+	pr_err("%s iocb=%pS pos=%lld from=%pS len=%zd\n",
+		__func__, iocb, iocb->ki_pos, i, iov_iter_count(i));
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iter.flags |= IOMAP_NOWAIT;
 
-	while ((ret = iomap_iter(&iter, ops)) > 0)
+	while ((ret = iomap_iter(&iter, ops)) > 0) {
+		pr_err("%s1 calling iomap_write_iter iocb=%pS pos=%lld from=%pS len=%zd\n",
+			__func__, iocb, iocb->ki_pos, i, iov_iter_count(i));
 		iter.processed = iomap_write_iter(&iter, i);
+	}
 
 	if (unlikely(iter.pos == iocb->ki_pos))
 		return ret;
