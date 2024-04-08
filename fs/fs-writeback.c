@@ -1652,6 +1652,8 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 
 	trace_writeback_single_inode_start(inode, wbc, nr_to_write);
 
+	pr_err("%s mapping=%pS wbc->nr_to_write=%ld, ->range_start=%lld, ->range_end=%lld\n", __func__,
+		mapping, wbc->nr_to_write, wbc->range_start, wbc->range_end);
 	ret = do_writepages(mapping, wbc);
 
 	/*
@@ -2075,6 +2077,7 @@ static long wb_writeback(struct bdi_writeback *wb,
 	long progress;
 	struct blk_plug plug;
 
+	pr_err("%s nr_pages=%ld\n", __func__, nr_pages);
 	blk_start_plug(&plug);
 	for (;;) {
 		/*

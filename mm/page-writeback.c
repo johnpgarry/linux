@@ -2565,7 +2565,12 @@ int write_cache_pages(struct address_space *mapping,
 	struct folio *folio = NULL;
 	int error;
 
+	pr_err("%s calling writeback_iter wbc->range_start=%lld, range_end=%lld\n",
+		__func__, wbc->range_start, wbc->range_end);
 	while ((folio = writeback_iter(mapping, wbc, folio, &error))) {
+	pr_err("%s2 called writeback_iter wbc->range_start=%lld, range_end=%lld folio=%pS folio_pos=%lld folio_size=%zd\n",
+		__func__, wbc->range_start, wbc->range_end,
+		folio, folio_pos(folio), folio_size(folio));
 		error = writepage(folio, wbc, data);
 		if (error == AOP_WRITEPAGE_ACTIVATE) {
 			folio_unlock(folio);

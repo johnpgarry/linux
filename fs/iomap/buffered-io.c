@@ -1814,6 +1814,8 @@ static int iomap_add_to_ioend(struct iomap_writepage_ctx *wpc,
 	size_t poff = offset_in_folio(folio, pos);
 	int error;
 
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
+
 	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, pos)) {
 new_ioend:
 		error = iomap_submit_ioend(wpc, 0);
@@ -1951,7 +1953,20 @@ static int iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 	unsigned count = 0;
 	int error = 0;
 	u32 rlen;
+	struct iomap *iomap = &wpc->iomap;
+#if 0
+	u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
 
+#endif
+
+	pr_err("%s folio=%pS pos=%lld end_pos=%lld iomap=%pS addr=%lld, offset=%lld, length=%lld wbc->range_start=%lld, range_end=%lld\n",
+		__func__, folio, pos, end_pos, iomap, iomap->addr,
+		iomap->offset, iomap->length,
+		wbc->range_start, wbc->range_end);
 	WARN_ON_ONCE(!folio_test_locked(folio));
 	WARN_ON_ONCE(folio_test_dirty(folio));
 	WARN_ON_ONCE(folio_test_writeback(folio));
@@ -1989,7 +2004,9 @@ static int iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 	/*
 	 * Walk through the folio to find dirty areas to write back.
 	 */
+	pr_err("%s2 calling iomap_find_dirty_range folio=%pS pos=%lld end_pos=%lld\n", __func__, folio, pos, end_pos);
 	while ((rlen = iomap_find_dirty_range(folio, &pos, end_pos))) {
+		pr_err("%s3 folio=%pS pos=%lld end_pos=%lld rlen=%d\n", __func__, folio, pos, end_pos, rlen);
 		error = iomap_writepage_map_blocks(wpc, wbc, folio, inode,
 				pos, rlen, &count);
 		if (error)
@@ -2029,6 +2046,8 @@ static int iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 static int iomap_do_writepage(struct folio *folio,
 		struct writeback_control *wbc, void *data)
 {
+	pr_err("%s folio=%pS folio_pos=%lld folio_size=%zd\n",
+		__func__, folio, folio_pos(folio), folio_size(folio));
 	return iomap_writepage_map(data, wbc, folio);
 }
 
@@ -2048,7 +2067,10 @@ iomap_writepages(struct address_space *mapping, struct writeback_control *wbc,
 		return -EIO;
 
 	wpc->ops = ops;
+	pr_err("%s calling write_cache_pages wbc->range_start=%lld, range_end=%lld\n",
+		__func__, wbc->range_start, wbc->range_end);
 	ret = write_cache_pages(mapping, wbc, iomap_do_writepage, wpc);
+	pr_err("%s2 calling iomap_submit_ioend\n", __func__);
 	return iomap_submit_ioend(wpc, ret);
 }
 EXPORT_SYMBOL_GPL(iomap_writepages);
