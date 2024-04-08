@@ -723,7 +723,7 @@ xfs_file_dio_write(
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
 		if (!generic_atomic_write_valid_size(iocb->ki_pos, from,
-			i_blocksize(inode), XFS_FSB_TO_B(mp, ip->i_extsize))) {
+			XFS_FSB_TO_B(mp, ip->i_extsize), XFS_FSB_TO_B(mp, ip->i_extsize))) {
 			return -EINVAL;
 		}
 	}
