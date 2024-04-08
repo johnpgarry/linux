@@ -35,8 +35,8 @@ struct statx_timestamp;
 #define __NR_statx -1
 #endif
 
-#define DEFAULT_WRITE_SIZE 1024
 #define RWF_ATOMIC      (0x00000040)
+#define DEFAULT_READ_SIZE 1024
 
 int main(int argc, char **argv)
 {
@@ -45,21 +45,19 @@ int main(int argc, char **argv)
 	int rw_flags = RWF_SYNC;
 	int o_flags = O_RDWR;
 	int opt = 0;
-	unsigned int write_size = DEFAULT_WRITE_SIZE;
 	char *file = NULL;
 	char **argv_orig = argv;
 	int argc_i;
 	int middle_start_end_align_4096 = 0;
 	int large_vectors = 0;
-	int i, remain;
+	int i;
 	int multi_vectors = 0;
+	unsigned int read_size = DEFAULT_READ_SIZE;
 	int byte_index;
 	int multi_vector_alloc_size = -1;
 	int ret;
 	loff_t pos = 0;
 	char *read_buffer = NULL;
-	int verify = 0;
-	int demo_hch_problem = 0;
 
 	argv_orig++;
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
@@ -69,12 +67,12 @@ int main(int argc, char **argv)
 	while ((opt = getopt(argc, argv, "l:p:PadmhS:vH")) != -1) {
 		switch (opt) {
 			case 'l':
-				write_size = atoi(optarg);
-				if (write_size == 0) {
+				read_size = atoi(optarg);
+				if (read_size == 0) {
 					printf("write size cannot be zero\n");
 					exit(0);
 				}
-				if (write_size % 512) {
+				if (read_size % 512) {
 					printf("write size must be multiple of 512\n");
 					exit(0);
 				}
@@ -95,9 +93,6 @@ int main(int argc, char **argv)
 			case 'd':
 				o_flags |= O_DIRECT;
 				break;
-			case 'v':
-				verify = 1;
-				break;
 			case 'P':
 				middle_start_end_align_4096 = 1;
 				break;
@@ -112,16 +107,10 @@ int main(int argc, char **argv)
 					exit(0);
 				}
 				break;
-			case 'H':
-				demo_hch_problem = 1;
-				multi_vectors = 1;
-				multi_vector_alloc_size = 4096 * 2;
-				write_size = 1024 * 256;
-				break;
 			case 'h':
 				printf("Options:\n");
-				printf("l: write size\n");
-				printf("p: write offset\n");
+				printf("l: read size\n");
+				printf("p: read offset\n");
 				printf("m: multi-vectors\n");
 				printf("a: atomic\n");
 				printf("d: direct I/O\n");
@@ -137,28 +126,27 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	printf("preadv2 rw_flags=0x%x o_flags=0x%x\n", __func__, rw_flags, o_flags);
-	read_buffer = malloc(write_size);
+	printf("preadv2 rw_flags=0x%x o_flags=0x%x\n", rw_flags, o_flags);
+	read_buffer = malloc(read_size);
 	if (!read_buffer) {
 		printf("could not alloc read buffer\n");
 		return -1;
 	}
 	struct iovec iov_read = {
 		.iov_base = read_buffer,
-		.iov_len = write_size,
+		.iov_len = read_size,
 	};
 	int dataread = preadv2(fd, &iov_read, 1, pos, rw_flags);
-	if (dataread == write_size) {
+	if (dataread == read_size) {
 		ret = 0;
 	} else {
-		printf("read incorrect amount of data, wanted=%d got=%d\n", write_size, dataread);
+		printf("read incorrect amount of data, wanted=%d got=%d\n", read_size, dataread);
 		return -1;
 	}
 
-	remain = write_size;
 	char *read_data = read_buffer;
 
-	printf("read back and compared ok data, wanted size=%d got=%d\n", write_size, dataread);
+	printf("read back and compared ok data, wanted size=%d got=%d\n", read_size, dataread);
 end:
 	close(fd);
 	free(read_buffer);
