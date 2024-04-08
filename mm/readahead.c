@@ -179,7 +179,7 @@ static void read_pages(struct readahead_control *rac)
 		while ((folio = readahead_folio(rac)) != NULL)
 			aops->read_folio(rac->file, folio);
 	}
-
+	pr_err("%s calling blk_finish_plug\n", __func__);
 	blk_finish_plug(&plug);
 	if (unlikely(rac->_workingset))
 		psi_memstall_leave(&rac->_pflags);

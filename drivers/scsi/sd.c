@@ -1355,7 +1355,7 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 	else
 		protect = 0;
 
-	WARN(nr_blocks == 16384 / 512, "lba=%lld write=%d ATOMIC=%d\n",
+	WARN(nr_blocks == 32768 / 512, "lba=%lld write=%d ATOMIC=%d\n",
 		lba, write, !!(rq->cmd_flags & REQ_ATOMIC));
 
 	if (protect && sdkp->protection_type == T10_PI_TYPE2_PROTECTION) {
