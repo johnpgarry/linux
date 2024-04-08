@@ -78,17 +78,9 @@ int main(int argc, char **argv)
 					printf("write size cannot be zero\n");
 					exit(0);
 				}
-				if (write_size % 512) {
-					printf("write size must be multiple of 512\n");
-					exit(0);
-				}
 				break;
 			case 'p':
 				pos = atoi(optarg);
-				if (pos % 512) {
-					printf("pos must be multiple of 512\n");
-					exit(0);
-				}
 				break;
 			case 'm':
 				multi_vectors = 1;
@@ -97,6 +89,14 @@ int main(int argc, char **argv)
 				rw_flags |= RWF_ATOMIC;
 				break;
 			case 'd':
+				if (write_size % 512) {
+					printf("write size must be multiple of 512\n");
+					exit(0);
+				}
+				if (pos % 512) {
+					printf("pos must be multiple of 512\n");
+					exit(0);
+				}
 				o_flags |= O_DIRECT;
 				break;
 			case 'v':
