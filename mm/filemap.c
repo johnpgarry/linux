@@ -2575,7 +2575,12 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 	bool writably_mapped;
 	loff_t isize, end_offset;
 	loff_t last_pos = ra->prev_pos;
+	bool special = (iov_iter_count(iter) == 16384);
+	int mycount = 0;
 
+	if (special)
+		pr_err("%s iocb=%pS pos=%lld iter=%pS len=%zd\n",
+			__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter));
 	if (unlikely(iocb->ki_pos >= inode->i_sb->s_maxbytes))
 		return 0;
 	if (unlikely(!iov_iter_count(iter)))
@@ -2587,6 +2592,10 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 	do {
 		cond_resched();
 
+		if (special)
+			pr_err("%s1 looping count=%d iocb=%pS pos=%lld iter=%pS len=%zd\n",
+				__func__, mycount, iocb, iocb->ki_pos, iter, iov_iter_count(iter));
+		mycount++;
 		/*
 		 * If we've already successfully copied some data, then we
 		 * can no longer safely return -EIOCBQUEUED. Hence mark
@@ -2598,9 +2607,21 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		if (unlikely(iocb->ki_pos >= i_size_read(inode)))
 			break;
 
+		if (special)
+			pr_err("%s1.1 calling filemap_get_pages iocb=%pS pos=%lld iter=%pS len=%zd\n",
+				__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter));
 		error = filemap_get_pages(iocb, iter->count, &fbatch, false);
 		if (error < 0)
 			break;
+		if (special) {
+			if (fbatch.nr == 1) {
+				struct folio *johnfolio = fbatch.folios[0];
+				pr_err("%s1.2 called filemap_get_pages iocb=%pS pos=%lld iter=%pS len=%zd fbatch.nr=%d folios[0]=%pS pos=%lld len=%zd\n",
+					__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), fbatch.nr, johnfolio, folio_pos(johnfolio), folio_size(johnfolio));
+			} else
+				pr_err("%s1.2 called filemap_get_pages iocb=%pS pos=%lld iter=%pS len=%zd fbatch.nr=%d\n",
+					__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), fbatch.nr);
+		}
 
 		/*
 		 * i_size must be checked after we know the pages are Uptodate.
@@ -2611,9 +2632,15 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		 * another truncate extends the file - this is desired though).
 		 */
 		isize = i_size_read(inode);
+		if (special)
+			pr_err("%s3 iocb=%pS pos=%lld iter=%pS len=%zd isize=%lld\n",
+				__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), isize);
 		if (unlikely(iocb->ki_pos >= isize))
 			goto put_folios;
 		end_offset = min_t(loff_t, isize, iocb->ki_pos + iter->count);
+		if (special)
+			pr_err("%s4 iocb=%pS pos=%lld iter=%pS len=%zd isize=%lld end_offset=%lld\n",
+				__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), isize, end_offset);
 
 		/*
 		 * Once we start copying data, we don't want to be touching any

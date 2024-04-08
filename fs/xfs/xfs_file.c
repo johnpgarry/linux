@@ -723,7 +723,7 @@ xfs_file_dio_write(
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
 		if (!generic_atomic_write_valid_size(iocb->ki_pos, from,
-			XFS_FSB_TO_B(mp, ip->i_extsize), XFS_FSB_TO_B(mp, ip->i_extsize))) {
+			XFS_FSB_TO_B(mp, 1), XFS_FSB_TO_B(mp, ip->i_extsize))) {
 			return -EINVAL;
 		}
 	}
@@ -795,9 +795,18 @@ xfs_file_buffered_write(
 	unsigned int		iolock;
 	int mycount = 0;
 
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		struct xfs_mount	*mp = ip->i_mount;
+		if (!generic_atomic_write_valid_size(iocb->ki_pos, from,
+			XFS_FSB_TO_B(mp, 1), XFS_FSB_TO_B(mp, ip->i_extsize))) {
+			return -EINVAL;
+		}
+	}
+
 write_retry:
-	pr_err("%s count=%d write_retry: iocb=%pS pos=%lld from=%pS len=%zd\n",
-		__func__, mycount, iocb, iocb->ki_pos, from, iov_iter_count(from));
+	if (iocb->ki_flags & IOCB_ATOMIC)
+		pr_err("%s count=%d write_retry: ATOMIC iocb=%pS pos=%lld from=%pS len=%zd\n",
+			__func__, mycount, iocb, iocb->ki_pos, from, iov_iter_count(from));
 	mycount++;
 	iolock = XFS_IOLOCK_EXCL;
 	ret = xfs_ilock_iocb(iocb, iolock);
@@ -1256,10 +1265,8 @@ static bool xfs_file_open_can_atomicwrite(
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 
-	if (!(file->f_flags & O_DIRECT))
-		return false;
-	pr_err("%s xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
-		__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev));
+//	pr_err("%s xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
+//		__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev));
 	if (!xfs_inode_has_atomicwrites(ip))
 		return false;
 
