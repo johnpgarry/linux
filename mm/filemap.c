@@ -1584,6 +1584,7 @@ EXPORT_SYMBOL(folio_wait_private_2_killable);
  */
 void folio_end_writeback(struct folio *folio)
 {
+	pr_err("%s folio=%pS\n", __func__, folio);
 	VM_BUG_ON_FOLIO(!folio_test_writeback(folio), folio);
 
 	/*

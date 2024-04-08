@@ -376,7 +376,7 @@ static void wb_update_bandwidth_workfn(struct work_struct *work)
 {
 	struct bdi_writeback *wb = container_of(to_delayed_work(work),
 						struct bdi_writeback, bw_dwork);
-
+	pr_err("%s\n", __func__);
 	wb_update_bandwidth(wb);
 }
 
@@ -452,9 +452,11 @@ static void wb_shutdown(struct bdi_writeback *wb)
 	 * tells wb_workfn() that @wb is dying and its work_list needs to
 	 * be drained no matter what.
 	 */
+	pr_err("%s calling mod_delayed_work for wb->bw_dwork on bdi_wq\n", __func__);
 	mod_delayed_work(bdi_wq, &wb->dwork, 0);
 	flush_delayed_work(&wb->dwork);
 	WARN_ON(!list_empty(&wb->work_list));
+	pr_err("%s2 calling flush_delayed_work for wb->bw_dwork\n", __func__);
 	flush_delayed_work(&wb->bw_dwork);
 }
 

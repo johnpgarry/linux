@@ -136,8 +136,10 @@ static bool inode_io_list_move_locked(struct inode *inode,
 static void wb_wakeup(struct bdi_writeback *wb)
 {
 	spin_lock_irq(&wb->work_lock);
-	if (test_bit(WB_registered, &wb->state))
+	if (test_bit(WB_registered, &wb->state)) {
+		pr_err("%s calling mod_delayed_work for wb->dwork", __func__);
 		mod_delayed_work(bdi_wq, &wb->dwork, 0);
+	}
 	spin_unlock_irq(&wb->work_lock);
 }
 
@@ -161,8 +163,10 @@ static void wb_wakeup_delayed(struct bdi_writeback *wb)
 
 	timeout = msecs_to_jiffies(dirty_writeback_interval * 10);
 	spin_lock_irq(&wb->work_lock);
-	if (test_bit(WB_registered, &wb->state))
+	if (test_bit(WB_registered, &wb->state)) {
+		pr_err("%s calling queue_delayed_work for wb->dwork dirty_writeback_interval=%d (centisec)", __func__, dirty_writeback_interval);
 		queue_delayed_work(bdi_wq, &wb->dwork, timeout);
+	}
 	spin_unlock_irq(&wb->work_lock);
 }
 
@@ -194,6 +198,7 @@ static void wb_queue_work(struct bdi_writeback *wb,
 
 	if (test_bit(WB_registered, &wb->state)) {
 		list_add_tail(&work->list, &wb->work_list);
+		pr_err("%s calling mod_delayed_work for wb->dwork", __func__);
 		mod_delayed_work(bdi_wq, &wb->dwork, 0);
 	} else
 		finish_writeback_work(wb, work);
@@ -2289,7 +2294,7 @@ void wb_workfn(struct work_struct *work)
 	struct bdi_writeback *wb = container_of(to_delayed_work(work),
 						struct bdi_writeback, dwork);
 	long pages_written;
-
+	pr_err("%s\n", __func__);
 	set_worker_desc("flush-%s", bdi_dev_name(wb->bdi));
 
 	if (likely(!current_is_workqueue_rescuer() ||
@@ -2317,8 +2322,10 @@ void wb_workfn(struct work_struct *work)
 
 	if (!list_empty(&wb->work_list))
 		wb_wakeup(wb);
-	else if (wb_has_dirty_io(wb) && dirty_writeback_interval)
+	else if (wb_has_dirty_io(wb) && dirty_writeback_interval) {
+		pr_err("%s2 calling wb_wakeup_delayed dirty_writeback_interval=%d\n", __func__, dirty_writeback_interval);
 		wb_wakeup_delayed(wb);
+	}
 }
 
 /*
@@ -2569,8 +2576,11 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 			 * later.
 			 */
 			if (wakeup_bdi &&
-			    (wb->bdi->capabilities & BDI_CAP_WRITEBACK))
+			    (wb->bdi->capabilities & BDI_CAP_WRITEBACK)) {
+				pr_err("%s calling wb_wakeup_delayed\n", __func__);
 				wb_wakeup_delayed(wb);
+
+			}
 			return;
 		}
 	}

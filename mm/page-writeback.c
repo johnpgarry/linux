@@ -2992,8 +2992,10 @@ static void wb_inode_writeback_end(struct bdi_writeback *wb)
 	 * batched into one bandwidth update.
 	 */
 	spin_lock_irqsave(&wb->work_lock, flags);
-	if (test_bit(WB_registered, &wb->state))
+	if (test_bit(WB_registered, &wb->state)) {
+		pr_err("%s calling queue_delayed_work for wb->bw_dwork\n", __func__);
 		queue_delayed_work(bdi_wq, &wb->bw_dwork, BANDWIDTH_INTERVAL);
+	}
 	spin_unlock_irqrestore(&wb->work_lock, flags);
 }
 
