@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 	void **buffers = NULL;
 	ssize_t written;
 	int fd;
-	int rw_flags = RWF_SYNC;
+	int rw_flags = 0;
 	int o_flags = O_RDWR;
 	int opt = 0;
 	unsigned int write_size = DEFAULT_WRITE_SIZE;
@@ -105,6 +105,9 @@ int main(int argc, char **argv)
 			case 'P':
 				middle_start_end_align_4096 = 1;
 				break;
+			case 's':
+				rw_flags |= RWF_SYNC;
+				break;
 			case 'S':
 				multi_vector_alloc_size = atoi(optarg);
 				if (multi_vector_alloc_size == 0) {
@@ -132,6 +135,7 @@ int main(int argc, char **argv)
 				printf("S: vector size\n");
 				printf("P: middle start+end align to 4096\n");
 				printf("v: verify data written properly\n");
+				printf("s: use RWF_SYNC\n");
 				exit(0);
 		}
 	}
