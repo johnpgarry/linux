@@ -2277,15 +2277,25 @@ static void shrink_readahead_size_eio(struct file_ra_state *ra)
  * clear so that the caller can take the appropriate action.
  */
 static void filemap_get_read_batch(struct address_space *mapping,
-		pgoff_t index, pgoff_t max, struct folio_batch *fbatch)
+		pgoff_t index, pgoff_t max, struct folio_batch *fbatch, bool special)
 {
 	XA_STATE(xas, &mapping->i_pages, index);
 	struct folio *folio;
 
+	if (special) {
+		pr_err("%s mapping=%pS index=%ld max=%ld\n", __func__, mapping, index, max);
+	}
+
 	rcu_read_lock();
 	for (folio = xas_load(&xas); folio; folio = xas_next(&xas)) {
+		if (special) {
+			pr_err("%s2 mapping=%pS index=%ld max=%ld folio=%pS\n", __func__, mapping, index, max, folio);
+		}
 		if (xas_retry(&xas, folio))
 			continue;
+		if (special) {
+			pr_err("%s2.1  mapping=%pS xas.xa_index=%ld max=%ld folio=%pS\n", __func__, mapping, xas.xa_index, max, folio);
+		}
 		if (xas.xa_index > max || xa_is_value(folio))
 			break;
 		if (xa_is_sibling(folio))
@@ -2296,8 +2306,14 @@ static void filemap_get_read_batch(struct address_space *mapping,
 		if (unlikely(folio != xas_reload(&xas)))
 			goto put_folio;
 
+		if (special) {
+			pr_err("%s2.4 calling folio_batch_add mapping=%pS xas.xa_index=%ld max=%ld folio=%pS\n", __func__, mapping, xas.xa_index, max, folio);
+		}
 		if (!folio_batch_add(fbatch, folio))
 			break;
+		if (special) {
+			pr_err("%s2.4 called folio_batch_add ok mapping=%pS xas.xa_index=%ld max=%ld folio=%pS\n", __func__, mapping, xas.xa_index, max, folio);
+		}
 		if (!folio_test_uptodate(folio))
 			break;
 		if (folio_test_readahead(folio))
@@ -2505,9 +2521,9 @@ retry:
 		return -EINTR;
 
 	if (special)
-		pr_err("%s2 calling filemap_get_read_batch iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
-				__func__, iocb, iocb->ki_pos, count, fbatch->nr);
-	filemap_get_read_batch(mapping, index, last_index - 1, fbatch);
+		pr_err("%s2 calling filemap_get_read_batch iocb=%pS pos=%lld count=%zd fbatch->nr=%d mapping=%pS index=%ld last_index=%ld\n",
+				__func__, iocb, iocb->ki_pos, count, fbatch->nr, mapping, index, last_index);
+	filemap_get_read_batch(mapping, index, last_index - 1, fbatch, special);
 	if (special)
 		pr_err("%s3 called filemap_get_read_batch iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
 				__func__, iocb, iocb->ki_pos, count, fbatch->nr);
@@ -2519,7 +2535,7 @@ retry:
 					__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 		page_cache_sync_readahead(mapping, ra, filp, index,
 				last_index - index);
-		filemap_get_read_batch(mapping, index, last_index - 1, fbatch);
+		filemap_get_read_batch(mapping, index, last_index - 1, fbatch, special);
 	}
 	if (special)
 		pr_err("%s5 maybe called page_cache_sync_readahead iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
@@ -2603,8 +2619,8 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 	int mycount = 0;
 
 	if (special)
-		pr_err("%s iocb=%pS pos=%lld iter=%pS len=%zd\n",
-			__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter));
+		pr_err("%s iocb=%pS pos=%lld iter=%pS len=%zd mapping=%pS inode=%pS\n",
+			__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), mapping, inode);
 	if (unlikely(iocb->ki_pos >= inode->i_sb->s_maxbytes))
 		return 0;
 	if (unlikely(!iov_iter_count(iter)))

@@ -939,7 +939,8 @@ static loff_t iomap_write_iter(struct iomap_iter *iter, struct iov_iter *i)
 	unsigned int bdp_flags = (iter->flags & IOMAP_NOWAIT) ? BDP_ASYNC : 0;
 	int mycount = 0;
 	if (iter->flags & IOMAP_ATOMIC)
-		pr_err("%s ATOMIC pos=%lld len=%zd\n", __func__, pos, iov_iter_count(i));
+		pr_err("%s ATOMIC pos=%lld len=%zd mapping=%pS iter->inode=%pS\n",
+			__func__, pos, iov_iter_count(i), mapping, iter->inode);
 
 	do {
 		struct folio *folio;
