@@ -2508,7 +2508,7 @@ static int filemap_get_pages(struct kiocb *iocb, size_t count,
 	pgoff_t last_index;
 	struct folio *folio;
 	int err = 0;
-	bool special = (count == 32768);
+	bool special = (count == 32768) || (count == 19968) || (count == 20480);
 
 	if (special)
 		pr_err("%s iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
@@ -2615,7 +2615,7 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 	bool writably_mapped;
 	loff_t isize, end_offset;
 	loff_t last_pos = ra->prev_pos;
-	bool special = (iov_iter_count(iter) == 32768);
+	bool special = (iov_iter_count(iter) == 32768) || (iov_iter_count(iter) == 19968) || (iov_iter_count(iter) == 20480);
 	int mycount = 0;
 
 	if (special)
