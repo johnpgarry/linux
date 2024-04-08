@@ -3655,7 +3655,7 @@ bool generic_atomic_write_valid_size(loff_t pos, struct iov_iter *iter,
 	size_t len = iov_iter_count(iter);
 
 	if (len < unit_min || len > unit_max)
-		return -EINVAL;
+		return false;
 
 	return generic_atomic_write_valid(pos, iter);
 }
