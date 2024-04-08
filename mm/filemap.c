@@ -2491,6 +2491,11 @@ static int filemap_get_pages(struct kiocb *iocb, size_t count,
 	pgoff_t last_index;
 	struct folio *folio;
 	int err = 0;
+	bool special = (count == 16384);
+
+	if (special)
+		pr_err("%s iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
+				__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 
 	/* "last_index" is the index of the page beyond the end of the read */
 	last_index = DIV_ROUND_UP(iocb->ki_pos + count, PAGE_SIZE);
@@ -2498,17 +2503,32 @@ retry:
 	if (fatal_signal_pending(current))
 		return -EINTR;
 
+	if (special)
+		pr_err("%s2 calling filemap_get_read_batch iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
+				__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 	filemap_get_read_batch(mapping, index, last_index - 1, fbatch);
+	if (special)
+		pr_err("%s3 called filemap_get_read_batch iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
+				__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 	if (!folio_batch_count(fbatch)) {
 		if (iocb->ki_flags & IOCB_NOIO)
 			return -EAGAIN;
+		if (special)
+			pr_err("%s4 calling page_cache_sync_readahead iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
+					__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 		page_cache_sync_readahead(mapping, ra, filp, index,
 				last_index - index);
 		filemap_get_read_batch(mapping, index, last_index - 1, fbatch);
 	}
+	if (special)
+		pr_err("%s5 maybe called page_cache_sync_readahead iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
+					__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 	if (!folio_batch_count(fbatch)) {
 		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
 			return -EAGAIN;
+		if (special)
+			pr_err("%s6 calling filemap_create_folio iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
+						__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 		err = filemap_create_folio(filp, mapping,
 				iocb->ki_pos >> PAGE_SHIFT, fbatch);
 		if (err == AOP_TRUNCATED_PAGE)
@@ -2517,6 +2537,9 @@ retry:
 	}
 
 	folio = fbatch->folios[folio_batch_count(fbatch) - 1];
+	if (special)
+		pr_err("%s7 iocb=%pS pos=%lld count=%zd fbatch->nr=%d folio=%pS folio_pos=%lld folio_size=%zd\n",
+					__func__, iocb, iocb->ki_pos, count, fbatch->nr, folio, folio_pos(folio), folio_size(folio));
 	if (folio_test_readahead(folio)) {
 		err = filemap_readahead(iocb, filp, mapping, folio, last_index);
 		if (err)
