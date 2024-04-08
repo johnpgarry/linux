@@ -1859,6 +1859,8 @@ struct folio *__filemap_get_folio(struct address_space *mapping, pgoff_t index,
 	struct folio *folio;
 
 repeat:
+	pr_err("%s repeat: index=%ld fgp_flags FGP_CREAT set=%d\n",
+		__func__, index, !!(fgp_flags & FGP_CREAT));
 	folio = filemap_get_entry(mapping, index);
 	if (xa_is_value(folio))
 		folio = NULL;
@@ -1895,6 +1897,8 @@ repeat:
 	if (fgp_flags & FGP_STABLE)
 		folio_wait_stable(folio);
 no_page:
+	pr_err("%s2 no_page: index=%ld folio=%pS FGP_CREAT set=%d\n",
+		__func__, index, folio, !!(fgp_flags & FGP_CREAT));
 	if (!folio && (fgp_flags & FGP_CREAT)) {
 		unsigned order = FGF_GET_ORDER(fgp_flags);
 		int err;
@@ -1924,6 +1928,8 @@ no_page:
 			err = -ENOMEM;
 			if (order > 0)
 				alloc_gfp |= __GFP_NORETRY | __GFP_NOWARN;
+		pr_err("%s3 calling filemap_alloc_folio order=%d\n",
+			__func__, order);
 			folio = filemap_alloc_folio(alloc_gfp, order);
 			if (!folio)
 				continue;

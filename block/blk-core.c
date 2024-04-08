@@ -758,12 +758,12 @@ void submit_bio_noacct(struct bio *bio)
 	struct request_queue *q = bdev_get_queue(bdev);
 	blk_status_t status = BLK_STS_IOERR;
 
-	WARN(bio->bi_iter.bi_size == 32768, "bi_size=%d bi_sector=%lld READ=%d\n",
-		bio->bi_iter.bi_size, bio->bi_iter.bi_sector, bio_op(bio) == REQ_OP_READ);
-	WARN(bio->bi_iter.bi_size == 19968, "bi_size=%d bi_sector=%lld READ=%d\n",
-		bio->bi_iter.bi_size, bio->bi_iter.bi_sector, bio_op(bio) == REQ_OP_READ);
-	WARN(bio->bi_iter.bi_size == 20480, "bi_size=%d bi_sector=%lld READ=%d\n",
-		bio->bi_iter.bi_size, bio->bi_iter.bi_sector, bio_op(bio) == REQ_OP_READ);
+	WARN(bio->bi_iter.bi_size == 32768, "bi_size=%d bi_sector=%lld READ=%d bio=%pS\n",
+		bio->bi_iter.bi_size, bio->bi_iter.bi_sector, bio_op(bio) == REQ_OP_READ, bio);
+	WARN(bio->bi_iter.bi_size == 19968, "bi_size=%d bi_sector=%lld READ=%d bio=%pS\n",
+		bio->bi_iter.bi_size, bio->bi_iter.bi_sector, bio_op(bio) == REQ_OP_READ, bio);
+	WARN(bio->bi_iter.bi_size == 20480, "bi_size=%d bi_sector=%lld READ=%d bio=%pS\n",
+		bio->bi_iter.bi_size, bio->bi_iter.bi_sector, bio_op(bio) == REQ_OP_READ, bio);
 	might_sleep();
 
 	/*

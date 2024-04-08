@@ -119,6 +119,7 @@ enum pageflags {
 	PG_reclaim,		/* To be reclaimed asap */
 	PG_swapbacked,		/* Page is backed by RAM/swap */
 	PG_unevictable,		/* Page is "unevictable"  */
+	PG_atomic,
 #ifdef CONFIG_MMU
 	PG_mlocked,		/* Page is vma mlocked */
 #endif
@@ -578,6 +579,10 @@ PAGEFLAG_FALSE(SwapCache, swapcache)
 PAGEFLAG(Unevictable, unevictable, PF_HEAD)
 	__CLEARPAGEFLAG(Unevictable, unevictable, PF_HEAD)
 	TESTCLEARFLAG(Unevictable, unevictable, PF_HEAD)
+
+PAGEFLAG(Atomic, atomic, PF_HEAD)
+	__CLEARPAGEFLAG(Atomic, atomic, PF_HEAD)
+	TESTCLEARFLAG(Atomic, atomic, PF_HEAD)
 
 #ifdef CONFIG_MMU
 PAGEFLAG(Mlocked, mlocked, PF_NO_TAIL)
