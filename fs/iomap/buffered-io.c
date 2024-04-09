@@ -1000,15 +1000,26 @@ retry:
 				!!(srcmap->flags & IOMAP_F_XATTR));
 		}
 		status = iomap_write_begin(iter, pos, bytes, &folio);
+		if (unlikely(status)) {
+			if (is_atomic || (pos == 98304)) {
+				BUG();
+			}
+			break;
+		}
+		if (iter->iomap.flags & IOMAP_F_STALE) {
+			if (is_atomic || (pos == 98304)) {
+		//		BUG();
+				pr_err("%s2.9 IOMAP_F_STALE\n", __func__);
+			}
+			break;
+		}
 		if (is_atomic || (pos == 98304)) {
 			//const struct iomap *srcmap = iomap_iter_srcmap(iter);
+			//BUG_ON(!folio);
 			pr_err("%s3 called iomap_write_begin pos=%lld len=%zd bytes=%zd offset=%zd folio=%pS folio_pos=%lld folio_size(folio)=%zd\n",
-				__func__, pos, iov_iter_count(i), bytes, offset, folio, folio_pos(folio), folio_size(folio));
+				__func__, pos, iov_iter_count(i), bytes, offset, folio,
+				folio ? folio_pos(folio) : -1, folio ? folio_size(folio) : -1);
 		}
-		if (unlikely(status))
-			break;
-		if (iter->iomap.flags & IOMAP_F_STALE)
-			break;
 
 		offset = offset_in_folio(folio, pos);
 		if (bytes > folio_size(folio) - offset)
