@@ -426,6 +426,7 @@ xfs_prepare_ioend(
 	int			status)
 {
 	unsigned int		nofs_flag;
+	pr_err("%s ioend=%pS status=%d\n", __func__, ioend, status);
 
 	/*
 	 * We can allocate memory here while doing writeback on behalf of
@@ -511,6 +512,7 @@ xfs_vm_writepages(
 		return 0;
 
 	xfs_iflags_clear(XFS_I(mapping->host), XFS_ITRUNCATED);
+	pr_err("%s &wpc=%pS calling iomap_writepages with pointer to xfs_writeback_ops\n", __func__, &wpc);
 	return iomap_writepages(mapping, wbc, &wpc.ctx, &xfs_writeback_ops);
 }
 

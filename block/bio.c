@@ -1158,7 +1158,8 @@ bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 			max_atomic_size = bio->bi_iter.bi_size;
 			pr_err("%s max atomic bi size=%d\n", __func__, max_atomic_size);
 		}
-		pr_err_once("%s setting REQ_ATOMIC bio=%pS\n", __func__, bio);
+		pr_err("%s setting REQ_ATOMIC bio=%pS %pS\n", __func__, bio,
+			__builtin_return_address(0));
 	}
 	return true;
 }
