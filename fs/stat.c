@@ -100,10 +100,14 @@ EXPORT_SYMBOL(generic_fill_statx_attr);
  */
 void generic_fill_statx_atomic_writes(struct kstat *stat,
 				      unsigned int unit_min,
-				      unsigned int unit_max)
+				      unsigned int unit_max,
+				      bool dio)
 {
 	/* Confirm that the request type is known */
-	stat->result_mask |= STATX_WRITE_ATOMIC;
+	if (dio)
+		stat->result_mask |= STATX_WRITE_ATOMIC;
+	else
+		stat->result_mask |= STATX_WRITE_ATOMIC_BUFFERED;
 
 	/* Confirm that the file attribute type is known */
 	stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC;

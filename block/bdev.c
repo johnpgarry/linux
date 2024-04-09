@@ -1208,12 +1208,14 @@ void bdev_statx(struct inode *backing_inode, struct kstat *stat,
 		stat->result_mask |= STATX_DIOALIGN;
 	}
 
-	if (request_mask & STATX_WRITE_ATOMIC && bdev_can_atomic_write(bdev)) {
+	if ((request_mask & STATX_WRITE_ATOMIC) &&
+	!(request_mask & STATX_WRITE_ATOMIC_BUFFERED) && bdev_can_atomic_write(bdev)) {
 		struct request_queue *bd_queue = bdev->bd_queue;
 
 		generic_fill_statx_atomic_writes(stat,
 			queue_atomic_write_unit_min_bytes(bd_queue),
-			queue_atomic_write_unit_max_bytes(bd_queue));
+			queue_atomic_write_unit_max_bytes(bd_queue),
+			true);
 	}
 
 	blkdev_put_no_open(bdev);

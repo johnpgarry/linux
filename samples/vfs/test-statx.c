@@ -42,6 +42,7 @@ struct statx_timestamp;
 #endif
 
 #define STATX_WRITE_ATOMIC	0x00008000U	/* Want/got atomic_write_* fields */
+#define STATX_WRITE_ATOMIC_BUFFERED	0x00010000U	/* Want/got atomic_write_* fields */
 #define STATX_ATTR_WRITE_ATOMIC		0x00400000 /* File supports atomic write operations */
 
 extern int open(const char *path, int flags, ...);
@@ -262,6 +263,10 @@ int main(int argc, char **argv)
 		}
 		if (strcmp(*argv, "-a") == 0) {
 			mask |= STATX_WRITE_ATOMIC;
+			continue;
+		}
+		if (strcmp(*argv, "-b") == 0) {
+			mask |= STATX_WRITE_ATOMIC_BUFFERED;
 			continue;
 		}
 		if (strcmp(*argv, "-R") == 0) {
