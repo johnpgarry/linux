@@ -1265,15 +1265,26 @@ static bool xfs_file_open_can_atomicwrite(
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 
-//	pr_err("%s xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
-//		__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev));
+//	pr_err("%s xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d O_DIRECT set=%d O_ATOMIC set=%d\n",
+//		__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev),
+//		!!(file->f_flags & O_DIRECT),
+//		!!(file->f_flags & O_ATOMIC));
 	if (!xfs_inode_has_atomicwrites(ip))
 		return false;
 
+	pr_err("%s1 xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d O_DIRECT set=%d O_ATOMIC set=%d\n",
+		__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev),
+		!!(file->f_flags & O_DIRECT),
+		!!(file->f_flags & O_ATOMIC));
 	if (!bdev_can_atomic_write(target->bt_bdev))
 		return false;
 
-	return true;
+	if (file->f_flags & O_DIRECT)
+		return true;
+	else if (file->f_flags & O_ATOMIC)
+		return true;
+
+	return false;
 }
 
 STATIC int
