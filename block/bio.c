@@ -1153,6 +1153,7 @@ bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 	if (folio_test_atomic(folio)) {
 		BUG_ON(bi_size_orig > 0 && !(bio->bi_opf & REQ_ATOMIC));
 		bio->bi_opf |= REQ_ATOMIC;
+		pr_err_once("%s setting REQ_ATOMIC bio=%pS\n", __func__, bio);
 	}
 	return true;
 }

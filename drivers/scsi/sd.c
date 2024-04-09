@@ -1355,12 +1355,22 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 	else
 		protect = 0;
 
-	WARN(nr_blocks == 32768 / 512, "lba=%lld nr_blocks=%d write=%d ATOMIC=%d\n",
-		lba, nr_blocks, write, !!(rq->cmd_flags & REQ_ATOMIC));
-	WARN(nr_blocks == 19968 / 512, "lba=%lld nr_blocks=%d write=%d ATOMIC=%d\n",
-		lba, nr_blocks, write, !!(rq->cmd_flags & REQ_ATOMIC));
-	WARN(nr_blocks == 20480 / 512, "lba=%lld nr_blocks=%d write=%d ATOMIC=%d\n",
-		lba, nr_blocks, write, !!(rq->cmd_flags & REQ_ATOMIC));
+//	WARN(nr_blocks == 32768 / 512, "lba=%lld nr_blocks=%d write=%d ATOMIC=%d\n",
+//		lba, nr_blocks, write, !!(rq->cmd_flags & REQ_ATOMIC));
+//	WARN(nr_blocks == 19968 / 512, "lba=%lld nr_blocks=%d write=%d ATOMIC=%d\n",
+//		lba, nr_blocks, write, !!(rq->cmd_flags & REQ_ATOMIC));
+//	WARN(nr_blocks == 20480 / 512, "lba=%lld nr_blocks=%d write=%d ATOMIC=%d\n",
+//		lba, nr_blocks, write, !!(rq->cmd_flags & REQ_ATOMIC));
+
+	if (rq->cmd_flags & REQ_ATOMIC) {
+		pr_err_ratelimited("%s __data_len=%d bio=%pS biotail=%pS\n", 
+				__func__, rq->__data_len, rq->bio, rq->biotail);
+
+		if (rq->__data_len != 32768)
+			pr_err("%s1 __data_len=%d bio=%pS biotail=%pS\n", 
+				__func__, rq->__data_len, rq->bio, rq->biotail);
+		BUG_ON(rq->__data_len != 32768);
+	}
 
 	if (protect && sdkp->protection_type == T10_PI_TYPE2_PROTECTION) {
 		ret = sd_setup_rw32_cmnd(cmd, write, lba, nr_blocks,
