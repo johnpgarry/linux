@@ -1363,13 +1363,20 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 //		lba, nr_blocks, write, !!(rq->cmd_flags & REQ_ATOMIC));
 
 	if (rq->cmd_flags & REQ_ATOMIC) {
-		pr_err_ratelimited("%s __data_len=%d bio=%pS biotail=%pS\n", 
-				__func__, rq->__data_len, rq->bio, rq->biotail);
+		static atomic_t mycc;
+		int _mycc = atomic_inc_return(&mycc);
+		int divisor = 16;
+		if ((_mycc % divisor) == 0) {
+			pr_err("%s __data_len=%d bio=%pS biotail=%pS\n", 
+					__func__, rq->__data_len, rq->bio, rq->biotail);
+			divisor *= 2;
+		}
 
 		if (rq->__data_len != 32768)
 			pr_err("%s1 __data_len=%d bio=%pS biotail=%pS\n", 
 				__func__, rq->__data_len, rq->bio, rq->biotail);
-		BUG_ON(rq->__data_len != 32768);
+		if (rq->__data_len != 32768)
+			return BLK_STS_IOERR;
 	}
 
 	if (protect && sdkp->protection_type == T10_PI_TYPE2_PROTECTION) {
