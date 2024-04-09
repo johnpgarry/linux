@@ -915,7 +915,8 @@ static int do_dentry_open(struct file *f,
 	f->f_sb_err = file_sample_sb_err(f);
 
 	if (f->f_flags & O_ATOMIC) {
-		pr_err("%s1 O_ATOMIC set O_ATOMIC=0x%x\n", __func__, O_ATOMIC);
+		pr_err("%s1 O_ATOMIC set O_ATOMIC=0x%x inode_is_locked=%d\n",
+			__func__, O_ATOMIC, inode_is_locked(inode));
 	}
 	if (f->f_flags & O_DIRECT) {
 		pr_err("%s1 O_DIRECT set\n", __func__);
@@ -956,7 +957,7 @@ static int do_dentry_open(struct file *f,
 		goto cleanup_all;
 
 	if (f->f_flags & O_ATOMIC)
-		pr_err("%s3 O_ATOMIC set\n", __func__);
+		pr_err("%s3 O_ATOMIC set f->f_op->open=%pS\n", __func__, f->f_op->open);
 	/* normally all 3 are set; ->open() can clear them if needed */
 	f->f_mode |= FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	if (!open)
