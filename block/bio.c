@@ -1095,7 +1095,7 @@ EXPORT_SYMBOL_GPL(__bio_add_page);
  *	if either bio->bi_vcnt == bio->bi_max_vecs or it's a cloned bio.
  */
 int bio_add_page(struct bio *bio, struct page *page,
-		 unsigned int len, unsigned int offset)
+		 const unsigned int len, unsigned int offset)
 {
 	bool same_page = false;
 
@@ -1144,6 +1144,7 @@ bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 		   size_t off)
 {
 	int bi_size_orig;
+	static int max_atomic_size;
 	if (len > UINT_MAX || off > UINT_MAX)
 		return false;
 
@@ -1153,6 +1154,10 @@ bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 	if (folio_test_atomic(folio)) {
 		BUG_ON(bi_size_orig > 0 && !(bio->bi_opf & REQ_ATOMIC));
 		bio->bi_opf |= REQ_ATOMIC;
+		if (bio->bi_iter.bi_size > max_atomic_size) {
+			max_atomic_size = bio->bi_iter.bi_size;
+			pr_err("%s max atomic bi size=%d\n", __func__, max_atomic_size);
+		}
 		pr_err_once("%s setting REQ_ATOMIC bio=%pS\n", __func__, bio);
 	}
 	return true;

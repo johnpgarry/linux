@@ -1073,10 +1073,11 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *i,
 	};
 	ssize_t ret;
 	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
-	if (is_atomic || (iocb->ki_pos == 98304))
+	bool special_print = is_atomic || (iocb->ki_pos == 98304);
+	if (special_print)
 		pr_err("%s ATOMIC=%d iocb=%pS pos=%lld from=%pS len=%zd\n",
 			__func__, is_atomic,
-			iocb, iocb->ki_pos, i, iov_iter_count(i));
+			iocb, iocb ? iocb->ki_pos : -1, i, i ? iov_iter_count(i) : -1);
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iter.flags |= IOMAP_NOWAIT;
@@ -1085,9 +1086,9 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *i,
 		iter.flags |= IOMAP_ATOMIC;
 
 	while ((ret = iomap_iter(&iter, ops)) > 0) {
-		if (is_atomic || (iocb->ki_pos == 98304))
-			pr_err("%s1 calling iomap_write_iter iocb=%pS pos=%lld from=%pS len=%zd\n",
-				__func__, iocb, iocb->ki_pos, i, iov_iter_count(i));
+		if (special_print)
+			pr_err("%s1 calling iomap_write_iter iocb=%pS pos=%lld i=%pS i=%zd\n",
+				__func__, iocb, iocb ? iocb->ki_pos : -1, i, i ? iov_iter_count(i) : -1);
 		iter.processed = iomap_write_iter(&iter, i);
 	}
 
