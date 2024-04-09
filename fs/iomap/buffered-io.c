@@ -800,7 +800,8 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 	if (is_atomic || (pos == 98304)) {
 		pr_err("%s3 pos=%lld len=%zd called __iomap_get_folio folio=%pS folio_pos=%lld folio_size=%zd\n",
 			__func__, pos, len, folio, folio_pos(folio), folio_size(folio));
-		folio_set_atomic(folio);
+		if (is_atomic)
+			folio_set_atomic(folio);
 	}
 
 	/*
