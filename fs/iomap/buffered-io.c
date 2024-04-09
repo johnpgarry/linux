@@ -824,7 +824,7 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 	}
 
 	if (is_atomic || (pos == 98304)) {
-		pr_err("%s4 ATOMIC adjusting len pos=%lld len=%zd folio_pos=%lld folio_size=%zd\n",
+		pr_err("%s4 adjusting len pos=%lld len=%zd folio_pos=%lld folio_size=%zd\n",
 			__func__, pos, len, folio_pos(folio), folio_size(folio));
 	}
 
@@ -832,7 +832,7 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 		len = folio_pos(folio) + folio_size(folio) - pos;
 
 	if (is_atomic || (pos == 98304)) {
-		pr_err("%s5 ATOMIC calling iomap_write_begin_inline or other pos=%lld len=%zd folio_position=%lld folio_size=%zd\n",
+		pr_err("%s5 calling iomap_write_begin_inline or other pos=%lld len=%zd folio_position=%lld folio_size=%zd\n",
 			__func__, pos, len, folio_pos(folio), folio_size(folio));
 	}
 	if (srcmap->type == IOMAP_INLINE)
