@@ -901,6 +901,30 @@ cleanup_inode:
 	return error;
 }
 
+static inline int file_get_write_access_exclusive(struct file *f)
+{
+	int error;
+
+	error = get_write_access_exclusive(f->f_inode);
+	if (unlikely(error))
+		return error;
+	error = mnt_get_write_access(f->f_path.mnt);
+	if (unlikely(error))
+		goto cleanup_inode;
+	if (unlikely(f->f_mode & FMODE_BACKING)) {
+		error = mnt_get_write_access(backing_file_user_path(f)->mnt);
+		if (unlikely(error))
+			goto cleanup_mnt;
+	}
+	return 0;
+
+cleanup_mnt:
+	mnt_put_write_access(f->f_path.mnt);
+cleanup_inode:
+	put_write_access_exclusive(f->f_inode);
+	return error;
+}
+
 static int do_dentry_open(struct file *f,
 			  struct inode *inode,
 			  int (*open)(struct inode *, struct file *))
@@ -930,7 +954,11 @@ static int do_dentry_open(struct file *f,
 	if ((f->f_mode & (FMODE_READ | FMODE_WRITE)) == FMODE_READ) {
 		i_readcount_inc(inode);
 	} else if (f->f_mode & FMODE_WRITE && !special_file(inode->i_mode)) {
-		error = file_get_write_access(f);
+		if (f->f_flags & O_ATOMIC)
+			error = file_get_write_access_exclusive(f);
+		else
+			error = file_get_write_access(f);
+
 		if (unlikely(error))
 			goto cleanup_file;
 		f->f_mode |= FMODE_WRITER;
