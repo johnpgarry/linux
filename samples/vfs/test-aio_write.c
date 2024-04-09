@@ -39,7 +39,7 @@ struct statx_timestamp;
 
 #define DEFAULT_WRITE_SIZE 1024
 #define RWF_ATOMIC      (0x00000040)
-
+#define O_ATOMIC	0x800000
 int main(int argc, char **argv)
 {
 	struct iocb **cbs = NULL, **cbs_tmp;
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 	void **buffers = NULL;
 	ssize_t written;
 	int fd;
-	int rw_flags = RWF_SYNC;
+	int rw_flags = 0;
 	int o_flags = O_RDWR;
 	int opt = 0;
 	unsigned int write_size = DEFAULT_WRITE_SIZE;
@@ -67,6 +67,7 @@ int main(int argc, char **argv)
 	int ret;
 	loff_t pos = 0;
 	char *read_buffer = NULL;
+	int verify = 0;
 	int io_submit_vectors = 0;
 
 	argv_orig++;
@@ -74,7 +75,7 @@ int main(int argc, char **argv)
 		file = *argv_orig;
 	}
 
-	while ((opt = getopt(argc, argv, "l:p:PadmhS:i")) != -1) {
+	while ((opt = getopt(argc, argv, "l:p:PadmhS:iAv")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
@@ -82,17 +83,9 @@ int main(int argc, char **argv)
 					printf("write size cannot be zero\n");
 					exit(0);
 				}
-				if (write_size % 512) {
-					printf("write size must be multiple of 512\n");
-					exit(0);
-				}
 				break;
 			case 'p':
 				pos = atoi(optarg);
-				if (pos % 512) {
-					printf("pos must be multiple of 512\n");
-					exit(0);
-				}
 				break;
 			case 'm':
 				multi_vectors = 1;
@@ -103,8 +96,22 @@ int main(int argc, char **argv)
 			case 'a':
 				rw_flags |= RWF_ATOMIC;
 				break;
+			case 'A':
+				o_flags |= O_ATOMIC;
+				break;
 			case 'd':
+				if (write_size % 512) {
+					printf("write size must be multiple of 512\n");
+					exit(0);
+				}
+				if (pos % 512) {
+					printf("pos must be multiple of 512\n");
+					exit(0);
+				}
 				o_flags |= O_DIRECT;
+				break;
+			case 'v':
+				verify = 1;
 				break;
 			case 'P':
 				start_align_4096 = 1;
@@ -126,10 +133,13 @@ int main(int argc, char **argv)
 				printf("p: write offset\n");
 				printf("m: multi-vectors\n");
 				printf("a: atomic\n");
+				printf("A: use O_ATOMIC\n");
 				printf("d: direct I/O\n");
 				printf("S: vector size\n");
 				printf("P: start vector align to 4096\n");
 				printf("i: use iovec for multi-vector\n");
+				printf("v: verify data written properly\n");
+				printf("s: use RWF_SYNC\n");
 				exit(0);
 		}
 	}
@@ -334,6 +344,9 @@ do_write:
 		ret = -1;
 		goto end;
 	}
+
+	if (verify == 0)
+		goto end;
 
 	read_buffer = malloc(write_size);
 
