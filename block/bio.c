@@ -1123,6 +1123,7 @@ void bio_add_folio_nofail(struct bio *bio, struct folio *folio, size_t len,
 {
 	WARN_ON_ONCE(len > UINT_MAX);
 	WARN_ON_ONCE(off > UINT_MAX);
+	WARN_ON_ONCE(folio_test_atomic(folio) & bio->bi_iter.bi_size);
 	__bio_add_page(bio, &folio->page, len, off);
 }
 
@@ -1144,11 +1145,15 @@ bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 		   size_t off)
 {
 	int bi_size_orig;
+	bool atomic = folio_test_atomic(folio);
 	static int max_atomic_size;
 	if (len > UINT_MAX || off > UINT_MAX)
 		return false;
 
 	bi_size_orig = bio->bi_iter.bi_size;
+	if (atomic && bi_size_orig)
+		return 0;
+
 	if (bio_add_page(bio, &folio->page, len, off) <= 0)
 		return false;
 	if (folio_test_atomic(folio)) {
