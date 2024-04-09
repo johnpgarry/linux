@@ -1618,9 +1618,13 @@ static int aio_write(struct kiocb *req, const struct iocb *iocb,
 	struct file *file;
 	int ret;
 
+	pr_err("%s IOCB_ATOMIC set in aio_rw_flags=%d, req->ki_flags=%d calling aio_prep_rw\n",
+		__func__, !!(iocb->aio_rw_flags & IOCB_ATOMIC), !!(req->ki_flags & IOCB_ATOMIC));
 	ret = aio_prep_rw(req, iocb, WRITE);
 	if (ret)
 		return ret;
+	pr_err("%s2 IOCB_ATOMIC set in aio_rw_flags=%d, req->ki_flags=%d called aio_prep_rw\n",
+		__func__, !!(iocb->aio_rw_flags & IOCB_ATOMIC), !!(req->ki_flags & IOCB_ATOMIC));
 	file = req->ki_filp;
 
 	if (unlikely(!(file->f_mode & FMODE_WRITE)))
@@ -1978,6 +1982,8 @@ static int __io_submit_one(struct kioctx *ctx, const struct iocb *iocb,
 	req->ki_filp = fget(iocb->aio_fildes);
 	if (unlikely(!req->ki_filp))
 		return -EBADF;
+
+	pr_err("%s IOCB_ATOMIC set=%d\n", __func__, !!(iocb->aio_rw_flags & IOCB_ATOMIC));
 
 	if (iocb->aio_flags & IOCB_FLAG_RESFD) {
 		struct eventfd_ctx *eventfd;
