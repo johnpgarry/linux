@@ -915,7 +915,7 @@ static int do_dentry_open(struct file *f,
 	f->f_sb_err = file_sample_sb_err(f);
 
 	if (f->f_flags & O_ATOMIC) {
-		pr_err("%s1 O_ATOMIC set\n", __func__);
+		pr_err("%s1 O_ATOMIC set O_ATOMIC=0x%x\n", __func__, O_ATOMIC);
 	}
 	if (f->f_flags & O_DIRECT) {
 		pr_err("%s1 O_DIRECT set\n", __func__);
