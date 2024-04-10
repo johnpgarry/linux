@@ -99,7 +99,10 @@ struct file *alloc_empty_backing_file(int flags, const struct cred *cred);
 
 static inline void file_put_write_access(struct file *file)
 {
-	put_write_access(file->f_inode);
+	if (file->f_flags & O_ATOMIC)
+		put_write_access_exclusive(file->f_inode);
+	else
+		put_write_access(file->f_inode);
 	mnt_put_write_access(file->f_path.mnt);
 	if (unlikely(file->f_mode & FMODE_BACKING))
 		mnt_put_write_access(backing_file_user_path(file)->mnt);
