@@ -648,9 +648,7 @@ xfs_vn_getattr(
 			xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
 			generic_fill_statx_atomic_writes(stat,
 				unit_min, unit_max, true);
-		}
-		if (request_mask & STATX_WRITE_ATOMIC_BUFFERED &&
-			!(request_mask & STATX_WRITE_ATOMIC)) {
+		} else if (request_mask & STATX_WRITE_ATOMIC_BUFFERED) {
 			unsigned int unit_min, unit_max;
 
 			xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
