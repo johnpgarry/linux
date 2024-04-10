@@ -1902,6 +1902,8 @@ no_page:
 	if (!folio && (fgp_flags & FGP_CREAT)) {
 		unsigned order = FGF_GET_ORDER(fgp_flags);
 		int err;
+		pr_err("%s2.1 no_page: index=%ld folio=%pS FGP_CREAT set=%d order=%d\n",
+			__func__, index, folio, !!(fgp_flags & FGP_CREAT), order);
 
 		if ((fgp_flags & FGP_WRITE) && mapping_can_writeback(mapping))
 			gfp |= __GFP_WRITE;
@@ -1928,8 +1930,8 @@ no_page:
 			err = -ENOMEM;
 			if (order > 0)
 				alloc_gfp |= __GFP_NORETRY | __GFP_NOWARN;
-		pr_err("%s3 calling filemap_alloc_folio order=%d\n",
-			__func__, order);
+			pr_err("%s3 calling filemap_alloc_folio order=%d\n",
+				__func__, order);
 			folio = filemap_alloc_folio(alloc_gfp, order);
 			if (!folio)
 				continue;
