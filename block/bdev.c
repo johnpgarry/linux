@@ -1189,7 +1189,7 @@ void bdev_statx(struct inode *backing_inode, struct kstat *stat,
 {
 	struct block_device *bdev;
 
-	if (!(request_mask & (STATX_DIOALIGN | STATX_WRITE_ATOMIC)))
+	if (!(request_mask & (STATX_DIOALIGN | STATX_WRITE_ATOMIC | STATX_WRITE_ATOMIC_BUFFERED)))
 		return;
 
 	/*
@@ -1208,15 +1208,28 @@ void bdev_statx(struct inode *backing_inode, struct kstat *stat,
 		stat->result_mask |= STATX_DIOALIGN;
 	}
 
-	if ((request_mask & STATX_WRITE_ATOMIC) &&
-	!(request_mask & STATX_WRITE_ATOMIC_BUFFERED) && bdev_can_atomic_write(bdev)) {
+	if (bdev_can_atomic_write(bdev)) {
 		struct request_queue *bd_queue = bdev->bd_queue;
 
-		generic_fill_statx_atomic_writes(stat,
-			queue_atomic_write_unit_min_bytes(bd_queue),
-			queue_atomic_write_unit_max_bytes(bd_queue),
-			true);
+		if ((request_mask & STATX_WRITE_ATOMIC) &&
+			!(request_mask & STATX_WRITE_ATOMIC_BUFFERED)) {
+
+				generic_fill_statx_atomic_writes(stat,
+					queue_atomic_write_unit_min_bytes(bd_queue),
+					queue_atomic_write_unit_max_bytes(bd_queue),
+					true);
+		} else if (request_mask & STATX_WRITE_ATOMIC_BUFFERED) {
+			unsigned int ibs = i_blocksize(bdev->bd_inode);
+			pr_err("%s ibs=%d\n", __func__, ibs);
+
+			if ((queue_atomic_write_unit_min_bytes(bd_queue) <= ibs) &&
+				(ibs <= queue_atomic_write_unit_max_bytes(bd_queue))) {
+					generic_fill_statx_atomic_writes(stat,
+						ibs, ibs, false);
+			}
+		}
 	}
+
 
 	blkdev_put_no_open(bdev);
 }
