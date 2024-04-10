@@ -2943,7 +2943,9 @@ static inline int get_write_access(struct inode *inode)
 }
 static inline int get_write_access_exclusive(struct inode *inode)
 {
-	pr_err("%s i_writecount=%d\n", __func__, atomic_read(&inode->i_writecount));
+	bool special_print = false;
+	if (special_print)
+		pr_err("%s i_writecount=%d\n", __func__, atomic_read(&inode->i_writecount));
 	return atomic_cmpxchg(&inode->i_writecount, 0, -1) ? -ETXTBSY : 0;
 }
 static inline void put_write_access_exclusive(struct inode *inode)
@@ -3447,7 +3449,7 @@ static inline int kiocb_set_rw_flags(struct kiocb *ki, rwf_t flags,
 		kiocb_flags |= IOCB_NOIO;
 	}
 	if (flags & RWF_ATOMIC) {
-		pr_err("%s RWF_ATOMIC ki->ki_flags=0x%x\n", __func__, ki->ki_flags);
+	//	pr_err("%s RWF_ATOMIC ki->ki_flags=0x%x\n", __func__, ki->ki_flags);
 		if (rw_type != WRITE)
 			return -EOPNOTSUPP;
 		if (!(ki->ki_filp->f_mode & FMODE_CAN_ATOMIC_WRITE))

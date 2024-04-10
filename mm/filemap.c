@@ -1586,7 +1586,9 @@ EXPORT_SYMBOL(folio_wait_private_2_killable);
  */
 void folio_end_writeback(struct folio *folio)
 {
-	pr_err("%s folio=%pS\n", __func__, folio);
+	bool special_print = false;
+	if (special_print)
+		pr_err("%s folio=%pS\n", __func__, folio);
 	VM_BUG_ON_FOLIO(!folio_test_writeback(folio), folio);
 
 	/*
@@ -1858,11 +1860,14 @@ out:
 struct folio *__filemap_get_folio(struct address_space *mapping, pgoff_t index,
 		fgf_t fgp_flags, gfp_t gfp)
 {
-	struct folio *folio;
+	struct folio *folio;	
+	bool special_print = false;
+		
 
 repeat:
-	pr_err("%s repeat: index=%ld fgp_flags FGP_CREAT set=%d\n",
-		__func__, index, !!(fgp_flags & FGP_CREAT));
+	if (special_print)
+		pr_err("%s repeat: index=%ld fgp_flags FGP_CREAT set=%d\n",
+			__func__, index, !!(fgp_flags & FGP_CREAT));
 	folio = filemap_get_entry(mapping, index);
 	if (xa_is_value(folio))
 		folio = NULL;
@@ -1899,14 +1904,16 @@ repeat:
 	if (fgp_flags & FGP_STABLE)
 		folio_wait_stable(folio);
 no_page:
-	pr_err("%s2 no_page: index=%ld folio=%pS FGP_CREAT set=%d\n",
+	if (special_print)
+		pr_err("%s2 no_page: index=%ld folio=%pS FGP_CREAT set=%d\n",
 		__func__, index, folio, !!(fgp_flags & FGP_CREAT));
 	if (!folio && (fgp_flags & FGP_CREAT)) {
 		unsigned int min_order = mapping_min_folio_order(mapping);
 		unsigned int order = max(min_order, FGF_GET_ORDER(fgp_flags));
 		int err;
 
-		pr_err("%s2.1 no_page: index=%ld folio=%pS FGP_CREAT set=%d order=%d min_order=%d FGF_GET_ORDER(fgp_flags)=%d\n",
+		if (special_print)
+			pr_err("%s2.1 no_page: index=%ld folio=%pS FGP_CREAT set=%d order=%d min_order=%d FGF_GET_ORDER(fgp_flags)=%d\n",
 			__func__, index, folio, !!(fgp_flags & FGP_CREAT), order, min_order, FGF_GET_ORDER(fgp_flags));
 
 		index = mapping_align_start_index(mapping, index);
@@ -1936,7 +1943,8 @@ no_page:
 			err = -ENOMEM;
 			if (order > 0)
 				alloc_gfp |= __GFP_NORETRY | __GFP_NOWARN;
-			pr_err("%s3 calling filemap_alloc_folio order=%d\n",
+			if (special_print)
+				pr_err("%s3 calling filemap_alloc_folio order=%d\n",
 				__func__, order);
 			folio = filemap_alloc_folio(alloc_gfp, order);
 			if (!folio)
@@ -2295,19 +2303,20 @@ static void filemap_get_read_batch(struct address_space *mapping,
 {
 	XA_STATE(xas, &mapping->i_pages, index);
 	struct folio *folio;
+	bool special_print = false;
 
-	if (special) {
+	if (special_print) {
 		pr_err("%s mapping=%pS index=%ld max=%ld\n", __func__, mapping, index, max);
 	}
 
 	rcu_read_lock();
 	for (folio = xas_load(&xas); folio; folio = xas_next(&xas)) {
-		if (special) {
+		if (special_print) {
 			pr_err("%s2 mapping=%pS index=%ld max=%ld folio=%pS\n", __func__, mapping, index, max, folio);
 		}
 		if (xas_retry(&xas, folio))
 			continue;
-		if (special) {
+		if (special_print) {
 			pr_err("%s2.1  mapping=%pS xas.xa_index=%ld max=%ld folio=%pS\n", __func__, mapping, xas.xa_index, max, folio);
 		}
 		if (xas.xa_index > max || xa_is_value(folio))
@@ -2320,12 +2329,12 @@ static void filemap_get_read_batch(struct address_space *mapping,
 		if (unlikely(folio != xas_reload(&xas)))
 			goto put_folio;
 
-		if (special) {
+		if (special_print) {
 			pr_err("%s2.4 calling folio_batch_add mapping=%pS xas.xa_index=%ld max=%ld folio=%pS\n", __func__, mapping, xas.xa_index, max, folio);
 		}
 		if (!folio_batch_add(fbatch, folio))
 			break;
-		if (special) {
+		if (special_print) {
 			pr_err("%s2.4 called folio_batch_add ok mapping=%pS xas.xa_index=%ld max=%ld folio=%pS\n", __func__, mapping, xas.xa_index, max, folio);
 		}
 		if (!folio_test_uptodate(folio))
@@ -2527,9 +2536,9 @@ static int filemap_get_pages(struct kiocb *iocb, size_t count,
 	pgoff_t last_index;
 	struct folio *folio;
 	int err = 0;
-	bool special = (count == 32768) || (count == 19968) || (count == 20480);
+	bool special_print = false; //(count == 32768) || (count == 19968) || (count == 20480);
 
-	if (special)
+	if (special_print)
 		pr_err("%s iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
 				__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 
@@ -2539,31 +2548,31 @@ retry:
 	if (fatal_signal_pending(current))
 		return -EINTR;
 
-	if (special)
+	if (special_print)
 		pr_err("%s2 calling filemap_get_read_batch iocb=%pS pos=%lld count=%zd fbatch->nr=%d mapping=%pS index=%ld last_index=%ld\n",
 				__func__, iocb, iocb->ki_pos, count, fbatch->nr, mapping, index, last_index);
-	filemap_get_read_batch(mapping, index, last_index - 1, fbatch, special);
-	if (special)
+	filemap_get_read_batch(mapping, index, last_index - 1, fbatch, special_print);
+	if (special_print)
 		pr_err("%s3 called filemap_get_read_batch iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
 				__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 	if (!folio_batch_count(fbatch)) {
 		if (iocb->ki_flags & IOCB_NOIO)
 			return -EAGAIN;
-		if (special)
+		if (special_print)
 			pr_err("%s4 calling page_cache_sync_readahead iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
 					__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 		page_cache_sync_readahead(mapping, ra, filp, index,
 				last_index - index);
-		filemap_get_read_batch(mapping, index, last_index - 1, fbatch, special);
+		filemap_get_read_batch(mapping, index, last_index - 1, fbatch, special_print);
 	}
-	if (special)
+	if (special_print)
 		pr_err("%s5 maybe called page_cache_sync_readahead iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
 					__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 	if (!folio_batch_count(fbatch)) {
 		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
 			return -EAGAIN;
 
-		if (special)
+		if (special_print)
 			pr_err("%s6 calling filemap_create_folio iocb=%pS pos=%lld count=%zd fbatch->nr=%d\n",
 						__func__, iocb, iocb->ki_pos, count, fbatch->nr);
 
@@ -2574,7 +2583,7 @@ retry:
 	}
 
 	folio = fbatch->folios[folio_batch_count(fbatch) - 1];
-	if (special)
+	if (special_print)
 		pr_err("%s7 iocb=%pS pos=%lld count=%zd fbatch->nr=%d folio=%pS folio_pos=%lld folio_size=%zd\n",
 					__func__, iocb, iocb->ki_pos, count, fbatch->nr, folio, folio_pos(folio), folio_size(folio));
 	if (folio_test_readahead(folio)) {
@@ -2635,10 +2644,10 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 	bool writably_mapped;
 	loff_t isize, end_offset;
 	loff_t last_pos = ra->prev_pos;
-	bool special = (iov_iter_count(iter) == 32768) || (iov_iter_count(iter) == 19968) || (iov_iter_count(iter) == 20480);
+	bool special_print = false;//(iov_iter_count(iter) == 32768) || (iov_iter_count(iter) == 19968) || (iov_iter_count(iter) == 20480);
 	int mycount = 0;
 
-	if (special)
+	if (special_print)
 		pr_err("%s iocb=%pS pos=%lld iter=%pS len=%zd mapping=%pS inode=%pS\n",
 			__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), mapping, inode);
 	if (unlikely(iocb->ki_pos >= inode->i_sb->s_maxbytes))
@@ -2652,7 +2661,7 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 	do {
 		cond_resched();
 
-		if (special)
+		if (special_print)
 			pr_err("%s1 looping count=%d iocb=%pS pos=%lld iter=%pS len=%zd\n",
 				__func__, mycount, iocb, iocb->ki_pos, iter, iov_iter_count(iter));
 		mycount++;
@@ -2667,13 +2676,13 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		if (unlikely(iocb->ki_pos >= i_size_read(inode)))
 			break;
 
-		if (special)
+		if (special_print)
 			pr_err("%s1.1 calling filemap_get_pages iocb=%pS pos=%lld iter=%pS len=%zd\n",
 				__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter));
 		error = filemap_get_pages(iocb, iter->count, &fbatch, false);
 		if (error < 0)
 			break;
-		if (special) {
+		if (special_print) {
 			if (fbatch.nr == 1) {
 				struct folio *johnfolio = fbatch.folios[0];
 				pr_err("%s1.2 called filemap_get_pages iocb=%pS pos=%lld iter=%pS len=%zd fbatch.nr=%d folios[0]=%pS pos=%lld len=%zd\n",
@@ -2692,13 +2701,13 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		 * another truncate extends the file - this is desired though).
 		 */
 		isize = i_size_read(inode);
-		if (special)
+		if (special_print)
 			pr_err("%s3 iocb=%pS pos=%lld iter=%pS len=%zd isize=%lld\n",
 				__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), isize);
 		if (unlikely(iocb->ki_pos >= isize))
 			goto put_folios;
 		end_offset = min_t(loff_t, isize, iocb->ki_pos + iter->count);
-		if (special)
+		if (special_print)
 			pr_err("%s4 iocb=%pS pos=%lld iter=%pS len=%zd isize=%lld end_offset=%lld\n",
 				__func__, iocb, iocb->ki_pos, iter, iov_iter_count(iter), isize, end_offset);
 

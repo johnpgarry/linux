@@ -2564,13 +2564,16 @@ int write_cache_pages(struct address_space *mapping,
 {
 	struct folio *folio = NULL;
 	int error;
+	bool special_print = false;
 
-	pr_err("%s calling writeback_iter wbc->range_start=%lld, range_end=%lld\n",
-		__func__, wbc->range_start, wbc->range_end);
+	if (special_print)
+		pr_err("%s calling writeback_iter wbc->range_start=%lld, range_end=%lld\n",
+			__func__, wbc->range_start, wbc->range_end);
 	while ((folio = writeback_iter(mapping, wbc, folio, &error))) {
-	pr_err("%s2 called writeback_iter wbc->range_start=%lld, range_end=%lld folio=%pS folio_pos=%lld folio_size=%zd\n",
-		__func__, wbc->range_start, wbc->range_end,
-		folio, folio_pos(folio), folio_size(folio));
+		if (special_print)
+			pr_err("%s2 called writeback_iter wbc->range_start=%lld, range_end=%lld folio=%pS folio_pos=%lld folio_size=%zd\n",
+					__func__, wbc->range_start, wbc->range_end,
+					folio, folio_pos(folio), folio_size(folio));
 		error = writepage(folio, wbc, data);
 		if (error == AOP_WRITEPAGE_ACTIVATE) {
 			folio_unlock(folio);
@@ -2588,11 +2591,13 @@ static int writeback_use_writepage(struct address_space *mapping,
 	struct folio *folio = NULL;
 	struct blk_plug plug;
 	int err;
+	bool special_print = false;
 
 	blk_start_plug(&plug);
 	while ((folio = writeback_iter(mapping, wbc, folio, &err))) {
-		pr_err("%s folio=%pS pos=%lld size=%zd\n", __func__, folio,
-			folio_pos(folio), folio_size(folio));
+		if (special_print)
+			pr_err("%s folio=%pS pos=%lld size=%zd\n", __func__, folio,
+				folio_pos(folio), folio_size(folio));
 		err = mapping->a_ops->writepage(&folio->page, wbc);
 		if (err == AOP_WRITEPAGE_ACTIVATE) {
 			folio_unlock(folio);
@@ -2600,7 +2605,8 @@ static int writeback_use_writepage(struct address_space *mapping,
 		}
 		mapping_set_error(mapping, err);
 	}
-	pr_err("%s2 calling blk_finish_plug\n", __func__);
+	if (special_print)
+		pr_err("%s2 calling blk_finish_plug\n", __func__);
 	blk_finish_plug(&plug);
 
 	return err;
@@ -2989,6 +2995,7 @@ static void wb_inode_writeback_end(struct bdi_writeback *wb)
 {
 	unsigned long flags;
 	atomic_dec(&wb->writeback_inodes);
+	bool special_print = false;
 	/*
 	 * Make sure estimate of writeback throughput gets updated after
 	 * writeback completed. We delay the update by BANDWIDTH_INTERVAL
@@ -2998,7 +3005,8 @@ static void wb_inode_writeback_end(struct bdi_writeback *wb)
 	 */
 	spin_lock_irqsave(&wb->work_lock, flags);
 	if (test_bit(WB_registered, &wb->state)) {
-		pr_err("%s calling queue_delayed_work for wb->bw_dwork\n", __func__);
+		if (special_print)
+			pr_err("%s calling queue_delayed_work for wb->bw_dwork\n", __func__);
 		queue_delayed_work(bdi_wq, &wb->bw_dwork, BANDWIDTH_INTERVAL);
 	}
 	spin_unlock_irqrestore(&wb->work_lock, flags);

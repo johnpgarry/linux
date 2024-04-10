@@ -135,9 +135,11 @@ static bool inode_io_list_move_locked(struct inode *inode,
 
 static void wb_wakeup(struct bdi_writeback *wb)
 {
+	bool special_print = false;
 	spin_lock_irq(&wb->work_lock);
 	if (test_bit(WB_registered, &wb->state)) {
-		pr_err("%s calling mod_delayed_work for wb->dwork", __func__);
+		if (special_print)
+			pr_err("%s calling mod_delayed_work for wb->dwork", __func__);
 		mod_delayed_work(bdi_wq, &wb->dwork, 0);
 	}
 	spin_unlock_irq(&wb->work_lock);
@@ -160,11 +162,13 @@ static void wb_wakeup(struct bdi_writeback *wb)
 static void wb_wakeup_delayed(struct bdi_writeback *wb)
 {
 	unsigned long timeout;
+	bool special_print = false;
 
 	timeout = msecs_to_jiffies(dirty_writeback_interval * 10);
 	spin_lock_irq(&wb->work_lock);
 	if (test_bit(WB_registered, &wb->state)) {
-		pr_err("%s calling queue_delayed_work for wb->dwork dirty_writeback_interval=%d (centisec)", __func__, dirty_writeback_interval);
+		if (special_print)
+			pr_err("%s calling queue_delayed_work for wb->dwork dirty_writeback_interval=%d (centisec)", __func__, dirty_writeback_interval);
 		queue_delayed_work(bdi_wq, &wb->dwork, timeout);
 	}
 	spin_unlock_irq(&wb->work_lock);
@@ -189,6 +193,7 @@ static void finish_writeback_work(struct bdi_writeback *wb,
 static void wb_queue_work(struct bdi_writeback *wb,
 			  struct wb_writeback_work *work)
 {
+	bool special_print = false;
 	trace_writeback_queue(wb, work);
 
 	if (work->done)
@@ -198,7 +203,8 @@ static void wb_queue_work(struct bdi_writeback *wb,
 
 	if (test_bit(WB_registered, &wb->state)) {
 		list_add_tail(&work->list, &wb->work_list);
-		pr_err("%s calling mod_delayed_work for wb->dwork", __func__);
+		if (special_print)
+			pr_err("%s calling mod_delayed_work for wb->dwork", __func__);
 		mod_delayed_work(bdi_wq, &wb->dwork, 0);
 	} else
 		finish_writeback_work(wb, work);
@@ -1646,14 +1652,16 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 	struct address_space *mapping = inode->i_mapping;
 	long nr_to_write = wbc->nr_to_write;
 	unsigned dirty;
+	bool special_print = false;
 	int ret;
 
 	WARN_ON(!(inode->i_state & I_SYNC));
 
 	trace_writeback_single_inode_start(inode, wbc, nr_to_write);
 
-	pr_err("%s mapping=%pS wbc->nr_to_write=%ld, ->range_start=%lld, ->range_end=%lld\n", __func__,
-		mapping, wbc->nr_to_write, wbc->range_start, wbc->range_end);
+	if (special_print)
+		pr_err("%s mapping=%pS wbc->nr_to_write=%ld, ->range_start=%lld, ->range_end=%lld\n", __func__,
+			mapping, wbc->nr_to_write, wbc->range_start, wbc->range_end);
 	ret = do_writepages(mapping, wbc);
 
 	/*
@@ -2076,8 +2084,10 @@ static long wb_writeback(struct bdi_writeback *wb,
 	struct inode *inode;
 	long progress;
 	struct blk_plug plug;
+	bool special_print = false;
 
-	pr_err("%s nr_pages=%ld\n", __func__, nr_pages);
+	if (special_print)
+		pr_err("%s nr_pages=%ld\n", __func__, nr_pages);
 	blk_start_plug(&plug);
 	for (;;) {
 		/*
@@ -2297,7 +2307,9 @@ void wb_workfn(struct work_struct *work)
 	struct bdi_writeback *wb = container_of(to_delayed_work(work),
 						struct bdi_writeback, dwork);
 	long pages_written;
-	pr_err("%s\n", __func__);
+	bool special_print = false;
+	if (special_print)
+		pr_err("%s\n", __func__);
 	set_worker_desc("flush-%s", bdi_dev_name(wb->bdi));
 
 	if (likely(!current_is_workqueue_rescuer() ||
@@ -2326,7 +2338,8 @@ void wb_workfn(struct work_struct *work)
 	if (!list_empty(&wb->work_list))
 		wb_wakeup(wb);
 	else if (wb_has_dirty_io(wb) && dirty_writeback_interval) {
-		pr_err("%s2 calling wb_wakeup_delayed dirty_writeback_interval=%d\n", __func__, dirty_writeback_interval);
+		if (special_print)
+			pr_err("%s2 calling wb_wakeup_delayed dirty_writeback_interval=%d\n", __func__, dirty_writeback_interval);
 		wb_wakeup_delayed(wb);
 	}
 }
@@ -2457,6 +2470,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	struct super_block *sb = inode->i_sb;
 	int dirtytime = 0;
 	struct bdi_writeback *wb = NULL;
+	bool special_print = false;
 
 	trace_writeback_mark_inode_dirty(inode, flags);
 
@@ -2580,7 +2594,8 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 			 */
 			if (wakeup_bdi &&
 			    (wb->bdi->capabilities & BDI_CAP_WRITEBACK)) {
-				pr_err("%s calling wb_wakeup_delayed\n", __func__);
+				if (special_print)
+					pr_err("%s calling wb_wakeup_delayed\n", __func__);
 				wb_wakeup_delayed(wb);
 
 			}
