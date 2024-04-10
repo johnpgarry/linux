@@ -1906,8 +1906,8 @@ no_page:
 		unsigned int order = max(min_order, FGF_GET_ORDER(fgp_flags));
 		int err;
 
-		pr_err("%s2.1 no_page: index=%ld folio=%pS FGP_CREAT set=%d order=%d\n",
-			__func__, index, folio, !!(fgp_flags & FGP_CREAT), order);
+		pr_err("%s2.1 no_page: index=%ld folio=%pS FGP_CREAT set=%d order=%d min_order=%d FGF_GET_ORDER(fgp_flags)=%d\n",
+			__func__, index, folio, !!(fgp_flags & FGP_CREAT), order, min_order, FGF_GET_ORDER(fgp_flags));
 
 		index = mapping_align_start_index(mapping, index);
 

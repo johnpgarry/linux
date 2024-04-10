@@ -1281,8 +1281,10 @@ static bool xfs_file_open_can_atomicwrite(
 
 	if (file->f_flags & O_DIRECT)
 		return true;
-	else if (file->f_flags & O_ATOMIC)
+	else if (file->f_flags & O_ATOMIC) {
+		mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 3); //fixme on order
 		return true;
+	}
 
 	return false;
 }
