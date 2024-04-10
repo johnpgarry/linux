@@ -623,10 +623,13 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	if (!bdev)
 		return -ENXIO;
 
-	if (bdev_can_atomic_write(bdev) && filp->f_flags & O_DIRECT) {
-		pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS O_ATOMIC set=%d\n",
-			__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & O_ATOMIC));
-		filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
+	if (bdev_can_atomic_write(bdev)) {
+
+		if (filp->f_flags & (O_DIRECT | O_ATOMIC)) {
+			pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS O_ATOMIC set=%d\n",
+				__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & O_ATOMIC));
+			filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
+		}
 	}
 
 	ret = bdev_open(bdev, mode, filp->private_data, NULL, filp);
@@ -667,6 +670,21 @@ blkdev_direct_write(struct kiocb *iocb, struct iov_iter *from)
 
 static ssize_t blkdev_buffered_write(struct kiocb *iocb, struct iov_iter *from)
 {
+	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
+
+	if (is_atomic) {
+		struct file *file = iocb->ki_filp;
+		struct block_device *bdev = I_BDEV(file->f_mapping->host);
+		pr_err("%s is_atomic i_blocksize=%d iov count=%zd\n",
+			__func__, i_blocksize(bdev->bd_inode), iov_iter_count(from));
+		if (!generic_atomic_write_valid_size(iocb->ki_pos, from, i_blocksize(bdev->bd_inode),
+												i_blocksize(bdev->bd_inode))) {
+			pr_err("%s2 INVALID is_atomic i_blocksize=%d iov count=%zd\n",
+				__func__, i_blocksize(bdev->bd_inode), iov_iter_count(from));
+			return -EINVAL;
+		}
+	}
+
 	return iomap_file_buffered_write(iocb, from, &blkdev_iomap_ops);
 }
 
@@ -712,17 +730,21 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		return ret;
 
 	if (iocb->ki_flags & IOCB_DIRECT) {
+		pr_err("%s0 IOCB_DIRECT ret=%zd\n", __func__, ret);
 		ret = blkdev_direct_write(iocb, from);
 		if (ret >= 0 && iov_iter_count(from))
 			ret = direct_write_fallback(iocb, from, ret,
 					blkdev_buffered_write(iocb, from));
 	} else {
+		pr_err("%s1 calling blkdev_buffered_write\n", __func__);
 		ret = blkdev_buffered_write(iocb, from);
+		pr_err("%s1.1 called blkdev_buffered_write ret=%zd\n", __func__, ret);
 	}
-
+	pr_err("%s2 ret=%zd\n", __func__, ret);
 	if (ret > 0)
 		ret = generic_write_sync(iocb, ret);
 	iov_iter_reexpand(from, iov_iter_count(from) + shorted);
+	pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 

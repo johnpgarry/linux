@@ -1009,8 +1009,11 @@ static int do_dentry_open(struct file *f,
 
 	f->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
 	f->f_iocb_flags = iocb_flags(f);
-	if (f->f_flags & O_ATOMIC)
-		pr_err("%s4 O_ATOMIC set f_iocb_flags=0x%x IOCB_ATOMIC set=%d\n", __func__, f->f_iocb_flags, !!(f->f_iocb_flags & IOCB_ATOMIC));
+	if (f->f_flags & O_ATOMIC) {
+		pr_err("%s4 O_ATOMIC set f_iocb_flags=0x%x IOCB_ATOMIC set=%d FMODE_CAN_ATOMIC_WRITE=%d\n",
+			__func__, f->f_iocb_flags, !!(f->f_iocb_flags & IOCB_ATOMIC),
+			!!(f->f_mode & FMODE_CAN_ATOMIC_WRITE));
+	}
 
 	file_ra_state_init(&f->f_ra, f->f_mapping->host->i_mapping);
 	pr_err_once("%s O_DIRECT=0x%x O_ATOMIC=0x%x\n", __func__, O_DIRECT, O_ATOMIC);
