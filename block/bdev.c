@@ -1189,7 +1189,7 @@ void bdev_statx(struct inode *backing_inode, struct kstat *stat,
 {
 	struct block_device *bdev;
 
-	if (!(request_mask & (STATX_DIOALIGN | STATX_WRITE_ATOMIC | STATX_WRITE_ATOMIC_BUFFERED)))
+	if (!(request_mask & (STATX_DIOALIGN | STATX_WRITE_ATOMIC_DIO | STATX_WRITE_ATOMIC_BUF)))
 		return;
 
 	/*
@@ -1211,14 +1211,14 @@ void bdev_statx(struct inode *backing_inode, struct kstat *stat,
 	if (bdev_can_atomic_write(bdev)) {
 		struct request_queue *bd_queue = bdev->bd_queue;
 
-		if ((request_mask & STATX_WRITE_ATOMIC) &&
-			!(request_mask & STATX_WRITE_ATOMIC_BUFFERED)) {
+		if ((request_mask & STATX_WRITE_ATOMIC_DIO) &&
+			!(request_mask & STATX_WRITE_ATOMIC_BUF)) {
 
 				generic_fill_statx_atomic_writes(stat,
 					queue_atomic_write_unit_min_bytes(bd_queue),
 					queue_atomic_write_unit_max_bytes(bd_queue),
 					true);
-		} else if (request_mask & STATX_WRITE_ATOMIC_BUFFERED) {
+		} else if (request_mask & STATX_WRITE_ATOMIC_BUF) {
 			unsigned int ibs = i_blocksize(bdev->bd_inode);
 			pr_err("%s ibs=%d\n", __func__, ibs);
 

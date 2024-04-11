@@ -106,12 +106,12 @@ void generic_fill_statx_atomic_writes(struct kstat *stat,
 	/* Confirm that the request type is known */
 	if (dio) {
 		/* Confirm that the request type is known */
-		stat->result_mask |= STATX_WRITE_ATOMIC;
+		stat->result_mask |= STATX_WRITE_ATOMIC_DIO;
 		/* Confirm that the file attribute type is known */
-		stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC;
+		stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC_DIO;
 	} else {
-		stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC_BUFFERED;
-		stat->result_mask |= STATX_WRITE_ATOMIC_BUFFERED;
+		stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC_BUF;
+		stat->result_mask |= STATX_WRITE_ATOMIC_BUF;
 	}
 
 
@@ -123,9 +123,9 @@ void generic_fill_statx_atomic_writes(struct kstat *stat,
 
 		/* Confirm atomic writes are actually supported */
 		if (dio)
-			stat->attributes |= STATX_ATTR_WRITE_ATOMIC;
+			stat->attributes |= STATX_ATTR_WRITE_ATOMIC_DIO;
 		else
-			stat->attributes |= STATX_ATTR_WRITE_ATOMIC_BUFFERED;
+			stat->attributes |= STATX_ATTR_WRITE_ATOMIC_BUF;
 	}
 }
 EXPORT_SYMBOL_GPL(generic_fill_statx_atomic_writes);
