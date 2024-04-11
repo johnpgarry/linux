@@ -316,6 +316,7 @@ xfs_reinit_inode(
 	dev_t			dev = inode->i_rdev;
 	kuid_t			uid = inode->i_uid;
 	kgid_t			gid = inode->i_gid;
+	pr_err("%s inode=%pS\n", __func__, inode);
 
 	error = inode_init_always(mp->m_super, inode);
 

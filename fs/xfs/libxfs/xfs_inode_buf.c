@@ -276,7 +276,11 @@ xfs_inode_from_disk(
 			xfs_inode_buftarg(ip)->bt_bdev_awu_min > sbp->sb_blocksize) {
 			ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
 			pr_err("%s4 clearing XFS_DIFLAG2_ATOMICWRITES\n", __func__);
+	    } else {
+			pr_err("%s5 setting mapping_set_folio_min_order\n", __func__);
+	    	mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 3); //fixme on order
 	    }
+
 	}
 
 	return 0;
