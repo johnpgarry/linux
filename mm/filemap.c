@@ -1911,7 +1911,7 @@ no_page:
 		__func__, index, folio, !!(fgp_flags & FGP_CREAT));
 	if (!folio && (fgp_flags & FGP_CREAT)) {
 		unsigned int min_order = mapping_min_folio_order(mapping);
-		unsigned int order = max(min_order, FGF_GET_ORDER(fgp_flags));
+		unsigned int order = min_order;//max(min_order, FGF_GET_ORDER(fgp_flags));
 		int err;
 
 		if (special_print)
