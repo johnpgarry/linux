@@ -797,7 +797,8 @@ xfs_file_buffered_write(
 	bool			cleared_space = false;
 	unsigned int		iolock;
 	int mycount = 0;
-	bool special_print = false;
+	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
+	bool special_print = is_atomic;
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
 		struct xfs_mount	*mp = ip->i_mount;
@@ -808,10 +809,10 @@ xfs_file_buffered_write(
 	}
 
 write_retry:
-	if (iocb->ki_flags & IOCB_ATOMIC) {
+	if (is_atomic) {
 		if (special_print) {
-			pr_err("%s count=%d write_retry: ATOMIC iocb=%pS pos=%lld from=%pS len=%zd\n",
-				__func__, mycount, iocb, iocb->ki_pos, from, iov_iter_count(from));
+			pr_err("%s count=%d write_retry: ATOMIC=%d iocb=%pS pos=%lld from=%pS len=%zd\n",
+				__func__, mycount, is_atomic, iocb, iocb->ki_pos, from, iov_iter_count(from));
 		}
 	}
 	mycount++;
@@ -1282,20 +1283,15 @@ static bool xfs_file_open_can_atomicwrite(
 		return false;
 
 	if (special_print)
-		pr_err("%s1 xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d O_DIRECT set=%d O_ATOMIC set=%d\n",
+		pr_err("%s1 xfs_inode_has_atomicwrites=%d bdev_can_atomic_write=%d O_DIRECT set=%d 0 set=%d\n",
 			__func__, xfs_inode_has_atomicwrites(ip), bdev_can_atomic_write(target->bt_bdev),
 			!!(file->f_flags & O_DIRECT),
-			!!(file->f_flags & O_ATOMIC));
+			!!(file->f_flags & 0));
 	if (!bdev_can_atomic_write(target->bt_bdev))
 		return false;
 
-	if (file->f_flags & O_DIRECT)
-		return true;
-	else if (file->f_flags & O_ATOMIC) {
-		return true;
-	}
 
-	return false;
+	return true;
 }
 
 STATIC int

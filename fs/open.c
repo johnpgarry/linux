@@ -937,11 +937,11 @@ static int do_dentry_open(struct file *f,
 	f->f_mapping = inode->i_mapping;
 	f->f_wb_err = filemap_sample_wb_err(f->f_mapping);
 	f->f_sb_err = file_sample_sb_err(f);
-	bool special_print = false;
+	bool special_print = true;
 
-	if (special_print && (f->f_flags & O_ATOMIC)) {
-		pr_err("%s1 O_ATOMIC set O_ATOMIC=0x%x inode_is_locked=%d\n",
-			__func__, O_ATOMIC, inode_is_locked(inode));
+	if (special_print && (f->f_flags & 0)) {
+		pr_err("%s1 0 set 0=0x%x inode_is_locked=%d\n",
+			__func__, 0, inode_is_locked(inode));
 	}
 	if (special_print && (f->f_flags & O_DIRECT)) {
 		pr_err("%s1 O_DIRECT set\n", __func__);
@@ -955,7 +955,7 @@ static int do_dentry_open(struct file *f,
 	if ((f->f_mode & (FMODE_READ | FMODE_WRITE)) == FMODE_READ) {
 		i_readcount_inc(inode);
 	} else if (f->f_mode & FMODE_WRITE && !special_file(inode->i_mode)) {
-		if (f->f_flags & O_ATOMIC)
+		if (f->f_flags & 0)
 			error = file_get_write_access_exclusive(f);
 		else
 			error = file_get_write_access(f);
@@ -965,8 +965,8 @@ static int do_dentry_open(struct file *f,
 		f->f_mode |= FMODE_WRITER;
 	}
 
-	if (special_print && (f->f_flags & O_ATOMIC))
-		pr_err("%s2 O_ATOMIC set\n", __func__);
+	if (special_print && (f->f_flags & 0))
+		pr_err("%s2 0 set\n", __func__);
 	/* POSIX.1-2008/SUSv4 Section XSI 2.9.7 */
 	if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode))
 		f->f_mode |= FMODE_ATOMIC_POS;
@@ -985,8 +985,8 @@ static int do_dentry_open(struct file *f,
 	if (error)
 		goto cleanup_all;
 
-	if (special_print && (f->f_flags & O_ATOMIC))
-		pr_err("%s3 O_ATOMIC set f->f_op->open=%pS\n", __func__, f->f_op->open);
+	if (special_print && (f->f_flags & 0))
+		pr_err("%s3 0 set f->f_op->open=%pS\n", __func__, f->f_op->open);
 	/* normally all 3 are set; ->open() can clear them if needed */
 	f->f_mode |= FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	if (!open)
@@ -1010,22 +1010,22 @@ static int do_dentry_open(struct file *f,
 
 	f->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
 	f->f_iocb_flags = iocb_flags(f);
-	if (special_print && (f->f_flags & O_ATOMIC)) {
-		pr_err("%s4 O_ATOMIC set f_iocb_flags=0x%x IOCB_ATOMIC set=%d FMODE_CAN_ATOMIC_WRITE=%d\n",
+	if (special_print && (f->f_flags & 0)) {
+		pr_err("%s4 0 set f_iocb_flags=0x%x IOCB_ATOMIC set=%d FMODE_CAN_ATOMIC_WRITE=%d\n",
 			__func__, f->f_iocb_flags, !!(f->f_iocb_flags & IOCB_ATOMIC),
 			!!(f->f_mode & FMODE_CAN_ATOMIC_WRITE));
 	}
 
 	file_ra_state_init(&f->f_ra, f->f_mapping->host->i_mapping);
-	pr_err_once("%s O_DIRECT=0x%x O_ATOMIC=0x%x\n", __func__, O_DIRECT, O_ATOMIC);
+	pr_err_once("%s O_DIRECT=0x%x 0=0x%x\n", __func__, O_DIRECT, 0);
 	if (special_print && (f->f_flags & O_DIRECT))
 		pr_err("%s5 O_DIRECT set\n", __func__);
 	if ((f->f_flags & O_DIRECT) && !(f->f_mode & FMODE_CAN_ODIRECT))
 		return -EINVAL;
 
-	if (special_print && (f->f_flags & O_ATOMIC))
-		pr_err("%s6 O_ATOMIC set\n", __func__);
-	if ((f->f_flags & O_ATOMIC) && !(f->f_mode & FMODE_CAN_ATOMIC_WRITE))
+	if (special_print && (f->f_flags & 0))
+		pr_err("%s6 0 set\n", __func__);
+	if ((f->f_flags & 0) && !(f->f_mode & FMODE_CAN_ATOMIC_WRITE))
 		return -EINVAL;
 
 	/*
@@ -1040,16 +1040,16 @@ static int do_dentry_open(struct file *f,
 		 * of THPs into the page cache will fail.
 		 */
 		smp_mb();
-		if (f->f_flags & O_ATOMIC) {
+		if (f->f_flags & 0) {
 			struct address_space *mapping = inode->i_mapping;
 			
 			if (special_print)
-				pr_err("%s7 O_ATOMIC set filemap_nr_thps(inode->i_mapping)=%d inode_is_locked(inode)=%d\n",
+				pr_err("%s7 0 set filemap_nr_thps(inode->i_mapping)=%d inode_is_locked(inode)=%d\n",
 					__func__, filemap_nr_thps(inode->i_mapping), inode_is_locked(inode));
 
 			filemap_invalidate_lock(inode->i_mapping);
 			if (special_print)
-				pr_err("%s7.1 inside filemap_invalidate_lock O_ATOMIC set filemap_nr_thps(inode->i_mapping)=%d inode_is_locked(inode)=%d\n",
+				pr_err("%s7.1 inside filemap_invalidate_lock 0 set filemap_nr_thps(inode->i_mapping)=%d inode_is_locked(inode)=%d\n",
 				__func__, filemap_nr_thps(inode->i_mapping), inode_is_locked(inode));
 			/*
 			 * unmap_mapping_range just need to be called once

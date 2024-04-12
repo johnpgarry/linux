@@ -1511,8 +1511,10 @@ void folio_end_read(struct folio *folio, bool success)
 	VM_BUG_ON_FOLIO(!folio_test_locked(folio), folio);
 	VM_BUG_ON_FOLIO(folio_test_uptodate(folio), folio);
 
-	if (likely(success))
+	if (likely(success)) {
+		pr_err("%s setting PG_uptodate %pS folio=%pS\n", __func__, __builtin_return_address(0), folio);
 		mask |= 1 << PG_uptodate;
+	}
 	if (folio_xor_flags_has_waiters(folio, mask))
 		folio_wake_bit(folio, PG_locked);
 }
@@ -1586,7 +1588,7 @@ EXPORT_SYMBOL(folio_wait_private_2_killable);
  */
 void folio_end_writeback(struct folio *folio)
 {
-	bool special_print = false;
+	bool special_print = true;
 	if (special_print)
 		pr_err("%s folio=%pS\n", __func__, folio);
 	VM_BUG_ON_FOLIO(!folio_test_writeback(folio), folio);
@@ -1861,7 +1863,7 @@ struct folio *__filemap_get_folio(struct address_space *mapping, pgoff_t index,
 		fgf_t fgp_flags, gfp_t gfp)
 {
 	struct folio *folio;	
-	bool special_print = false;
+	bool special_print = true;
 		
 
 repeat:
@@ -1933,9 +1935,17 @@ no_page:
 			order = 0;
 		if (order > MAX_PAGECACHE_ORDER)
 			order = MAX_PAGECACHE_ORDER;
+		if (special_print)
+			pr_err("%s2.1.1 set order index=%ld folio=%pS FGP_CREAT set=%d order=%d min_order=%d FGF_GET_ORDER(fgp_flags)=%d MAX_PAGECACHE_ORDER=%d\n",
+			__func__, index, folio, !!(fgp_flags & FGP_CREAT), order, min_order, FGF_GET_ORDER(fgp_flags), MAX_PAGECACHE_ORDER);
 		/* If we're not aligned, allocate a smaller folio */
-		if (index & ((1UL << order) - 1))
+		if (index & ((1UL << order) - 1)) {
+			if (special_print)
+				pr_err("%s2.1.2 index=%ld order=%d mask=0x%lx\n", __func__, index, order, ((1UL << order) - 1));
 			order = __ffs(index);
+			if (special_print)
+				pr_err("%s2.1.3 index=%ld order=%d mask=0x%lx\n", __func__, index, order, ((1UL << order) - 1));
+		}
 
 		do {
 			gfp_t alloc_gfp = gfp;

@@ -278,7 +278,16 @@ xfs_inode_from_disk(
 			pr_err("%s4 clearing XFS_DIFLAG2_ATOMICWRITES\n", __func__);
 	    } else {
 			pr_err("%s5 setting mapping_set_folio_min_order\n", __func__);
-	    	mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 3); //fixme on order
+			if (ip->i_extsize == 2)
+	    		mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 1); //fixme on order
+	    	else if (ip->i_extsize == 4)
+	    		mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 2); //fixme on order
+	    	else if (ip->i_extsize == 8)
+	    		mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 3); //fixme on order
+	    	else if (ip->i_extsize == 16)
+	    		mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 4); //fixme on order
+	    	else
+	    		BUG();
 	    }
 
 	}

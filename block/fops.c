@@ -625,11 +625,11 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 
 	if (bdev_can_atomic_write(bdev)) {
 
-		if (filp->f_flags & (O_DIRECT | O_ATOMIC)) {
-			pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS O_ATOMIC set=%d\n",
-				__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & O_ATOMIC));
+		//if (filp->f_flags & (O_DIRECT | O_ATOMIC)) {
+			pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS 0 set=%d\n",
+				__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & 0));
 			filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
-		}
+		//}
 	}
 
 	ret = bdev_open(bdev, mode, filp->private_data, NULL, filp);

@@ -777,6 +777,7 @@ static inline int PageUptodate(const struct page *page)
 static __always_inline void __folio_mark_uptodate(struct folio *folio)
 {
 	smp_wmb();
+//	pr_err("%s setting PG_uptodate folio=%pS\n", __func__, folio);
 	__set_bit(PG_uptodate, folio_flags(folio, 0));
 }
 
@@ -788,6 +789,7 @@ static __always_inline void folio_mark_uptodate(struct folio *folio)
 	 * uptodate are actually visible before folio_test_uptodate becomes true.
 	 */
 	smp_wmb();
+//	pr_err("%s setting PG_uptodate folio=%pS\n", __func__, folio);
 	set_bit(PG_uptodate, folio_flags(folio, 0));
 }
 

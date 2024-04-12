@@ -1152,8 +1152,10 @@ bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 		return false;
 
 	bi_size_orig = bio->bi_iter.bi_size;
-	if (atomic && bi_size_orig)
+	if (atomic && bi_size_orig) {
+		pr_err("%s atomic and already has data\n", __func__);
 		return 0;
+	}
 
 	if (bio_add_page(bio, &folio->page, len, off) <= 0)
 		return false;

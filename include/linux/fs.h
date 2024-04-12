@@ -3423,8 +3423,8 @@ static inline int iocb_flags(struct file *file)
 		res |= IOCB_DSYNC;
 	if (file->f_flags & __O_SYNC)
 		res |= IOCB_SYNC;
-	if (file->f_flags & O_ATOMIC)
-		res |= IOCB_ATOMIC;
+//	if (file->f_flags & O_ATOMIC)
+//		res |= IOCB_ATOMIC;
 	return res;
 }
 

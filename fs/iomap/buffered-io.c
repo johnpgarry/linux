@@ -82,8 +82,10 @@ static void iomap_set_range_uptodate(struct folio *folio, size_t off,
 		spin_unlock_irqrestore(&ifs->state_lock, flags);
 	}
 
-	if (uptodate)
+	if (uptodate) {
+		pr_err("%s calling folio_mark_uptodate folio=%pS\n", __func__, folio);
 		folio_mark_uptodate(folio);
+	}
 }
 
 static inline bool ifs_block_is_dirty(struct folio *folio,
@@ -354,6 +356,7 @@ static int iomap_read_inline_data(const struct iomap_iter *iter,
 		ifs_alloc(iter->inode, folio, iter->flags);
 
 	folio_fill_tail(folio, offset, iomap->inline_data, size);
+	pr_err("%s calling iomap_set_range_uptodate\n", __func__);
 	iomap_set_range_uptodate(folio, offset, folio_size(folio) - offset);
 	return 0;
 }
@@ -391,6 +394,7 @@ static loff_t iomap_readpage_iter(const struct iomap_iter *iter,
 
 	if (iomap_block_needs_zeroing(iter, pos)) {
 		folio_zero_range(folio, poff, plen);
+		pr_err("%s calling iomap_set_range_uptodate\n", __func__);
 		iomap_set_range_uptodate(folio, poff, plen);
 		goto done;
 	}
@@ -586,16 +590,24 @@ EXPORT_SYMBOL_GPL(iomap_is_partially_uptodate);
  */
 struct folio *iomap_get_folio(struct iomap_iter *iter, loff_t pos, size_t len)
 {
-	bool special_print = false;
+	bool special_print = true;
 	fgf_t fgp = FGP_WRITEBEGIN | FGP_NOFS;
+	struct folio *folio;
 
 	if (iter->flags & IOMAP_NOWAIT)
 		fgp |= FGP_NOWAIT;
 	fgp |= fgf_set_order(len);
 	if (special_print)
 		pr_err("%s pos=%lld len=%zd\n", __func__, pos, len);
-	return __filemap_get_folio(iter->inode->i_mapping, pos >> PAGE_SHIFT,
+	folio = __filemap_get_folio(iter->inode->i_mapping, pos >> PAGE_SHIFT,
 			fgp, mapping_gfp_mask(iter->inode->i_mapping));
+	if (special_print) {
+		if (!IS_ERR(folio))
+			pr_err("%s1 pos=%lld len=%zd got folio=%pS pos=%lld size=%zd\n",
+				__func__, pos, len, folio, folio_pos(folio), folio_size(folio));
+	}
+
+	return folio;
 }
 EXPORT_SYMBOL_GPL(iomap_get_folio);
 
@@ -682,6 +694,11 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	size_t from = offset_in_folio(folio, pos), to = from + len;
 	size_t poff, plen;
 
+	pr_err("%s UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d folio_pos=%lld folio_size=%zd\n",
+		__func__, !!(iter->flags & IOMAP_UNSHARE),
+		pos, len, block_size, block_start, block_end, nr_blocks,
+		folio_pos(folio), folio_size(folio));
+
 	/*
 	 * If the write or zeroing completely overlaps the current folio, then
 	 * entire folio will be dirtied so there is no need for
@@ -693,17 +710,30 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	    pos + len >= folio_pos(folio) + folio_size(folio))
 		return 0;
 
+	pr_err("%s2 UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d\n",
+		__func__, !!(iter->flags & IOMAP_UNSHARE),
+		pos, len, block_size, block_start, block_end, nr_blocks);
 	ifs = ifs_alloc(iter->inode, folio, iter->flags);
 	if ((iter->flags & IOMAP_NOWAIT) && !ifs && nr_blocks > 1)
 		return -EAGAIN;
 
-	if (folio_test_uptodate(folio))
+	if (folio_test_uptodate(folio)) {
+		pr_err("%s2.1 folio_test_uptodate passed\n", __func__);
 		return 0;
+	}
 	folio_clear_error(folio);
 
 	do {
+		pr_err("%s3 calling iomap_adjust_read_range UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d\n",
+			__func__, !!(iter->flags & IOMAP_UNSHARE),
+			pos, len, block_size, block_start, block_end, nr_blocks);
 		iomap_adjust_read_range(iter->inode, folio, &block_start,
 				block_end - block_start, &poff, &plen);
+
+		pr_err("%s4 called iomap_adjust_read_range UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d poff=%zd plen=%zd\n",
+			__func__, !!(iter->flags & IOMAP_UNSHARE),
+			pos, len, block_size, block_start, block_end, nr_blocks,
+			poff, plen);
 		if (plen == 0)
 			break;
 
@@ -727,6 +757,7 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 			if (status)
 				return status;
 		}
+		pr_err("%s5 calling iomap_set_range_uptodate\n", __func__);
 		iomap_set_range_uptodate(folio, poff, plen);
 	} while ((block_start += plen) < block_end);
 
@@ -774,7 +805,7 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 	struct folio *folio;
 	int status = 0;
 	bool is_atomic = iter->flags & IOMAP_ATOMIC;
-	bool special_print = false;
+	bool special_print = true;
 
 	if (special_print && (is_atomic || (pos == 98304))) {
 		pr_err("%s ATOMIC=%d pos=%lld len=%zd mapping_large_folio_support=%d\n", __func__,
@@ -803,9 +834,9 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 	if (special_print && (is_atomic || (pos == 98304))) {
 		pr_err("%s3 pos=%lld len=%zd called __iomap_get_folio folio=%pS folio_pos=%lld folio_size=%zd\n",
 			__func__, pos, len, folio, folio_pos(folio), folio_size(folio));
-		if (is_atomic)
-			folio_set_atomic(folio);
 	}
+	if (is_atomic)
+		folio_set_atomic(folio);
 
 	/*
 	 * Now we have a locked folio, before we do anything with it we need to
@@ -908,13 +939,30 @@ static size_t iomap_write_end(struct iomap_iter *iter, loff_t pos, size_t len,
 	const struct iomap *srcmap = iomap_iter_srcmap(iter);
 	loff_t old_size = iter->inode->i_size;
 	size_t ret;
+	bool special_print = true;
+	if (special_print)
+		pr_err("%s folio=%pS (pos=%lld, size=%zd) copied=%zd pos=%lld len=%zd\n",
+			__func__, folio, folio_pos(folio), folio_size(folio),
+			copied, pos, len);
 
 	if (srcmap->type == IOMAP_INLINE) {
+		if (special_print)
+			pr_err("%s2 folio=%pS (pos=%lld, size=%zd) copied=%zd pos=%lld len=%zd calling iomap_write_end_inline\n",
+				__func__, folio, folio_pos(folio), folio_size(folio),
+				copied, pos, len);
 		ret = iomap_write_end_inline(iter, folio, pos, copied);
 	} else if (srcmap->flags & IOMAP_F_BUFFER_HEAD) {
+		if (special_print)
+			pr_err("%s3 folio=%pS (pos=%lld, size=%zd) copied=%zd pos=%lld len=%zd calling block_write_end for IOMAP_F_BUFFER_HEAD\n",
+				__func__, folio, folio_pos(folio), folio_size(folio),
+				copied, pos, len);
 		ret = block_write_end(NULL, iter->inode->i_mapping, pos, len,
 				copied, &folio->page, NULL);
 	} else {
+		if (special_print)
+			pr_err("%s5 folio=%pS (pos=%lld, size=%zd) copied=%zd pos=%lld len=%zd calling __iomap_write_end\n",
+				__func__, folio, folio_pos(folio), folio_size(folio),
+				copied, pos, len);
 		ret = __iomap_write_end(iter->inode, pos, len, copied, folio);
 	}
 
@@ -947,7 +995,7 @@ static loff_t iomap_write_iter(struct iomap_iter *iter, struct iov_iter *i)
 	unsigned int bdp_flags = (iter->flags & IOMAP_NOWAIT) ? BDP_ASYNC : 0;
 	int mycount = 0;
 	bool is_atomic = iter->flags & IOMAP_ATOMIC;
-	bool special_print = false;
+	bool special_print = true;
 	if (special_print && (is_atomic || (pos == 98304))) {
 		pr_err("%s ATOMIC=%d pos=%lld len=%zd mapping=%pS iter->inode=%pS\n",
 			__func__, is_atomic,
@@ -1022,8 +1070,8 @@ retry:
 		if (special_print && (is_atomic || (pos == 98304))) {
 			//const struct iomap *srcmap = iomap_iter_srcmap(iter);
 			//BUG_ON(!folio);
-			pr_err("%s3 called iomap_write_begin pos=%lld len=%zd bytes=%zd offset=%zd folio=%pS folio_pos=%lld folio_size(folio)=%zd\n",
-				__func__, pos, iov_iter_count(i), bytes, offset, folio,
+			pr_err("%s3 called iomap_write_begin pos=%lld len=%zd bytes=%zd offset=%zd folio=%pS (atomic=%d) folio_pos=%lld folio_size(folio)=%zd\n",
+				__func__, pos, iov_iter_count(i), bytes, offset, folio, folio_test_atomic(folio),
 				folio ? folio_pos(folio) : -1, folio ? folio_size(folio) : -1);
 		}
 
@@ -1044,7 +1092,7 @@ retry:
 
 		if (special_print && (is_atomic || (pos == 98304))) {
 			//const struct iomap *srcmap = iomap_iter_srcmap(iter);
-			pr_err("%s5 called iomap_write_end pos=%lld len=%zd bytes=%zd offset=%zd copied=%zd folio=%pS\n",
+			pr_err("%s6 called iomap_write_end pos=%lld len=%zd bytes=%zd offset=%zd copied=%zd folio=%pS\n",
 				__func__, pos, iov_iter_count(i), bytes, offset, copied, folio);
 		}
 		if (unlikely(copied != status))
@@ -1090,7 +1138,8 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *i,
 	};
 	ssize_t ret;
 	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
-	bool special_print = false; // is_atomic || (iocb->ki_pos == 98304);
+	bool special_print = is_atomic || (iocb->ki_pos == 98304);
+
 	if (special_print)
 		pr_err("%s ATOMIC=%d iocb=%pS pos=%lld from=%pS len=%zd\n",
 			__func__, is_atomic,
@@ -1840,7 +1889,7 @@ static int iomap_add_to_ioend(struct iomap_writepage_ctx *wpc,
 	struct iomap_folio_state *ifs = folio->private;
 	size_t poff = offset_in_folio(folio, pos);
 	int error;
-	bool special_print = false;
+	bool special_print = true;
 
 	if (special_print)
 		pr_err("%s folio=%pS (atomic=%d) pos=%lld len=%d poff=%zd\n",

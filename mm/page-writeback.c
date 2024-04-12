@@ -2564,7 +2564,7 @@ int write_cache_pages(struct address_space *mapping,
 {
 	struct folio *folio = NULL;
 	int error;
-	bool special_print = false;
+	bool special_print = true;
 
 	if (special_print)
 		pr_err("%s calling writeback_iter wbc->range_start=%lld, range_end=%lld\n",

@@ -2307,7 +2307,7 @@ void wb_workfn(struct work_struct *work)
 	struct bdi_writeback *wb = container_of(to_delayed_work(work),
 						struct bdi_writeback, dwork);
 	long pages_written;
-	bool special_print = false;
+	bool special_print = true;
 	if (special_print)
 		pr_err("%s\n", __func__);
 	set_worker_desc("flush-%s", bdi_dev_name(wb->bdi));
