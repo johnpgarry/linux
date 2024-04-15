@@ -1185,6 +1185,9 @@ xfs_ioctl_setattr_xflags(
 			return -EINVAL;
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
+
+		pr_err("%s5 setting mapping_set_folio_min_order i_extsize=%d\n", __func__, ip->i_extsize);
+		mapping_set_folio_min_order(VFS_I(ip)->i_mapping, ip->i_extsize - 1);
 	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);
