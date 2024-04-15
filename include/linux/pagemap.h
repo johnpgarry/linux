@@ -363,9 +363,10 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 #endif
 
 /*
- * mapping_set_folio_min_order() - Set the minimum folio order
+ * mapping_set_folio_orders() - Set the minimum and max folio order
  * @mapping: The address_space.
  * @min: Minimum folio order (between 0-MAX_PAGECACHE_ORDER inclusive).
+ * @max: Maximum folio order (between 0-MAX_PAGECACHE_ORDER inclusive).
  *
  * The filesystem should call this function in its inode constructor to
  * indicate which base size of folio the VFS can use to cache the contents
@@ -376,15 +377,20 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
  * Context: This should not be called while the inode is active as it
  * is non-atomic.
  */
-static inline void mapping_set_folio_min_order(struct address_space *mapping,
-					       unsigned int min)
+
+static inline void mapping_set_folio_orders(struct address_space *mapping,
+					    unsigned int min, unsigned int max)
 {
-	if (min > MAX_PAGECACHE_ORDER)
-		min = MAX_PAGECACHE_ORDER;
+	if (min == 1)
+		min = 2;
+	if (max < min)
+		max = min;
+	if (max > MAX_PAGECACHE_ORDER)
+		max = MAX_PAGECACHE_ORDER;
 
 	mapping->flags = (mapping->flags & ~AS_FOLIO_ORDER_MASK) |
 			 (min << AS_FOLIO_ORDER_MIN) |
-			 (MAX_PAGECACHE_ORDER << AS_FOLIO_ORDER_MAX);
+			 (max << AS_FOLIO_ORDER_MAX);
 }
 
 /**
@@ -400,7 +406,7 @@ static inline void mapping_set_folio_min_order(struct address_space *mapping,
  */
 static inline void mapping_set_large_folios(struct address_space *mapping)
 {
-	mapping_set_folio_min_order(mapping, 0);
+	mapping_set_folio_orders(mapping, 0, MAX_PAGECACHE_ORDER);
 }
 
 static inline unsigned int mapping_max_folio_order(struct address_space *mapping)

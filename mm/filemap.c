@@ -1898,8 +1898,14 @@ repeat:
 no_page:
 	if (!folio && (fgp_flags & FGP_CREAT)) {
 		unsigned int min_order = mapping_min_folio_order(mapping);
-		unsigned int order = max(min_order, FGF_GET_ORDER(fgp_flags));
+		unsigned int max_order = mapping_max_folio_order(mapping);
+		unsigned int order = FGF_GET_ORDER(fgp_flags);
 		int err;
+
+		if (order > max_order)
+			order = max_order;
+		else if (order < min_order)
+			order = max_order;
 
 		index = mapping_align_start_index(mapping, index);
 
