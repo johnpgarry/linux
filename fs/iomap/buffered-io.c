@@ -1986,6 +1986,7 @@ static int iomap_atomic_ioend(struct iomap_writepage_ctx *wpc,
 	if (!bio_add_folio(&wpc->ioend->io_bio, folio, len, poff))
 		return -EINVAL;
 
+	wpc->ioend->io_size = len;
 	error = iomap_submit_ioend(wpc, 0);
 	if (error)
 		return error;
