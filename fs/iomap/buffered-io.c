@@ -1921,14 +1921,16 @@ static int iomap_add_to_ioend(struct iomap_writepage_ctx *wpc,
 {
 	struct iomap_folio_state *ifs = folio->private;
 	size_t poff = offset_in_folio(folio, pos);
+	bool is_atomic = folio_test_atomic(folio);
 	int error;
 	bool special_print = true;
 
 	if (special_print)
 		pr_err("%s folio=%pS (atomic=%d) pos=%lld len=%d poff=%zd\n",
 			__func__,
-			folio, folio_test_atomic(folio),
+			folio, is_atomic,
 			pos, len, poff);
+	BUG_ON(is_atomic);
 
 	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, pos)) {
 new_ioend:
@@ -1954,6 +1956,46 @@ new_ioend:
 	wbc_account_cgroup_owner(wbc, &folio->page, len);
 	return 0;
 }
+
+/* Only ever submit an atomic write as a single BIO */
+static int iomap_atomic_ioend(struct iomap_writepage_ctx *wpc,
+		struct writeback_control *wbc, struct folio *folio,
+		struct inode *inode, loff_t pos, unsigned len)
+{
+	struct iomap_folio_state *ifs = folio->private;
+	size_t poff = offset_in_folio(folio, pos);
+	int error;
+	bool special_print = true;
+
+	if (special_print)
+		pr_err("%s folio=%pS (atomic=%d) pos=%lld len=%d poff=%zd wpc->ioend=%pS\n",
+			__func__,
+			folio, 1,
+			pos, len, poff,
+			wpc->ioend);
+
+	if (wpc->ioend) {
+		error = iomap_submit_ioend(wpc, 0);
+		if (error)
+			return error;
+	}
+	wpc->ioend = iomap_alloc_ioend(wpc, wbc, inode, pos);
+	if (!wpc->ioend)
+		return -ENOMEM;
+
+	if (!bio_add_folio(&wpc->ioend->io_bio, folio, len, poff))
+		return -EINVAL;
+
+	error = iomap_submit_ioend(wpc, 0);
+	if (error)
+		return error;
+
+	if (ifs)
+		atomic_add(len, &ifs->write_bytes_pending);
+	wbc_account_cgroup_owner(wbc, &folio->page, len);
+	return 0;
+}
+
 
 static int iomap_writepage_map_blocks(struct iomap_writepage_ctx *wpc,
 		struct writeback_control *wbc, struct folio *folio,
@@ -1991,8 +2033,13 @@ static int iomap_writepage_map_blocks(struct iomap_writepage_ctx *wpc,
 				pr_err("%s2 folio=%pS pos=%lld dirty_len=%d map_len=%d caling iomap_add_to_ioend\n", __func__,
 					folio, 
 					pos, dirty_len, map_len);
-			error = iomap_add_to_ioend(wpc, wbc, folio, inode, pos,
-					map_len);
+			if (folio_test_atomic(folio))
+				error = iomap_atomic_ioend(wpc, wbc, folio, inode, pos,
+						map_len);
+
+			else
+				error = iomap_add_to_ioend(wpc, wbc, folio, inode, pos,
+						map_len);
 			if (!error)
 				(*count)++;
 			break;

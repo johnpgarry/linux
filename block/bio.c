@@ -1144,33 +1144,9 @@ void bio_add_folio_nofail(struct bio *bio, struct folio *folio, size_t len,
 bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 		   size_t off)
 {
-	int bi_size_orig;
-	bool atomic = folio_test_atomic(folio);
-	bool special_print = false;
-	static int max_atomic_size;
 	if (len > UINT_MAX || off > UINT_MAX)
 		return false;
-
-	bi_size_orig = bio->bi_iter.bi_size;
-	if (atomic && bi_size_orig) {
-		pr_err("%s atomic and already has data\n", __func__);
-		return 0;
-	}
-
-	if (bio_add_page(bio, &folio->page, len, off) <= 0)
-		return false;
-	if (folio_test_atomic(folio)) {
-		BUG_ON(bi_size_orig > 0 && !(bio->bi_opf & REQ_ATOMIC));
-		bio->bi_opf |= REQ_ATOMIC;
-		if (bio->bi_iter.bi_size > max_atomic_size) {
-			max_atomic_size = bio->bi_iter.bi_size;
-			pr_err("%s max atomic bi size=%d\n", __func__, max_atomic_size);
-		}
-		if (special_print)
-			pr_err("%s setting REQ_ATOMIC bio=%pS %pS\n", __func__, bio,
-				__builtin_return_address(0));
-	}
-	return true;
+	return bio_add_page(bio, &folio->page, len, off) > 0;
 }
 EXPORT_SYMBOL(bio_add_folio);
 
