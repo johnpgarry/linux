@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 		file = *argv_orig;
 	}
 	printf("%s O_DIRECT=0x%x\n", __func__, O_DIRECT);
-	while ((opt = getopt(argc, argv, "l:p:PaAdmhS:vH")) != -1) {
+	while ((opt = getopt(argc, argv, "l:p:PaAdmhk:vHuSs")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
@@ -112,6 +112,15 @@ int main(int argc, char **argv)
 				rw_flags |= RWF_SYNC;
 				break;
 			case 'S':
+				o_flags |= O_SYNC;
+				break;
+			case 'u':
+				rw_flags |= RWF_DSYNC;
+				break;
+			case 'U':
+				o_flags |= O_DSYNC;
+				break;
+			case 'k':
 				multi_vector_alloc_size = atoi(optarg);
 				if (multi_vector_alloc_size == 0) {
 					printf("multi-vector alloc size cannot be zero\n");
@@ -136,10 +145,13 @@ int main(int argc, char **argv)
 				printf("a: atomic\n");
 				printf("A: use O_ATOMIC\n");
 				printf("d: direct I/O\n");
-				printf("S: vector size\n");
+				printf("k: vector size\n");
 				printf("P: middle start+end align to 4096\n");
 				printf("v: verify data written properly\n");
 				printf("s: use RWF_SYNC\n");
+				printf("S: use O_SYNC\n");
+				printf("u: use RWF_DSYNC\n");
+				printf("U: use O_DSYNC\n");
 				exit(0);
 		}
 	}
