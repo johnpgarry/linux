@@ -75,6 +75,7 @@ static void iomap_set_range_uptodate(struct folio *folio, size_t off,
 	struct iomap_folio_state *ifs = folio->private;
 	unsigned long flags;
 	bool uptodate = true;
+	pr_err("%s off=%zd len=%zd ifs=%pS\n", __func__, off, len, ifs);
 
 	if (ifs) {
 		spin_lock_irqsave(&ifs->state_lock, flags);
@@ -83,7 +84,7 @@ static void iomap_set_range_uptodate(struct folio *folio, size_t off,
 	}
 
 	if (uptodate) {
-		pr_err("%s calling folio_mark_uptodate folio=%pS\n", __func__, folio);
+		pr_err("%s1 calling folio_mark_uptodate folio=%pS, means we are fully uptodate\n", __func__, folio);
 		folio_mark_uptodate(folio);
 	}
 }
@@ -177,8 +178,11 @@ static void iomap_set_range_dirty(struct folio *folio, size_t off, size_t len)
 {
 	struct iomap_folio_state *ifs = folio->private;
 
-	if (ifs)
+	pr_err("%s ifs=%pS off=%zd len=%zd\n", __func__, ifs, off, len);
+	if (ifs) {
+		pr_err("%s2 calling ifs_set_range_dirty ifs=%pS off=%zd len=%zd\n", __func__, ifs, off, len);
 		ifs_set_range_dirty(folio, ifs, off, len);
+	}
 }
 
 static struct iomap_folio_state *ifs_alloc(struct inode *inode,
@@ -603,8 +607,8 @@ struct folio *iomap_get_folio(struct iomap_iter *iter, loff_t pos, size_t len)
 			fgp, mapping_gfp_mask(iter->inode->i_mapping));
 	if (special_print) {
 		if (!IS_ERR(folio))
-			pr_err("%s1 pos=%lld len=%zd got folio=%pS pos=%lld size=%zd\n",
-				__func__, pos, len, folio, folio_pos(folio), folio_size(folio));
+			pr_err("%s1 pos=%lld len=%zd got folio=%pS pos=%lld size=%zd atomic=%d\n",
+				__func__, pos, len, folio, folio_pos(folio), folio_size(folio), folio_test_atomic(folio));
 	}
 
 	return folio;
@@ -682,6 +686,18 @@ static int iomap_read_folio_sync(loff_t block_start, struct folio *folio,
 	return submit_bio_wait(&bio);
 }
 
+static __maybe_unused int iomap_write_folio_sync(loff_t block_start, struct folio *folio,
+		size_t poff, size_t plen, const struct iomap *iomap)
+{
+	struct bio_vec bvec;
+	struct bio bio;
+
+	bio_init(&bio, iomap->bdev, &bvec, 1, REQ_OP_READ);
+	bio.bi_iter.bi_sector = iomap_sector(iomap, block_start);
+	bio_add_folio_nofail(&bio, folio, plen, poff);
+	return submit_bio_wait(&bio);
+}
+
 static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 		size_t len, struct folio *folio)
 {
@@ -694,10 +710,10 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	size_t from = offset_in_folio(folio, pos), to = from + len;
 	size_t poff, plen;
 
-	pr_err("%s UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d folio_pos=%lld folio_size=%zd\n",
+	pr_err("%s UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d folio_pos=%lld folio_size=%zd folio->private(ifs)=%pS\n",
 		__func__, !!(iter->flags & IOMAP_UNSHARE),
 		pos, len, block_size, block_start, block_end, nr_blocks,
-		folio_pos(folio), folio_size(folio));
+		folio_pos(folio), folio_size(folio), folio->private);
 
 	/*
 	 * If the write or zeroing completely overlaps the current folio, then
@@ -710,16 +726,18 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	    pos + len >= folio_pos(folio) + folio_size(folio))
 		return 0;
 
-	pr_err("%s2 UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d\n",
-		__func__, !!(iter->flags & IOMAP_UNSHARE),
-		pos, len, block_size, block_start, block_end, nr_blocks);
 	ifs = ifs_alloc(iter->inode, folio, iter->flags);
+	pr_err("%s2 UNSHARE set=%d pos=%lld len=%zd block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d ifs=%pS\n",
+		__func__, !!(iter->flags & IOMAP_UNSHARE),
+		pos, len, block_size, block_start, block_end, nr_blocks, ifs);
 	if ((iter->flags & IOMAP_NOWAIT) && !ifs && nr_blocks > 1)
 		return -EAGAIN;
 
 	if (folio_test_uptodate(folio)) {
-		pr_err("%s2.1 folio_test_uptodate passed\n", __func__);
+		pr_err("%s2.1 folio_test_uptodate passed, so returning\n", __func__);
 		return 0;
+	} else {
+		pr_err("%s2.2 folio_test_uptodate failed, continuing\n", __func__);
 	}
 	folio_clear_error(folio);
 
@@ -906,10 +924,17 @@ static size_t __iomap_write_end(struct inode *inode, loff_t pos, size_t len,
 	 * non-uptodate page as a zero-length write, and force the caller to
 	 * redo the whole thing.
 	 */
+	pr_err("%s pos=%lld len=%zd copied=%zd folio=%pS private=%pS\n", __func__, pos, len, copied, folio, folio->private);
 	if (unlikely(copied < len && !folio_test_uptodate(folio)))
 		return 0;
+	pr_err("%s1 pos=%lld len=%zd copied=%zd folio=%pS calling iomap_set_range_uptodate offset_in_folio=%ld\n",
+		__func__, pos, len, copied, folio, offset_in_folio(folio, pos));
 	iomap_set_range_uptodate(folio, offset_in_folio(folio, pos), len);
+	pr_err("%s2 pos=%lld len=%zd copied=%zd folio=%pS calling iomap_set_range_dirty offset_in_folio=%ld\n",
+		__func__, pos, len, copied, folio, offset_in_folio(folio, pos));
 	iomap_set_range_dirty(folio, offset_in_folio(folio, pos), copied);
+	pr_err("%s3 pos=%lld len=%zd copied=%zd folio=%pS calling filemap_dirty_folio\n",
+		__func__, pos, len, copied, folio);
 	filemap_dirty_folio(inode->i_mapping, folio);
 	return copied;
 }
@@ -1044,8 +1069,8 @@ retry:
 			const struct iomap *srcmap = iomap_iter_srcmap(iter);
 			pr_err("%s2 calling iomap_write_begin ATOMIC=%d pos=%lld len=%zd bytes=%zd offset=%zd\n",
 				__func__, is_atomic, pos, iov_iter_count(i), bytes, offset);
-			pr_err("%s2.1 iomap type=%d IOMAP_MAPPED=%d set F_NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d, BUFFER_HEAD=%d, XATTR=%d\n",
-				__func__, srcmap->type, IOMAP_MAPPED,
+			pr_err("%s2.1 iomap type=%d IOMAP_MAPPED=%d IOMAP_UNWRITTEN=%d set F_NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d, BUFFER_HEAD=%d, XATTR=%d\n",
+				__func__, srcmap->type, IOMAP_MAPPED, IOMAP_UNWRITTEN,
 				!!(srcmap->flags & IOMAP_F_NEW),
 				!!(srcmap->flags & IOMAP_F_DIRTY),
 				!!(srcmap->flags & IOMAP_F_SHARED),
