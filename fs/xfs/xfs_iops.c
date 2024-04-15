@@ -650,7 +650,7 @@ xfs_vn_getattr(
 			stat->dio_mem_align = bdev_dma_alignment(bdev) + 1;
 			stat->dio_offset_align = bdev_logical_block_size(bdev);
 		}
-		if (request_mask & STATX_WRITE_ATOMIC) {
+		if (request_mask & STATX_WRITE_ATOMIC_DIO) {
 			unsigned int unit_min, unit_max;
 
 			xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);

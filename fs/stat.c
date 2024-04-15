@@ -95,18 +95,18 @@ EXPORT_SYMBOL(generic_fill_statx_attr);
  * @unit_min:	Minimum supported atomic write length in bytes
  * @unit_max:	Maximum supported atomic write length in bytes
  *
- * Fill in the STATX{_ATTR}_WRITE_ATOMIC flags in the kstat structure from
- * atomic write unit_min and unit_max values.
+ * Fill in the STATX{_ATTR}_WRITE_ATOMIC_DIO flags in the kstat structure
+ * from atomic write unit_min and unit_max values.
  */
 void generic_fill_statx_atomic_writes(struct kstat *stat,
 				      unsigned int unit_min,
 				      unsigned int unit_max)
 {
 	/* Confirm that the request type is known */
-	stat->result_mask |= STATX_WRITE_ATOMIC;
+	stat->result_mask |= STATX_WRITE_ATOMIC_DIO;
 
 	/* Confirm that the file attribute type is known */
-	stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC;
+	stat->attributes_mask |= STATX_ATTR_WRITE_ATOMIC_DIO;
 
 	if (unit_min) {
 		stat->atomic_write_unit_min = unit_min;
@@ -115,7 +115,7 @@ void generic_fill_statx_atomic_writes(struct kstat *stat,
 		stat->atomic_write_segments_max = 1;
 
 		/* Confirm atomic writes are actually supported */
-		stat->attributes |= STATX_ATTR_WRITE_ATOMIC;
+		stat->attributes |= STATX_ATTR_WRITE_ATOMIC_DIO;
 	}
 }
 EXPORT_SYMBOL_GPL(generic_fill_statx_atomic_writes);
