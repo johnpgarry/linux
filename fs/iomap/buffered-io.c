@@ -850,12 +850,12 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 		return PTR_ERR(folio);
 
 	if (special_print && (is_atomic || (pos == 98304))) {
-		pr_err("%s3 pos=%lld len=%zd called __iomap_get_folio folio=%pS folio_pos=%lld folio_size=%zd\n",
-			__func__, pos, len, folio, folio_pos(folio), folio_size(folio));
+		pr_err("%s3 pos=%lld len=%zd called __iomap_get_folio folio=%pS folio_pos=%lld folio_size=%zd test_atomic=%d\n",
+			__func__, pos, len, folio, folio_pos(folio), folio_size(folio), folio_test_atomic(folio));
 	}
 //	#ifdef dfsdsd
-	if (is_atomic)
-		folio_set_atomic(folio);
+//	if (is_atomic)
+//		folio_set_atomic(folio);
 //	#endif
 
 	/*
@@ -967,10 +967,11 @@ static size_t iomap_write_end(struct iomap_iter *iter, loff_t pos, size_t len,
 	loff_t old_size = iter->inode->i_size;
 	size_t ret;
 	bool special_print = true;
+	bool is_atomic = iter->flags & IOMAP_ATOMIC;
 	if (special_print)
-		pr_err("%s folio=%pS (pos=%lld, size=%zd) copied=%zd pos=%lld len=%zd\n",
+		pr_err("%s folio=%pS (pos=%lld, size=%zd) copied=%zd pos=%lld len=%zd is_atomic=%d folio_atomic=%d\n",
 			__func__, folio, folio_pos(folio), folio_size(folio),
-			copied, pos, len);
+			copied, pos, len, is_atomic, folio_test_atomic(folio));
 
 	if (srcmap->type == IOMAP_INLINE) {
 		if (special_print)
@@ -992,7 +993,12 @@ static size_t iomap_write_end(struct iomap_iter *iter, loff_t pos, size_t len,
 				copied, pos, len);
 		ret = __iomap_write_end(iter->inode, pos, len, copied, folio);
 	}
-
+	if (special_print)
+		pr_err("%s6 is_atomic=%d, calling folio_set_atomic if set, folio_clear_atomic if unset folio=%pS\n", __func__, is_atomic, folio);
+	if (is_atomic)
+		folio_set_atomic(folio);
+	else 
+		folio_clear_atomic(folio);
 	/*
 	 * Update the in-memory inode size after copying the data into the page
 	 * cache.  It's up to the file system to write the updated size to disk,
