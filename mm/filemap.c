@@ -1615,6 +1615,7 @@ void folio_end_writeback(struct folio *folio)
 	if (__folio_end_writeback(folio))
 		folio_wake_bit(folio, PG_writeback);
 	acct_reclaim_writeback(folio);
+	folio_clear_atomic(folio);
 	folio_put(folio);
 }
 EXPORT_SYMBOL(folio_end_writeback);
