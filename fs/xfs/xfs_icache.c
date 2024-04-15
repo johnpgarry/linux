@@ -89,6 +89,8 @@ xfs_inode_alloc(
 	/* VFS doesn't initialise i_mode or i_state! */
 	VFS_I(ip)->i_mode = 0;
 	VFS_I(ip)->i_state = 0;
+	pr_err("%s ip=%pS calling mapping_set_folio_min_order min_folio_order=%d\n", __func__, ip,
+		M_IGEO(mp)->min_folio_order);
 	mapping_set_folio_min_order(VFS_I(ip)->i_mapping,
 				    M_IGEO(mp)->min_folio_order);
 
@@ -316,7 +318,6 @@ xfs_reinit_inode(
 	dev_t			dev = inode->i_rdev;
 	kuid_t			uid = inode->i_uid;
 	kgid_t			gid = inode->i_gid;
-	pr_err("%s inode=%pS\n", __func__, inode);
 
 	error = inode_init_always(mp->m_super, inode);
 
@@ -327,6 +328,8 @@ xfs_reinit_inode(
 	inode->i_rdev = dev;
 	inode->i_uid = uid;
 	inode->i_gid = gid;
+	pr_err("%s inode=%pS calling mapping_set_folio_min_order min_folio_order=%d\n", __func__, inode, 
+		M_IGEO(mp)->min_folio_order);
 	mapping_set_folio_min_order(inode->i_mapping,
 				    M_IGEO(mp)->min_folio_order);
 	return error;

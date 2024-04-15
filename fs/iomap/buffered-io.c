@@ -853,8 +853,10 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 		pr_err("%s3 pos=%lld len=%zd called __iomap_get_folio folio=%pS folio_pos=%lld folio_size=%zd\n",
 			__func__, pos, len, folio, folio_pos(folio), folio_size(folio));
 	}
+//	#ifdef dfsdsd
 	if (is_atomic)
 		folio_set_atomic(folio);
+//	#endif
 
 	/*
 	 * Now we have a locked folio, before we do anything with it we need to
