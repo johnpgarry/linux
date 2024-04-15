@@ -150,6 +150,7 @@ xfs_file_fsync(
 	int			log_flushed = 0;
 
 	trace_xfs_file_fsync(ip);
+	pr_err("%s start=%lld end=%lld calling file_write_and_wait_range\n", __func__, start, end);
 
 	error = file_write_and_wait_range(file, start, end);
 	if (error)
@@ -168,8 +169,11 @@ xfs_file_fsync(
 	 */
 	if (XFS_IS_REALTIME_INODE(ip))
 		error = blkdev_issue_flush(mp->m_rtdev_targp->bt_bdev);
-	else if (mp->m_logdev_targp != mp->m_ddev_targp)
+	else if (mp->m_logdev_targp != mp->m_ddev_targp) {
+		pr_err("%s2 start=%lld end=%lld calling file_write_and_wait_range calling blkdev_issue_flush\n", __func__, start, end);
+
 		error = blkdev_issue_flush(mp->m_ddev_targp->bt_bdev);
+	}
 
 	/*
 	 * Any inode that has dirty modifications in the log is pinned.  The
@@ -811,8 +815,8 @@ xfs_file_buffered_write(
 write_retry:
 	if (is_atomic) {
 		if (special_print) {
-			pr_err("%s count=%d write_retry: ATOMIC=%d iocb=%pS pos=%lld from=%pS len=%zd\n",
-				__func__, mycount, is_atomic, iocb, iocb->ki_pos, from, iov_iter_count(from));
+			pr_err("%s count=%d write_retry: ATOMIC=%d iocb=%pS pos=%lld from=%pS len=%zd iocb_is_dsync(iocb)=%d\n",
+				__func__, mycount, is_atomic, iocb, iocb->ki_pos, from, iov_iter_count(from), iocb_is_dsync(iocb));
 		}
 	}
 	mycount++;

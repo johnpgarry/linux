@@ -1979,21 +1979,61 @@ static int iomap_atomic_ioend(struct iomap_writepage_ctx *wpc,
 		if (error)
 			return error;
 	}
+	if (special_print)
+		pr_err("%s2 calling iomap_alloc_ioendfolio=%pS (atomic=%d) pos=%lld len=%d poff=%zd wpc->ioend=%pS\n",
+			__func__,
+			folio, 1,
+			pos, len, poff,
+			wpc->ioend);
 	wpc->ioend = iomap_alloc_ioend(wpc, wbc, inode, pos);
 	if (!wpc->ioend)
 		return -ENOMEM;
 
+	if (special_print)
+		pr_err("%s3 calling bio_add_folio folio=%pS (atomic=%d) pos=%lld len=%d poff=%zd wpc->ioend=%pS\n",
+			__func__,
+			folio, 1,
+			pos, len, poff,
+			wpc->ioend);
 	if (!bio_add_folio(&wpc->ioend->io_bio, folio, len, poff))
 		return -EINVAL;
 
+	if (special_print)
+		pr_err("%s4 calling iomap_submit_ioend folio=%pS (atomic=%d) pos=%lld len=%d poff=%zd wpc->ioend=%pS wpc->ops->prepare_ioend=%pS\n",
+			__func__,
+			folio, 1,
+			pos, len, poff,
+			wpc->ioend,
+			wpc->ops->prepare_ioend);
 	wpc->ioend->io_size = len;
 	error = iomap_submit_ioend(wpc, 0);
+	if (special_print)
+		pr_err("%s4.1 called iomap_submit_ioend error=%d folio=%pS pos=%lld len=%d poff=%zd wpc->ioend=%pS wpc->ops->prepare_ioend=%pS ifs=%pS\n",
+			__func__,
+			 error, folio,
+			pos, len, poff,
+			wpc->ioend,
+			wpc->ops->prepare_ioend, ifs);
 	if (error)
 		return error;
 
 	if (ifs)
 		atomic_add(len, &ifs->write_bytes_pending);
+
+	if (special_print)
+		pr_err("%s4.3 calling wbc_account_cgroup_owner error=%d folio=%pS pos=%lld len=%d poff=%zd wpc->ioend=%pS wpc->ops->prepare_ioend=%pS ifs=%pS\n",
+			__func__,
+			 error, folio,
+			pos, len, poff,
+			wpc->ioend,
+			wpc->ops->prepare_ioend, ifs);
 	wbc_account_cgroup_owner(wbc, &folio->page, len);
+	if (special_print)
+		pr_err("%s10 exit folio=%pS (atomic=%d) pos=%lld len=%d poff=%zd wpc->ioend=%pS\n",
+			__func__,
+			folio, 1,
+			pos, len, poff,
+			wpc->ioend);
 	return 0;
 }
 

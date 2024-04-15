@@ -387,6 +387,25 @@ static inline void mapping_set_folio_min_order(struct address_space *mapping,
 			 (MAX_PAGECACHE_ORDER << AS_FOLIO_ORDER_MAX);
 }
 
+static inline void mapping_set_folio_orders(struct address_space *mapping,
+					    unsigned int min, unsigned int max)
+{
+	if (min == 1)
+		min = 2;
+	if (max < min)
+		max = min;
+	if (max > MAX_PAGECACHE_ORDER)
+		max = MAX_PAGECACHE_ORDER;
+
+	/*
+	 * XXX: max is ignored as only minimum folio order is supported
+	 * currently.
+	 */
+	mapping->flags = (mapping->flags & ~AS_FOLIO_ORDER_MASK) |
+			 (min << AS_FOLIO_ORDER_MIN) |
+			 (max << AS_FOLIO_ORDER_MAX);
+}
+
 /**
  * mapping_set_large_folios() - Indicate the file supports large folios.
  * @mapping: The address_space.

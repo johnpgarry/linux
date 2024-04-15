@@ -89,6 +89,7 @@ xfs_end_ioend(
 	size_t			size = ioend->io_size;
 	unsigned int		nofs_flag;
 	int			error;
+	pr_err("%s offset=%lld size=%zd bi_status=%d\n", __func__, offset, size, ioend->io_bio.bi_status);
 
 	/*
 	 * We can allocate memory here while doing writeback on behalf of
@@ -426,7 +427,7 @@ xfs_prepare_ioend(
 	int			status)
 {
 	unsigned int		nofs_flag;
-	bool special_print = false;
+	bool special_print = true;
 
 	if (special_print)
 		pr_err("%s ioend=%pS status=%d\n", __func__, ioend, status);
@@ -438,18 +439,24 @@ xfs_prepare_ioend(
 	 */
 	nofs_flag = memalloc_nofs_save();
 
+	if (special_print)
+		pr_err("%s2 ioend=%pS status=%d\n", __func__, ioend, status);
 	/* Convert CoW extents to regular */
 	if (!status && (ioend->io_flags & IOMAP_F_SHARED)) {
 		status = xfs_reflink_convert_cow(XFS_I(ioend->io_inode),
 				ioend->io_offset, ioend->io_size);
 	}
 
+	if (special_print)
+		pr_err("%s3 ioend=%pS status=%d\n", __func__, ioend, status);
 	memalloc_nofs_restore(nofs_flag);
 
 	/* send ioends that might require a transaction to the completion wq */
 	if (xfs_ioend_is_append(ioend) || ioend->io_type == IOMAP_UNWRITTEN ||
 	    (ioend->io_flags & IOMAP_F_SHARED))
 		ioend->io_bio.bi_end_io = xfs_end_bio;
+	if (special_print)
+		pr_err("%s10 out ioend=%pS status=%d\n", __func__, ioend, status);
 	return status;
 }
 

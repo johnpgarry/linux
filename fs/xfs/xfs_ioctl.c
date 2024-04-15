@@ -1186,15 +1186,15 @@ xfs_ioctl_setattr_xflags(
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
 
-		pr_err("%s5 setting mapping_set_folio_min_order i_extsize=%d\n", __func__, ip->i_extsize);
+		pr_err("%s5 setting mapping_set_folio_orders i_extsize=%d\n", __func__, ip->i_extsize);
 		if (ip->i_extsize == 2)
-			mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 1); //fixme on order
+			mapping_set_folio_orders(VFS_I(ip)->i_mapping, 1, 1); //fixme on order
 		else if (ip->i_extsize == 4)
-			mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 2); //fixme on order
+			mapping_set_folio_orders(VFS_I(ip)->i_mapping, 2, 2); //fixme on order
 		else if (ip->i_extsize == 8)
-			mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 3); //fixme on order
+			mapping_set_folio_orders(VFS_I(ip)->i_mapping, 3, 3); //fixme on order
 		else if (ip->i_extsize == 16)
-			mapping_set_folio_min_order(VFS_I(ip)->i_mapping, 4); //fixme on order
+			mapping_set_folio_orders(VFS_I(ip)->i_mapping, 4, 4); //fixme on order
 		else
 			BUG();
 	}
