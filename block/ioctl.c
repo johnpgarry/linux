@@ -624,7 +624,7 @@ long blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 	void __user *argp = (void __user *)arg;
 	blk_mode_t mode = file_to_blk_mode(file);
 	int ret;
-	pr_err("%s cmd=0x%x BLKBSZGET=0x%lx BLKAWUBUFSET=0x%lx\n", __func__, cmd, BLKBSZGET, BLKAWUBUFSET);
+	//pr_err("%s cmd=0x%x BLKBSZGET=0x%lx BLKAWUBUFSET=0x%lx\n", __func__, cmd, BLKBSZGET, BLKAWUBUFSET);
 
 	switch (cmd) {
 	/* These need separate implementations for the data structure */
@@ -647,10 +647,10 @@ long blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 
 	/* The data is compatible, but the command number is different */
 	case BLKBSZGET: /* get block device soft block size (cf. BLKSSZGET) */
-		pr_err("%s2 BLKBSZGET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
+	//	pr_err("%s2 BLKBSZGET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
 		return put_int(argp, block_size(bdev));
 	case BLKBSZSET:
-		pr_err("%s2 BLKBSZSET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
+	//	pr_err("%s2 BLKBSZSET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
 		return blkdev_bszset(bdev, mode, argp);
 	case BLKGETSIZE64:
 		return put_u64(argp, bdev_nr_bytes(bdev));
@@ -659,7 +659,7 @@ long blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 	case BLKTRACESETUP:
 		return blk_trace_ioctl(bdev, cmd, argp);
 	case BLKAWUBUFSET:
-		pr_err("%s2 BLKAWUBUFSET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
+	//	pr_err("%s2 BLKAWUBUFSET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
 		return blkdev_awubuf(bdev, mode, argp);
 	default:
 		break;

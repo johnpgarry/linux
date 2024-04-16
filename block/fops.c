@@ -627,7 +627,7 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 		struct address_space *mapping = inode->i_mapping;
 
 		//if (filp->f_flags & (O_DIRECT | O_ATOMIC)) {
-			pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS 0 set=%d mapping min=%d max=%d bdev=%pS\n",
+			pr_err_ratelimited("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS 0 set=%d mapping min=%d max=%d bdev=%pS\n",
 				__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & 0),
 				mapping_min_folio_order(mapping), mapping_max_folio_order(mapping), bdev);
 			filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;

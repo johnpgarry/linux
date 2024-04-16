@@ -136,16 +136,16 @@ static void set_init_blocksize(struct block_device *bdev)
 	unsigned int bsize = bdev_logical_block_size(bdev);
 	loff_t size = i_size_read(bdev->bd_inode);
 
-	pr_err("%s bdev=%pS bsize=%d size=%lld\n", __func__, bdev, bsize, size);
+//	pr_err("%s bdev=%pS bsize=%d size=%lld\n", __func__, bdev, bsize, size);
 	while (bsize < PAGE_SIZE) {
 		if (size & bsize)
 			break;
 		bsize <<= 1;
 	}
 	bdev->bd_inode->i_blkbits = blksize_bits(bsize);
-	pr_err("%s2 bdev=%pS bsize=%d size=%lld i_blkbits=%d atomic unit min=%d\n",
-		__func__, bdev, bsize, size, bdev->bd_inode->i_blkbits,
-		queue_atomic_write_unit_min_bytes(bdev_get_queue(bdev)));
+//	pr_err("%s2 bdev=%pS bsize=%d size=%lld i_blkbits=%d atomic unit min=%d\n",
+//		__func__, bdev, bsize, size, bdev->bd_inode->i_blkbits,
+//		queue_atomic_write_unit_min_bytes(bdev_get_queue(bdev)));
 }
 
 int set_blocksize(struct block_device *bdev, int size)
@@ -711,7 +711,7 @@ static int blkdev_get_whole(struct block_device *bdev, blk_mode_t mode)
 	}
 
 	if (!atomic_read(&bdev->bd_openers)) {
-		pr_err("%s calling set_init_blocksize\n", __func__);
+		//pr_err("%s calling set_init_blocksize\n", __func__);
 		set_init_blocksize(bdev);
 	}
 	if (test_bit(GD_NEED_PART_SCAN, &disk->state))
