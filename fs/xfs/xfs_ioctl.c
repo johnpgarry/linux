@@ -1170,6 +1170,7 @@ xfs_ioctl_setattr_xflags(
 	}
 
 	if (atomic_writes) {
+		unsigned int folio_order = ffs(XFS_B_TO_FSB(mp, fa->fsx_extsize)) - 1;
 		struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 		pr_err("%s ip=%pS ip->i_ino=%lld atomic_writes set FS_XFLAG_FORCEALIGN=%d xfs_has_atomicwrites=%d bdev_can_atomic_write=%d\n",
 			__func__, ip, ip->i_ino,
@@ -1177,8 +1178,8 @@ xfs_ioctl_setattr_xflags(
 			bdev_can_atomic_write(target->bt_bdev));
 		if (!xfs_has_atomicwrites(mp))
 			return -EINVAL;
-		pr_err("%s2 xfs_inode_buftarg(ip) awu_min=%d, max=%d\n",
-			__func__, xfs_inode_buftarg(ip)->bt_bdev_awu_min, xfs_inode_buftarg(ip)->bt_bdev_awu_max);
+		pr_err("%s2 xfs_inode_buftarg(ip) awu_min=%d, max=%d folio_order=%d ip->i_extsize=%d fa->fsx_extsize=%d\n",
+			__func__, xfs_inode_buftarg(ip)->bt_bdev_awu_min, xfs_inode_buftarg(ip)->bt_bdev_awu_max, folio_order, ip->i_extsize, fa->fsx_extsize);
 		if (xfs_inode_buftarg(ip)->bt_bdev_awu_min > sbp->sb_blocksize)
 			return -EINVAL;
 		if (sbp->sb_blocksize > xfs_inode_buftarg(ip)->bt_bdev_awu_max)

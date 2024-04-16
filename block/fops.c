@@ -624,10 +624,12 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 		return -ENXIO;
 
 	if (bdev_can_atomic_write(bdev)) {
+		struct address_space *mapping = inode->i_mapping;
 
 		//if (filp->f_flags & (O_DIRECT | O_ATOMIC)) {
-			pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS 0 set=%d\n",
-				__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & 0));
+			pr_err("%s bdev_can_atomic_write i_blocksize=%d i_blkbits=%d inode=%pS bdev=%pS 0 set=%d mapping min=%d max=%d bdev=%pS\n",
+				__func__, i_blocksize(inode), inode->i_blkbits, inode, bdev, !!(filp->f_flags & 0),
+				mapping_min_folio_order(mapping), mapping_max_folio_order(mapping), bdev);
 			filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
 		//}
 	}
@@ -675,12 +677,13 @@ static ssize_t blkdev_buffered_write(struct kiocb *iocb, struct iov_iter *from)
 	if (is_atomic) {
 		struct file *file = iocb->ki_filp;
 		struct block_device *bdev = I_BDEV(file->f_mapping->host);
-		pr_err("%s is_atomic i_blocksize=%d iov count=%zd\n",
-			__func__, i_blocksize(bdev->bd_inode), iov_iter_count(from));
-		if (!generic_atomic_write_valid_size(iocb->ki_pos, from, i_blocksize(bdev->bd_inode),
-												i_blocksize(bdev->bd_inode))) {
-			pr_err("%s2 INVALID is_atomic i_blocksize=%d iov count=%zd\n",
-				__func__, i_blocksize(bdev->bd_inode), iov_iter_count(from));
+		unsigned int awu_buf = block_awubuf_size(bdev);
+		pr_err("%s is_atomic i_blocksize=%d iov count=%zd awu_buf=%d\n",
+			__func__, i_blocksize(bdev->bd_inode), iov_iter_count(from), awu_buf);
+		if (!generic_atomic_write_valid_size(iocb->ki_pos, from, awu_buf,
+												awu_buf)) {
+			pr_err("%s2 INVALID is_atomic i_blocksize=%d iov count=%zd awu_buf=%d\n",
+				__func__, i_blocksize(bdev->bd_inode), iov_iter_count(from), awu_buf);
 			return -EINVAL;
 		}
 	}

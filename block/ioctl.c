@@ -484,6 +484,7 @@ static int blkdev_bszset(struct block_device *bdev, blk_mode_t mode,
 		return -EINVAL;
 	if (get_user(n, argp))
 		return -EFAULT;
+	pr_err("%s bdev=%pS n=%d\n", __func__, bdev, n);
 
 	if (mode & BLK_OPEN_EXCL)
 		return set_blocksize(bdev, n);
@@ -492,6 +493,33 @@ static int blkdev_bszset(struct block_device *bdev, blk_mode_t mode,
 	if (IS_ERR(file))
 		return -EBUSY;
 	ret = set_blocksize(bdev, n);
+	fput(file);
+	return ret;
+}
+
+
+/* set the logical block size */
+static int blkdev_awubuf(struct block_device *bdev, blk_mode_t mode,
+		int __user *argp)
+{
+	int ret, n;
+	struct file *file;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	if (!argp)
+		return -EINVAL;
+	if (get_user(n, argp))
+		return -EFAULT;
+	pr_err("%s bdev=%pS n=%d BLK_OPEN_EXCL set=%d\n", __func__, bdev, n, !!(mode & BLK_OPEN_EXCL));
+
+	if (mode & BLK_OPEN_EXCL)
+		return set_block_awubuf_size(bdev, n);
+
+	file = bdev_file_open_by_dev(bdev->bd_dev, mode, &bdev, NULL);
+	if (IS_ERR(file))
+		return -EBUSY;
+	ret = set_block_awubuf_size(bdev, n);
 	fput(file);
 	return ret;
 }
@@ -596,6 +624,7 @@ long blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 	void __user *argp = (void __user *)arg;
 	blk_mode_t mode = file_to_blk_mode(file);
 	int ret;
+	pr_err("%s cmd=0x%x BLKBSZGET=0x%lx BLKAWUBUFSET=0x%lx\n", __func__, cmd, BLKBSZGET, BLKAWUBUFSET);
 
 	switch (cmd) {
 	/* These need separate implementations for the data structure */
@@ -618,8 +647,10 @@ long blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 
 	/* The data is compatible, but the command number is different */
 	case BLKBSZGET: /* get block device soft block size (cf. BLKSSZGET) */
+		pr_err("%s2 BLKBSZGET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
 		return put_int(argp, block_size(bdev));
 	case BLKBSZSET:
+		pr_err("%s2 BLKBSZSET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
 		return blkdev_bszset(bdev, mode, argp);
 	case BLKGETSIZE64:
 		return put_u64(argp, bdev_nr_bytes(bdev));
@@ -627,6 +658,9 @@ long blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 	/* Incompatible alignment on i386 */
 	case BLKTRACESETUP:
 		return blk_trace_ioctl(bdev, cmd, argp);
+	case BLKAWUBUFSET:
+		pr_err("%s2 BLKAWUBUFSET BLKBSZGET=0x%lx\n", __func__, BLKBSZGET);
+		return blkdev_awubuf(bdev, mode, argp);
 	default:
 		break;
 	}

@@ -1410,6 +1410,11 @@ static inline unsigned int block_size(struct block_device *bdev)
 	return 1 << bdev->bd_inode->i_blkbits;
 }
 
+static inline unsigned int block_awubuf_size(struct block_device *bdev)
+{
+	return 1 << bdev->awubuf_bits;
+}
+
 int kblockd_schedule_work(struct work_struct *work);
 int kblockd_mod_delayed_work_on(int cpu, struct delayed_work *dwork, unsigned long delay);
 
@@ -1516,6 +1521,7 @@ static inline void bio_end_io_acct(struct bio *bio, unsigned long start_time)
 
 int bdev_read_only(struct block_device *bdev);
 int set_blocksize(struct block_device *bdev, int size);
+int set_block_awubuf_size(struct block_device *bdev, int size);
 
 int lookup_bdev(const char *pathname, dev_t *dev);
 

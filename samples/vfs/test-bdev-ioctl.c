@@ -26,10 +26,14 @@
 
 #include <sys/uio.h>
 
+// example
+//#define BLKGETSIZE64 _IOR(0x12,114,size_t) 
+#define BLKAWUBUFSET  _IOW(0x12,129,size_t)
+
 
 int main(int argc, char **argv)
 {
-	int fd;
+	int fd = -1;
 	char **argv_orig = argv;
 	int o_flags = O_RDWR;
 	int argc_i;
@@ -44,13 +48,15 @@ int main(int argc, char **argv)
 	}
 
 	printf("3 file=%s\n", file);
-	fd = open(file, o_flags, 777);
-	if (fd < 0) {
-		printf("could not open %s\n", file);
-		return -1;
+	if (strcmp(file, "-h")) {
+		fd = open(file, o_flags, 777);
+		if (fd < 0) {
+			printf("could not open %s\n", file);
+			return -1;
+		}
 	}
 
-	while ((opt = getopt(argc, argv, "bB:")) != -1) {
+	while ((opt = getopt(argc, argv, "bB:a:h")) != -1) {
 		switch (opt) {
 			case 'b': //BLKBSZGET
 				error = ioctl(fd, BLKBSZGET, &blocksize);
@@ -63,14 +69,21 @@ int main(int argc, char **argv)
 				error = ioctl(fd, BLKBSZGET, &blocksize);
 				printf("2BLKBSZGET error=%d blocksize=%d\n", error, blocksize);
 				break;
+			case 'a': //BLKAWUBUFSET
+				blocksize = atoi(optarg);
+				error = ioctl(fd, BLKAWUBUFSET, &blocksize);
+				printf("BLKAWUBUFSET error=%d blocksize=%d BLKAWUBUFSET=0x%x\n", error, blocksize, BLKAWUBUFSET);
+				break;
 			case 'h':
 				printf("Options:\n");
 				printf("b: BLKBSZGET\n");
 				printf("B: BLKBSZSET\n");
+				printf("a: BLKAWUBUFSET\n");
 				exit(0);
 		}
 	}
-	close(fd);
+	if (fd >= 0)
+		close(fd);
 	
 	return 0;
 }

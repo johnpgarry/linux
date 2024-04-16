@@ -136,34 +136,69 @@ static void set_init_blocksize(struct block_device *bdev)
 	unsigned int bsize = bdev_logical_block_size(bdev);
 	loff_t size = i_size_read(bdev->bd_inode);
 
+	pr_err("%s bdev=%pS bsize=%d size=%lld\n", __func__, bdev, bsize, size);
 	while (bsize < PAGE_SIZE) {
 		if (size & bsize)
 			break;
 		bsize <<= 1;
 	}
 	bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+	pr_err("%s2 bdev=%pS bsize=%d size=%lld i_blkbits=%d atomic unit min=%d\n",
+		__func__, bdev, bsize, size, bdev->bd_inode->i_blkbits,
+		queue_atomic_write_unit_min_bytes(bdev_get_queue(bdev)));
 }
 
 int set_blocksize(struct block_device *bdev, int size)
 {
+	pr_err("%s bdev=%pS size=%d\n", __func__, bdev, size);
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || !is_power_of_2(size))
 		return -EINVAL;
+	pr_err("%s2 bdev=%pS size=%d\n", __func__, bdev, size);
 
 	/* Size cannot be smaller than the size supported by the device */
 	if (size < bdev_logical_block_size(bdev))
 		return -EINVAL;
 
+	pr_err("%s3 bdev=%pS size=%d\n", __func__, bdev, size);
 	/* Don't change the size if it is same as current */
 	if (bdev->bd_inode->i_blkbits != blksize_bits(size)) {
 		sync_blockdev(bdev);
 		bdev->bd_inode->i_blkbits = blksize_bits(size);
+		pr_err("%s3 bdev=%pS size=%d i_blkbits=%d\n", __func__, bdev, size, bdev->bd_inode->i_blkbits);
 		kill_bdev(bdev);
 	}
 	return 0;
 }
-
 EXPORT_SYMBOL(set_blocksize);
+
+int set_block_awubuf_size(struct block_device *bdev, int size)
+{
+	struct request_queue *q = bdev_get_queue(bdev);
+
+	pr_err("%s bdev=%pS size=%d\n", __func__, bdev, size);
+	/* Size must be a power of two, and between 512 and PAGE_SIZE */
+	if (size < queue_atomic_write_unit_min_bytes(q) ||
+		size > queue_atomic_write_unit_max_bytes(q) ||
+		!is_power_of_2(size))
+		return -EINVAL;
+	pr_err("%s2 bdev=%pS size=%d\n", __func__, bdev, size);
+
+	pr_err("%s3 bdev=%pS size=%d awubuf_bits=%d blksize_bits(size)=%d\n",
+		__func__, bdev, size, bdev->awubuf_bits, blksize_bits(size));
+	/* Don't change the size if it is same as current */
+	if (bdev->awubuf_bits != blksize_bits(size)) {
+		unsigned int mapping_order = blksize_bits(size) - PAGE_SHIFT;
+		sync_blockdev(bdev);
+		bdev->awubuf_bits = blksize_bits(size);
+		pr_err("%s3 bdev=%pS size=%d i_blkbits=%d bdev->awubuf_bits=%d PAGE_SHIFT=%d mapping_order=%d\n",
+			__func__, bdev, size, bdev->bd_inode->i_blkbits, bdev->awubuf_bits, PAGE_SHIFT, mapping_order);
+		kill_bdev(bdev);
+
+		mapping_set_folio_orders(bdev->bd_inode->i_mapping, mapping_order, mapping_order);
+	}
+	return 0;
+}
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
@@ -414,6 +449,13 @@ struct block_device *bdev_alloc(struct gendisk *disk, u8 partno)
 	bdev->bd_partno = partno;
 	bdev->bd_inode = inode;
 	bdev->bd_queue = disk->queue;
+	{
+		struct queue_limits *limits = &bdev->bd_queue->limits;
+
+		pr_err("%s bdev=%pS atomic write unit min=%d\n",
+			__func__, bdev, limits->atomic_write_unit_min);
+		
+	}
 	if (partno)
 		bdev->bd_has_submit_bio = disk->part0->bd_has_submit_bio;
 	else
@@ -668,8 +710,10 @@ static int blkdev_get_whole(struct block_device *bdev, blk_mode_t mode)
 		}
 	}
 
-	if (!atomic_read(&bdev->bd_openers))
+	if (!atomic_read(&bdev->bd_openers)) {
+		pr_err("%s calling set_init_blocksize\n", __func__);
 		set_init_blocksize(bdev);
+	}
 	if (test_bit(GD_NEED_PART_SCAN, &disk->state))
 		bdev_disk_changed(disk, false);
 	atomic_inc(&bdev->bd_openers);
@@ -1219,14 +1263,11 @@ void bdev_statx(struct inode *backing_inode, struct kstat *stat,
 					queue_atomic_write_unit_max_bytes(bd_queue),
 					true);
 		} else if (request_mask & STATX_WRITE_ATOMIC_BUF) {
-			unsigned int ibs = i_blocksize(bdev->bd_inode);
-			pr_err("%s ibs=%d\n", __func__, ibs);
+			unsigned int awu_buf = block_awubuf_size(bdev);
+			pr_err("%s awu_buf=%d\n", __func__, awu_buf);
 
-			if ((queue_atomic_write_unit_min_bytes(bd_queue) <= ibs) &&
-				(ibs <= queue_atomic_write_unit_max_bytes(bd_queue))) {
-					generic_fill_statx_atomic_writes(stat,
-						ibs, ibs, false);
-			}
+			generic_fill_statx_atomic_writes(stat,
+						awu_buf, awu_buf, false);
 		}
 	}
 
