@@ -650,12 +650,19 @@ xfs_vn_getattr(
 			stat->dio_mem_align = bdev_dma_alignment(bdev) + 1;
 			stat->dio_offset_align = bdev_logical_block_size(bdev);
 		}
-		if (request_mask & STATX_WRITE_ATOMIC_DIO) {
+		if (request_mask & STATX_WRITE_ATOMIC_DIO &&
+		    !(request_mask & STATX_WRITE_ATOMIC_BUF)) {
 			unsigned int unit_min, unit_max;
 
 			xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
 			generic_fill_statx_atomic_writes(stat,
 				unit_min, unit_max, true);
+		} else if (request_mask & STATX_WRITE_ATOMIC_BUF) {
+			unsigned int unit_min, unit_max;
+
+			xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
+			generic_fill_statx_atomic_writes(stat,
+				unit_max, unit_max, false);
 		}
 		fallthrough;
 	default:
