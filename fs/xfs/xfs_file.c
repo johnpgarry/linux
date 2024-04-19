@@ -782,6 +782,16 @@ xfs_file_buffered_write(
 	ssize_t			ret;
 	bool			cleared_space = false;
 	unsigned int		iolock;
+	struct xfs_mount	*mp = ip->i_mount;
+
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		unsigned int extsz_bytes = XFS_FSB_TO_B(mp, ip->i_extsize);
+
+		if (!generic_atomic_write_valid_size(iocb->ki_pos, from,
+			extsz_bytes, extsz_bytes)) {
+			return -EINVAL;
+		}
+	}
 
 write_retry:
 	iolock = XFS_IOLOCK_EXCL;
@@ -1241,8 +1251,6 @@ static bool xfs_file_open_can_atomicwrite(
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 
-	if (!(file->f_flags & O_DIRECT))
-		return false;
 
 	if (!xfs_inode_atomicwrites(ip))
 		return false;

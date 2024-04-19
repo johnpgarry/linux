@@ -1169,10 +1169,13 @@ xfs_ioctl_setattr_xflags(
 	}
 
 	if (atomic_writes) {
+		unsigned int folio_order = ffs(XFS_B_TO_FSB(mp, fa->fsx_extsize)) - 1;
+
 		if (!xfs_has_atomicwrites(mp))
 			return -EINVAL;
 		if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 			return -EINVAL;
+		mapping_set_folio_orders(VFS_I(ip)->i_mapping, folio_order, folio_order);
 	}
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);

@@ -181,6 +181,7 @@ xfs_inode_from_disk(
 	struct inode		*inode = VFS_I(ip);
 	int			error;
 	xfs_failaddr_t		fa;
+	struct xfs_mount	*mp = ip->i_mount;
 
 	ASSERT(ip->i_cowfp == NULL);
 
@@ -261,6 +262,13 @@ xfs_inode_from_disk(
 	}
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
+
+	if (xfs_inode_atomicwrites(ip)) {
+		unsigned int folio_order = ffs(XFS_B_TO_FSB(mp, ip->i_extsize)) - 1;
+
+		mapping_set_folio_orders(VFS_I(ip)->i_mapping, folio_order, folio_order);
+	}
+
 	return 0;
 
 out_destroy_data_fork:
