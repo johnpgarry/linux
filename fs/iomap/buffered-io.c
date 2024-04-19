@@ -586,13 +586,25 @@ EXPORT_SYMBOL_GPL(iomap_is_partially_uptodate);
  */
 struct folio *iomap_get_folio(struct iomap_iter *iter, loff_t pos, size_t len)
 {
+	struct address_space *mapping = iter->inode->i_mapping;
 	fgf_t fgp = FGP_WRITEBEGIN | FGP_NOFS;
 
 	if (iter->flags & IOMAP_NOWAIT)
 		fgp |= FGP_NOWAIT;
 	fgp |= fgf_set_order(len);
 
-	return __filemap_get_folio(iter->inode->i_mapping, pos >> PAGE_SHIFT,
+	if (iter->flags & IOMAP_ATOMIC) {
+		unsigned int min_order = mapping_min_folio_order(mapping);
+		unsigned int max_order = mapping_max_folio_order(mapping);
+		unsigned int order = FGF_GET_ORDER(fgp);
+
+		if (order != min_order)
+			return ERR_PTR(-EINVAL);
+		if (order != max_order)
+			return ERR_PTR(-EINVAL);
+	}
+
+	return __filemap_get_folio(mapping, pos >> PAGE_SHIFT,
 			fgp, mapping_gfp_mask(iter->inode->i_mapping));
 }
 EXPORT_SYMBOL_GPL(iomap_get_folio);
@@ -769,6 +781,7 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 {
 	const struct iomap_folio_ops *folio_ops = iter->iomap.folio_ops;
 	const struct iomap *srcmap = iomap_iter_srcmap(iter);
+	bool is_atomic = iter->flags & IOMAP_ATOMIC;
 	struct folio *folio;
 	int status = 0;
 
@@ -785,6 +798,11 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 	folio = __iomap_get_folio(iter, pos, len);
 	if (IS_ERR(folio))
 		return PTR_ERR(folio);
+
+	if (is_atomic)
+		folio_set_atomic(folio);
+	else
+		folio_clear_atomic(folio);
 
 	/*
 	 * Now we have a locked folio, before we do anything with it we need to
@@ -1010,6 +1028,8 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *i,
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iter.flags |= IOMAP_NOWAIT;
+	if (iocb->ki_flags & IOCB_ATOMIC)
+		iter.flags |= IOMAP_ATOMIC;
 
 	while ((ret = iomap_iter(&iter, ops)) > 0)
 		iter.processed = iomap_write_iter(&iter, i);
@@ -1499,8 +1519,10 @@ static void iomap_finish_folio_write(struct inode *inode, struct folio *folio,
 	WARN_ON_ONCE(i_blocks_per_folio(inode, folio) > 1 && !ifs);
 	WARN_ON_ONCE(ifs && atomic_read(&ifs->write_bytes_pending) <= 0);
 
-	if (!ifs || atomic_sub_and_test(len, &ifs->write_bytes_pending))
+	if (!ifs || atomic_sub_and_test(len, &ifs->write_bytes_pending)) {
+		folio_clear_atomic(folio);
 		folio_end_writeback(folio);
+	}
 }
 
 /*
@@ -1679,14 +1701,18 @@ static int iomap_submit_ioend(struct iomap_writepage_ctx *wpc, int error)
 }
 
 static struct iomap_ioend *iomap_alloc_ioend(struct iomap_writepage_ctx *wpc,
-		struct writeback_control *wbc, struct inode *inode, loff_t pos)
+		struct writeback_control *wbc, struct inode *inode, loff_t pos,
+		bool atomic)
 {
+	blk_opf_t opf = REQ_OP_WRITE | wbc_to_write_flags(wbc);
 	struct iomap_ioend *ioend;
 	struct bio *bio;
 
+	if (atomic)
+		opf |= REQ_ATOMIC;
+
 	bio = bio_alloc_bioset(wpc->iomap.bdev, BIO_MAX_VECS,
-			       REQ_OP_WRITE | wbc_to_write_flags(wbc),
-			       GFP_NOFS, &iomap_ioend_bioset);
+			       opf, GFP_NOFS, &iomap_ioend_bioset);
 	bio->bi_iter.bi_sector = iomap_sector(&wpc->iomap, pos);
 	bio->bi_end_io = iomap_writepage_end_bio;
 	wbc_init_bio(wbc, bio);
@@ -1744,14 +1770,27 @@ static int iomap_add_to_ioend(struct iomap_writepage_ctx *wpc,
 {
 	struct iomap_folio_state *ifs = folio->private;
 	size_t poff = offset_in_folio(folio, pos);
+	bool is_atomic = folio_test_atomic(folio);
 	int error;
 
-	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, pos)) {
+	if (!wpc->ioend || is_atomic || !iomap_can_add_to_ioend(wpc, pos)) {
 new_ioend:
 		error = iomap_submit_ioend(wpc, 0);
 		if (error)
 			return error;
-		wpc->ioend = iomap_alloc_ioend(wpc, wbc, inode, pos);
+		wpc->ioend = iomap_alloc_ioend(wpc, wbc, inode, pos, is_atomic);
+	}
+
+	/* We must not append anything later if atomic, so submit now */
+	if (is_atomic) {
+		if (!bio_add_folio(&wpc->ioend->io_bio, folio, len, poff))
+			return -EINVAL;
+		wpc->ioend->io_size = len;
+		wbc_account_cgroup_owner(wbc, &folio->page, len);
+		if (ifs)
+			atomic_add(len, &ifs->write_bytes_pending);
+
+		return iomap_submit_ioend(wpc, 0);
 	}
 
 	if (!bio_add_folio(&wpc->ioend->io_bio, folio, len, poff))
