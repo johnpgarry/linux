@@ -655,7 +655,7 @@ xfs_vn_getattr(
 
 			xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
 			generic_fill_statx_atomic_writes(stat,
-				unit_min, unit_max);
+				unit_min, unit_max, true);
 		}
 		fallthrough;
 	default:
