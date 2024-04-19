@@ -38,39 +38,160 @@ struct statx_timestamp;
 #define DEFAULT_WRITE_SIZE 1024
 #define RWF_ATOMIC      (0x00000040)
 
+
+struct iovec *iov = NULL;
+void **buffers = NULL;
+int multi_vectors = 0;
+int max_vectors;
+int multi_vector_alloc_size = -1;
+int demo_hch_problem = 0;
+int middle_start_end_align_4096 = 0;
+
+int do_jwrite(int fd, loff_t pos, size_t write_size, int rw_flags)
+{
+	int written;
+	int i, remain;
+	int byte_index;
+	int vectors;
+
+	printf("%s fd=%d pos=%lld write_size=%zd rw_flags=%d (RWF_ATOMIC set=%d)\n", __func__,
+		fd, pos, write_size, rw_flags, !!(rw_flags & RWF_ATOMIC));
+	iov = malloc(sizeof(*iov) * max_vectors);
+	if (!iov)
+		return -1;
+	buffers = malloc(sizeof(*buffers) * max_vectors);
+	if (!buffers)
+		return -1;
+
+	for (i = 0; i < max_vectors; i++)
+		buffers[i] = NULL;
+
+	if (multi_vectors == 0) {
+		posix_memalign(&buffers[0], 4096, write_size);
+		if (!buffers[0])
+			return -1;
+		unsigned char *ptr = buffers[0];
+		for (byte_index = 0; byte_index < write_size; byte_index++, ptr++) {
+			*ptr = rand();
+		}
+
+		iov[0].iov_len = write_size;
+		iov[0].iov_base = buffers[0];
+		vectors = 1;
+		goto do_write;
+	}
+
+	for (i = 0; i < max_vectors; i++) {
+		unsigned char *ptr;
+		posix_memalign(&buffers[i], 4096, multi_vector_alloc_size);
+		if (!buffers[i])
+			return -1;
+		ptr = buffers[i];
+		for (byte_index = 0; byte_index < multi_vector_alloc_size; byte_index++, ptr++) {
+			*ptr = rand();
+		}
+		//printf("buffers[%d]=%p\n", i, buffers[i]);
+	}
+
+	remain = write_size;
+
+/*
+	int middle_start_align_4096 = 0;
+	int middle_end_align_4096 = 0;*/
+
+	printf("%s max_vectors=%d\n", __func__, max_vectors);
+	for (vectors = 0, i = 0; i < max_vectors && remain > 0; i++, vectors++) {
+		int sz;
+		int offset;
+		int multi_vector_alloc_size_kb = multi_vector_alloc_size / 1024;
+
+		if (demo_hch_problem) {
+			sz = 1024;
+			offset = 3584;
+		} else if (i == 0) {
+			sz = 1024;
+			if (middle_start_end_align_4096)
+				offset = 3072;
+			else
+				offset = 2048;
+		} else {
+			if (middle_start_end_align_4096)
+				offset = 0;
+			else
+				offset = 1024 * (rand() % 4);
+			//printf("2 i=%d offset=%d\n", i, offset);
+			if (remain < 4096)
+				sz = remain;
+			else if (middle_start_end_align_4096)
+				sz = 4096;
+			else {
+				sz = 1024 + (1024 * (rand() % multi_vector_alloc_size_kb));
+				if (sz + offset > multi_vector_alloc_size)
+					sz = multi_vector_alloc_size - offset;
+			}
+		}
+
+		if (sz > remain)
+			sz = remain;
+
+		iov[i].iov_len = sz;
+		iov[i].iov_base = buffers[i];
+		iov[i].iov_base += offset;
+		remain -= sz;
+		printf("3 i=%d remain=%d offset=%d sz=%d\n", i, remain, offset, sz);
+	}
+
+	printf("%s vectors=%d\n", __func__, vectors);
+do_write:
+	for (i = 0; i < vectors; i++) {
+		if (iov[i].iov_len)
+			printf("iov[%d].iov_base=%p, .iov_len=%zd offset=%zd\n",
+				i, iov[i].iov_base, iov[i].iov_len, iov[i].iov_base - buffers[i]);
+	}
+	written = pwritev2(fd, iov, vectors, pos, rw_flags);
+	printf("%s wrote %zd bytes at pos %zd write_size=%d\n", __func__, written, pos, write_size);
+
+	for (i = 0; i < max_vectors; i++) {
+		free(buffers[i]);
+		buffers[i] = NULL;
+	}
+
+	free(buffers);
+	buffers = NULL;
+
+	free(iov);
+	iov = NULL;
+
+	printf("%s written=%d, returning\n", __func__, written);
+	return written;
+}
+
 int main(int argc, char **argv)
 {
-	struct iovec *iov = NULL;
-	void **buffers = NULL;
 	ssize_t written;
 	int fd;
-	int rw_flags = RWF_SYNC;
+	int rw_flags = 0;
 	int o_flags = O_RDWR;
 	int opt = 0;
 	unsigned int write_size = DEFAULT_WRITE_SIZE;
 	char *file = NULL;
 	char **argv_orig = argv;
 	int argc_i;
-	int middle_start_end_align_4096 = 0;
 	int large_vectors = 0;
-	int i, remain;
-	int multi_vectors = 0;
-	int max_vectors;
 	int vectors;
-	int byte_index;
-	int multi_vector_alloc_size = -1;
 	int ret;
 	loff_t pos = 0;
 	char *read_buffer = NULL;
 	int verify = 0;
-	int demo_hch_problem = 0;
+	int type_of_X = -1;
+	int i;
 
 	argv_orig++;
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
 		file = *argv_orig;
 	}
 
-	while ((opt = getopt(argc, argv, "l:p:PadmhS:vH")) != -1) {
+	while ((opt = getopt(argc, argv, "l:p:Padmhk:HvuUSsX:")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
@@ -78,17 +199,9 @@ int main(int argc, char **argv)
 					printf("write size cannot be zero\n");
 					exit(0);
 				}
-				if (write_size % 512) {
-					printf("write size must be multiple of 512\n");
-					exit(0);
-				}
 				break;
 			case 'p':
 				pos = atoi(optarg);
-				if (pos % 512) {
-					printf("pos must be multiple of 512\n");
-					exit(0);
-				}
 				break;
 			case 'm':
 				multi_vectors = 1;
@@ -97,6 +210,14 @@ int main(int argc, char **argv)
 				rw_flags |= RWF_ATOMIC;
 				break;
 			case 'd':
+				if (write_size % 512) {
+					printf("write size must be multiple of 512\n");
+					exit(0);
+				}
+				if (pos % 512) {
+					printf("pos must be multiple of 512\n");
+					exit(0);
+				}
 				o_flags |= O_DIRECT;
 				break;
 			case 'v':
@@ -105,7 +226,19 @@ int main(int argc, char **argv)
 			case 'P':
 				middle_start_end_align_4096 = 1;
 				break;
+			case 's':
+				rw_flags |= RWF_SYNC;
+				break;
 			case 'S':
+				o_flags |= O_SYNC;
+				break;
+			case 'u':
+				rw_flags |= RWF_DSYNC;
+				break;
+			case 'U':
+				o_flags |= O_DSYNC;
+				break;
+			case 'k':
 				multi_vector_alloc_size = atoi(optarg);
 				if (multi_vector_alloc_size == 0) {
 					printf("multi-vector alloc size cannot be zero\n");
@@ -122,6 +255,9 @@ int main(int argc, char **argv)
 				multi_vector_alloc_size = 4096 * 2;
 				write_size = 1024 * 256;
 				break;
+			case 'X':
+				type_of_X = atoi(optarg);
+				break;
 			case 'h':
 				printf("Options:\n");
 				printf("l: write size\n");
@@ -129,13 +265,26 @@ int main(int argc, char **argv)
 				printf("m: multi-vectors\n");
 				printf("a: atomic\n");
 				printf("d: direct I/O\n");
-				printf("S: vector size\n");
+				printf("k: vector size\n");
 				printf("P: middle start+end align to 4096\n");
 				printf("v: verify data written properly\n");
+				printf("s: use RWF_SYNC\n");
+				printf("S: use O_SYNC\n");
+				printf("u: use RWF_DSYNC\n");
+				printf("U: use O_DSYNC\n");
+				printf("X: 0: write 4x write_size non-atomic and then 1x write_size atomic\n");
+				printf("X: 1: write 1x write_size atomic and then 4x write_size non-atomic\n");
+				printf("X: 2: write 1x write_size atomic with RWF_SYNC and then 4x write_size non-atomic\n");
 				exit(0);
 		}
 	}
 	printf("demo_hch_problem=%d multi_vectors=%d\n", demo_hch_problem, multi_vectors);
+	if ((rw_flags & RWF_ATOMIC) && type_of_X >= 0) {
+		
+		printf("Don't set -a for special X mode\n");
+		return -1;
+	}
+
 	if (multi_vectors == 0) {
 		if (multi_vector_alloc_size > 0) {
 			printf("multi-vector size set but not multi-vector mode\n");
@@ -184,14 +333,6 @@ int main(int argc, char **argv)
 		write_size = 1024 * 256;
 	}
 
-	printf("2 demo_hch_problem=%d multi_vectors=%d\n", demo_hch_problem, multi_vectors);
-	iov = malloc(sizeof(*iov) * max_vectors);
-	if (!iov)
-		return -1;
-	buffers = malloc(sizeof(*buffers) * max_vectors);
-	if (!buffers)
-		return -1;
-
 	printf("file=%s write_size=%d pos=%ld o_flags=0x%x rw_flags=0x%x multi_vector_alloc_size=%d\n",
 		file, write_size, pos, o_flags, rw_flags, multi_vector_alloc_size);
 	fd = open(file, o_flags, 777);
@@ -200,93 +341,48 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	for (i = 0; i < max_vectors; i++)
-		buffers[i] = NULL;
+	switch (type_of_X) {
+	case 0:
+		printf("write 4x write_size non-atomic and then 1x write_size atomic\n");
 
-	if (multi_vectors == 0) {
-		posix_memalign(&buffers[0], 4096, write_size);
-		if (!buffers[0])
-			return -1;
-		unsigned char *ptr = buffers[0];
-		for (byte_index = 0; byte_index < write_size; byte_index++, ptr++) {
-			*ptr = rand();
-		}
+		written = do_jwrite(fd, pos, write_size * 4, rw_flags);
+		printf("written from %d non-atomic=%d\n", written, write_size * 4);
 
-		iov[0].iov_len = write_size;
-		iov[0].iov_base = buffers[0];
-		vectors = 1;
-		goto do_write;
+		written = do_jwrite(fd, pos, write_size, rw_flags | RWF_ATOMIC);
+		printf("written from %d atomic=%d\n", written, write_size);
+
+		/* hack to avoid complaints */
+		written = write_size;
+		break;
+	case 1:
+		printf("write 1x write_size atomic and then 4x write_size non-atomic\n");
+
+		written = do_jwrite(fd, pos, write_size, rw_flags | RWF_ATOMIC);
+		printf("written from %d atomic=%d\n", written, write_size);
+
+		written = do_jwrite(fd, pos, 4 * write_size, rw_flags);
+		printf("written from %d non-atomic=%d\n", written, write_size * 4);
+
+		/* hack to avoid complaints */
+		written = write_size;
+		break;
+	case 2:
+		printf("write 1x write_size atomic with RWF_SYNC and then 4x write_size non-atomic\n");
+
+		written = do_jwrite(fd, pos, write_size, rw_flags | RWF_ATOMIC | RWF_SYNC);
+		printf("written from %d atomic=%d with RWF_SYNC\n", written, write_size);
+
+		written = do_jwrite(fd, pos, 4 * write_size, rw_flags);
+		printf("written from %d non-atomic=%d\n", written, 4 * write_size);
+
+		/* hack to avoid complaints */
+		written = write_size;
+		break;
+	default:
+		//int do_jwrite(int fd, loff_t pos, size_t write_size, int rw_flags)
+		written = do_jwrite(fd, pos, write_size, rw_flags);
 	}
 
-	for (i = 0; i < max_vectors; i++) {
-		unsigned char *ptr;
-		posix_memalign(&buffers[i], 4096, multi_vector_alloc_size);
-		if (!buffers[i])
-			return -1;
-		ptr = buffers[i];
-		for (byte_index = 0; byte_index < multi_vector_alloc_size; byte_index++, ptr++) {
-			*ptr = rand();
-		}
-		//printf("buffers[%d]=%p\n", i, buffers[i]);
-	}
-
-	remain = write_size;
-
-/*
-	int middle_start_align_4096 = 0;
-	int middle_end_align_4096 = 0;*/
-
-	printf("max_vectors=%d\n", max_vectors);
-	for (vectors = 0, i = 0; i < max_vectors && remain > 0; i++, vectors++) {
-		int sz;
-		int offset;
-		int multi_vector_alloc_size_kb = multi_vector_alloc_size / 1024;
-
-		if (demo_hch_problem) {
-			sz = 1024;
-			offset = 3584;
-		} else if (i == 0) {
-			sz = 1024;
-			if (middle_start_end_align_4096)
-				offset = 3072;
-			else
-				offset = 2048;
-		} else {
-			if (middle_start_end_align_4096)
-				offset = 0;
-			else
-				offset = 1024 * (rand() % 4);
-			//printf("2 i=%d offset=%d\n", i, offset);
-			if (remain < 4096)
-				sz = remain;
-			else if (middle_start_end_align_4096)
-				sz = 4096;
-			else {
-				sz = 1024 + (1024 * (rand() % multi_vector_alloc_size_kb));
-				if (sz + offset > multi_vector_alloc_size)
-					sz = multi_vector_alloc_size - offset;
-			}
-		}
-
-		if (sz > remain)
-			sz = remain;
-
-		iov[i].iov_len = sz;
-		iov[i].iov_base = buffers[i];
-		iov[i].iov_base += offset;
-		remain -= sz;
-		printf("3 i=%d remain=%d offset=%d sz=%d\n", i, remain, offset, sz);
-	}
-
-	printf("vectors=%d\n", vectors);
-do_write:
-	for (i = 0; i < vectors; i++) {
-		if (iov[i].iov_len)
-			printf("iov[%d].iov_base=%p, .iov_len=%zd offset=%zd\n",
-				i, iov[i].iov_base, iov[i].iov_len, iov[i].iov_base - buffers[i]);
-	}
-	written = pwritev2(fd, iov, vectors, pos, rw_flags);
-	printf("wrote %zd bytes at pos %zd write_size=%d\n", written, pos, write_size);
 	if (written == write_size) {
 		ret = 0;
 	} else {
@@ -314,7 +410,6 @@ do_write:
 		return -1;
 	}
 
-	remain = write_size;
 	char *read_data = read_buffer;
 	for (i = 0; i < vectors; i++) {
 		char *tmp_buf = iov[i].iov_base;
@@ -335,10 +430,6 @@ do_write:
 	printf("read back and compared ok data, wanted size=%d got=%d\n", write_size, dataread);
 end:
 	close(fd);
-	for (i = 0; i < max_vectors; i++)
-		free(buffers[i]);
-	free(buffers);
-	free(iov);
 	free(read_buffer);
 
 	return 0;

@@ -41,8 +41,10 @@ struct statx_timestamp;
 #define __NR_statx -1
 #endif
 
-#define STATX_WRITE_ATOMIC	0x00008000U	/* Want/got atomic_write_* fields */
-#define STATX_ATTR_WRITE_ATOMIC		0x00400000 /* File supports atomic write operations */
+#define STATX_WRITE_ATOMIC_DIO						0x00008000U	/* Want/got atomic_write_* fields */
+#define STATX_WRITE_ATOMIC_BUF				0x00010000U	/* Want/got atomic_write_* fields */
+#define STATX_ATTR_WRITE_ATOMIC_DIO					0x00400000 /* File supports atomic write operations */
+#define STATX_ATTR_WRITE_ATOMIC_BUF		0x00800000
 
 extern int open(const char *path, int flags, ...);
 
@@ -172,8 +174,14 @@ static void dump_statx(struct statx *stx)
 			"?dai?c??"	/*  7- 0	0x00000000-000000ff */
 			;
 
-		if (stx->stx_attributes & STATX_ATTR_WRITE_ATOMIC) {
+		if (stx->stx_attributes & STATX_ATTR_WRITE_ATOMIC_DIO) {
 			printf("\tSTATX_ATTR_WRITE_ATOMIC set\n");
+			printf("\tunit min: %d\n", stx->stx_atomic_write_unit_min);
+			printf("\tunit max: %d\n", stx->stx_atomic_write_unit_max);
+			printf("\tsegments max: %d\n", stx->stx_atomic_write_segments_max);
+		}
+		if (stx->stx_attributes & STATX_ATTR_WRITE_ATOMIC_BUF) {
+			printf("\tSTATX_ATTR_WRITE_ATOMIC_BUFFERED set\n");
 			printf("\tunit min: %d\n", stx->stx_atomic_write_unit_min);
 			printf("\tunit max: %d\n", stx->stx_atomic_write_unit_max);
 			printf("\tsegments max: %d\n", stx->stx_atomic_write_segments_max);
@@ -261,7 +269,11 @@ int main(int argc, char **argv)
 			continue;
 		}
 		if (strcmp(*argv, "-a") == 0) {
-			mask |= STATX_WRITE_ATOMIC;
+			mask |= STATX_WRITE_ATOMIC_DIO;
+			continue;
+		}
+		if (strcmp(*argv, "-b") == 0) {
+			mask |= STATX_WRITE_ATOMIC_BUF;
 			continue;
 		}
 		if (strcmp(*argv, "-R") == 0) {
