@@ -138,6 +138,8 @@ xfs_bmbt_to_iomap(
 
 	iomap->validity_cookie = sequence_cookie;
 	iomap->folio_ops = &xfs_iomap_folio_ops;
+	if (xfs_inode_has_forcealign(ip) && ip->i_extsize > 1)
+		iomap->extent_size = XFS_FSB_TO_B(mp, ip->i_extsize);
 	return 0;
 }
 
@@ -570,8 +572,15 @@ xfs_iomap_write_unwritten(
 
 	trace_xfs_unwritten_convert(ip, offset, count);
 
-	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
+	if (xfs_inode_has_forcealign(ip) && ip->i_extsize > 1) {
+		xfs_extlen_t extsize_bytes = mp->m_sb.sb_blocksize * ip->i_extsize;
+
+		offset_fsb = XFS_B_TO_FSBT(mp, round_down(offset, extsize_bytes));
+		count_fsb = XFS_B_TO_FSB(mp, round_up(offset + count, extsize_bytes));
+	} else {
+		offset_fsb = XFS_B_TO_FSBT(mp, offset);
+		count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
+	}
 	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 
 	/*
