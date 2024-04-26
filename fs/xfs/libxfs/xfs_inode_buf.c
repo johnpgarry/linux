@@ -266,9 +266,17 @@ xfs_inode_from_disk(
 		xfs_ifork_init_cow(ip);
 
 	if (xfs_inode_has_atomicwrites(ip)) {
+
+
+		pr_err("%s3 has_atomicwrites = 1, xfs_inode_buftarg(ip) bt_bdev_awu_min=%d, bt_bdev_awu_max=%d sb_blocksize=%d i_extsize=%d\n",
+			__func__, xfs_inode_buftarg(ip)->bt_bdev_awu_min, xfs_inode_buftarg(ip)->bt_bdev_awu_max, sbp->sb_blocksize, ip->i_extsize);
+
+		
 		if (sbp->sb_blocksize < target->bt_bdev_awu_min ||
-		    sbp->sb_blocksize * ip->i_extsize > target->bt_bdev_awu_max)
+		    sbp->sb_blocksize * ip->i_extsize > target->bt_bdev_awu_max) {
 			ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
+			pr_err("%s4 clearing XFS_DIFLAG2_ATOMICWRITES\n", __func__);
+		}
 	}
 
 	return 0;
@@ -654,6 +662,7 @@ xfs_dinode_verify(
 	}
 
 	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		pr_err("%s6 calling xfs_inode_validate_atomicwrites\n", __func__);
 		fa = xfs_inode_validate_atomicwrites(mp,
 			flags2 & XFS_DIFLAG2_FORCEALIGN);
 		if (fa)

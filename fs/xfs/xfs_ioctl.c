@@ -1173,6 +1173,9 @@ xfs_ioctl_setattr_xflags(
 	if (atomic_writes) {
 		if (!xfs_has_atomicwrites(mp))
 			return -EINVAL;
+		pr_err("%s2 xfs_inode_buftarg(ip) bt_bdev_awu_min=%d, max=%d sb_blocksize=%d fsx_extsize=%d\n",
+			__func__, xfs_inode_buftarg(ip)->bt_bdev_awu_min, xfs_inode_buftarg(ip)->bt_bdev_awu_max,
+			sbp->sb_blocksize, fa->fsx_extsize);
 		if (target->bt_bdev_awu_min > sbp->sb_blocksize)
 			return -EINVAL;
 		if (target->bt_bdev_awu_max < fa->fsx_extsize)
