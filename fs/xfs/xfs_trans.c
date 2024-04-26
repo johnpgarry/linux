@@ -252,6 +252,7 @@ xfs_trans_alloc(
 	struct xfs_trans	*tp;
 	bool			want_retry = true;
 	int			error;
+	pr_err("%s snake77 rtextents=%d\n", __func__, rtextents);
 
 	/*
 	 * Allocate the handle before we do our freeze accounting and setting up
@@ -1273,6 +1274,7 @@ xfs_trans_reserve_more_inode(
 	unsigned int		rtx = xfs_extlen_to_rtxlen(mp, rblocks);
 	int			error;
 
+	pr_err("%s snake77 rtx=%d\n", __func__, rtx);
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 
 	error = xfs_trans_reserve(tp, &resv, dblocks, rtx);

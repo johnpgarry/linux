@@ -3068,6 +3068,7 @@ xfs_bmap_extsize_align(
 	 * If realtime, and the result isn't a multiple of the realtime
 	 * extent size we need to remove blocks until it is.
 	 */
+	pr_err("%s snake77 rt=%d\n", __func__, rt);
 	if (rt && (temp = xfs_extlen_to_rtxmod(mp, align_alen))) {
 		/*
 		 * We're not covering the original request, or
@@ -3364,6 +3365,7 @@ xfs_bmap_btalloc_select_lengths(
 	}
 	if (pag)
 		xfs_perag_rele(pag);
+	pr_err("%s blen=%d ap->length=%d\n", __func__, blen, ap->length);
 
 	return xfs_bmap_select_minlen(ap, args, blen);
 }
@@ -5150,6 +5152,7 @@ xfs_bmap_del_extent_real(
 		return -ENOSPC;
 
 	*logflagsp = XFS_ILOG_CORE;
+	pr_err("%s snake77 xfs_ifork_is_realtime=%d\n", __func__, xfs_ifork_is_realtime(ip, whichfork));
 	if (xfs_ifork_is_realtime(ip, whichfork)) {
 		if (!(bflags & XFS_BMAPI_REMAP)) {
 			error = xfs_rtfree_blocks(tp, del->br_startblock,
@@ -5480,9 +5483,12 @@ __xfs_bunmapi(
 		if (isrt)
 			mod = xfs_rtb_to_rtxoff(mp,
 					del.br_startblock + del.br_blockcount);
-		else if (isforcealign)
+		else if (isforcealign) {
 			mod = xfs_forcealign_extent_offset(ip,
 					del.br_startblock + del.br_blockcount);
+			pr_err("%s1.1.1 mod=%d del.br_startblock + del.br_blockcount=%lld\n",
+				__func__, mod, del.br_startblock + del.br_blockcount);
+		}
 		if (mod) {
 			/*
 			 * Realtime extent not lined up at the end.
@@ -5532,9 +5538,12 @@ __xfs_bunmapi(
 
 		if (isrt)
 			mod = xfs_rtb_to_rtxoff(mp, del.br_startblock);
-		else if (isforcealign)
+		else if (isforcealign) {
 			mod = xfs_forcealign_extent_offset(ip,
 					del.br_startblock);
+			pr_err("%s1.1.2 mod=%d del.br_startblock=%lld\n",
+				__func__, mod, del.br_startblock);
+		}
 
 		if (mod) {
 			xfs_extlen_t off;
@@ -5542,6 +5551,8 @@ __xfs_bunmapi(
 				off = mp->m_sb.sb_rextsize - mod;
 			else if (isforcealign) {
 				off = ip->i_extsize - mod;
+				pr_err("%s1.1.3 off=%d mod=%d\n",
+					__func__, off, mod);
 			}
 
 			/*

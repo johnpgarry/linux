@@ -975,6 +975,9 @@ xfs_file_fallocate(
 	uint			iolock = XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL;
 	loff_t			new_size = 0;
 	bool			do_file_insert = false;
+	struct xfs_mount	*mp = ip->i_mount;
+
+	pr_err("%s mp->m_sb.sb_blocksize=%d\n", __func__, mp->m_sb.sb_blocksize);
 
 	if (!S_ISREG(inode->i_mode))
 		return -EINVAL;
