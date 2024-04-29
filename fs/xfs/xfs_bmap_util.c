@@ -711,14 +711,8 @@ xfs_alloc_file_space(
 			dblocks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
 			rblocks = resblks;
 		} else {
-			if (xfs_inode_has_forcealign(ip) && ip->i_extsize > 1) {
-				pr_err("%s2 xfs_inode_has_forcealign resblks=%d extsz=%d\n", __func__, resblks, ip->i_extsize);
-				dblocks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
-				rblocks = resblks;
-			} else {
-				dblocks = XFS_DIOSTRAT_SPACE_RES(mp, resblks);
-				rblocks = 0;
-			}
+			dblocks = XFS_DIOSTRAT_SPACE_RES(mp, resblks);
+			rblocks = 0;
 		}
 
 		error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write,
