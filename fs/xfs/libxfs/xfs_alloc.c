@@ -1014,7 +1014,7 @@ xfs_alloc_cur_finish(
 	ASSERT(acur->bno >= acur->rec_bno);
 	ASSERT(acur->bno + acur->len <= acur->rec_bno + acur->rec_len);
 	ASSERT(xfs_verify_agbext(args->pag, acur->rec_bno, acur->rec_len));
-
+	pr_err_once("%s\n", __func__);
 	error = xfs_alloc_fixup_trees(acur->cnt, acur->bnolt, acur->rec_bno,
 				      acur->rec_len, acur->bno, acur->len, 0);
 	if (error)
@@ -1296,6 +1296,7 @@ xfs_alloc_ag_vextent_exact(
 	cnt_cur = xfs_cntbt_init_cursor(args->mp, args->tp, args->agbp,
 					args->pag);
 	ASSERT(xfs_verify_agbext(args->pag, args->agbno, args->len));
+	pr_err_once("%s\n", __func__);
 	error = xfs_alloc_fixup_trees(cnt_cur, bno_cur, fbno, flen, args->agbno,
 				      args->len, XFSA_FIXUP_BNO_OK);
 	if (error) {
