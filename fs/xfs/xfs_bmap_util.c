@@ -804,8 +804,13 @@ xfs_flush_unmap_range(
 	 * of the modification we are about to do is clean and idle.
 	 */
 	rounding = max_t(xfs_off_t, xfs_inode_alloc_unitsize(ip), PAGE_SIZE);
+
+	pr_err("%s initial offset=%lld len=%lld (sum=%lld) rounding=%lld\n",
+		__func__, offset, len, offset + len, rounding);
 	start = rounddown_64(offset, rounding);
 	end = roundup_64(offset + len, rounding) - 1;
+	pr_err("%s2 start=%lld end=%lld\n",
+		__func__, start, end);
 
 	error = filemap_write_and_wait_range(inode->i_mapping, start, end);
 	if (error)
@@ -910,9 +915,14 @@ xfs_prepare_shift(
 	 * boundary.
 	 */
 	rounding = xfs_inode_alloc_unitsize(ip);
+
+	pr_err("%s initial rounding=%d offset=%lld\n", __func__, rounding, offset);
 	offset = rounddown_64(offset, rounding);
+	pr_err("%s2 after rounddown offset=%lld\n", __func__, offset);
+	
 	if (offset)
 		offset -= rounding;
+	pr_err("%s3 after subtraction offset=%lld\n", __func__, offset);
 
 	/*
 	 * Writeback and invalidate cache for the remainder of the file as we're
