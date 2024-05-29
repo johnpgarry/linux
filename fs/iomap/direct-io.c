@@ -294,9 +294,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 {
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
-	unsigned int fs_block_size = i_blocksize(inode), pad;
 	const loff_t length = iomap_length(iter);
 	bool atomic = iter->flags & IOMAP_ATOMIC;
+	u64 io_block_size = iomap->io_block_size, pad;
 	loff_t pos = iter->pos;
 	blk_opf_t bio_opf;
 	struct bio *bio;
@@ -306,7 +306,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
-	if (atomic && length != fs_block_size)
+	if (iomap->io_block_size)
+		io_block_size = iomap->io_block_size;
+	else
+		io_block_size = i_blocksize(inode);
+
+	if (atomic && length != i_blocksize(inode))
 		return -EINVAL;
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
@@ -376,7 +381,13 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 	if (need_zeroout) {
 		/* zero out from the start of the block to the write offset */
-		pad = pos & (fs_block_size - 1);
+		if (is_power_of_2(io_block_size)) {
+			pad = pos & (io_block_size - 1);
+		} else {
+			loff_t _pos = pos;
+
+			pad = do_div(_pos, io_block_size);
+		}
 
 		ret = iomap_dio_zero(iter, dio, pos - pad, pad);
 		if (ret)
@@ -458,10 +469,17 @@ zero_tail:
 	if (need_zeroout ||
 	    ((dio->flags & IOMAP_DIO_WRITE) && pos >= i_size_read(inode))) {
 		/* zero out from the end of the write to the end of the block */
-		pad = pos & (fs_block_size - 1);
+		if (is_power_of_2(io_block_size)) {
+			pad = pos & (io_block_size - 1);
+		} else {
+			loff_t _pos = pos;
+
+			pad = do_div(_pos, io_block_size);
+		}
+
 		if (pad)
 			ret = iomap_dio_zero(iter, dio, pos,
-					     fs_block_size - pad);
+					     io_block_size - pad);
 	}
 out:
 	/* Undo iter limitation to current extent */
