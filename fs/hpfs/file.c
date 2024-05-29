@@ -149,6 +149,7 @@ static int hpfs_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		iomap->addr = IOMAP_NULL_ADDR;
 		iomap->length = 1 << blkbits;
 	}
+	iomap->io_block_size = i_blocksize(inode);
 
 	hpfs_unlock(sb);
 	return 0;

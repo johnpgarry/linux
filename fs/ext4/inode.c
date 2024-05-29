@@ -3235,6 +3235,7 @@ static void ext4_set_iomap(struct inode *inode, struct iomap *iomap,
 		iomap->bdev = inode->i_sb->s_bdev;
 	iomap->offset = (u64) map->m_lblk << blkbits;
 	iomap->length = (u64) map->m_len << blkbits;
+	iomap->io_block_size = i_blocksize(inode);
 
 	if ((map->m_flags & EXT4_MAP_MAPPED) &&
 	    !ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))
