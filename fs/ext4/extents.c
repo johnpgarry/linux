@@ -4933,6 +4933,7 @@ static int ext4_iomap_xattr_fiemap(struct inode *inode, struct iomap *iomap)
 	iomap->length = length;
 	iomap->type = iomap_type;
 	iomap->flags = 0;
+	iomap->io_block_size = i_blocksize(inode);
 out:
 	return error;
 }

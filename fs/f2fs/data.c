@@ -4233,6 +4233,7 @@ static int f2fs_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		}
 		iomap->addr = IOMAP_NULL_ADDR;
 	}
+	iomap->io_block_size = i_blocksize(inode);
 
 	if (map.m_flags & F2FS_MAP_NEW)
 		iomap->flags |= IOMAP_F_NEW;

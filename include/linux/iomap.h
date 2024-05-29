@@ -103,6 +103,8 @@ struct iomap {
 	void			*private; /* filesystem private */
 	const struct iomap_folio_ops *folio_ops;
 	u64			validity_cookie; /* used with .iomap_valid() */
+	/* io block zeroing size, not necessarily a power-of-2  */
+	u64			io_block_size;
 };
 
 static inline sector_t iomap_sector(const struct iomap *iomap, loff_t pos)
