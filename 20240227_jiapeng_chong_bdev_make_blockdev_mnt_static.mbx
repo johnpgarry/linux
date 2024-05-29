@@ -1,0 +1,40 @@
+From git@z Thu Jan  1 00:00:00 1970
+Subject: [PATCH] bdev: make blockdev_mnt static
+From: Jiapeng Chong <jiapeng.chong@linux.alibaba.com>
+Date: Tue, 27 Feb 2024 16:19:58 +0800
+Message-Id: <20240227081958.89092-1-jiapeng.chong@linux.alibaba.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+The blockdev_mnt are not used outside the file bdev.c, so the modification
+is defined as static.
+
+block/bdev.c:377:17: warning: symbol 'blockdev_mnt' was not declared. Should it be static?
+
+Reported-by: Abaci Robot <abaci@linux.alibaba.com>
+Closes: https://bugzilla.openanolis.cn/show_bug.cgi?id=8341
+Signed-off-by: Jiapeng Chong <jiapeng.chong@linux.alibaba.com>
+Reviewed-by: Christoph Hellwig <hch@lst.de>
+Fixes: 8f3a608827d1 ("bdev: open block device as files")
+Tested-by: John Garry <john.g.garry@oracle.com>
+---
+ block/bdev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/block/bdev.c b/block/bdev.c
+index e7adaaf1c219..ca1c12c1189e 100644
+--- a/block/bdev.c
++++ b/block/bdev.c
+@@ -374,7 +374,7 @@ static struct file_system_type bd_type = {
+ };
+ 
+ struct super_block *blockdev_superblock __ro_after_init;
+-struct vfsmount *blockdev_mnt __ro_after_init;
++static struct vfsmount *blockdev_mnt __ro_after_init;
+ EXPORT_SYMBOL_GPL(blockdev_superblock);
+ 
+ void __init bdev_cache_init(void)
+-- 
+2.20.1.7.g153144c
+
