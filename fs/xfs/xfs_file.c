@@ -601,7 +601,7 @@ out_unlock:
 }
 
 /*
- * Handle block unaligned direct I/O writes
+ * Handle unaligned direct IO writes.
  *
  * In most cases direct I/O writes will be done holding IOLOCK_SHARED, allowing
  * them to be done in parallel with reads and other direct I/O writes.  However,
@@ -630,9 +630,9 @@ xfs_file_dio_write_unaligned(
 	ssize_t			ret;
 
 	/*
-	 * Extending writes need exclusivity because of the sub-block zeroing
-	 * that the DIO code always does for partial tail blocks beyond EOF, so
-	 * don't even bother trying the fast path in this case.
+	 * Extending writes need exclusivity because of the sub-block/extent
+	 * zeroing that the DIO code always does for partial tail blocks
+	 * beyond EOF, so don't even bother trying the fast path in this case.
 	 */
 	if (iocb->ki_pos > isize || iocb->ki_pos + count >= isize) {
 		if (iocb->ki_flags & IOCB_NOWAIT)
@@ -698,11 +698,25 @@ xfs_file_dio_write(
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+	bool			unaligned;
+	u64			unitsize;
 
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
-	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
+
+	unitsize = xfs_inode_alloc_unitsize(ip);
+	if (!is_power_of_2(unitsize)) {
+		if (isaligned_64(iocb->ki_pos, unitsize) &&
+		    isaligned_64(count, unitsize))
+			unaligned = false;
+		else
+			unaligned = true;
+	} else {
+		unaligned = (iocb->ki_pos | count) & (unitsize - 1);
+	}
+
+	if (unaligned)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
