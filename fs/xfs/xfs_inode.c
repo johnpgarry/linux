@@ -3107,17 +3107,22 @@ xfs_break_layouts(
 	return error;
 }
 
+unsigned int
+xfs_inode_alloc_unitsize_fsb(
+	struct xfs_inode	*ip)
+{
+	if (XFS_IS_REALTIME_INODE(ip))
+		return ip->i_mount->m_sb.sb_rextsize;
+
+	return 1;
+}
+
 /* Returns the size of fundamental allocation unit for a file, in bytes. */
 unsigned int
 xfs_inode_alloc_unitsize(
 	struct xfs_inode	*ip)
 {
-	unsigned int		blocks = 1;
-
-	if (XFS_IS_REALTIME_INODE(ip))
-		blocks = ip->i_mount->m_sb.sb_rextsize;
-
-	return XFS_FSB_TO_B(ip->i_mount, blocks);
+	return XFS_FSB_TO_B(ip->i_mount, xfs_inode_alloc_unitsize_fsb(ip));
 }
 
 /* Should we always be using copy on write for file writes? */
