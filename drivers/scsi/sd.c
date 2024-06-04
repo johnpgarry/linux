@@ -989,6 +989,7 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 	lim->atomic_write_hw_boundary = 0;
 	lim->atomic_write_hw_unit_min = unit_min * logical_block_size;
 	lim->atomic_write_hw_unit_max = unit_max * logical_block_size;
+	lim->atomic_write_hw_boundary = 2 * max_atomic * logical_block_size;
 }
 
 static blk_status_t sd_setup_write_same16_cmnd(struct scsi_cmnd *cmd,
