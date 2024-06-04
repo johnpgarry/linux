@@ -918,6 +918,9 @@ static struct request *attempt_merge(struct request_queue *q,
 	if (!blk_discard_mergable(req))
 		elv_merge_requests(q, req, next);
 
+	if (req->cmd_flags & REQ_ATOMIC)
+		pr_err_once("%s merged atomic\n", __func__);
+
 	blk_crypto_rq_put_keyslot(next);
 
 	/*
@@ -1051,6 +1054,8 @@ enum bio_merge_status bio_attempt_back_merge(struct request *req,
 
 	bio_crypt_free_ctx(bio);
 
+	if (req->cmd_flags & REQ_ATOMIC)
+		pr_err_once("%s merged atomic\n", __func__);
 	blk_account_io_merge_bio(req);
 	return BIO_MERGE_OK;
 }
@@ -1087,6 +1092,8 @@ static enum bio_merge_status bio_attempt_front_merge(struct request *req,
 
 	bio_crypt_do_front_merge(req, bio);
 
+	if (req->cmd_flags & REQ_ATOMIC)
+		pr_err_once("%s merged atomic\n", __func__);
 	blk_account_io_merge_bio(req);
 	return BIO_MERGE_OK;
 }
