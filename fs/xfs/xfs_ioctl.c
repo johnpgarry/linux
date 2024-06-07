@@ -527,6 +527,8 @@ xfs_flags2diflags2(
 		di_flags2 |= XFS_DIFLAG2_COWEXTSIZE;
 	if (xflags & FS_XFLAG_FORCEALIGN)
 		di_flags2 |= XFS_DIFLAG2_FORCEALIGN;
+	if (xflags & FS_XFLAG_ATOMICWRITES)
+		di_flags2 |= XFS_DIFLAG2_ATOMICWRITES;
 
 	return di_flags2;
 }
@@ -568,14 +570,44 @@ xfs_ioctl_setattr_forcealign(
 }
 
 static int
+xfs_ioctl_setattr_atomicwrites(
+	struct xfs_inode	*ip,
+	struct fileattr		*fa,
+	struct xfs_buftarg	*target)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_sb		*sbp = &mp->m_sb;
+
+	if (!xfs_has_atomicwrites(mp))
+		return -EINVAL;
+
+	if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
+		return -EINVAL;
+
+	if (!is_power_of_2(fa->fsx_extsize))
+		return -EINVAL;
+
+	/* bdev can actually support atomic writes range required */
+	if (target->bt_bdev_awu_min > sbp->sb_blocksize)
+		return -EINVAL;
+
+	if (target->bt_bdev_awu_max < fa->fsx_extsize)
+		return -EINVAL;
+
+	return 0;
+}
+
+static int
 xfs_ioctl_setattr_xflags(
 	struct xfs_trans	*tp,
 	struct xfs_inode	*ip,
 	struct fileattr		*fa)
 {
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct xfs_mount	*mp = ip->i_mount;
 	bool			rtflag = (fa->fsx_xflags & FS_XFLAG_REALTIME);
 	bool			forcealign = fa->fsx_xflags & FS_XFLAG_FORCEALIGN;
+	bool			atomicwrites = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 	uint64_t		i_flags2;
 
 	/* Can't change RT or forcealign flags if any extents are allocated. */
@@ -602,6 +634,10 @@ xfs_ioctl_setattr_xflags(
 		return -EINVAL;
 
 	if (forcealign && (xfs_ioctl_setattr_forcealign(ip, fa) < 0))
+		return -EINVAL;
+
+	if (atomicwrites &&
+	    (xfs_ioctl_setattr_atomicwrites(ip, fa, target) < 0))
 		return -EINVAL;
 
 	ip->i_diflags = xfs_flags2diflags(ip, fa->fsx_xflags);

@@ -610,6 +610,8 @@ xfs_ip2xflags(
 			flags |= FS_XFLAG_COWEXTSIZE;
 		if (ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN)
 			flags |= FS_XFLAG_FORCEALIGN;
+		if (ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES)
+			flags |= FS_XFLAG_ATOMICWRITES;
 	}
 
 	if (xfs_inode_has_attr_fork(ip))
@@ -757,6 +759,13 @@ xfs_inode_inherit_flags2(
 				ip->i_diflags2);
 		if (failaddr)
 			ip->i_diflags2 &= ~XFS_DIFLAG2_FORCEALIGN;
+	}
+
+	if (ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		failaddr = xfs_inode_validate_atomicwrites(ip->i_mount,
+				ip->i_extsize, ip->i_diflags2);
+		if (failaddr)
+			ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
 	}
 }
 

@@ -93,7 +93,7 @@ xmbuf_alloc(
 	btp->bt_meta_sectorsize = XMBUF_BLOCKSIZE;
 	btp->bt_meta_sectormask = XMBUF_BLOCKSIZE - 1;
 
-	error = xfs_init_buftarg(btp, XMBUF_BLOCKSIZE, descr);
+	error = xfs_init_buftarg(btp, XMBUF_BLOCKSIZE, 0, 0, descr);
 	if (error)
 		goto out_bcache;
 
