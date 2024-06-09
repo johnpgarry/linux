@@ -98,6 +98,79 @@ static int blk_validate_zoned_limits(struct queue_limits *lim)
 }
 
 /*
+ * Returns max guaranteed bytes which we can fit in a bio.
+ *
+ * We request that an atomic_write is ITER_UBUF iov_iter (so a single vector),
+ * so we assume that we can fit in at least PAGE_SIZE in a segment, apart from
+ * the first and last segments.
+ */
+static
+unsigned int blk_queue_max_guaranteed_bio(struct queue_limits *lim)
+{
+	unsigned int max_segments = min(BIO_MAX_VECS, lim->max_segments);
+	unsigned int length;
+
+	length = min(max_segments, 2) * lim->logical_block_size;
+	if (max_segments > 2)
+		length += (max_segments - 2) * PAGE_SIZE;
+
+	return length;
+}
+
+static void blk_atomic_writes_update_limits(struct queue_limits *lim)
+{
+	unsigned int unit_limit = min(lim->max_hw_sectors << SECTOR_SHIFT,
+					blk_queue_max_guaranteed_bio(lim));
+
+	unit_limit = rounddown_pow_of_two(unit_limit);
+
+	lim->atomic_write_max_sectors =
+		min(lim->atomic_write_hw_max >> SECTOR_SHIFT,
+			lim->max_hw_sectors);
+	lim->atomic_write_unit_min =
+		min(lim->atomic_write_hw_unit_min, unit_limit);
+	lim->atomic_write_unit_max =
+		min(lim->atomic_write_hw_unit_max, unit_limit);
+	lim->atomic_write_boundary_sectors =
+		lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
+}
+
+static void blk_validate_atomic_write_limits(struct queue_limits *lim)
+{
+	unsigned int boundary_sectors_hw;
+
+	if (!lim->atomic_write_hw_max)
+		goto unsupported;
+
+	boundary_sectors_hw = lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
+
+	if (boundary_sectors_hw) {
+		/* It doesn't make sense to allow different non-zero values */
+		if (lim->chunk_sectors &&
+		    lim->chunk_sectors != boundary_sectors_hw)
+			goto unsupported;
+
+		/* The boundary size just needs to be a multiple of unit_max
+		 * (and not necessarily a power-of-2), so this following check
+		 * could be relaxed in future.
+		 * Furthermore, if needed, unit_max could be reduced so that
+		 * it is compliant with a !power-of-2 boundary.
+		 */
+		if (!is_power_of_2(lim->atomic_write_hw_boundary))
+			goto unsupported;
+	}
+
+	blk_atomic_writes_update_limits(lim);
+	return;
+
+unsupported:
+	lim->atomic_write_max_sectors = 0;
+	lim->atomic_write_boundary_sectors = 0;
+	lim->atomic_write_unit_min = 0;
+	lim->atomic_write_unit_max = 0;
+}
+
+/*
  * Check that the limits in lim are valid, initialize defaults for unset
  * values, and cap values based on others where needed.
  */
@@ -229,6 +302,8 @@ static int blk_validate_limits(struct queue_limits *lim)
 		lim->alignment_offset &= (lim->physical_block_size - 1);
 		lim->misaligned = 0;
 	}
+
+	blk_validate_atomic_write_limits(lim);
 
 	return blk_validate_zoned_limits(lim);
 }
