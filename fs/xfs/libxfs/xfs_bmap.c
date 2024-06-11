@@ -5387,15 +5387,18 @@ xfs_bmap_del_extent_real(
 static xfs_extlen_t
 xfs_bunmapi_align(
 	struct xfs_inode	*ip,
-	xfs_fsblock_t		bno)
+	xfs_fsblock_t		fsbno)
 {
 	if (xfs_inode_has_forcealign(ip)) {
+		struct xfs_mount	*mp = ip->i_mount;
+		xfs_agblock_t			agbno = XFS_FSB_TO_AGBNO(mp, fsbno);
+
 		if (is_power_of_2(ip->i_extsize))
-			return bno & (ip->i_extsize - 1);
-		return do_div(bno, ip->i_extsize);
+			return agbno & (ip->i_extsize - 1);
+		return do_div(agbno, ip->i_extsize);
 	}
 	ASSERT(XFS_IS_REALTIME_INODE(ip));
-	return xfs_rtb_to_rtxoff(ip->i_mount, bno);
+	return xfs_rtb_to_rtxoff(ip->i_mount, fsbno);
 }
 
 /*
