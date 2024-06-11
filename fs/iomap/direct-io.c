@@ -237,16 +237,43 @@ static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 {
 	struct inode *inode = file_inode(dio->iocb->ki_filp);
 	struct page *page = ZERO_PAGE(0);
+	unsigned short nr_vecs = DIV_ROUND_UP(len, PAGE_SIZE);
 	struct bio *bio;
+	int loop_count = 0;
+	loff_t _pos = pos;
 
-	bio = iomap_dio_alloc_bio(iter, dio, 1, REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
+	bio = iomap_dio_alloc_bio(iter, dio, nr_vecs, REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
 	fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
 				  GFP_KERNEL);
 	bio->bi_iter.bi_sector = iomap_sector(&iter->iomap, pos);
 	bio->bi_private = dio;
 	bio->bi_end_io = iomap_dio_bio_end_io;
+#if 0
+ * __bio_add_page - add page(s) to a bio in a new segment
+ * @bio: destination bio
+ * @page: start page to add
+ * @len: length of the data to add, may cross pages
+ * @off: offset of the data relative to @page, may cross pages
+ *
+ * Add the data at @page + @off to @bio as a new bvec.  The caller must ensure
+ * that @bio has space for another bvec.
+ #endif
+	pr_err("%s pos=%lld len=%d nr_vecs=%d\n", __func__, pos, len, nr_vecs);
+	do {
+		unsigned int len_to_add = min(len, PAGE_SIZE);
 
-	__bio_add_page(bio, page, len, 0);
+		pr_err("%s1 len=%d calling __bio_add_page(len_to_add=%d, 0) for index=%d PAGE_SIZE=%ld PAGE_MASK=0x%lx\n",
+			__func__, len, len_to_add, loop_count, PAGE_SIZE, PAGE_MASK);
+		__bio_add_page(bio, page, len_to_add, 0);
+		len -= len_to_add;
+		_pos += len_to_add;
+		pr_err("%s2 _pos=%lld len=%d called __bio_add_page for index=%d\n", __func__, _pos, len, loop_count);
+		loop_count++;
+
+		if (loop_count > nr_vecs + 1)
+			panic("stop");
+	} while (len);
+
 	iomap_dio_submit_bio(iter, dio, bio, pos);
 }
 
