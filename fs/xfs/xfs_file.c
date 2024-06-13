@@ -575,6 +575,7 @@ xfs_file_dio_write_aligned(
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	ssize_t			ret;
 
+	pr_err("%s iocb->ki_pos=%lld count=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -629,6 +630,7 @@ xfs_file_dio_write_unaligned(
 	unsigned int		flags = IOMAP_DIO_OVERWRITE_ONLY;
 	ssize_t			ret;
 
+	pr_err("%s iocb->ki_pos=%lld count=%zd\n", __func__, iocb->ki_pos, count);
 	/*
 	 * Extending writes need exclusivity because of the sub-block/extent
 	 * zeroing that the DIO code always does for partial tail blocks
@@ -681,6 +683,7 @@ retry_exclusive:
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT)) {
 		ASSERT(flags & IOMAP_DIO_OVERWRITE_ONLY);
 		xfs_iunlock(ip, iolock);
+		pr_err("%s3 goto retry_exclusive iocb->ki_pos=%lld count=%zd\n", __func__, iocb->ki_pos, count);
 		goto retry_exclusive;
 	}
 
@@ -703,6 +706,7 @@ xfs_file_dio_write(
 	bool			unaligned;
 	u64			unitsize;
 
+	pr_err("%s iocb->ki_pos=%lld count=%zd\n", __func__, iocb->ki_pos, count);
 	if (iocb->ki_flags & IOCB_ATOMIC) {
 		if (!generic_atomic_write_valid_size(iocb->ki_pos, from,
 			i_blocksize(inode), XFS_FSB_TO_B(mp, ip->i_extsize))) {

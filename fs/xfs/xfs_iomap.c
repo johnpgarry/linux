@@ -148,8 +148,8 @@ xfs_bmbt_to_iomap(
 	xfs_filblks_t	br_blockcount;	/* number of blocks */
 	xfs_exntst_t	br_state;	/* extent state */
 	#endif
-	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__,
-		imap->br_startoff, imap->br_startblock, imap->br_blockcount);
+	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld xfs_fsb_to_db(br_startblock)=%lld iomap->addr=%lld\n", __func__,
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount, xfs_fsb_to_db(ip, imap->br_startblock), iomap->addr);
 	iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 	iomap->length = XFS_FSB_TO_B(mp, imap->br_blockcount);
 	iomap->io_block_size = xfs_inode_alloc_unitsize(ip);
@@ -281,11 +281,13 @@ xfs_iomap_write_direct(
 	int			error;
 	int			bmapi_flags = XFS_BMAPI_PREALLOC;
 	int			nr_exts = XFS_IEXT_ADD_NOSPLIT_CNT;
+	pr_err("%s offset_fsb=%lld count_fsb=%lld\n", __func__, offset_fsb, count_fsb);
 
 	ASSERT(count_fsb > 0);
 
 	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
 					   xfs_get_extsz_hint(ip));
+	pr_err("%s2 offset_fsb=%lld count_fsb=%lld resaligned=%lld\n", __func__, offset_fsb, count_fsb, resaligned);
 	if (unlikely(XFS_IS_REALTIME_INODE(ip))) {
 		dblocks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
 		rblocks = resaligned;
@@ -838,6 +840,8 @@ xfs_direct_write_iomap_begin(
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
+	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb);
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -909,6 +913,13 @@ xfs_direct_write_iomap_begin(
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 allocate_blocks:
+#if 0
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+#endif
+	pr_err("%s2 allocate_blocks: offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	error = -EAGAIN;
 	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY))
 		goto out_unlock;
@@ -924,15 +935,34 @@ allocate_blocks:
 	 */
 	length = min_t(loff_t, length, 1024 * PAGE_SIZE);
 	end_fsb = xfs_iomap_end_fsb(mp, offset, length);
+	xfs_fileoff_t diff_offset_fsb = 0;
+	pr_err("%s2.0 after xfs_iomap_end_fsb offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld nimaps=%d\n",
+			__func__, offset, length, offset_fsb, end_fsb, nimaps);
 
-	if (offset + length > XFS_ISIZE(ip))
+	if (0 && xfs_inode_has_forcealign(ip)) {
+		end_fsb = roundup_64(end_fsb, ip->i_extsize);
+		diff_offset_fsb = offset_fsb;
+		offset_fsb = rounddown_64(offset_fsb, ip->i_extsize);
+		diff_offset_fsb = diff_offset_fsb - offset_fsb;
+		pr_err("%s2.1 xfs_inode_has_forcealign offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld diff_offset_fsb=%lld\n",
+			__func__, offset, length, offset_fsb, end_fsb, diff_offset_fsb);
+	} else if (offset + length > XFS_ISIZE(ip)) {
 		end_fsb = xfs_iomap_eof_align_last_fsb(ip, end_fsb);
-	else if (nimaps && imap.br_startblock == HOLESTARTBLOCK)
+		pr_err("%s2.2 after xfs_iomap_eof_align_last_fsb offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld\n",
+			__func__, offset, length, offset_fsb, end_fsb);
+	} else if (nimaps && imap.br_startblock == HOLESTARTBLOCK) {
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
+		pr_err("%s2.3 after HOLESTARTBLOCK offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld\n",
+			__func__, offset, length, offset_fsb, end_fsb);
+	}
 	xfs_iunlock(ip, lockmode);
 
+	pr_err("%s3 calling xfs_iomap_write_direct offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
 			flags, &imap, &seq);
+	pr_err("%s3.1 called xfs_iomap_write_direct offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	if (error)
 		return error;
 
@@ -1492,6 +1522,8 @@ xfs_zero_range(
 	if (IS_DAX(inode))
 		return dax_zero_range(inode, pos, len, did_zero,
 				      &xfs_dax_write_iomap_ops);
+	WARN_ON_ONCE(1);
+	pr_err("%s calling iomap_zero_range\n", __func__);
 	return iomap_zero_range(inode, pos, len, did_zero,
 				&xfs_buffered_write_iomap_ops);
 }
@@ -1507,6 +1539,7 @@ xfs_truncate_page(
 	if (IS_DAX(inode))
 		return dax_truncate_page(inode, pos, did_zero,
 					&xfs_dax_write_iomap_ops);
+	pr_err("%s calling xfs_truncate_page\n", __func__);
 	return iomap_truncate_page(inode, pos, did_zero,
 				   &xfs_buffered_write_iomap_ops);
 }

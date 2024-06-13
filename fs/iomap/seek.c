@@ -92,6 +92,7 @@ iomap_seek_data(struct inode *inode, loff_t pos, const struct iomap_ops *ops)
 		return -ENXIO;
 
 	iter.len = size - pos;
+	pr_err("%s %d calling iomap_iter\n", __func__, __LINE__);
 	while ((ret = iomap_iter(&iter, ops)) > 0)
 		iter.processed = iomap_seek_data_iter(&iter, &pos);
 	if (ret < 0)

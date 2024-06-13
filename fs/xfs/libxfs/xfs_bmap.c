@@ -3809,6 +3809,7 @@ xfs_bmap_btalloc(
 		ap->blkno = NULLFSBLOCK;
 		ap->length = 0;
 	}
+	pr_err("%s ap->blkno=%lld, length=%d, offset=%lld\n", __func__, ap->blkno, ap->length, ap->offset);
 	return 0;
 }
 
@@ -3996,8 +3997,9 @@ xfs_bmapi_read(
 		eof = true;
 	end = bno + len;
 	obno = bno;
-
+	pr_err("%s bno=%lld end=%lld eof=%d n=%d *nmap=%d\n", __func__, bno, end, eof, n, *nmap);
 	while (bno < end && n < *nmap) {
+		pr_err("%s1 bno=%lld end=%lld eof=%d n=%d *nmap=%d\n", __func__, bno, end, eof, n, *nmap);
 		/* Reading past eof, act as though there's a hole up to end. */
 		if (eof)
 			got.br_startoff = end;
@@ -4007,6 +4009,8 @@ xfs_bmapi_read(
 			mval->br_startblock = HOLESTARTBLOCK;
 			mval->br_blockcount =
 				XFS_FILBLKS_MIN(len, got.br_startoff - bno);
+			pr_err("%s2 set HOLESTARTBLOCK bno=%lld end=%lld eof=%d n=%d *nmap=%d mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld n=%d\n",
+				__func__, bno, end, eof, n, *nmap, mval->br_startoff, mval->br_startblock, mval->br_blockcount, n);
 			mval->br_state = XFS_EXT_NORM;
 			bno += mval->br_blockcount;
 			len -= mval->br_blockcount;
@@ -4020,14 +4024,19 @@ xfs_bmapi_read(
 		xfs_bmapi_update_map(&mval, &bno, &len, obno, end, &n, flags);
 
 		/* If we're done, stop now. */
-		if (bno >= end || n >= *nmap)
+		if (bno >= end || n >= *nmap) {
+			pr_err("%s3 bno=%lld end=%lld eof=%d n=%d *nmap=%d mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld n=%d\n",
+				__func__, bno, end, eof, n, *nmap, mval->br_startoff, mval->br_startblock, mval->br_blockcount, n);
 			break;
+		}
 
 		/* Else go on to the next record. */
 		if (!xfs_iext_next_extent(ifp, &icur, &got))
 			eof = true;
 	}
 	*nmap = n;
+	pr_err("%s10 out bno=%lld end=%lld eof=%d n=%d *nmap=%d mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld n=%d\n",
+				__func__, bno, end, eof, n, *nmap, mval->br_startoff, mval->br_startblock, mval->br_blockcount, n);
 	return 0;
 }
 

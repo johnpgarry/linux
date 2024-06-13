@@ -66,6 +66,10 @@ static void iomap_dio_submit_bio(const struct iomap_iter *iter,
 {
 	struct kiocb *iocb = dio->iocb;
 
+	pr_err("%s bio->bi_iter.bi_sector=%lld (db=%lld, mod=%lld) bi_size=%d\n",
+		__func__, bio->bi_iter.bi_sector,
+		bio->bi_iter.bi_sector / 8, bio->bi_iter.bi_sector % 8,
+		bio->bi_iter.bi_size);
 	atomic_inc(&dio->ref);
 
 	/* Sync dio can't be polled reliably */
@@ -258,16 +262,16 @@ static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
  * Add the data at @page + @off to @bio as a new bvec.  The caller must ensure
  * that @bio has space for another bvec.
  #endif
-	pr_err("%s pos=%lld len=%d nr_vecs=%d\n", __func__, pos, len, nr_vecs);
+//	pr_err("%s pos=%lld len=%d nr_vecs=%d\n", __func__, pos, len, nr_vecs);
 	do {
 		unsigned int len_to_add = min(len, PAGE_SIZE);
 
-		pr_err("%s1 len=%d calling __bio_add_page(len_to_add=%d, 0) for index=%d PAGE_SIZE=%ld PAGE_MASK=0x%lx\n",
-			__func__, len, len_to_add, loop_count, PAGE_SIZE, PAGE_MASK);
+	//	pr_err("%s1 len=%d calling __bio_add_page(len_to_add=%d, 0) for index=%d PAGE_SIZE=%ld PAGE_MASK=0x%lx\n",
+	//		__func__, len, len_to_add, loop_count, PAGE_SIZE, PAGE_MASK);
 		__bio_add_page(bio, page, len_to_add, 0);
 		len -= len_to_add;
 		_pos += len_to_add;
-		pr_err("%s2 _pos=%lld len=%d called __bio_add_page for index=%d\n", __func__, _pos, len, loop_count);
+	//	pr_err("%s2 _pos=%lld len=%d called __bio_add_page for index=%d\n", __func__, _pos, len, loop_count);
 		loop_count++;
 
 		if (loop_count > nr_vecs + 1)
@@ -318,7 +322,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 	unsigned int pad;
-	pr_err("%s pos=%lld length=%lld\n", __func__, pos, length);
+	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld\n",
+		__func__, pos, length, iomap->addr, iomap->offset, iomap->length);
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -614,6 +619,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct blk_plug plug;
 	struct iomap_dio *dio;
 	loff_t ret = 0;
+	pr_err("%s iocb->ki_pos=%lld iov_iter_count(iter)=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
 
@@ -715,6 +721,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	inode_dio_begin(inode);
 
 	blk_start_plug(&plug);
+	pr_err("%s %d calling iomap_iter\n", __func__, __LINE__);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
 		iomi.processed = iomap_dio_iter(&iomi, dio);
 

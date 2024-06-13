@@ -109,7 +109,16 @@ struct iomap {
 
 static inline sector_t iomap_sector(const struct iomap *iomap, loff_t pos)
 {
-	return (iomap->addr + pos - iomap->offset) >> SECTOR_SHIFT;
+	sector_t val;
+	// addr from iomap->br_startblock
+	// offset from iomap->br_startoff
+
+	val = (iomap->addr + pos - iomap->offset) >> SECTOR_SHIFT;
+	pr_err("%s pos=%lld iomap->addr=%lld, offset=%lld val=%lld\n", __func__,
+		pos, iomap->addr, iomap->offset, val);
+	if (pos < iomap->offset)
+		panic("should not happen\n");
+	return val;
 }
 
 /*

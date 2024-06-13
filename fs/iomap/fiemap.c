@@ -111,6 +111,7 @@ iomap_bmap(struct address_space *mapping, sector_t bno,
 		return 0;
 
 	bno = 0;
+	pr_err("%s %d calling iomap_iter\n", __func__, __LINE__);
 	while ((ret = iomap_iter(&iter, ops)) > 0) {
 		if (iter.iomap.type == IOMAP_MAPPED)
 			bno = iomap_sector(&iter.iomap, iter.pos) >> blkshift;
