@@ -89,7 +89,24 @@ xfs_iomap_valid(
 static const struct iomap_folio_ops xfs_iomap_folio_ops = {
 	.iomap_valid		= xfs_iomap_valid,
 };
+#if 0
 
+
+	u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
+	struct block_device	*bdev;	/* block device for I/O */
+	struct dax_device	*dax_dev; /* dax_dev for dax operations */
+	void			*inline_data;
+	void			*private; /* filesystem private */
+	const struct iomap_folio_ops *folio_ops;
+	u64			validity_cookie; /* used with .iomap_valid() */
+	/* io block zeroing size, not necessarily a power-of-2  */
+	u64			io_block_size;
+
+#endif
 int
 xfs_bmbt_to_iomap(
 	struct xfs_inode	*ip,
@@ -125,6 +142,14 @@ xfs_bmbt_to_iomap(
 			iomap->type = IOMAP_MAPPED;
 
 	}
+	#if 0
+		xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+	#endif
+	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__,
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 	iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 	iomap->length = XFS_FSB_TO_B(mp, imap->br_blockcount);
 	iomap->io_block_size = xfs_inode_alloc_unitsize(ip);

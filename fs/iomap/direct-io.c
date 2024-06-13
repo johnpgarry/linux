@@ -318,6 +318,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 	unsigned int pad;
+	pr_err("%s pos=%lld length=%lld\n", __func__, pos, length);
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -392,6 +393,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			loff_t _pos = pos;
 
 			pad = do_div(_pos, io_block_size);
+			pr_err("%s2 front zeroout pos=%lld length=%lld pad=%d\n", __func__, pos, length, pad);
 		}
 
 		if (pad)
@@ -486,6 +488,7 @@ zero_tail:
 			pad = do_div(_pos, io_block_size);
 		}
 
+			pr_err("%s2 tail zeroout pos=%lld length=%lld pad=%d\n", __func__, pos, length, pad);
 		if (pad)
 			iomap_dio_zero(iter, dio, pos, io_block_size - pad);
 	}
