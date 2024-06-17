@@ -5329,6 +5329,7 @@ static u32 get_tag(struct scsi_cmnd *cmnd)
 	return blk_mq_unique_tag(scsi_cmd_to_rq(cmnd));
 }
 
+/* stop_qc_helper */
 /* Queued (deferred) command completions converge here. */
 static void sdebug_q_cmd_complete(struct sdebug_defer *sd_dp)
 {
@@ -5352,21 +5353,19 @@ static void sdebug_q_cmd_complete(struct sdebug_defer *sd_dp)
 	sdsc = scsi_cmd_priv(scp);
 	spin_lock_irqsave(&sdsc->lock, flags);
 	aborted = sd_dp->aborted;
-	if (unlikely(aborted))
+	if (unlikely(aborted)) {
 		sd_dp->aborted = false;
-	ASSIGN_QUEUED_CMD(scp, NULL);
-
-	spin_unlock_irqrestore(&sdsc->lock, flags);
-
-	if (aborted) {
+		spin_unlock_irqrestore(&sdsc->lock, flags);
 		pr_info("bypassing scsi_done() due to aborted cmd, kicking-off EH\n");
 		blk_abort_request(scsi_cmd_to_rq(scp));
-		goto out;
+		return;
 	}
-
-	scsi_done(scp); /* callback to mid level */
-out:
+/* stop_qc_helper */
+	ASSIGN_QUEUED_CMD(scp, NULL);
+	spin_unlock_irqrestore(&sdsc->lock, flags);
 	sdebug_free_queued_cmd(sqcp);
+out:
+	scsi_done(scp); /* callback to mid level */
 }
 
 /* When high resolution timer goes off this function is called. */
@@ -5648,53 +5647,49 @@ static void scsi_debug_slave_destroy(struct scsi_device *sdp)
 	sdp->hostdata = NULL;
 }
 
-/* Returns true if we require the queued memory to be freed by the caller. */
-static bool stop_qc_helper(struct sdebug_defer *sd_dp,
-			   enum sdeb_defer_type defer_t)
+/* sdebug_q_cmd_complete */
+/* Return true if no references to cmnd in the driver */
+static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 {
+	struct sdebug_scsi_cmd *sdsc = scsi_cmd_priv(cmnd);
+	struct sdebug_queued_cmd *sqcp = TO_QUEUED_CMD(cmnd);
+	struct sdebug_defer *sd_dp;
+	enum sdeb_defer_type defer_t;
+
+	lockdep_assert_held(&sdsc->lock);
+
+	/*
+	 * sdebug_q_cmd_complete() may have set sqcp as NULL. Or we may not
+	 * even have got to set sqcp in schedule_resp(). In both these cases,
+	 * we may still have a reference to cmnd.
+	 */
+	if (!sqcp)
+		return false;
+
+	sd_dp = &sqcp->sd_dp;
+	defer_t = READ_ONCE(sd_dp->defer_t);
+
 	if (defer_t == SDEB_DEFER_HRT) {
 		int res = hrtimer_try_to_cancel(&sd_dp->hrt);
 
 		switch (res) {
 		case 0: /* Not active, it must have already run */
-		case -1: /* -1 It's executing the CB */
+			return true;
+		case -1: /* It's executing the CB */
 			return false;
 		case 1: /* Was active, we've now cancelled */
 		default:
-			return true;
+			goto free_memory;
 		}
 	} else if (defer_t == SDEB_DEFER_WQ) {
-		/* Cancel if pending */
-		if (cancel_work_sync(&sd_dp->ew.work))
-			return true;
-		/* Was not pending, so it must have run */
-		return false;
+		if (cancel_work(&sd_dp->ew.work))
+			goto free_memory;
+		return false; /* CB may be executing or finished */
 	} else if (defer_t == SDEB_DEFER_POLL) {
-		return true;
 	}
-
-	return false;
-}
-
-
-static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
-{
-	enum sdeb_defer_type l_defer_t;
-	struct sdebug_defer *sd_dp;
-	struct sdebug_scsi_cmd *sdsc = scsi_cmd_priv(cmnd);
-	struct sdebug_queued_cmd *sqcp = TO_QUEUED_CMD(cmnd);
-
-	lockdep_assert_held(&sdsc->lock);
-
-	if (!sqcp)
-		return false;
-	sd_dp = &sqcp->sd_dp;
-	l_defer_t = READ_ONCE(sd_dp->defer_t);
+free_memory:
+	sdebug_free_queued_cmd(sqcp);
 	ASSIGN_QUEUED_CMD(cmnd, NULL);
-
-	if (stop_qc_helper(sd_dp, l_defer_t))
-		sdebug_free_queued_cmd(sqcp);
-
 	return true;
 }
 
@@ -5786,7 +5781,7 @@ static int scsi_debug_abort(struct scsi_cmnd *SCpnt)
 		return FAILED;
 	}
 
-	return SUCCESS;
+	return ok ? SUCCESS : FAILED;
 }
 
 static bool scsi_debug_stop_all_queued_iter(struct request *rq, void *data)
