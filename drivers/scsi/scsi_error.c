@@ -337,6 +337,7 @@ enum blk_eh_timer_return scsi_timeout(struct request *req)
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct Scsi_Host *host = scmd->device->host;
 
+	pr_err("%s scmd=%pS req=%pS\n", __func__, scmd, req);
 	trace_scsi_dispatch_cmd_timeout(scmd);
 	scsi_log_completion(scmd, TIMEOUT_ERROR);
 
@@ -877,6 +878,7 @@ static enum scsi_disposition scsi_try_host_reset(struct scsi_cmnd *scmd)
 	struct Scsi_Host *host = scmd->device->host;
 	const struct scsi_host_template *hostt = host->hostt;
 
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 	SCSI_LOG_ERROR_RECOVERY(3,
 		shost_printk(KERN_INFO, host, "Snd Host RST\n"));
 
@@ -907,6 +909,7 @@ static enum scsi_disposition scsi_try_bus_reset(struct scsi_cmnd *scmd)
 	struct Scsi_Host *host = scmd->device->host;
 	const struct scsi_host_template *hostt = host->hostt;
 
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 	SCSI_LOG_ERROR_RECOVERY(3, scmd_printk(KERN_INFO, scmd,
 		"%s: Snd Bus RST\n", __func__));
 
@@ -949,6 +952,7 @@ static enum scsi_disposition scsi_try_target_reset(struct scsi_cmnd *scmd)
 	struct Scsi_Host *host = scmd->device->host;
 	const struct scsi_host_template *hostt = host->hostt;
 
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 	if (!hostt->eh_target_reset_handler)
 		return FAILED;
 
@@ -978,6 +982,7 @@ static enum scsi_disposition scsi_try_bus_device_reset(struct scsi_cmnd *scmd)
 	enum scsi_disposition rtn;
 	const struct scsi_host_template *hostt = scmd->device->host->hostt;
 
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 	if (!hostt->eh_device_reset_handler)
 		return FAILED;
 
@@ -1007,6 +1012,7 @@ static enum scsi_disposition scsi_try_bus_device_reset(struct scsi_cmnd *scmd)
 static enum scsi_disposition
 scsi_try_to_abort_cmd(const struct scsi_host_template *hostt, struct scsi_cmnd *scmd)
 {
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 	if (!hostt->eh_abort_handler)
 		return FAILED;
 
@@ -1015,6 +1021,7 @@ scsi_try_to_abort_cmd(const struct scsi_host_template *hostt, struct scsi_cmnd *
 
 static void scsi_abort_eh_cmnd(struct scsi_cmnd *scmd)
 {
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 	if (scsi_try_to_abort_cmd(scmd->device->host->hostt, scmd) != SUCCESS)
 		if (scsi_try_bus_device_reset(scmd) != SUCCESS)
 			if (scsi_try_target_reset(scmd) != SUCCESS)
