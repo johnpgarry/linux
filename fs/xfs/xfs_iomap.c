@@ -944,7 +944,13 @@ allocate_blocks:
 		diff_offset_fsb = offset_fsb;
 		offset_fsb = rounddown_64(offset_fsb, ip->i_extsize);
 		diff_offset_fsb = diff_offset_fsb - offset_fsb;
-		pr_err("%s2.1 xfs_inode_has_forcealign offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld diff_offset_fsb=%lld\n",
+		pr_err("%s2.1 calling xfs_bmapi_read xfs_inode_has_forcealign offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld diff_offset_fsb=%lld\n",
+			__func__, offset, length, offset_fsb, end_fsb, diff_offset_fsb);
+		error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
+			       &nimaps, 0);
+		if (error)
+			goto out_unlock;
+		pr_err("%s2.1.1 called xfs_bmapi_read xfs_inode_has_forcealign offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld diff_offset_fsb=%lld\n",
 			__func__, offset, length, offset_fsb, end_fsb, diff_offset_fsb);
 	} else if (offset + length > XFS_ISIZE(ip)) {
 		end_fsb = xfs_iomap_eof_align_last_fsb(ip, end_fsb);
