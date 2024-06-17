@@ -5648,26 +5648,34 @@ static void scsi_debug_slave_destroy(struct scsi_device *sdp)
 	sdp->hostdata = NULL;
 }
 
-/* Returns true if we require the queued memory to be freed by the caller. */
+/*
+ * Returns true if we require the queued memory to be freed by the caller.
+ * Set scmd_ref_held as true if we possibly will still reference the
+ * scmd in the delay handler CB.
+ */
 static bool stop_qc_helper(struct sdebug_defer *sd_dp,
-			   enum sdeb_defer_type defer_t)
+			   enum sdeb_defer_type defer_t,
+			   bool *scmd_ref_held)
 {
 	if (defer_t == SDEB_DEFER_HRT) {
 		int res = hrtimer_try_to_cancel(&sd_dp->hrt);
 
 		switch (res) {
 		case 0: /* Not active, it must have already run */
-		case -1: /* -1 It's executing the CB */
 			return false;
+		case -1: /* -1 It's executing the CB */
+		{
+			*scmd_ref_held = true;
+			return false;
+		}
 		case 1: /* Was active, we've now cancelled */
 		default:
 			return true;
 		}
 	} else if (defer_t == SDEB_DEFER_WQ) {
-		/* Cancel if pending */
-		if (cancel_work_sync(&sd_dp->ew.work))
+		if (cancel_work(&sd_dp->ew.work))
 			return true;
-		/* Was not pending, so it must have run */
+		*scmd_ref_held = true;
 		return false;
 	} else if (defer_t == SDEB_DEFER_POLL) {
 		return true;
@@ -5683,6 +5691,7 @@ static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 	struct sdebug_defer *sd_dp;
 	struct sdebug_scsi_cmd *sdsc = scsi_cmd_priv(cmnd);
 	struct sdebug_queued_cmd *sqcp = TO_QUEUED_CMD(cmnd);
+	bool scmd_ref_held = false;
 
 	lockdep_assert_held(&sdsc->lock);
 
@@ -5692,10 +5701,10 @@ static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 	l_defer_t = READ_ONCE(sd_dp->defer_t);
 	ASSIGN_QUEUED_CMD(cmnd, NULL);
 
-	if (stop_qc_helper(sd_dp, l_defer_t))
+	if (stop_qc_helper(sd_dp, l_defer_t, &scmd_ref_held))
 		sdebug_free_queued_cmd(sqcp);
 
-	return true;
+	return !scmd_ref_held;
 }
 
 /*
@@ -5786,7 +5795,9 @@ static int scsi_debug_abort(struct scsi_cmnd *SCpnt)
 		return FAILED;
 	}
 
-	return SUCCESS;
+	if (ok)
+		return SUCCESS;
+	return FAILED;
 }
 
 static bool scsi_debug_stop_all_queued_iter(struct request *rq, void *data)
