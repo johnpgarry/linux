@@ -4276,6 +4276,11 @@ xfs_bmapi_convert_unwritten(
 	int			tmp_logflags = 0;
 	int			error;
 
+	pr_err("%s mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount);
+	pr_err("%s0 bma->got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount);
+
 	/* check if we need to do unwritten->real conversion */
 	if (mval->br_state == XFS_EXT_UNWRITTEN &&
 	    (flags & XFS_BMAPI_PREALLOC))
@@ -4311,6 +4316,10 @@ xfs_bmapi_convert_unwritten(
 
 	error = xfs_bmap_add_extent_unwritten_real(bma->tp, bma->ip, whichfork,
 			&bma->icur, &bma->cur, mval, &tmp_logflags);
+	pr_err("%s1.0 after xfs_bmap_add_extent_unwritten_real mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount);
+	pr_err("%s1.1 after xfs_bmap_add_extent_unwritten_real bma->got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount);
 	/*
 	 * Log the inode core unconditionally in the unwritten extent conversion
 	 * path because the conversion might not have done so (e.g., if the
@@ -4333,6 +4342,10 @@ xfs_bmapi_convert_unwritten(
 	 * of the neighbouring ones.
 	 */
 	xfs_iext_get_extent(ifp, &bma->icur, &bma->got);
+	pr_err("%s2.0 after xfs_iext_get_extent mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount);
+	pr_err("%s2.1 after xfs_iext_get_extent bma->got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount);
 
 	/*
 	 * We may have combined previously unwritten space with written space,
@@ -4438,7 +4451,9 @@ xfs_bmapi_write(
 	orig_mval = mval;
 	orig_nmap = *nmap;
 #endif
-
+	pr_err("%s bno=%lld len=%lld\n", __func__, bno, len);
+	pr_err("%s0 mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount);
 	ASSERT(*nmap >= 1);
 	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP);
 	ASSERT(tp != NULL);
@@ -4558,6 +4573,11 @@ xfs_bmapi_write(
 		xfs_bmapi_trim_map(mval, &bma.got, &bno, len, obno,
 							end, n, flags);
 
+		pr_err("%s1 bno=%lld len=%lld\n", __func__, bno, len);
+		pr_err("%s1.1 mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, mval->br_startoff, mval->br_startblock, mval->br_blockcount);
+		pr_err("%s1.2 calling xfs_bmapi_convert_unwritten bma.got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount);
 		/* Execute unwritten extent conversion if necessary */
 		error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
 		if (error == -EAGAIN)

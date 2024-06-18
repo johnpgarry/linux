@@ -255,6 +255,10 @@ xfs_iomap_write_direct(
 	int			error;
 	int			bmapi_flags = XFS_BMAPI_PREALLOC;
 	int			nr_exts = XFS_IEXT_ADD_NOSPLIT_CNT;
+	pr_err("%s offset_fsb=%lld count_fsb=%lld\n", __func__,
+		offset_fsb, count_fsb);
+	pr_err("%s0 imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 
 	ASSERT(count_fsb > 0);
 
@@ -308,6 +312,10 @@ xfs_iomap_write_direct(
 	 * caller gave to us.
 	 */
 	nimaps = 1;
+	pr_err("%s1 offset_fsb=%lld count_fsb=%lld\n", __func__,
+		offset_fsb, count_fsb);
+	pr_err("%s1.0 calling xfs_bmapi_write imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb, bmapi_flags, 0,
 				imap, &nimaps);
 	if (error)
@@ -576,6 +584,7 @@ xfs_iomap_write_unwritten(
 	xfs_fsize_t	i_size;
 	uint		resblks;
 	int		error;
+	pr_err("%s offset=%lld count=%lld\n", __func__, offset, count);
 
 	trace_xfs_unwritten_convert(ip, offset, count);
 
@@ -624,6 +633,7 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
+		pr_err("%s3 calling xfs_bmapi_write offset=%lld count=%lld\n", __func__, offset, count);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);
@@ -804,6 +814,10 @@ xfs_direct_write_iomap_begin(
 	unsigned int		lockmode = XFS_ILOCK_SHARED;
 	u64			seq;
 
+	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld %pS %pS\n",
+		__func__, offset, length, offset_fsb, end_fsb,
+		__builtin_return_address(0),
+		__builtin_return_address(1));
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
 	if (xfs_is_shutdown(mp))
@@ -825,6 +839,17 @@ xfs_direct_write_iomap_begin(
 			       &nimaps, 0);
 	if (error)
 		goto out_unlock;
+	#if 0
+	typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+#endif
+	pr_err("%s2 offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d nimaps=%d\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, nimaps);
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;
@@ -874,9 +899,13 @@ xfs_direct_write_iomap_begin(
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
 	trace_xfs_iomap_found(ip, offset, length, XFS_DATA_FORK, &imap);
+	pr_err("%s2.1 calling xfs_bmbt_to_iomap imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+		__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 allocate_blocks:
+	pr_err("%s3 allocate_blocks offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	error = -EAGAIN;
 	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY))
 		goto out_unlock;
@@ -899,12 +928,16 @@ allocate_blocks:
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
 	xfs_iunlock(ip, lockmode);
 
+	pr_err("%s3.1 calling xfs_iomap_write_direct offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
 			flags, &imap, &seq);
 	if (error)
 		return error;
 
 	trace_xfs_iomap_alloc(ip, offset, length, XFS_DATA_FORK, &imap);
+	pr_err("%s3.2 calling xfs_bmbt_to_iomap offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags,
 				 iomap_flags | IOMAP_F_NEW, seq);
 

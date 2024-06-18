@@ -520,6 +520,8 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
+		pr_err("%s3 calling xfs_iomap_write_unwritten offset=%lld size=%ld\n", __func__,
+			offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}
@@ -699,6 +701,7 @@ xfs_file_dio_write(
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+	struct xfs_mount	*mp = ip->i_mount;
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
 		if (!generic_atomic_write_valid_size(iocb->ki_pos, from,

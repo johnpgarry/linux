@@ -290,7 +290,18 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	int nr_pages, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
-
+	pr_err("%s pos=%lld length=%lld\n",
+		__func__, pos, length);
+	pr_err("%s0.1 iomap->type=%d (HOLE=0, DELALLOC=1, MAPPED=2, UNWRITTEN=3, INLINE=4)\n",
+		__func__, iomap->type);
+	pr_err("%s0.2 iomap->flags=0x%x NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d, BH=%d, XATTR=%d\n",
+		__func__, iomap->flags,
+		!!(iomap->flags & IOMAP_F_NEW),
+		!!(iomap->flags & IOMAP_F_DIRTY),
+		!!(iomap->flags & IOMAP_F_SHARED),
+		!!(iomap->flags & IOMAP_F_MERGED),
+		!!(iomap->flags & IOMAP_F_BUFFER_HEAD),
+		!!(iomap->flags & IOMAP_F_XATTR));
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
