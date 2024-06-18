@@ -127,8 +127,11 @@ xfs_end_ioend(
 	 */
 	if (ioend->io_flags & IOMAP_F_SHARED)
 		error = xfs_reflink_end_cow(ip, offset, size);
-	else if (ioend->io_type == IOMAP_UNWRITTEN)
+	else if (ioend->io_type == IOMAP_UNWRITTEN) {
+		pr_err("%s3 calling xfs_iomap_write_unwritten offset=%lld size=%ld\n", __func__,
+			offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, false);
+	}
 
 	if (!error && xfs_ioend_is_append(ioend))
 		error = xfs_setfilesize(ip, ioend->io_offset, ioend->io_size);

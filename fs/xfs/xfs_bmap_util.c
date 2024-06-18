@@ -645,7 +645,7 @@ xfs_alloc_file_space(
 	int			error;
 
 	trace_xfs_alloc_file_space(ip);
-
+	pr_err("%s offset=%lld len=%lld\n", __func__, offset, len);
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -729,6 +729,7 @@ xfs_alloc_file_space(
 		 * startoffset_fsb so that one of the following allocations
 		 * will eventually reach the requested range.
 		 */
+		pr_err("%s3 calling xfs_bmapi_write offset=%lld len=%lld\n", __func__, offset, len);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
 				&nimaps);
