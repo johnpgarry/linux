@@ -862,7 +862,6 @@ static int ext2_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		iomap->length = (u64)ret << blkbits;
 		iomap->flags |= IOMAP_F_MERGED;
 	}
-	iomap->io_block_size = i_blocksize(inode);
 
 	if (new)
 		iomap->flags |= IOMAP_F_NEW;

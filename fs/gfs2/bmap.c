@@ -927,7 +927,6 @@ unstuff:
 
 out:
 	iomap->bdev = inode->i_sb->s_bdev;
-	iomap->io_block_size = i_blocksize(inode);
 unlock:
 	up_read(&ip->i_rw_mutex);
 	return ret;

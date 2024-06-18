@@ -402,7 +402,6 @@ static int blkdev_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 	iomap->addr = iomap->offset;
 	iomap->length = isize - iomap->offset;
 	iomap->flags |= IOMAP_F_BUFFER_HEAD; /* noop for !CONFIG_BUFFER_HEAD */
-	iomap->io_block_size = i_blocksize(inode);
 	return 0;
 }
 
