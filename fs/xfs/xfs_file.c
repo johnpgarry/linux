@@ -484,6 +484,8 @@ xfs_dio_write_end_io(
 	loff_t			offset = iocb->ki_pos;
 	unsigned int		nofs_flag;
 
+	pr_err("%s size=%zd error=%d\n", __func__, size, error);
+
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
 	if (xfs_is_shutdown(ip->i_mount))

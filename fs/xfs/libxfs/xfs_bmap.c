@@ -3801,6 +3801,8 @@ xfs_bmap_btalloc(
 	if (args.fsbno != NULLFSBLOCK) {
 		xfs_bmap_process_allocated_extent(ap, &args, orig_offset,
 			orig_length);
+		pr_err("%s ap->offset=%lld, length=%d, blkno=%lld\n", __func__,
+			ap->offset, ap->length, ap->blkno);
 	} else {
 		ap->blkno = NULLFSBLOCK;
 		ap->length = 0;
@@ -3901,7 +3903,6 @@ xfs_bmapi_update_map(
 	uint32_t		flags)
 {
 	xfs_bmbt_irec_t	*mval = *map;
-
 	ASSERT((flags & XFS_BMAPI_ENTIRE) ||
 	       ((mval->br_startoff + mval->br_blockcount) <= end));
 	ASSERT((flags & XFS_BMAPI_ENTIRE) || (mval->br_blockcount <= *len) ||
@@ -3909,6 +3910,8 @@ xfs_bmapi_update_map(
 
 	*bno = mval->br_startoff + mval->br_blockcount;
 	*len = end - *bno;
+	pr_err("%s obno=%lld end=%lld mval->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d *bno=%lld *len=%lld\n",
+		__func__, obno, end, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, *bno, *len);
 	if (*n > 0 && mval->br_startoff == mval[-1].br_startoff) {
 		/* update previous map with new information */
 		ASSERT(mval->br_startblock == mval[-1].br_startblock);
@@ -3964,6 +3967,8 @@ xfs_bmapi_read(
 	bool			eof = false;
 	int			n = 0;
 
+	pr_err("%s bno=%lld len=%lld flags=0x%x\n", __func__, bno, len, flags);
+
 	ASSERT(*nmap >= 1);
 	ASSERT(!(flags & ~(XFS_BMAPI_ATTRFORK | XFS_BMAPI_ENTIRE)));
 	xfs_assert_ilocked(ip, XFS_ILOCK_SHARED | XFS_ILOCK_EXCL);
@@ -3990,9 +3995,14 @@ xfs_bmapi_read(
 
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &icur, &got))
 		eof = true;
+	pr_err("%s1 after xfs_iext_lookup_extent bno=%lld len=%lld eof=%d\n", __func__, bno, len, eof);
+	pr_err("%s1.1 got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 	end = bno + len;
 	obno = bno;
 
+	pr_err("%s1.2 about to loop obno=%lld, end=%lld\n",
+			__func__, obno, end);
 	while (bno < end && n < *nmap) {
 		/* Reading past eof, act as though there's a hole up to end. */
 		if (eof)
@@ -4008,21 +4018,42 @@ xfs_bmapi_read(
 			len -= mval->br_blockcount;
 			mval++;
 			n++;
+			pr_err("%s1.2 looping Reading in a hole got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 			continue;
 		}
-
+#if 0
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+#endif
 		/* set up the extent map to return. */
+		pr_err("%s2 looping calling xfs_bmapi_trim_map obno=%lld len=%lld\n", __func__, obno, len);
+		pr_err("%s2.1 looping got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 		xfs_bmapi_trim_map(mval, &got, &bno, len, obno, end, n, flags);
+		pr_err("%s3 looping calling xfs_bmapi_update_map obno=%lld end=%lld len=%lld\n", __func__, obno, end, len);
+		pr_err("%s3.1 looping got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 		xfs_bmapi_update_map(&mval, &bno, &len, obno, end, &n, flags);
+		pr_err("%s4 looping called xfs_bmapi_update_map obno=%lld end=%lld len=%lld bno=%lld n=%d *nmap=%d\n", __func__, obno, end, len, bno, n, *nmap);
+		pr_err("%s4.1 looping got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 
 		/* If we're done, stop now. */
 		if (bno >= end || n >= *nmap)
 			break;
 
 		/* Else go on to the next record. */
-		if (!xfs_iext_next_extent(ifp, &icur, &got))
+		if (!xfs_iext_next_extent(ifp, &icur, &got)) {
+			pr_err("%s5 looping no next extent\n", __func__);
 			eof = true;
+		}
 	}
+	pr_err("%s10 obno=%lld len=%lld\n", __func__, obno, len);
+	pr_err("%s10.1 got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 	*nmap = n;
 	return 0;
 }
