@@ -177,6 +177,7 @@ struct iomap_folio_ops {
 #define IOMAP_DAX		(1 << 8) /* DAX mapping */
 #else
 #define IOMAP_DAX		0
+#define IOMAP_ATOMIC		(1 << 9)
 #endif /* CONFIG_FS_DAX */
 
 struct iomap_ops {

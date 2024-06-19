@@ -605,6 +605,12 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iomi.flags |= IOMAP_NOWAIT;
 
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s setting IOCB_ATOMIC iomi.flags=0x%x\n", __func__, iomi.flags);
+		iomi.flags |= IOMAP_ATOMIC;
+		pr_err("%s1 set IOCB_ATOMIC iomi.flags=0x%x\n", __func__, iomi.flags);
+	}
+
 	if (iov_iter_rw(iter) == READ) {
 		/* reads can always complete inline */
 		dio->flags |= IOMAP_DIO_INLINE_COMP;
