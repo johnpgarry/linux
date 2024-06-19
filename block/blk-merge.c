@@ -60,6 +60,35 @@ static bool rq_straddles_atomic_write_boundary(struct request *rq,
 	return false;
 }
 
+
+static bool rq_straddles_chunk_boundary(struct request *rq,
+					unsigned int front_adjust,
+					unsigned int back_adjust)
+{
+	struct request_queue *q = rq->q;
+	unsigned int boundary = q->limits.chunk_sectors << SECTOR_SHIFT;
+	u64 mask, start_rq_pos, end_rq_pos;
+
+	if (!boundary)
+		return false;
+
+	start_rq_pos = blk_rq_pos(rq) << SECTOR_SHIFT;
+	end_rq_pos = start_rq_pos + blk_rq_bytes(rq) - 1;
+
+	start_rq_pos -= front_adjust;
+	end_rq_pos += back_adjust;
+
+	mask = ~(boundary - 1);
+
+	/* Top bits are different, so crossed a boundary */
+	if ((start_rq_pos & mask) != (end_rq_pos & mask)) {
+		BUG();
+		return true;
+	}
+
+	return false;
+}
+
 static inline void bio_get_first_bvec(struct bio *bio, struct bio_vec *bv)
 {
 	*bv = mp_bvec_iter_bvec(bio->bi_io_vec, bio->bi_iter);
@@ -727,6 +756,11 @@ int ll_back_merge_fn(struct request *req, struct bio *bio, unsigned int nr_segs)
 		}
 	}
 
+	if (rq_straddles_chunk_boundary(req,
+			0, bio->bi_iter.bi_size)) {
+		return 0;
+	}
+
 	return ll_new_hw_segment(req, bio, nr_segs);
 }
 
@@ -751,6 +785,12 @@ static int ll_front_merge_fn(struct request *req, struct bio *bio,
 				bio->bi_iter.bi_size, 0)) {
 			return 0;
 		}
+	}
+
+
+	if (rq_straddles_chunk_boundary(req,
+			bio->bi_iter.bi_size, 0)) {
+		return 0;
 	}
 
 	return ll_new_hw_segment(req, bio, nr_segs);
@@ -794,6 +834,11 @@ static int ll_merge_requests_fn(struct request_queue *q, struct request *req,
 				0, blk_rq_bytes(next))) {
 			return 0;
 		}
+	}
+
+	if (rq_straddles_chunk_boundary(req,
+			0, blk_rq_bytes(next))) {
+		return 0;
 	}
 
 	total_phys_segments = req->nr_phys_segments + next->nr_phys_segments;
