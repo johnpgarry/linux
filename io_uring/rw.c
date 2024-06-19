@@ -787,6 +787,8 @@ static int io_rw_init_file(struct io_kiocb *req, fmode_t mode, int rw_type)
 		req->flags |= io_file_get_flags(file);
 
 	kiocb->ki_flags = file->f_iocb_flags;
+	pr_err_ratelimited("%s snake rw->flags=0x%x (RWF_ATOMIC set=%d) rw_type=%d\n",
+		__func__, rw->flags, !!(rw->flags & RWF_ATOMIC), rw_type);
 	ret = kiocb_set_rw_flags(kiocb, rw->flags, rw_type);
 	if (unlikely(ret))
 		return ret;
@@ -832,6 +834,7 @@ static int __io_read(struct io_kiocb *req, unsigned int issue_flags)
 		if (unlikely(ret < 0))
 			return ret;
 	}
+	pr_err_once("%s snake\n", __func__);
 	ret = io_rw_init_file(req, FMODE_READ, READ);
 	if (unlikely(ret))
 		return ret;
@@ -1012,6 +1015,7 @@ int io_write(struct io_kiocb *req, unsigned int issue_flags)
 	ssize_t ret, ret2;
 	loff_t *ppos;
 
+	pr_err_once("%s snake\n", __func__);
 	ret = io_rw_init_file(req, FMODE_WRITE, WRITE);
 	if (unlikely(ret))
 		return ret;

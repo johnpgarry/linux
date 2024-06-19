@@ -1542,6 +1542,9 @@ static int aio_prep_rw(struct kiocb *req, const struct iocb *iocb, int rw_type)
 	} else
 		req->ki_ioprio = get_current_ioprio();
 
+	
+	pr_err_ratelimited("%s snake iocb->aio_rw_flags=0x%x (RWF_ATOMIC set=%d) rw_type=%d\n",
+		__func__, iocb->aio_rw_flags, !!(iocb->aio_rw_flags & RWF_ATOMIC), rw_type);
 	ret = kiocb_set_rw_flags(req, iocb->aio_rw_flags, rw_type);
 	if (unlikely(ret))
 		return ret;
@@ -1594,6 +1597,7 @@ static int aio_read(struct kiocb *req, const struct iocb *iocb,
 	struct file *file;
 	int ret;
 
+	pr_err_once("%s snake\n", __func__);
 	ret = aio_prep_rw(req, iocb, READ);
 	if (ret)
 		return ret;
@@ -1621,6 +1625,7 @@ static int aio_write(struct kiocb *req, const struct iocb *iocb,
 	struct file *file;
 	int ret;
 
+	pr_err_once("%s snake\n", __func__);
 	ret = aio_prep_rw(req, iocb, WRITE);
 	if (ret)
 		return ret;
