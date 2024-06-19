@@ -813,6 +813,7 @@ xfs_direct_write_iomap_begin(
 	u16			iomap_flags = 0;
 	unsigned int		lockmode = XFS_ILOCK_SHARED;
 	u64			seq;
+	bool atomic = flags & IOMAP_ATOMIC;
 
 	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld %pS %pS\n",
 		__func__, offset, length, offset_fsb, end_fsb,
