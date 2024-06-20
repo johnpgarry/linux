@@ -997,6 +997,27 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 	lim->atomic_write_hw_unit_max = unit_max * logical_block_size;
 	lim->atomic_write_hw_boundary = 2 * max_atomic * logical_block_size;
 	lim->chunk_sectors = max_atomic;
+	lim->chunk_sectors = 0;
+
+	{
+
+		unsigned int temp = 8;
+		pr_err_once("%s do_div(8, 4)=%d\n", __func__, do_div(temp, 4));
+		temp = 8;
+		pr_err_once("%s do_div(8, 3)=%d\n", __func__, do_div(temp, 3));
+		temp = 4;
+		pr_err_once("%s do_div(4, 3)=%d\n", __func__, do_div(temp, 3));
+		temp = 4;
+		pr_err_once("%s do_div(4, 8)=%d\n", __func__, do_div(temp, 8));
+		temp = 0;
+		pr_err_once("%s do_div(0, 8)=%d\n", __func__, do_div(temp, 8));
+		temp = 3;
+		pr_err_once("%s do_div(3, 8)=%d\n", __func__, do_div(temp, 8));
+		temp = 2;
+		pr_err_once("%s do_div(2, 8)=%d\n", __func__, do_div(temp, 8));
+		temp = 2;
+		pr_err_once("%s do_div(2, 3)=%d\n", __func__, do_div(temp, 3));
+	}
 }
 
 static blk_status_t sd_setup_write_same16_cmnd(struct scsi_cmnd *cmd,
