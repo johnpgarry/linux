@@ -3164,3 +3164,28 @@ xfs_is_always_cow_inode(
 {
 	return ip->i_mount->m_always_cow && xfs_has_reflink(ip->i_mount);
 }
+
+/* Return mod+offset for a blkno to an extent boundary */
+xfs_extlen_t
+xfs_inode_alloc_fsbsize_align(
+	struct xfs_inode	*ip,
+	xfs_fileoff_t		blkno,
+	xfs_extlen_t		*off)
+{
+	unsigned int		blocks = xfs_inode_alloc_fsbsize(ip);
+	xfs_extlen_t		mod;
+
+	if (blocks == 1)
+		mod = 0;
+	else if (is_power_of_2(blocks))
+		mod = blkno & (blocks - 1);
+	else
+		mod = do_div(blkno, blocks);
+
+	if (mod)
+		*off = blocks - mod;
+	else
+		*off = 0;
+
+	return mod;
+}
