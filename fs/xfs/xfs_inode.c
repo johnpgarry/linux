@@ -3111,10 +3111,14 @@ unsigned int
 xfs_inode_alloc_unitsize_fsb(
 	struct xfs_inode	*ip)
 {
-	if (XFS_IS_REALTIME_INODE(ip))
-		return ip->i_mount->m_sb.sb_rextsize;
+	unsigned int		blocks = 1;
 
-	return 1;
+	if (xfs_inode_has_forcealign(ip))
+		blocks = ip->i_extsize;
+	else if (XFS_IS_REALTIME_INODE(ip))
+		blocks = ip->i_mount->m_sb.sb_rextsize;
+
+	return blocks;
 }
 
 /* Returns the size of fundamental allocation unit for a file, in bytes. */
