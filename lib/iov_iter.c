@@ -879,6 +879,8 @@ static int want_pages_array(struct page ***res, size_t size,
 	if (count > maxpages)
 		count = maxpages;
 	WARN_ON(!count);	// caller should've prevented that
+	if (!count)
+		panic("no count in want_pages_array\n");
 	if (!*res) {
 		*res = kvmalloc_array(count, sizeof(struct page *), GFP_KERNEL);
 		if (!*res)

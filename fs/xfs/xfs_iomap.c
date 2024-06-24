@@ -875,7 +875,7 @@ xfs_direct_write_iomap_begin(
 	 * the I/O range not covered by this map triggering an EAGAIN condition
 	 * when it is subsequently mapped and aborting the I/O.
 	 */
-	if (atomic) {
+	if (atomic && 0) {
 		pr_err("%s2.0 atomi offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d nimaps=%d imap_spans_range=%d\n",
 			__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, nimaps, imap_spans_range(&imap, offset_fsb, end_fsb));
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb))

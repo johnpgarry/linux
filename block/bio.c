@@ -1211,16 +1211,18 @@ static int bio_iov_add_page(struct bio *bio, struct page *page,
 
 	if (WARN_ON_ONCE(bio->bi_iter.bi_size > UINT_MAX - len))
 		return -EIO;
-
+	pr_err("%s bio->bi_vcnt=%d bi_size=%d len=%d\n", __func__, bio->bi_vcnt, bio->bi_iter.bi_size, len);
 	if (bio->bi_vcnt > 0 &&
 	    bvec_try_merge_page(&bio->bi_io_vec[bio->bi_vcnt - 1],
 				page, len, offset, &same_page)) {
 		bio->bi_iter.bi_size += len;
 		if (same_page)
 			bio_release_page(bio, page);
+		pr_err("%s2 returning as bvec_try_merge_page ok bio->bi_vcnt=%d bi_size=%d\n", __func__, bio->bi_vcnt, bio->bi_iter.bi_size);
 		return 0;
 	}
 	__bio_add_page(bio, page, len, offset);
+	pr_err("%s10  bio->bi_vcnt=%d bi_size=%d\n", __func__, bio->bi_vcnt, bio->bi_iter.bi_size);
 	return 0;
 }
 
@@ -1262,6 +1264,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	size_t offset;
 	int ret = 0;
 
+	pr_err("%s iov_iter->iov_offset=%zd, count=%zd entries_left=%d\n", __func__, iter->iov_offset, iter->count, entries_left);
 	/*
 	 * Move page array up in the allocated memory for the bio vecs as far as
 	 * possible so that we can start filling biovecs from the beginning
@@ -1285,7 +1288,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 				      nr_pages, extraction_flags, &offset);
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
-
+	pr_err("%s1 after iov_iter_extract_pages size=%zd nr_pages=%d offset=%zd\n", __func__, size, nr_pages, offset);
 	nr_pages = DIV_ROUND_UP(offset + size, PAGE_SIZE);
 
 	if (bio->bi_bdev) {
@@ -1299,10 +1302,12 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 		goto out;
 	}
 
+	pr_err("%s2 size=%zd nr_pages=%d\n", __func__, size, nr_pages);
 	for (left = size, i = 0; left > 0; left -= len, i++) {
 		struct page *page = pages[i];
 
 		len = min_t(size_t, PAGE_SIZE - offset, left);
+		pr_err("%s3 len=%d size=%zd nr_pages=%d\n", __func__, len, size, nr_pages);
 		if (bio_op(bio) == REQ_OP_ZONE_APPEND) {
 			ret = bio_iov_add_zone_append_page(bio, page, len,
 					offset);
@@ -1345,7 +1350,9 @@ out:
 int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 {
 	int ret = 0;
-
+	pr_err("%s bi_vcnt=%d bi size=%d iov_iter_count(iter)=%zd iov_iter->iov_offset=%zd, count=%zd\n",
+		__func__, bio->bi_vcnt, bio->bi_iter.bi_size, iov_iter_count(iter),
+		iter->iov_offset, iter->count);
 	if (WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED)))
 		return -EIO;
 
@@ -1355,12 +1362,18 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 		return 0;
 	}
 
+	pr_err("%s2 going to loop bi size=%d\n", __func__, bio->bi_iter.bi_size);
 	if (iov_iter_extract_will_pin(iter))
 		bio_set_flag(bio, BIO_PAGE_PINNED);
 	do {
+		pr_err("%s3 looping and calling __bio_iov_iter_get_pages bi_vcnt=%d bi size=%d iov_iter_count(iter)=%zd\n",
+			__func__, bio->bi_vcnt, bio->bi_iter.bi_size, iov_iter_count(iter));
 		ret = __bio_iov_iter_get_pages(bio, iter);
+		pr_err("%s3.1 looping and called __bio_iov_iter_get_pages ret=%d bi_vcnt=%d bi size=%d iov_iter_count(iter)=%zd\n",
+			__func__, ret, bio->bi_vcnt, bio->bi_iter.bi_size, iov_iter_count(iter));
 	} while (!ret && iov_iter_count(iter) && !bio_full(bio, 0));
 
+	pr_err("%s10 bi_vcnt=%d bi size=%d\n", __func__, bio->bi_vcnt, bio->bi_iter.bi_size);
 	return bio->bi_vcnt ? 0 : ret;
 }
 EXPORT_SYMBOL_GPL(bio_iov_iter_get_pages);

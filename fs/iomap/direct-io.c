@@ -37,6 +37,8 @@ struct iomap_dio {
 	int			error;
 	size_t			done_before;
 	bool			wait_for_completion;
+	struct bio *atomic_write_bio;
+	u64 atomic_write_len;
 
 	union {
 		/* used during submission and for synchronous completion: */
@@ -66,6 +68,8 @@ static void iomap_dio_submit_bio(const struct iomap_iter *iter,
 {
 	struct kiocb *iocb = dio->iocb;
 
+	pr_err("%s bio bi_sector=%lld, bi_size=%d\n",
+			__func__, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	atomic_inc(&dio->ref);
 
 	/* Sync dio can't be polled reliably */
@@ -289,9 +293,11 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bool use_fua = false;
 	int nr_pages, ret = 0;
 	size_t copied = 0;
+	size_t bi_size_orig;
 	size_t orig_count;
-	pr_err("%s pos=%lld length=%lld\n",
-		__func__, pos, length);
+	static int count;
+	pr_err("%s pos=%lld length=%lld count=%d iomap_iter->pos=%lld, len=%lld\n",
+		__func__, pos, length, count, iter->pos, iter->len);
 	pr_err("%s0.1 iomap->type=%d (HOLE=0, DELALLOC=1, MAPPED=2, UNWRITTEN=3, INLINE=4)\n",
 		__func__, iomap->type);
 	pr_err("%s0.2 iomap->flags=0x%x NEW=%d, DIRTY=%d, SHARED=%d, MERGED=%d, BH=%d, XATTR=%d\n",
@@ -302,9 +308,17 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		!!(iomap->flags & IOMAP_F_MERGED),
 		!!(iomap->flags & IOMAP_F_BUFFER_HEAD),
 		!!(iomap->flags & IOMAP_F_XATTR));
+	pr_err("%s0.1 iov_iter->iov_offset=%zd, count=%zd\n",
+			__func__, dio->submit.iter->iov_offset, dio->submit.iter->count);
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
+
+	count++;
+	if (count > 4)
+		panic("big count\n");
+
+
 
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
@@ -382,6 +396,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, is_atomic);
 
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
+	pr_err("%s1 nr_pages=%d\n", __func__, nr_pages);
 	do {
 		size_t n;
 		if (dio->error) {
@@ -390,14 +405,38 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			goto out;
 		}
 
-		bio = iomap_dio_alloc_bio(iter, dio, nr_pages, bio_opf);
-		fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
-					  GFP_KERNEL);
-		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
-		bio->bi_write_hint = inode->i_write_hint;
-		bio->bi_ioprio = dio->iocb->ki_ioprio;
-		bio->bi_private = dio;
-		bio->bi_end_io = iomap_dio_bio_end_io;
+		bi_size_orig = 0;
+		if (is_atomic) {
+			pr_err("%s1.1 is_atomic dio->atomic_write_bio=%pS nr_pages=%d\n", __func__, dio->atomic_write_bio, nr_pages);
+			if (dio->atomic_write_bio) {
+				pr_err("%s1.2 is_atomic dio->atomic_write_bio=%pS bi_sector=%lld bi_size=%d iomap_sector(iomap, pos)=%lld\n",
+					__func__, dio->atomic_write_bio, dio->atomic_write_bio->bi_iter.bi_sector,
+					dio->atomic_write_bio->bi_iter.bi_size, iomap_sector(iomap, pos));
+				BUG_ON(dio->atomic_write_bio->bi_iter.bi_sector + (dio->atomic_write_bio->bi_iter.bi_size >> SECTOR_SHIFT) != iomap_sector(iomap, pos));
+				bio = dio->atomic_write_bio;
+				bi_size_orig = dio->atomic_write_bio->bi_iter.bi_size;
+			} else {
+				dio->atomic_write_bio = bio = iomap_dio_alloc_bio(iter, dio, BIO_MAX_VECS, bio_opf);
+				fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
+							  GFP_KERNEL);
+				bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
+				bio->bi_write_hint = inode->i_write_hint;
+				bio->bi_ioprio = dio->iocb->ki_ioprio;
+				bio->bi_private = dio;
+				bio->bi_end_io = iomap_dio_bio_end_io;
+				pr_err("%s1.3 bi_sector=%lld\n",
+					__func__, iomap_sector(iomap, pos));
+			}
+		} else {
+			bio = iomap_dio_alloc_bio(iter, dio, nr_pages, bio_opf);
+			fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
+						  GFP_KERNEL);
+			bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
+			bio->bi_write_hint = inode->i_write_hint;
+			bio->bi_ioprio = dio->iocb->ki_ioprio;
+			bio->bi_private = dio;
+			bio->bi_end_io = iomap_dio_bio_end_io;
+		}
 
 		ret = bio_iov_iter_get_pages(bio, dio->submit.iter);
 		if (unlikely(ret)) {
@@ -411,7 +450,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			goto zero_tail;
 		}
 
-		n = bio->bi_iter.bi_size;
+		n = bio->bi_iter.bi_size - bi_size_orig;
+		pr_err("%s1.4 checking is_atomic && (n != orig_count) bio bi_sector=%lld, bi_size=%d bi_size_orig=%zd n=%zd\n",
+					__func__, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+					bi_size_orig, n);
 		if (is_atomic && (n != orig_count)) {
 			/*
 			 * This bio should have covered the complete length,
@@ -419,9 +461,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			 * the tail, similar to when bio_iov_iter_get_pages()
 			 * returns an error, above.
 			 */
-			ret = -EINVAL;
-			bio_put(bio);
-			goto zero_tail;
+		//	ret = -EINVAL;
+		//	bio_put(bio);
+		//	goto zero_tail;
 		}
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);
@@ -435,14 +477,19 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 		nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter,
 						 BIO_MAX_VECS);
+		pr_err("%s1.5 nr_pages=%d dio->size=%lld, atomic_write_len=%lld copied=%zd orig_count=%zd bio->bi_iter.bi_size=%d\n",
+			__func__, nr_pages, dio->size, dio->atomic_write_len, copied, orig_count, bio->bi_iter.bi_size);
 		/*
 		 * We can only poll for single bio I/Os.
 		 */
 		if (nr_pages)
 			dio->iocb->ki_flags &= ~IOCB_HIPRI;
-		iomap_dio_submit_bio(iter, dio, bio, pos);
+		if ((is_atomic && dio->atomic_write_len == bio->bi_iter.bi_size)|| !is_atomic)
+			iomap_dio_submit_bio(iter, dio, bio, pos);
+
 		pos += n;
 	} while (nr_pages);
+	pr_err("%s1.6 finished loop\n", __func__);
 
 	/*
 	 * We need to zeroout the tail of a sub-block write if the extent type
@@ -461,6 +508,7 @@ zero_tail:
 out:
 	/* Undo iter limitation to current extent */
 	iov_iter_reexpand(dio->submit.iter, orig_count - copied);
+	pr_err("%s1.10 out copied=%zd\n", __func__, copied);
 	if (copied)
 		return copied;
 	return ret;
@@ -598,6 +646,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	dio->error = 0;
 	dio->flags = 0;
 	dio->done_before = done_before;
+	dio->atomic_write_bio = NULL;
 
 	dio->submit.iter = iter;
 	dio->submit.waiter = current;
@@ -606,10 +655,14 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		iomi.flags |= IOMAP_NOWAIT;
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
-		pr_err("%s setting IOCB_ATOMIC iomi.flags=0x%x\n", __func__, iomi.flags);
+		pr_err("%s setting IOCB_ATOMIC iomi.flags=0x%x iomi.len=%lld\n",
+			__func__, iomi.flags, iomi.len);
 		iomi.flags |= IOMAP_ATOMIC;
-		pr_err("%s1 set IOCB_ATOMIC iomi.flags=0x%x\n", __func__, iomi.flags);
-	}
+		dio->atomic_write_len = iov_iter_count(iter);
+	} else
+		dio->atomic_write_len = 0;
+	pr_err("%s0 iov_iter->iov_offset=%zd, count=%zd\n",
+			__func__, iter->iov_offset, iter->count);
 
 	if (iov_iter_rw(iter) == READ) {
 		/* reads can always complete inline */
