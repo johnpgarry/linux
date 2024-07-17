@@ -7740,7 +7740,6 @@ static int btrfs_dio_iomap_begin(struct inode *inode, loff_t start,
 	iomap->offset = start;
 	iomap->bdev = fs_info->fs_devices->latest_dev->bdev;
 	iomap->length = len;
-	iomap->io_block_size = i_blocksize(inode);
 	free_extent_map(em);
 
 	return 0;

@@ -305,7 +305,6 @@ static int erofs_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		if (flags & IOMAP_DAX)
 			iomap->addr += mdev.m_dax_part_off;
 	}
-	iomap->io_block_size = i_blocksize(inode);
 	return 0;
 }
 

@@ -749,7 +749,6 @@ static int z_erofs_iomap_begin_report(struct inode *inode, loff_t offset,
 		if (iomap->offset >= inode->i_size)
 			iomap->length = length + offset - map.m_la;
 	}
-	iomap->io_block_size = i_blocksize(inode);
 	iomap->flags = 0;
 	return 0;
 }

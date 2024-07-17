@@ -577,7 +577,6 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
 	iomap->flags = 0;
 	iomap->bdev = NULL;
 	iomap->dax_dev = fc->dax->dev;
-	iomap->io_block_size = i_blocksize(inode);
 
 	/*
 	 * Both read/write and mmap path can race here. So we need something
