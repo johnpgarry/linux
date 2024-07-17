@@ -815,10 +815,11 @@ xfs_direct_write_iomap_begin(
 	u64			seq;
 	bool atomic = flags & IOMAP_ATOMIC;
 
-	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld %pS %pS\n",
+	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld %pS %pS atomic=%d\n",
 		__func__, offset, length, offset_fsb, end_fsb,
 		__builtin_return_address(0),
-		__builtin_return_address(1));
+		__builtin_return_address(1),
+		atomic);
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
 	if (xfs_is_shutdown(mp))

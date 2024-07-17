@@ -419,6 +419,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			 * the tail, similar to when bio_iov_iter_get_pages()
 			 * returns an error, above.
 			 */
+			pr_err("%s failed atomic n=%zd orig_count=%zd\n", __func__,
+				n, orig_count);
 			ret = -EINVAL;
 			bio_put(bio);
 			goto zero_tail;
