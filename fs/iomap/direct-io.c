@@ -37,6 +37,9 @@ struct iomap_dio {
 	int			error;
 	size_t			done_before;
 	bool			wait_for_completion;
+	struct bio	*atomic_write_bio;
+	unsigned int atomic_write_size;
+	sector_t	atomic_write_pos;
 
 	union {
 		/* used during submission and for synchronous completion: */
@@ -287,7 +290,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	struct bio *bio;
 	bool need_zeroout = false;
 	bool use_fua = false;
-	int nr_pages, ret = 0;
+	int nr_pages, nr_pages_atomic_write = 0, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
 	pr_err("%s pos=%lld length=%lld\n",
@@ -302,6 +305,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		!!(iomap->flags & IOMAP_F_MERGED),
 		!!(iomap->flags & IOMAP_F_BUFFER_HEAD),
 		!!(iomap->flags & IOMAP_F_XATTR));
+	pr_err("%s0.3 dio->atomic_write_bio=%pS, atomic_write_size=%d, pos=%lld\n",
+		__func__, dio->atomic_write_bio, dio->atomic_write_size, dio->pos);
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
@@ -341,11 +346,25 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 * are operating on right now.  The iter will be re-expanded once
 	 * we are done.
 	 */
+	if (is_atomic) {
+		if (dio->atomic_write_bio) {
+			if (iter->iomap.bdev != dio->atomic_write_bio->bi_bdev)
+				BUG();
+		} else {
+			nr_pages_atomic_write = bio_iov_vecs_to_alloc(dio->submit.iter, INT_MAX);
+			if (nr_pages_atomic_write > BIO_MAX_VECS)
+				BUG();
+		}
+		pr_err("%s1 nr_pages_atomic_write=%d dio->atomic_write_bio=%pS\n",
+			__func__, nr_pages_atomic_write, dio->atomic_write_bio);
+	}
 	orig_count = iov_iter_count(dio->submit.iter);
 	iov_iter_truncate(dio->submit.iter, length);
 
-	if (!iov_iter_count(dio->submit.iter))
+	if (!iov_iter_count(dio->submit.iter)) {
+		pr_err("%s1.1 goto out\n", __func__);
 		goto out;
+	}
 
 	/*
 	 * We can only do deferred completion for pure overwrites that
@@ -381,6 +400,66 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 */
 	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, is_atomic);
 
+	if (is_atomic) {
+		size_t copied;
+		if (dio->atomic_write_bio) {
+				pr_err("%s2 nr_pages_atomic_write=%d dio->atomic_write_bio=%pS bi_sector=%lld bi_size=%d\n",
+				__func__, nr_pages_atomic_write, dio->atomic_write_bio,
+				dio->atomic_write_bio->bi_iter.bi_sector,
+				dio->atomic_write_bio->bi_iter.bi_size);
+
+		} else {
+			dio->atomic_write_bio = iomap_dio_alloc_bio(iter, dio, nr_pages_atomic_write, bio_opf);
+			fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
+						  GFP_KERNEL);
+			dio->atomic_write_bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
+			dio->atomic_write_bio->bi_write_hint = inode->i_write_hint;
+			dio->atomic_write_bio->bi_ioprio = dio->iocb->ki_ioprio;
+			dio->atomic_write_bio->bi_private = dio;
+			dio->atomic_write_bio->bi_end_io = iomap_dio_bio_end_io;
+		}
+
+		pr_err("%s2.1 nr_pages_atomic_write=%d dio->atomic_write_bio=%pS bi_sector=%lld bi_size=%d atomic_write_size=%d\n",
+			__func__, nr_pages_atomic_write, dio->atomic_write_bio,
+			dio->atomic_write_bio->bi_iter.bi_sector,
+			dio->atomic_write_bio->bi_iter.bi_size,
+			dio->atomic_write_size);
+
+		copied = dio->atomic_write_bio->bi_iter.bi_size;
+		ret = bio_iov_iter_get_pages(dio->atomic_write_bio, dio->submit.iter);
+		if (unlikely(ret)) {
+			/*
+			 * We have to stop part way through an IO. We must fall
+			 * through to the sub-block tail zeroing here, otherwise
+			 * this short IO may expose stale data in the tail of
+			 * the block we haven't written data to.
+			 */
+			bio_put(bio);
+			BUG();
+			goto zero_tail;
+		}
+		dio->size = dio->atomic_write_bio->bi_iter.bi_size;
+		copied = dio->atomic_write_bio->bi_iter.bi_size - copied;
+		pr_err("%s2.2 nr_pages_atomic_write=%d dio->atomic_write_bio=%pS bi_sector=%lld bi_size=%d pos=%lld copied=%zd\n",
+			__func__, nr_pages_atomic_write, dio->atomic_write_bio,
+			dio->atomic_write_bio->bi_iter.bi_sector,
+			dio->atomic_write_bio->bi_iter.bi_size,
+			pos, copied);
+
+		if (dio->size == dio->atomic_write_size) {
+			pr_err("%s2.3 calling iomap_dio_submit_bio dio->atomic_write_bio=%pS bi_sector=%lld bi_size=%d dio->atomic_write_pos=%lld\n",
+				__func__, dio->atomic_write_bio,
+				dio->atomic_write_bio->bi_iter.bi_sector,
+				dio->atomic_write_bio->bi_iter.bi_size,
+				dio->atomic_write_pos);
+			iomap_dio_submit_bio(iter, dio, dio->atomic_write_bio, dio->atomic_write_pos);
+		}
+		iov_iter_reexpand(dio->submit.iter, orig_count - copied);
+		pr_err("%s2.4 iov_iter_count(dio->submit.iter)=%zd before return orig_count=%zd copied=%zd\n", __func__,
+			iov_iter_count(dio->submit.iter), orig_count, copied);
+		return copied;
+	}
+
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
 	do {
 		size_t n;
@@ -412,19 +491,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		n = bio->bi_iter.bi_size;
-		if (is_atomic && (n != orig_count)) {
-			/*
-			 * This bio should have covered the complete length,
-			 * which it doesn't, so error. We may need to zero out
-			 * the tail, similar to when bio_iov_iter_get_pages()
-			 * returns an error, above.
-			 */
-			pr_err("%s failed atomic n=%zd orig_count=%zd\n", __func__,
-				n, orig_count);
-			ret = -EINVAL;
-			bio_put(bio);
-			goto zero_tail;
-		}
+	
 		if (dio->flags & IOMAP_DIO_WRITE) {
 			task_io_account_write(n);
 		} else {
@@ -583,6 +650,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct iomap_dio *dio;
 	loff_t ret = 0;
 
+	unsigned nr_pages = bio_iov_vecs_to_alloc(iter, BIO_MAX_VECS);
+
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
 
 	if (!iomi.len)
@@ -610,8 +679,12 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (iocb->ki_flags & IOCB_ATOMIC) {
 		pr_err("%s setting IOCB_ATOMIC iomi.flags=0x%x\n", __func__, iomi.flags);
 		iomi.flags |= IOMAP_ATOMIC;
+		dio->atomic_write_bio = NULL;
+		dio->atomic_write_size = iomi.len;
+		dio->atomic_write_pos = iocb->ki_pos;
 		pr_err("%s1 set IOCB_ATOMIC iomi.flags=0x%x\n", __func__, iomi.flags);
 	}
+	pr_err("%s2 nr_pages=%d\n", __func__, nr_pages);
 
 	if (iov_iter_rw(iter) == READ) {
 		/* reads can always complete inline */
