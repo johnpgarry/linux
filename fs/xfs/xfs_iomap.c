@@ -127,7 +127,7 @@ xfs_bmbt_to_iomap(
 	}
 	iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 	iomap->length = XFS_FSB_TO_B(mp, imap->br_blockcount);
-	iomap->io_block_size = xfs_inode_alloc_unitsize(ip);
+	//iomap->io_block_size = xfs_inode_alloc_unitsize(ip);
 	if (mapping_flags & IOMAP_DAX)
 		iomap->dax_dev = target->bt_daxdev;
 	else
@@ -578,16 +578,23 @@ xfs_iomap_write_unwritten(
 	uint		resblks;
 	int		error;
 	unsigned int	rounding;
+	xfs_fileoff_t	offset_fsb_orig;
+	xfs_filblks_t	count_fsb_orig;
 
 	trace_xfs_unwritten_convert(ip, offset, count);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
 	rounding = xfs_inode_alloc_unitsize_fsb(ip);
-	if (rounding > 1) {
+	offset_fsb_orig = offset_fsb;
+	count_fsb_orig = count_fsb;
+	if (0) {
 		offset_fsb = rounddown_64(offset_fsb, rounding);
 		count_fsb = roundup_64(count_fsb, rounding);
 	}
+	pr_err("%s offset_fsb=%lld (was %lld) count_fsb=%lld (was %lld)\n", __func__,
+			offset_fsb, offset_fsb_orig,
+			count_fsb, count_fsb_orig);
 	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 
 	/*
