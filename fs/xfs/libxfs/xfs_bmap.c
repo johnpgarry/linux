@@ -5412,24 +5412,50 @@ xfs_bmap_del_extent_real(
 
 	return 0;
 }
+#ifdef dssd
+
+		if (isforcealign) {
+				off = ip->i_extsize - mod;
+			} else {
+				ASSERT(isrt);
+				off = mp->m_sb.sb_rextsize - mod;
+			}
+
+
+#endif
 
 static xfs_extlen_t
 xfs_bunmapi_align(
 	struct xfs_inode	*ip,
-	xfs_fsblock_t		bno)
+	xfs_fsblock_t		bno,
+	xfs_extlen_t *off)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	xfs_agblock_t		agbno;
+	xfs_extlen_t mod;
 
 	if (xfs_inode_has_forcealign(ip)) {
-		if (is_power_of_2(ip->i_extsize))
-			return bno & (ip->i_extsize - 1);
-
 		agbno = XFS_FSB_TO_AGBNO(mp, bno);
-		return agbno % ip->i_extsize;
+		if (is_power_of_2(ip->i_extsize)) {
+			if (agbno != bno) {
+				pr_err("%s agbno=%d bno=%lld\n", __func__, agbno, bno);
+				BUG();
+			}
+			mod = bno & (ip->i_extsize - 1);
+			if (off)
+				*off = ip->i_extsize - mod;
+			return mod;
+		}
+		mod = agbno % ip->i_extsize;
+		if (off)
+				*off = ip->i_extsize - mod;
+		return mod;
 	}
 	ASSERT(XFS_IS_REALTIME_INODE(ip));
-	return xfs_rtb_to_rtxoff(ip->i_mount, bno);
+	mod = xfs_rtb_to_rtxoff(ip->i_mount, bno);
+	if (off)
+		*off = mp->m_sb.sb_rextsize - mod;
+	return mod;
 }
 
 /*
@@ -5512,6 +5538,8 @@ __xfs_bunmapi(
 	extno = 0;
 	while (end != (xfs_fileoff_t)-1 && end >= start &&
 	       (nexts == 0 || extno < nexts)) {
+		xfs_extlen_t off;
+
 		/*
 		 * Is the found extent after a hole in which end lives?
 		 * Just back up to the previous extent, if so.
@@ -5548,7 +5576,7 @@ __xfs_bunmapi(
 		if ((!isrt && !isforcealign) || (flags & XFS_BMAPI_REMAP))
 			goto delete;
 
-		mod = xfs_bunmapi_align(ip, del.br_startblock + del.br_blockcount);
+		mod = xfs_bunmapi_align(ip, del.br_startblock + del.br_blockcount, NULL);
 		if (mod) {
 			/*
 			 * Not aligned to allocation unit on the end.
@@ -5596,17 +5624,8 @@ __xfs_bunmapi(
 			goto nodelete;
 		}
 
-		mod = xfs_bunmapi_align(ip, del.br_startblock);
+		mod = xfs_bunmapi_align(ip, del.br_startblock, &off);
 		if (mod) {
-			xfs_extlen_t off;
-
-			if (isforcealign) {
-				off = ip->i_extsize - mod;
-			} else {
-				ASSERT(isrt);
-				off = mp->m_sb.sb_rextsize - mod;
-			}
-
 			/*
 			 * Extent is lined up to the allocation unit at the
 			 * end but not at the front.  We'll get rid of full

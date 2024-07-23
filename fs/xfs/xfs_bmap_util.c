@@ -539,10 +539,7 @@ xfs_can_free_eofblocks(
 	end_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_ISIZE(ip));
 
 	/* Only try to free beyond the allocation unit that crosses EOF */
-	if (xfs_inode_has_forcealign(ip))
-		end_fsb = roundup_64(end_fsb, ip->i_extsize);
-	else if (xfs_inode_has_bigrtalloc(ip))
-		end_fsb = xfs_rtb_roundup_rtx(mp, end_fsb);
+	xfs_round_to_alloc_unitsize_fsb(ip, &end_fsb, NULL);
 
 	last_fsb = XFS_B_TO_FSB(mp, mp->m_super->s_maxbytes);
 	if (last_fsb <= end_fsb)
@@ -857,13 +854,7 @@ xfs_free_file_space(
 	endoffset_fsb = XFS_B_TO_FSBT(mp, offset + len);
 
 	/* Free only complete extents. */
-	if (xfs_inode_has_forcealign(ip)) {
-		startoffset_fsb = roundup_64(startoffset_fsb, ip->i_extsize);
-		endoffset_fsb = rounddown_64(endoffset_fsb, ip->i_extsize);
-	} else if (xfs_inode_has_bigrtalloc(ip)) {
-		startoffset_fsb = xfs_rtb_roundup_rtx(mp, startoffset_fsb);
-		endoffset_fsb = xfs_rtb_rounddown_rtx(mp, endoffset_fsb);
-	}
+	xfs_round_to_alloc_unitsize_fsb(ip, &startoffset_fsb, &endoffset_fsb);
 
 	/*
 	 * Need to zero the stuff we're not freeing, on disk.
