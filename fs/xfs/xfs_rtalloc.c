@@ -297,6 +297,8 @@ xfs_rtallocate_extent_block(
 		 * Allocation failed.  Set *nextp to the next block to try.
 		 */
 		*nextp = next;
+
+			pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
 	}
 
@@ -358,16 +360,24 @@ xfs_rtallocate_extent_exact(
 		 * If not, allocate what there is, if it's at least minlen.
 		 */
 		maxlen = next - start;
-		if (maxlen < minlen)
+		if (maxlen < minlen) {
+			pr_err("%s ENOSPC\n", __func__);
 			return -ENOSPC;
+		}
+		pr_err("%s1.1 error=%d start=%lld minlen=%d max_len=%d prod=%d next=%lld isfree=%d\n",
+			__func__, error, start, minlen, maxlen, prod, next, isfree);
 
 		/*
 		 * Trim off tail of extent, if prod is specified.
 		 */
 		if (prod > 1 && (i = maxlen % prod)) {
 			maxlen -= i;
-			if (maxlen < minlen)
+			if (maxlen < minlen) {
+				pr_err("%s ENOSPC\n", __func__);
 				return -ENOSPC;
+			}
+			pr_err("%s1.2 error=%d start=%lld minlen=%d max_len=%d prod=%d next=%lld isfree=%d\n",
+				__func__, error, start, minlen, maxlen, prod, next, isfree);
 		}
 	}
 
@@ -418,8 +428,10 @@ xfs_rtallocate_extent_near(
 
 	/* Make sure we don't run off the end of the rt volume. */
 	maxlen = xfs_rtallocate_clamp_len(mp, start, maxlen, prod);
-	if (maxlen < minlen)
+	if (maxlen < minlen) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 
 	/*
 	 * Try the exact allocation first.
@@ -538,6 +550,7 @@ xfs_rtallocate_extent_near(
 		else
 			break;
 	}
+	pr_err("%s ENOSPC\n", __func__);
 	return -ENOSPC;
 }
 
@@ -583,7 +596,7 @@ xfs_rtalloc_sumlevel(
 		if (xfs_rtx_to_rbmblock(args->mp, n) > i + 1)
 			i = xfs_rtx_to_rbmblock(args->mp, n) - 1;
 	}
-
+pr_err("%s ENOSPC\n", __func__);
 	return -ENOSPC;
 }
 
@@ -628,8 +641,10 @@ xfs_rtallocate_extent_size(
 	 * Didn't find any maxlen blocks.  Try smaller ones, unless we are
 	 * looking for a fixed size extent.
 	 */
-	if (minlen > --maxlen)
+	if (minlen > --maxlen) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 	ASSERT(minlen != 0);
 	ASSERT(maxlen != 0);
 

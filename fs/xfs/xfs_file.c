@@ -792,7 +792,9 @@ write_retry:
 		cleared_space = true;
 		goto write_retry;
 	} else if (ret == -ENOSPC && !cleared_space) {
+		
 		struct xfs_icwalk	icw = {0};
+			pr_err("%s ENOSPC\n", __func__);
 
 		cleared_space = true;
 		xfs_flush_inodes(ip->i_mount);
