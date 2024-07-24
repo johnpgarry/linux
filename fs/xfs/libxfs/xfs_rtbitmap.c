@@ -685,6 +685,7 @@ xfs_rtfree_range(
 	xfs_rtxnum_t		postblock; /* first rtext freed > end */
 	xfs_rtxnum_t		preblock;  /* first rtext freed < start */
 
+	pr_err("%s start=%lld len=%d\n", __func__, start, len);
 	end = start + len - 1;
 	/*
 	 * Modify the bitmap to mark this extent freed.
@@ -714,6 +715,7 @@ xfs_rtfree_range(
 	 * old extent, add summary data for them to be allocated.
 	 */
 	if (preblock < start) {
+		pr_err("%s2 preblock=%lld start=%lld callind xfs_rtmodify_summary\n", __func__, preblock, start);
 		error = xfs_rtmodify_summary(args,
 				xfs_highbit64(start - preblock),
 				xfs_rtx_to_rbmblock(mp, preblock), -1);
@@ -726,6 +728,7 @@ xfs_rtfree_range(
 	 * old extent, add summary data for them to be allocated.
 	 */
 	if (postblock > end) {
+		pr_err("%s3 postblock=%lld start=%lld callind xfs_rtmodify_summary\n", __func__, postblock, start);
 		error = xfs_rtmodify_summary(args,
 				xfs_highbit64(postblock - end),
 				xfs_rtx_to_rbmblock(mp, end + 1), -1);
@@ -939,6 +942,7 @@ xfs_rtfree_extent(
 	};
 	int			error;
 	struct timespec64	atime;
+	pr_err("%s start=%lld len=%d\n", __func__, start, len);
 
 	ASSERT(mp->m_rbmip->i_itemp != NULL);
 	xfs_assert_ilocked(mp->m_rbmip, XFS_ILOCK_EXCL);
@@ -993,6 +997,8 @@ xfs_rtfree_blocks(
 	xfs_rtxnum_t		start;
 	xfs_filblks_t		len;
 	xfs_extlen_t		mod;
+
+	pr_err("%s rtbno=%lld rtlen=%lld\n", __func__, rtbno, rtlen);
 
 	ASSERT(rtlen <= XFS_MAX_BMBT_EXTLEN);
 

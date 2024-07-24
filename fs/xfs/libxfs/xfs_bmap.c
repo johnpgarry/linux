@@ -5382,6 +5382,7 @@ xfs_bmap_del_extent_real(
 				tp->t_flags |= XFS_TRANS_RTBITMAP_LOCKED;
 				xfs_rtbitmap_lock(tp, mp);
 			}
+			pr_err("%s calling xfs_rtfree_blocks\n", __func__);
 			error = xfs_rtfree_blocks(tp, del->br_startblock,
 					del->br_blockcount);
 		} else {
