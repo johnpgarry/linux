@@ -22,13 +22,13 @@ xfs_rtx_to_rtb(
 	struct xfs_mount	*mp,
 	xfs_rtxnum_t		rtx)
 {
-	pr_err("%s rtx=%lld %pS\n", __func__, rtx, __builtin_return_address(0));
+	pr_err_once("%s rtx=%lld %pS\n", __func__, rtx, __builtin_return_address(0));
 	if (mp->m_rtxblklog >= 0) {
-		pr_err("%s1 return %lld\n", __func__,  rtx << mp->m_rtxblklog);
+		pr_err_once("%s1 return %lld\n", __func__,  rtx << mp->m_rtxblklog);
 		return rtx << mp->m_rtxblklog;
 	}
 
-	pr_err("%s2 return %lld\n", __func__,  rtx * mp->m_sb.sb_rextsize);
+	pr_err_once("%s2 return %lld\n", __func__,  rtx * mp->m_sb.sb_rextsize);
 	return rtx * mp->m_sb.sb_rextsize;
 }
 
@@ -37,13 +37,13 @@ xfs_rtxlen_to_extlen(
 	struct xfs_mount	*mp,
 	xfs_rtxlen_t		rtxlen)
 {
-	pr_err("%s rtxlen=%d %pS\n", __func__, rtxlen, __builtin_return_address(0));
+	pr_err_once("%s rtxlen=%d %pS\n", __func__, rtxlen, __builtin_return_address(0));
 	if (mp->m_rtxblklog >= 0) {
-		pr_err("%s1 return %d\n", __func__,  rtxlen << mp->m_rtxblklog);
+		pr_err_once("%s1 return %d\n", __func__,  rtxlen << mp->m_rtxblklog);
 		return rtxlen << mp->m_rtxblklog;
 	}
 	
-	pr_err("%s2 return %d\n", __func__,  rtxlen * mp->m_sb.sb_rextsize);
+	pr_err_once("%s2 return %d\n", __func__,  rtxlen * mp->m_sb.sb_rextsize);
 	return rtxlen * mp->m_sb.sb_rextsize;
 }
 
@@ -53,13 +53,13 @@ xfs_extlen_to_rtxmod(
 	struct xfs_mount	*mp,
 	xfs_extlen_t		len)
 {
-	pr_err("%s len=%d %pS\n", __func__, len, __builtin_return_address(0));
+	pr_err_once("%s len=%d %pS\n", __func__, len, __builtin_return_address(0));
 	if (mp->m_rtxblklog >= 0) {
-		pr_err("%s1 return %lld\n", __func__,  len & mp->m_rtxblkmask);
+		pr_err_once("%s1 return %lld\n", __func__,  len & mp->m_rtxblkmask);
 		return len & mp->m_rtxblkmask;
 	}
 
-	pr_err("%s2 return %d\n", __func__,  len % mp->m_sb.sb_rextsize);
+	pr_err_once("%s2 return %d\n", __func__,  len % mp->m_sb.sb_rextsize);
 	return len % mp->m_sb.sb_rextsize;
 }
 
@@ -68,13 +68,13 @@ xfs_extlen_to_rtxlen(
 	struct xfs_mount	*mp,
 	xfs_extlen_t		len)
 {
-	pr_err("%s len=%d %pS\n", __func__, len, __builtin_return_address(0));
+	pr_err_once("%s len=%d %pS\n", __func__, len, __builtin_return_address(0));
 	if (mp->m_rtxblklog >= 0) {
-		pr_err("%s1 return %d\n", __func__, len >> mp->m_rtxblklog);
+		pr_err_once("%s1 return %d\n", __func__, len >> mp->m_rtxblklog);
 		return len >> mp->m_rtxblklog;
 	}
 
-	pr_err("%s2 return %d\n", __func__, len / mp->m_sb.sb_rextsize);
+	pr_err_once("%s2 return %d\n", __func__, len / mp->m_sb.sb_rextsize);
 	return len / mp->m_sb.sb_rextsize;
 }
 
@@ -85,15 +85,15 @@ xfs_rtb_to_rtx(
 	xfs_rtblock_t		rtbno)
 {
 	unsigned long long val;
-	pr_err("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
+	pr_err_once("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
 	if (likely(mp->m_rtxblklog >= 0)) {
-		pr_err("%s1 return %lld\n", __func__, rtbno >> mp->m_rtxblklog);
+		pr_err_once("%s1 return %lld\n", __func__, rtbno >> mp->m_rtxblklog);
 		return rtbno >> mp->m_rtxblklog;
 	}
 
 	val = div_u64(rtbno, mp->m_sb.sb_rextsize);
 
-	pr_err("%s1 return %lld\n", __func__, val);
+	pr_err_once("%s1 return %lld\n", __func__, val);
 	return val;
 }
 
@@ -104,16 +104,16 @@ xfs_rtb_to_rtxoff(
 	xfs_rtblock_t		rtbno)
 {
 	unsigned long long val;
-	pr_err("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
+	pr_err_once("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
 	if (likely(mp->m_rtxblklog >= 0)) {
-		pr_err("%s1 return %lld\n", __func__, rtbno & mp->m_rtxblkmask);
+		pr_err_once("%s1 return %lld\n", __func__, rtbno & mp->m_rtxblkmask);
 
 		return rtbno & mp->m_rtxblkmask;
 	}
 
 	val = do_div(rtbno, mp->m_sb.sb_rextsize);
 
-	pr_err("%s2 return %lld\n", __func__, val);
+	pr_err_once("%s2 return %lld\n", __func__, val);
 	return val;
 }
 
@@ -128,15 +128,15 @@ xfs_rtb_to_rtxrem(
 	xfs_extlen_t		*off)
 {
 	unsigned long long val;
-	pr_err("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
+	pr_err_once("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
 	if (likely(mp->m_rtxblklog >= 0)) {
 		*off = rtbno & mp->m_rtxblkmask;
-		pr_err("%s1 return %lld *off=%d\n", __func__, rtbno >> mp->m_rtxblklog, *off);
+		pr_err_once("%s1 return %lld *off=%d\n", __func__, rtbno >> mp->m_rtxblklog, *off);
 		return rtbno >> mp->m_rtxblklog;
 	}
 
 	val = div_u64_rem(rtbno, mp->m_sb.sb_rextsize, off);
-	pr_err("%s2 return %lld *off=%d\n", __func__, rtbno >> mp->m_rtxblklog, *off);
+	pr_err_once("%s2 return %lld *off=%d\n", __func__, rtbno >> mp->m_rtxblklog, *off);
 	return val;
 }
 
@@ -149,19 +149,19 @@ xfs_rtb_to_rtxup(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
-	pr_err("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
+	pr_err_once("%s rtbno=%lld %pS\n", __func__, rtbno, __builtin_return_address(0));
 	if (likely(mp->m_rtxblklog >= 0)) {
 		if (rtbno & mp->m_rtxblkmask) {
-			pr_err("%s1 return %lld\n", __func__, (rtbno >> mp->m_rtxblklog) + 1);
+			pr_err_once("%s1 return %lld\n", __func__, (rtbno >> mp->m_rtxblklog) + 1);
 			return (rtbno >> mp->m_rtxblklog) + 1;
 		}
-		pr_err("%s2 return %lld\n", __func__, rtbno >> mp->m_rtxblklog);
+		pr_err_once("%s2 return %lld\n", __func__, rtbno >> mp->m_rtxblklog);
 		return rtbno >> mp->m_rtxblklog;
 	}
 
 	if (do_div(rtbno, mp->m_sb.sb_rextsize))
 		rtbno++;
-	pr_err("%s3 return %lld\n", __func__, rtbno++);
+	pr_err_once("%s3 return %lld\n", __func__, rtbno++);
 	return rtbno;
 }
 
@@ -171,7 +171,7 @@ xfs_rtb_roundup_rtx(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
-	pr_err("%s rtbno=%lld %pS returning %lld\n", __func__, rtbno, __builtin_return_address(0), roundup_64(rtbno, mp->m_sb.sb_rextsize));
+	pr_err_once("%s rtbno=%lld %pS returning %lld\n", __func__, rtbno, __builtin_return_address(0), roundup_64(rtbno, mp->m_sb.sb_rextsize));
 	return roundup_64(rtbno, mp->m_sb.sb_rextsize);
 }
 
@@ -181,7 +181,7 @@ xfs_rtb_rounddown_rtx(
 	struct xfs_mount	*mp,
 	xfs_rtblock_t		rtbno)
 {
-	pr_err("%s rtbno=%lld %pS returning %lld\n", __func__, rtbno, __builtin_return_address(0), rounddown_64(rtbno, mp->m_sb.sb_rextsize));
+	pr_err_once("%s rtbno=%lld %pS returning %lld\n", __func__, rtbno, __builtin_return_address(0), rounddown_64(rtbno, mp->m_sb.sb_rextsize));
 	return rounddown_64(rtbno, mp->m_sb.sb_rextsize);
 }
 
@@ -191,7 +191,7 @@ xfs_rtx_to_rbmblock(
 	struct xfs_mount	*mp,
 	xfs_rtxnum_t		rtx)
 {
-	pr_err("%s rtx=%lld %pS return %lld \n", __func__, rtx, __builtin_return_address(0), rtx >> mp->m_blkbit_log);
+	pr_err_once("%s rtx=%lld %pS return %lld \n", __func__, rtx, __builtin_return_address(0), rtx >> mp->m_blkbit_log);
 	return rtx >> mp->m_blkbit_log;
 }
 
@@ -202,7 +202,7 @@ xfs_rtx_to_rbmword(
 	xfs_rtxnum_t		rtx)
 {
 	unsigned long long val = (rtx >> XFS_NBWORDLOG) & (mp->m_blockwsize - 1);
-	pr_err("%s rtx=%lld %pS return %lld\n", __func__, rtx, __builtin_return_address(0), val);
+	pr_err_once("%s rtx=%lld %pS return %lld\n", __func__, rtx, __builtin_return_address(0), val);
 	return val;
 }
 
@@ -213,7 +213,7 @@ xfs_rbmblock_to_rtx(
 	xfs_fileoff_t		rbmoff)
 {
 	unsigned long long val = rbmoff << mp->m_blkbit_log;
-	pr_err("%s rbmoff=%lld %pS returning %lld\n", __func__, rbmoff, __builtin_return_address(0), val);
+	pr_err_once("%s rbmoff=%lld %pS returning %lld\n", __func__, rbmoff, __builtin_return_address(0), val);
 	return val;
 }
 
