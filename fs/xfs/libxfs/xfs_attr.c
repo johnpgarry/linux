@@ -1151,15 +1151,19 @@ xfs_attr_shortform_addname(
 	}
 
 	if (args->namelen >= XFS_ATTR_SF_ENTSIZE_MAX ||
-	    args->valuelen >= XFS_ATTR_SF_ENTSIZE_MAX)
+	    args->valuelen >= XFS_ATTR_SF_ENTSIZE_MAX) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 
 	newsize = xfs_attr_sf_totsize(args->dp);
 	newsize += xfs_attr_sf_entsize_byname(args->namelen, args->valuelen);
 
 	forkoff = xfs_attr_shortform_bytesfit(args->dp, newsize);
-	if (!forkoff)
+	if (!forkoff) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 
 	xfs_attr_shortform_add(args, forkoff);
 	return 0;

@@ -164,8 +164,10 @@ xfs_trans_reserve(
 	 */
 	if (blocks > 0) {
 		error = xfs_dec_fdblocks(mp, blocks, rsvd);
-		if (error != 0)
+		if (error != 0) {
+			pr_err("%s ENOSPC\n", __func__);
 			return -ENOSPC;
+		}
 		tp->t_blk_res += blocks;
 	}
 
@@ -212,6 +214,7 @@ xfs_trans_reserve(
 	if (rtextents > 0) {
 		error = xfs_dec_frextents(mp, rtextents);
 		if (error) {
+			pr_err("%s ENOSPC\n", __func__);
 			error = -ENOSPC;
 			goto undo_log;
 		}

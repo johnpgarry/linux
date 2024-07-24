@@ -422,8 +422,10 @@ xfs_dir2_block_addname(
 	 */
 	if (!dup) {
 		/* Don't have a space reservation: return no-space.  */
-		if (args->total == 0)
+		if (args->total == 0) {
+		pr_err("%s ENOSPC\n", __func__);
 			return -ENOSPC;
+		}
 		/*
 		 * Convert to the next larger format.
 		 * Then add the new entry in that format.

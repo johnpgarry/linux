@@ -2348,6 +2348,7 @@ xfs_da_grow_inode_int(
 	if (got != count || mapp[0].br_startoff != *bno ||
 	    mapp[mapi - 1].br_startoff + mapp[mapi - 1].br_blockcount !=
 	    *bno + count) {
+		pr_err("%s ENOSPC\n", __func__);
 		error = -ENOSPC;
 		goto out_free_map;
 	}

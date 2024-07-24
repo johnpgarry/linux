@@ -693,6 +693,7 @@ xfs_bmap_extents_to_btree(
 	 */
 	if (WARN_ON_ONCE(args.fsbno == NULLFSBLOCK)) {
 		error = -ENOSPC;
+		pr_err("%s ENOSPC\n", __func__);
 		goto out_root_realloc;
 	}
 
@@ -913,6 +914,7 @@ xfs_bmap_add_attrfork_btree(
 			goto error0;
 		if (stat == 0) {
 			xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
+		pr_err("%s ENOSPC\n", __func__);
 			return -ENOSPC;
 		}
 		cur->bc_bmap.allocated = 0;
@@ -3314,8 +3316,10 @@ xfs_bmap_select_minlen(
 	if (args->alignment > 1) {
 		blen = rounddown(blen, args->alignment);
 		if (blen < ap->minlen) {
-			if (args->datatype & XFS_ALLOC_FORCEALIGN)
+			if (args->datatype & XFS_ALLOC_FORCEALIGN) {
+		pr_err("%s ENOSPC\n", __func__);
 				return -ENOSPC;
+			}
 			blen = ap->minlen;
 		}
 	}
@@ -4236,8 +4240,10 @@ xfs_bmapi_allocate(
 	}
 	if (error)
 		return error;
-	if (bma->blkno == NULLFSBLOCK)
+	if (bma->blkno == NULLFSBLOCK) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 
 	if (WARN_ON_ONCE(!xfs_valid_startblock(bma->ip, bma->blkno))) {
 		xfs_bmap_mark_sick(bma->ip, whichfork);
@@ -5215,8 +5221,10 @@ xfs_bmap_del_extent_real(
 	if (tp->t_blk_res == 0 &&
 	    ifp->if_format == XFS_DINODE_FMT_EXTENTS &&
 	    ifp->if_nextents >= XFS_IFORK_MAXEXT(ip, whichfork) &&
-	    del->br_startoff > got.br_startoff && del_endoff < got_endoff)
+	    del->br_startoff > got.br_startoff && del_endoff < got_endoff) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 
 	*logflagsp = XFS_ILOG_CORE;
 	if (xfs_ifork_is_realtime(ip, whichfork))
@@ -5349,6 +5357,7 @@ xfs_bmap_del_extent_real(
 				 */
 				xfs_iext_update_extent(ip, state, icur, &old);
 				*logflagsp = 0;
+		pr_err("%s ENOSPC\n", __func__);
 				return -ENOSPC;
 			}
 			if (XFS_IS_CORRUPT(mp, i != 1)) {

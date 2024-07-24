@@ -1444,8 +1444,10 @@ xfs_attr3_leaf_add(
 	 * and we don't have enough freespace, then compaction will do us
 	 * no good and we should just give up.
 	 */
-	if (!ichdr.holes && sum < entsize)
+	if (!ichdr.holes && sum < entsize) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 
 	/*
 	 * Compact the entries to coalesce free space.
@@ -1459,6 +1461,7 @@ xfs_attr3_leaf_add(
 	 */
 	if (ichdr.freemap[0].size < (entsize + sizeof(xfs_attr_leaf_entry_t))) {
 		tmp = -ENOSPC;
+		pr_err("%s ENOSPC\n", __func__);
 		goto out_log_hdr;
 	}
 

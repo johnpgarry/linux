@@ -976,6 +976,8 @@ xfs_alloc_cur_setup(
 	if (!acur->bnogt)
 		acur->bnogt = xfs_bnobt_init_cursor(args->mp, args->tp,
 					args->agbp, args->pag);
+	if (i != 1)
+		pr_err("%s ENOSPC\n", __func__);
 	return i == 1 ? 0 : -ENOSPC;
 }
 
@@ -3514,6 +3516,8 @@ xfs_alloc_vextent_check_args(
 
 	if (args->agno != NULLAGNUMBER && *minimum_agno > args->agno) {
 		trace_xfs_alloc_vextent_skip_deadlock(args);
+		
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
 	}
 	return 0;

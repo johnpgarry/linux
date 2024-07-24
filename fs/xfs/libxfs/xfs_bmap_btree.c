@@ -221,8 +221,10 @@ xfs_bmbt_alloc_block(
 			cur->bc_ino.whichfork);
 	args.minlen = args.maxlen = args.prod = 1;
 	args.wasdel = cur->bc_flags & XFS_BTREE_BMBT_WASDEL;
-	if (!args.wasdel && args.tp->t_blk_res == 0)
+	if (!args.wasdel && args.tp->t_blk_res == 0) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 
 	/*
 	 * If we are coming here from something like unwritten extent

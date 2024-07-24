@@ -1111,8 +1111,11 @@ xfs_reflink_ag_has_free_space(
 
 	pag = xfs_perag_get(mp, agno);
 	if (xfs_ag_resv_critical(pag, XFS_AG_RESV_RMAPBT) ||
-	    xfs_ag_resv_critical(pag, XFS_AG_RESV_METADATA))
+	    xfs_ag_resv_critical(pag, XFS_AG_RESV_METADATA)) {
+
+			pr_err("%s ENOSPC\n", __func__);
 		error = -ENOSPC;
+	}
 	xfs_perag_put(pag);
 	return error;
 }

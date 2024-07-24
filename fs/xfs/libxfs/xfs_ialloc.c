@@ -731,8 +731,10 @@ xfs_ialloc_ag_alloc(
 	newlen = igeo->ialloc_inos;
 	if (igeo->maxicount &&
 	    percpu_counter_read_positive(&args.mp->m_icount) + newlen >
-							igeo->maxicount)
+							igeo->maxicount) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 	args.minlen = args.maxlen = igeo->ialloc_blks;
 	/*
 	 * First try to allocate inodes contiguous with the last-allocated
@@ -1944,6 +1946,7 @@ retry:
 				ok_alloc = true;
 			goto retry;
 		}
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
 	}
 
@@ -3143,6 +3146,7 @@ xfs_ialloc_check_shrink(
 
 	/* If the record covers inodes that would be beyond EOFS, bail out. */
 	if (rec.ir_startino + XFS_INODES_PER_CHUNK > agino) {
+		pr_err("%s ENOSPC\n", __func__);
 		error = -ENOSPC;
 		goto out;
 	}

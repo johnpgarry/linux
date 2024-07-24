@@ -1022,6 +1022,7 @@ xfs_ag_shrink_space(
 			return error;
 
 		error = -ENOSPC;
+		pr_err("%s ENOSPC\n", __func__);
 		goto resv_init_out;
 	}
 

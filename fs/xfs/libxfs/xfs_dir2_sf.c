@@ -410,8 +410,10 @@ xfs_dir2_sf_addname(
 		/*
 		 * Just checking or no space reservation, it doesn't fit.
 		 */
-		if ((args->op_flags & XFS_DA_OP_JUSTCHECK) || args->total == 0)
+		if ((args->op_flags & XFS_DA_OP_JUSTCHECK) || args->total == 0) {
+			pr_err("%s ENOSPC\n", __func__);
 			return -ENOSPC;
+		}
 		/*
 		 * Convert to block form then add the name.
 		 */

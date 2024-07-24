@@ -688,6 +688,7 @@ xfs_create(
 	error = xfs_trans_alloc_icreate(mp, tres, udqp, gdqp, pdqp, resblks,
 			&tp);
 	if (error == -ENOSPC) {
+			pr_err("%s ENOSPC\n", __func__);
 		/* flush outstanding delalloc blocks and retry */
 		xfs_flush_inodes(mp);
 		error = xfs_trans_alloc_icreate(mp, tres, udqp, gdqp, pdqp,
@@ -964,9 +965,12 @@ xfs_link(
 	xfs_iunlock(sip, XFS_ILOCK_EXCL);
  out_parent:
 	xfs_parent_finish(mp, du.ppargs);
- std_return:
-	if (error == -ENOSPC && nospace_error)
+ std_return: 
+	if (error == -ENOSPC && nospace_error) {
+
+			pr_err("%s ENOSPC\n", __func__);
 		error = nospace_error;
+	}
 	return error;
 }
 
@@ -1288,6 +1292,7 @@ xfs_inactive_ifree(
 	}
 	if (error) {
 		if (error == -ENOSPC) {
+			pr_err("%s ENOSPC\n", __func__);
 			xfs_warn_ratelimited(mp,
 			"Failed to remove inode(s) from unlinked list. "
 			"Please free space, unmount and run xfs_repair.");
@@ -2249,6 +2254,8 @@ retry:
 			target_name->len, du_wip.ip != NULL);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_rename, spaceres, 0, 0, &tp);
 	if (error == -ENOSPC) {
+		
+			pr_err("%s ENOSPC\n", __func__);
 		nospace_error = error;
 		spaceres = 0;
 		error = xfs_trans_alloc(mp, &M_RES(mp)->tr_rename, 0, 0, 0,

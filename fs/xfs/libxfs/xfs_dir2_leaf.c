@@ -786,6 +786,7 @@ xfs_dir2_leaf_addname(
 		if ((args->op_flags & XFS_DA_OP_JUSTCHECK) ||
 							args->total == 0) {
 			xfs_trans_brelse(tp, lbp);
+		pr_err("%s ENOSPC\n", __func__);
 			return -ENOSPC;
 		}
 		/*

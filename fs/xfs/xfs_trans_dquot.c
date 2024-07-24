@@ -867,8 +867,10 @@ xfs_trans_dqresv(
 
 error_return:
 	xfs_dqunlock(dqp);
-	if (xfs_dquot_type(dqp) == XFS_DQTYPE_PROJ)
+	if (xfs_dquot_type(dqp) == XFS_DQTYPE_PROJ) {
+		pr_err("%s ENOSPC\n", __func__);
 		return -ENOSPC;
+	}
 	return -EDQUOT;
 error_corrupt:
 	xfs_dqunlock(dqp);

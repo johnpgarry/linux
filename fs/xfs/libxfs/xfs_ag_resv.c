@@ -201,8 +201,10 @@ __xfs_ag_resv_init(
 		return -EINVAL;
 	}
 
-	if (XFS_TEST_ERROR(false, mp, XFS_ERRTAG_AG_RESV_FAIL))
+	if (XFS_TEST_ERROR(false, mp, XFS_ERRTAG_AG_RESV_FAIL)) {
+		pr_err("%s ENOSPC\n", __func__);
 		error = -ENOSPC;
+	}
 	else
 		error = xfs_dec_fdblocks(mp, hidden_space, true);
 	if (error) {
@@ -325,8 +327,10 @@ out:
 		if (!error &&
 		    xfs_perag_resv(pag, XFS_AG_RESV_METADATA)->ar_reserved +
 		    xfs_perag_resv(pag, XFS_AG_RESV_RMAPBT)->ar_reserved >
-		    pag->pagf_freeblks + pag->pagf_flcount)
+		    pag->pagf_freeblks + pag->pagf_flcount) {
+			pr_err("%s ENOSPC\n", __func__);
 			error = -ENOSPC;
+		}
 	}
 
 	return error;
