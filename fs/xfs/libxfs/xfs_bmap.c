@@ -5446,10 +5446,12 @@ xfs_bunmapi_align(
 
 	if (xfs_inode_has_forcealign(ip)) {
 		agbno = XFS_FSB_TO_AGBNO(mp, bno);
+		pr_err("%s1 agbno=%d bno=%lld\n", __func__, agbno, bno);
 		if (is_power_of_2(ip->i_extsize)) {
 			if (agbno != bno) {
-				pr_err("%s agbno=%d bno=%lld\n", __func__, agbno, bno);
-				BUG();
+
+				pr_err("%s2 agbno=%d bno=%lld\n", __func__, agbno, bno);
+			//	BUG();
 			}
 			mod = bno & (ip->i_extsize - 1);
 			if (off)
@@ -5501,6 +5503,7 @@ __xfs_bunmapi(
 	xfs_fileoff_t		end;
 	struct xfs_iext_cursor	icur;
 	bool			done = false;
+	pr_err("%s start=%lld *rlen=%lld\n", __func__, start, *rlen);
 
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
 
@@ -5586,7 +5589,11 @@ __xfs_bunmapi(
 		if ((!isrt && !isforcealign) || (flags & XFS_BMAPI_REMAP))
 			goto delete;
 
+		pr_err("%s2 calling xfs_bunmapi_align del.br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, del.br_startblock, del.br_blockcount);
 		mod = xfs_bunmapi_align(ip, del.br_startblock + del.br_blockcount, NULL);
+		pr_err("%s2.1 called xfs_bunmapi_align mod=%d del.br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, mod, del.br_startblock, del.br_blockcount);
 		if (mod) {
 			/*
 			 * Not aligned to allocation unit on the end.
