@@ -539,7 +539,9 @@ xfs_can_free_eofblocks(
 	end_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_ISIZE(ip));
 
 	/* Only try to free beyond the allocation unit that crosses EOF */
+	pr_err("%s end_fsb=%lld calling xfs_round_to_alloc_unitsize_fsb\n", __func__, end_fsb);
 	xfs_round_to_alloc_unitsize_fsb(ip, &end_fsb, NULL);
+	pr_err("%s1 end_fsb=%lld called xfs_round_to_alloc_unitsize_fsb\n", __func__, end_fsb);
 
 	last_fsb = XFS_B_TO_FSB(mp, mp->m_super->s_maxbytes);
 	if (last_fsb <= end_fsb)
@@ -854,7 +856,9 @@ xfs_free_file_space(
 	endoffset_fsb = XFS_B_TO_FSBT(mp, offset + len);
 
 	/* Free only complete extents. */
+	pr_err("%s startoffset_fsb=%lld endoffset_fsb=%lld calling xfs_round_to_alloc_unitsize_fsb\n", __func__, startoffset_fsb, endoffset_fsb);
 	xfs_round_to_alloc_unitsize_fsb(ip, &startoffset_fsb, &endoffset_fsb);
+	pr_err("%s startoffset_fsb=%lld endoffset_fsb=%lld called xfs_round_to_alloc_unitsize_fsb\n", __func__, startoffset_fsb, endoffset_fsb);
 
 	/*
 	 * Need to zero the stuff we're not freeing, on disk.

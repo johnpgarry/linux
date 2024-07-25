@@ -5589,8 +5589,8 @@ __xfs_bunmapi(
 		if ((!isrt && !isforcealign) || (flags & XFS_BMAPI_REMAP))
 			goto delete;
 
-		pr_err("%s2 calling xfs_bunmapi_align del.br_startblock=%lld, br_blockcount=%lld\n",
-			__func__, del.br_startblock, del.br_blockcount);
+		pr_err("%s2 calling xfs_bunmapi_align del.br_startblock=%lld, br_blockcount=%lld (total=%lld)\n",
+			__func__, del.br_startblock, del.br_blockcount, del.br_startblock + del.br_blockcount);
 		mod = xfs_bunmapi_align(ip, del.br_startblock + del.br_blockcount, NULL);
 		pr_err("%s2.1 called xfs_bunmapi_align mod=%d del.br_startblock=%lld, br_blockcount=%lld\n",
 			__func__, mod, del.br_startblock, del.br_blockcount);
@@ -5622,7 +5622,8 @@ __xfs_bunmapi(
 			 * This is better than zeroing it.
 			 */
 			ASSERT(del.br_state == XFS_EXT_NORM);
-			ASSERT(tp->t_blk_res > 0);
+			if (1)
+				ASSERT(tp->t_blk_res > 0);
 			/*
 			 * If this spans a realtime extent boundary,
 			 * chop it back to the start of the one we end at.
