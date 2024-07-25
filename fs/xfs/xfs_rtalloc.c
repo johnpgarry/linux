@@ -1440,7 +1440,9 @@ retry:
 	xfs_rtbuf_cache_relse(&args);
 
 	if (error == -ENOSPC) {
+		pr_err("%s2.7 ENOSPC align=%d mp->m_sb.sb_rextsize=%d\n", __func__, align, mp->m_sb.sb_rextsize);
 		if (align > mp->m_sb.sb_rextsize && !forcealign) {
+
 			/*
 			 * We previously enlarged the request length to try to
 			 * satisfy an extent size hint.  The allocator didn't
@@ -1460,6 +1462,7 @@ retry:
 			 * again without locality criteria.
 			 */
 			ignore_locality = true;
+			pr_err("%s4 set ignore_locality\n", __func__);
 			goto retry;
 		}
 
