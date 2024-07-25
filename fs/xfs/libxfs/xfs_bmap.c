@@ -5535,8 +5535,8 @@ __xfs_bunmapi(
 			xfs_inode_has_forcealign(ip);
 	end = start + len;
 
-	pr_err("%s1 end=%lld start=%lld len=%lld calling xfs_iext_lookup_extent_before\n",
-		__func__, end, start, len);
+	pr_err("%s1 start=%lld end=%lld len=%lld calling xfs_iext_lookup_extent_before\n",
+		__func__, start, end, len);
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
 		*rlen = 0;
 		return 0;
@@ -5566,23 +5566,23 @@ __xfs_bunmapi(
 		 * Is the found extent after a hole in which end lives?
 		 * Just back up to the previous extent, if so.
 		 */
-		pr_err("%s1.4 start of loop end=%lld calling xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
-			__func__, end, got.br_startoff, got.br_startblock, got.br_blockcount);
+		pr_err("%s *** 1.4 start of loop start=%lld end=%lld calling xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, start, end, got.br_startoff, got.br_startblock, got.br_blockcount);
 		if (got.br_startoff > end &&
 		    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 			done = true;
 			break;
 		}
-		pr_err("%s1.5 calling XFS_FILEOFF_MIN XFS_FILEOFF_MIN end=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
-			__func__, end, got.br_startoff, got.br_startblock, got.br_blockcount);
+		pr_err("%s1.5 calling XFS_FILEOFF_MIN XFS_FILEOFF_MIN start=%lld end=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, start, end, got.br_startoff, got.br_startblock, got.br_blockcount);
 		/*
 		 * Is the last block of this extent before the range
 		 * we're supposed to delete?  If so, we're done.
 		 */
 		end = XFS_FILEOFF_MIN(end,
 			got.br_startoff + got.br_blockcount - 1);
-		pr_err("%s1.6 checking end < start, end=%lld start=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
-			__func__, end, start, got.br_startoff, got.br_startblock, got.br_blockcount);
+		pr_err("%s1.6 checking end < start, start=%lld end=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, start, end, got.br_startoff, got.br_startblock, got.br_blockcount);
 		if (end < start)
 			break;
 		/*
@@ -5597,13 +5597,15 @@ __xfs_bunmapi(
 			del.br_blockcount -= start - got.br_startoff;
 			if (!wasdel)
 				del.br_startblock += start - got.br_startoff;
-			pr_err("%s1.7 br_startoff < start end=%lld start=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
-				__func__, end, start, got.br_startoff, got.br_startblock, got.br_blockcount);
+			pr_err("%s1.7 br_startoff < start wasdel=%d start=%lld end=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+				__func__, wasdel, start, end , got.br_startoff, got.br_startblock, got.br_blockcount);
 		}
+		pr_err("%s1.8 start=%lld end=%lld maybe tweaking br_blockcount got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+				__func__, start, end, got.br_startoff, got.br_startblock, got.br_blockcount);
 		if (del.br_startoff + del.br_blockcount > end + 1)
 			del.br_blockcount = end + 1 - del.br_startoff;
-		pr_err("%s1.8 end=%lld start=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
-				__func__, end, start, got.br_startoff, got.br_startblock, got.br_blockcount);
+		pr_err("%s1.9 start=%lld end=%lld maybe tweaked br_blockcount got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+				__func__, start, end, got.br_startoff, got.br_startblock, got.br_blockcount);
 
 		if ((!isrt && !isforcealign) || (flags & XFS_BMAPI_REMAP))
 			goto delete;
@@ -5615,7 +5617,8 @@ __xfs_bunmapi(
 			__func__, mod, del.br_startblock, del.br_blockcount);
 		if (mod) 
 			{
-			pr_err("%s2.1x not aligned at the end\n", __func__);
+			pr_err("%s2.1x not aligned at the end del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+				__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 			/*
 			 * Not aligned to allocation unit on the end.
 			 * The extent could have been split into written
@@ -5624,6 +5627,8 @@ __xfs_bunmapi(
 			 * get rid of part of a realtime extent.
 			 */
 			if (del.br_state == XFS_EXT_UNWRITTEN) {
+				pr_err("%s2.1.1 XFS_EXT_UNWRITTEN mod=%d del.br_startblock=%lld, br_blockcount=%lld end=%lld\n",
+			__func__, mod, del.br_startblock, del.br_blockcount, end);
 				/*
 				 * This piece is unwritten, or we're not
 				 * using unwritten extents.  Skip over it.
@@ -5631,11 +5636,15 @@ __xfs_bunmapi(
 				ASSERT((flags & XFS_BMAPI_REMAP) || end >= mod);
 				end -= mod > del.br_blockcount ?
 					del.br_blockcount : mod;
+				pr_err("%s2.1.2 modified end mod=%d del.br_startblock=%lld, br_blockcount=%lld end=%lld\n",
+					__func__, mod, del.br_startblock, del.br_blockcount, end);
 				if (end < got.br_startoff &&
 				    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 					done = true;
+					pr_err("%s2.1.3 going to break\n", __func__);
 					break;
 				}
+				pr_err("%s2.1.4 going to continue\n", __func__);
 				continue;
 			}
 			/*
@@ -5645,14 +5654,18 @@ __xfs_bunmapi(
 			ASSERT(del.br_state == XFS_EXT_NORM);
 			ASSERT(tp->t_blk_res > 0);
 			/*
-			 * If this spans a realtime extent boundary,
+			 * If this spans an extent boundary,
 			 * chop it back to the start of the one we end at.
 			 */
 			if (del.br_blockcount > mod) {
 				del.br_startoff += del.br_blockcount - mod;
 				del.br_startblock += del.br_blockcount - mod;
 				del.br_blockcount = mod;
+				pr_err("%s2.1.2 chopped back del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 			}
+			pr_err("%s2.1.3 calling xfs_bmap_add_extent_unwritten_real del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 			del.br_state = XFS_EXT_UNWRITTEN;
 			error = xfs_bmap_add_extent_unwritten_real(tp, ip,
 					whichfork, &icur, &cur, &del,
@@ -5668,7 +5681,8 @@ __xfs_bunmapi(
 		pr_err("%s3.1 called xfs_bunmapi_align del.br_startblock=%lld mod=%d off=%d\n",
 			__func__, del.br_startblock, mod, off);
 		if (mod) {
-			pr_err("%s3.1x not aligned at the front\n", __func__);
+			pr_err("%s3.1x start=%lld end=%lld not aligned at the front del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld mod=%d off=%d\n",
+				__func__, start, end, del.br_startoff, del.br_startblock, del.br_blockcount, mod, off);
 			/*
 			 * Extent is lined up to the allocation unit at the
 			 * end but not at the front.  We'll get rid of full
@@ -5678,6 +5692,8 @@ __xfs_bunmapi(
 				del.br_blockcount -= off;
 				del.br_startoff += off;
 				del.br_startblock += off;
+				pr_err("%s3.1.1 modified from off del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 			} else if (del.br_startoff == start &&
 				   (del.br_state == XFS_EXT_UNWRITTEN ||
 				    tp->t_blk_res == 0)) {
@@ -5687,16 +5703,24 @@ __xfs_bunmapi(
 				 */
 				ASSERT(end >= del.br_blockcount);
 				end -= del.br_blockcount;
+				pr_err("%s3.1.2 del.br_startoff == start or unwrittent or t_blk_res=0 del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 				if (got.br_startoff > end &&
 				    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 					done = true;
+					pr_err("%s3.1.3 going to break del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+						__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 					break;
 				}
+				pr_err("%s3.1.4 going to continue del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 				continue;
 			} else if (del.br_state == XFS_EXT_UNWRITTEN) {
 				struct xfs_bmbt_irec	prev;
 				xfs_fileoff_t		unwrite_start;
 
+				pr_err("%s3.1.4 br_state == XFS_EXT_UNWRITTEN del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 				/*
 				 * This one is already unwritten.
 				 * It must have a written left neighbor.
@@ -5717,6 +5741,8 @@ __xfs_bunmapi(
 				prev.br_startblock += mod;
 				prev.br_blockcount -= mod;
 				prev.br_state = XFS_EXT_UNWRITTEN;
+				pr_err("%s3.1.4.1 calling xfs_bmap_add_extent_unwritten_real XFS_EXT_UNWRITTEN prev.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, prev.br_startoff, prev.br_startblock, prev.br_blockcount);
 				error = xfs_bmap_add_extent_unwritten_real(tp,
 						ip, whichfork, &icur, &cur,
 						&prev, &logflags);
@@ -5724,6 +5750,8 @@ __xfs_bunmapi(
 					goto error0;
 				goto nodelete;
 			} else {
+				pr_err("%s3.1.5 br_state == XFS_EXT_NORM del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount);
 				ASSERT(del.br_state == XFS_EXT_NORM);
 				del.br_state = XFS_EXT_UNWRITTEN;
 				error = xfs_bmap_add_extent_unwritten_real(tp,
