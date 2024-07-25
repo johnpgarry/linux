@@ -5458,8 +5458,7 @@ xfs_bunmapi_align(
 				*off = ip->i_extsize - mod;
 			return mod;
 		}
-
-		mod = bno % ip->i_extsize;
+		mod = agbno % ip->i_extsize;
 		if (off)
 				*off = ip->i_extsize - mod;
 		return mod;
