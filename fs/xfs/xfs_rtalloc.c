@@ -1353,6 +1353,12 @@ xfs_bmap_rtalloc(
 	int			error;
 
 	align = xfs_get_extsz_hint(ap->ip);
+
+	pr_err("%s align=%d mp->m_sb.sb_rextsize=%d ap->length=%d ALLOC_FORCEALIGN set=%d, ALLOC_INITIAL_USER_DATA set=%d\n",
+		__func__, align, mp->m_sb.sb_rextsize, ap->length,
+		!!(ap->datatype & XFS_ALLOC_FORCEALIGN),
+		!!(ap->datatype & XFS_ALLOC_INITIAL_USER_DATA));
+
 	if (!align)
 		align = 1;
 retry:
