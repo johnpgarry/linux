@@ -828,6 +828,7 @@ xfs_setattr_size(
 
 	oldsize = inode->i_size;
 	newsize = iattr->ia_size;
+	pr_err("%s newsize=%lld\n", __func__, newsize);
 
 	/*
 	 * Short circuit the truncate case for zero length files.
@@ -934,6 +935,7 @@ xfs_setattr_size(
 	if (xfs_inode_alloc_unitsize_fsb(ip) > 1)
 		resblks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
 
+	pr_err("%s2 resblks=%d\n", __func__, resblks);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate, resblks,
 				0, 0, &tp);
 	if (error)
@@ -976,6 +978,7 @@ xfs_setattr_size(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 	if (newsize <= oldsize) {
+		pr_err("%s3 calling xfs_itruncate_extents tp->t_blk_res=%d\n", __func__, tp->t_blk_res);
 		error = xfs_itruncate_extents(&tp, ip, XFS_DATA_FORK, newsize);
 		if (error)
 			goto out_trans_cancel;
