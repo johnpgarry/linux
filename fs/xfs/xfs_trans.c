@@ -167,7 +167,7 @@ xfs_trans_reserve(
 		if (error != 0) {
 			WARN_ON_ONCE(1);
 			pr_err("%s ENOSPC\n", __func__);
-		//	return -ENOSPC;
+			return -ENOSPC;
 		}
 		tp->t_blk_res += blocks;
 	}
@@ -217,7 +217,7 @@ xfs_trans_reserve(
 		if (error) {
 			WARN_ON_ONCE(1);
 			pr_err("%s2 ENOSPC\n", __func__);
-			//error = -ENOSPC;c
+			error = -ENOSPC;
 			
 			if (1 ==2)
 				goto undo_log;
@@ -259,7 +259,7 @@ xfs_trans_alloc(
 	struct xfs_trans	*tp;
 	bool			want_retry = true;
 	int			error;
-
+	pr_err("%s blocks=%d rtextents=%d\n", __func__, blocks, rtextents);
 	/*
 	 * Allocate the handle before we do our freeze accounting and setting up
 	 * GFP_NOFS allocation context so that we avoid lockdep false positives
