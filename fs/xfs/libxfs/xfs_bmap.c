@@ -5535,12 +5535,21 @@ __xfs_bunmapi(
 			xfs_inode_has_forcealign(ip);
 	end = start + len;
 
+	pr_err("%s1 end=%lld start=%lld len=%lld calling xfs_iext_lookup_extent_before\n",
+		__func__, end, start, len);
 	if (!xfs_iext_lookup_extent_before(ip, ifp, &end, &icur, &got)) {
 		*rlen = 0;
 		return 0;
 	}
 	end--;
-
+	pr_err("%s1.1 end=%lld called xfs_iext_lookup_extent_before got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, end, got.br_startoff, got.br_startblock, got.br_blockcount);
+	#if 0
+	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+	#endif
 	logflags = 0;
 	if (ifp->if_format == XFS_DINODE_FMT_BTREE) {
 		ASSERT(ifp->if_format == XFS_DINODE_FMT_BTREE);
@@ -5557,17 +5566,23 @@ __xfs_bunmapi(
 		 * Is the found extent after a hole in which end lives?
 		 * Just back up to the previous extent, if so.
 		 */
+		pr_err("%s1.4 start of loop end=%lld calling xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, got.br_startoff, got.br_startblock, got.br_blockcount);
 		if (got.br_startoff > end &&
 		    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 			done = true;
 			break;
 		}
+		pr_err("%s1.5 calling XFS_FILEOFF_MIN XFS_FILEOFF_MIN end=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, got.br_startoff, got.br_startblock, got.br_blockcount);
 		/*
 		 * Is the last block of this extent before the range
 		 * we're supposed to delete?  If so, we're done.
 		 */
 		end = XFS_FILEOFF_MIN(end,
 			got.br_startoff + got.br_blockcount - 1);
+		pr_err("%s1.6 checking end < start, end=%lld start=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, end, start, got.br_startoff, got.br_startblock, got.br_blockcount);
 		if (end < start)
 			break;
 		/*
@@ -5582,9 +5597,13 @@ __xfs_bunmapi(
 			del.br_blockcount -= start - got.br_startoff;
 			if (!wasdel)
 				del.br_startblock += start - got.br_startoff;
+			pr_err("%s1.7 br_startoff < start end=%lld start=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+				__func__, end, start, got.br_startoff, got.br_startblock, got.br_blockcount);
 		}
 		if (del.br_startoff + del.br_blockcount > end + 1)
 			del.br_blockcount = end + 1 - del.br_startoff;
+		pr_err("%s1.8 end=%lld start=%lld called xfs_iext_prev_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+				__func__, end, start, got.br_startoff, got.br_startblock, got.br_blockcount);
 
 		if ((!isrt && !isforcealign) || (flags & XFS_BMAPI_REMAP))
 			goto delete;
@@ -5594,7 +5613,9 @@ __xfs_bunmapi(
 		mod = xfs_bunmapi_align(ip, del.br_startblock + del.br_blockcount, NULL);
 		pr_err("%s2.1 called xfs_bunmapi_align mod=%d del.br_startblock=%lld, br_blockcount=%lld\n",
 			__func__, mod, del.br_startblock, del.br_blockcount);
-		if (mod) {
+		if (mod) 
+			{
+			pr_err("%s2.1x not aligned at the end\n", __func__);
 			/*
 			 * Not aligned to allocation unit on the end.
 			 * The extent could have been split into written
@@ -5641,8 +5662,13 @@ __xfs_bunmapi(
 			goto nodelete;
 		}
 
+		pr_err("%s3 calling xfs_bunmapi_align del.br_startblock=%lld\n",
+			__func__, del.br_startblock);
 		mod = xfs_bunmapi_align(ip, del.br_startblock, &off);
+		pr_err("%s3.1 called xfs_bunmapi_align del.br_startblock=%lld mod=%d off=%d\n",
+			__func__, del.br_startblock, mod, off);
 		if (mod) {
+			pr_err("%s3.1x not aligned at the front\n", __func__);
 			/*
 			 * Extent is lined up to the allocation unit at the
 			 * end but not at the front.  We'll get rid of full
