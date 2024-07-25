@@ -572,6 +572,7 @@ xfs_itruncate_extents(
 	int			whichfork,
 	xfs_fsize_t		new_size)
 {
+	pr_err("%s ip=%pS calling xfs_itruncate_extents_flags new_size=%lld\n", __func__, ip, new_size);
 	return xfs_itruncate_extents_flags(tpp, ip, whichfork, new_size, 0);
 }
 

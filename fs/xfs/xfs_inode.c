@@ -1025,6 +1025,7 @@ xfs_itruncate_extents_flags(
 	struct xfs_trans	*tp = *tpp;
 	xfs_fileoff_t		first_unmap_block;
 	int			error = 0;
+	pr_err("%s new_size=%lld\n", __func__, new_size);
 
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 	if (atomic_read(&VFS_I(ip)->i_count))
@@ -1222,8 +1223,9 @@ xfs_inactive_truncate(
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_trans	*tp;
 	int			error;
-
+	pr_err("%s ip=%pS calling xfs_trans_alloc blocks=rtextents=0\n", __func__, ip);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate, 0, 0, 0, &tp);
+	pr_err("%s2 ip=%pS called xfs_trans_alloc error=%d tp=%pS t_blk_res=%d\n", __func__, ip, error, tp, tp->t_blk_res);
 	if (error) {
 		ASSERT(xfs_is_shutdown(mp));
 		return error;
@@ -1239,6 +1241,7 @@ xfs_inactive_truncate(
 	ip->i_disk_size = 0;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
+	pr_err("%s3 ip=%pS calling xfs_itruncate_extents\n", __func__, ip);
 	error = xfs_itruncate_extents(&tp, ip, XFS_DATA_FORK, 0);
 	if (error)
 		goto error_trans_cancel;

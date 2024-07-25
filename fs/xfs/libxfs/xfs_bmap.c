@@ -5503,7 +5503,7 @@ __xfs_bunmapi(
 	xfs_fileoff_t		end;
 	struct xfs_iext_cursor	icur;
 	bool			done = false;
-	pr_err("%s start=%lld *rlen=%lld\n", __func__, start, *rlen);
+	pr_err("%s start=%lld *rlen=%lld tp->t_blk_res=%d\n", __func__, start, *rlen, tp->t_blk_res);
 
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
 
@@ -6465,13 +6465,16 @@ xfs_bunmapi_range(
 {
 	xfs_filblks_t		unmap_len = endoff - startoff + 1;
 	int			error = 0;
+	pr_err("%s startoff=%lld endoff=%lld\n", __func__, startoff, endoff);
 
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 
 	while (unmap_len > 0) {
 		ASSERT((*tpp)->t_highest_agno == NULLAGNUMBER);
+		pr_err("%s1 calling __xfs_bunmapi startoff=%lld unmap_len=%lld\n", __func__, startoff, unmap_len);
 		error = __xfs_bunmapi(*tpp, ip, startoff, &unmap_len, flags,
 				XFS_ITRUNC_MAX_EXTENTS);
+		pr_err("%s2 called __xfs_bunmapi startoff=%lld unmap_len=%lld error=%d\n", __func__, startoff, unmap_len, error);
 		if (error)
 			goto out;
 
