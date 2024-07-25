@@ -5445,7 +5445,10 @@ xfs_bunmapi_align(
 	xfs_extlen_t mod;
 
 	if (xfs_inode_has_forcealign(ip)) {
-		agbno = XFS_FSB_TO_AGBNO(mp, bno);
+		if XFS_IS_REALTIME_INODE(ip)
+			agbno = bno;
+		else
+			agbno = XFS_FSB_TO_AGBNO(mp, bno);
 		pr_err("%s1 agbno=%d bno=%lld\n", __func__, agbno, bno);
 		if (is_power_of_2(ip->i_extsize)) {
 			if (agbno != bno) {
@@ -5458,7 +5461,7 @@ xfs_bunmapi_align(
 				*off = ip->i_extsize - mod;
 			return mod;
 		}
-		mod = bno % ip->i_extsize;
+		mod = agbno % ip->i_extsize;
 		if (off)
 				*off = ip->i_extsize - mod;
 		return mod;
