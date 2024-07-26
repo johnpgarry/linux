@@ -1330,6 +1330,7 @@ xfs_bmap_rtalloc(
 	xfs_rtxlen_t		raminlen;
 	bool			rtlocked = false;
 	bool			ignore_locality = false;
+	bool			forcealign = ap->datatype & XFS_ALLOC_FORCEALIGN;
 	struct xfs_rtalloc_args	args = {
 		.mp		= mp,
 		.tp		= ap->tp,
@@ -1383,7 +1384,7 @@ retry:
 		start = 0;
 	} else if (xfs_bmap_adjacent(ap)) {
 		start = xfs_rtb_to_rtx(mp, ap->blkno);
-	} else if (ap->datatype & XFS_ALLOC_INITIAL_USER_DATA) {
+	} else if (ap->datatype & XFS_ALLOC_INITIAL_USER_DATA && !forcealign) {
 		/*
 		 * If it's an allocation to an empty file at offset 0, pick an
 		 * extent that will space things out in the rt area.
@@ -1418,7 +1419,7 @@ retry:
 	xfs_rtbuf_cache_relse(&args);
 
 	if (error == -ENOSPC) {
-		if (align > mp->m_sb.sb_rextsize) {
+		if (align > mp->m_sb.sb_rextsize && !forcealign) {
 			/*
 			 * We previously enlarged the request length to try to
 			 * satisfy an extent size hint.  The allocator didn't
