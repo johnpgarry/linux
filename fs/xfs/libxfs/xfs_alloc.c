@@ -329,9 +329,14 @@ xfs_alloc_compute_aligned(
 	xfs_extlen_t	len = foundlen;
 	xfs_extlen_t	diff;
 	bool		busy;
+	
+	pr_err("%s args->minlen=%d, maxlen=%d, prod=%d, mod=%d foundbno=%d *resbno=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod, foundbno, *resbno);
 
 	/* Trim busy sections out of found extent */
 	busy = xfs_extent_busy_trim(args, &bno, &len, busy_gen);
+	pr_err("%s2 calling args->minlen=%d, maxlen=%d, prod=%d, mod=%d foundbno=%d *resbno=%d bno=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod, foundbno, *resbno, bno);
 
 	/*
 	 * If we have a largish extent that happens to start before min_agbno,
@@ -345,9 +350,13 @@ xfs_alloc_compute_aligned(
 		}
 	}
 
+	pr_err("%s4 checking alignment args->minlen=%d, maxlen=%d, prod=%d, mod=%d foundbno=%d *resbno=%d bno=%d len=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod, foundbno, *resbno, bno, len);
 	if (args->alignment > 1 && len >= args->minlen) {
 		xfs_agblock_t	aligned_bno = roundup(bno, args->alignment);
 
+		pr_err("%s4.1 aligned_bno=%d args->minlen=%d, maxlen=%d, prod=%d, mod=%d foundbno=%d *resbno=%d bno=%d len=%d\n",
+					__func__, aligned_bno, args->minlen, args->maxlen, args->prod, args->mod, foundbno, *resbno, bno, len);
 		diff = aligned_bno - bno;
 
 		*resbno = aligned_bno;
@@ -1122,6 +1131,7 @@ xfs_alloc_cur_finish(
 		return error;
 
 	args->agbno = acur->bno;
+	pr_err("%s args->agbno=%d\n", __func__, args->agbno);
 	args->len = acur->len;
 	args->wasfromfl = 0;
 
@@ -1266,6 +1276,7 @@ xfs_alloc_ag_vextent_small(
 		xfs_trans_binval(args->tp, bp);
 	}
 	*fbnop = args->agbno = fbno;
+	pr_err("%s args->agbno=%d\n", __func__, args->agbno);
 	*flenp = args->len = 1;
 	if (XFS_IS_CORRUPT(args->mp, fbno >= be32_to_cpu(agf->agf_length))) {
 		xfs_btree_mark_sick(ccur);
@@ -1688,10 +1699,13 @@ xfs_alloc_ag_vextent_near(
 	ASSERT(args->min_agbno <= args->max_agbno);
 
 	/* clamp agbno to the range if it's outside */
+	pr_err("%s1 args->agbno=%d\n", __func__, args->agbno);
 	if (args->agbno < args->min_agbno)
 		args->agbno = args->min_agbno;
+	pr_err("%s2 args->agbno=%d\n", __func__, args->agbno);
 	if (args->agbno > args->max_agbno)
 		args->agbno = args->max_agbno;
+	pr_err("%s3 args->agbno=%d\n", __func__, args->agbno);
 
 	/* Retry once quickly if we find busy extents before blocking. */
 	alloc_flags |= XFS_ALLOC_FLAG_TRYFLUSH;
@@ -1803,6 +1817,9 @@ xfs_alloc_ag_vextent_size(
 	int			error;
 	int			i;
 
+	pr_err("%s args->minlen=%d, maxlen=%d, prod=%d, mod=%d\n",
+		__func__, args->minlen, args->maxlen, args->prod, args->mod);
+
 	/* Retry once quickly if we find busy extents before blocking. */
 	alloc_flags |= XFS_ALLOC_FLAG_TRYFLUSH;
 restart:
@@ -1838,8 +1855,12 @@ restart:
 			return 0;
 		}
 		ASSERT(i == 1);
+		pr_err("%s2 calling xfs_alloc_compute_aligned args->minlen=%d, maxlen=%d, prod=%d, mod=%d\n",
+			__func__, args->minlen, args->maxlen, args->prod, args->mod);
 		busy = xfs_alloc_compute_aligned(args, fbno, flen, &rbno,
 				&rlen, &busy_gen);
+		pr_err("%s2.1 called xfs_alloc_compute_aligned args->minlen=%d, maxlen=%d, prod=%d, mod=%d rbno=%d\n",
+			__func__, args->minlen, args->maxlen, args->prod, args->mod, rbno);
 	} else {
 		/*
 		 * Search for a non-busy extent that is large enough.
@@ -1854,8 +1875,12 @@ restart:
 				goto error0;
 			}
 
+			pr_err("%s3.1 calling xfs_alloc_compute_aligned args->minlen=%d, maxlen=%d, prod=%d, mod=%d fbno=%d rbno=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod, fbno, rbno);
 			busy = xfs_alloc_compute_aligned(args, fbno, flen,
 					&rbno, &rlen, &busy_gen);
+			pr_err("%s3.1 called xfs_alloc_compute_aligned args->minlen=%d, maxlen=%d, prod=%d, mod=%d fbno=%d rbno=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod, fbno, rbno);
 
 			if (rlen >= args->maxlen)
 				break;
@@ -1925,8 +1950,12 @@ restart:
 			}
 			if (flen < bestrlen)
 				break;
+			pr_err("%s4 calling xfs_alloc_compute_aligned args->minlen=%d, maxlen=%d, prod=%d, mod=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod);
 			busy = xfs_alloc_compute_aligned(args, fbno, flen,
 					&rbno, &rlen, &busy_gen);
+			pr_err("%s4.1 called xfs_alloc_compute_aligned args->minlen=%d, maxlen=%d, prod=%d, mod=%d rbno=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod, rbno);
 			rlen = XFS_EXTLEN_MIN(args->maxlen, rlen);
 			if (XFS_IS_CORRUPT(args->mp,
 					   rlen != 0 &&
@@ -1955,6 +1984,8 @@ restart:
 		}
 		rlen = bestrlen;
 		rbno = bestrbno;
+		pr_err("%s5 assigned from testrbno args->minlen=%d, maxlen=%d, prod=%d, mod=%d rbno=%d\n",
+				__func__, args->minlen, args->maxlen, args->prod, args->mod, rbno);
 		flen = bestflen;
 		fbno = bestfbno;
 	}
@@ -2005,6 +2036,7 @@ restart:
 	cnt_cur = bno_cur = NULL;
 	args->len = rlen;
 	args->agbno = rbno;
+	pr_err("%s8 args->agbno=%d\n", __func__, args->agbno);
 	if (XFS_IS_CORRUPT(args->mp,
 			   args->agbno + args->len >
 			   be32_to_cpu(agf->agf_length))) {
@@ -3612,6 +3644,13 @@ xfs_alloc_vextent_finish(
 	}
 
 	args->fsbno = XFS_AGB_TO_FSB(mp, args->agno, args->agbno);
+	pr_err("%s fsbno=%lld (aligned=%d) agno=%d agbno=%d (aligned=%d) alignment=%d args->len=%d\n",
+		__func__, args->fsbno,
+		((args->fsbno % args->alignment) == 0),
+		args->agno, args->agbno, 
+		((args->agbno % args->alignment) == 0),
+		args->alignment,
+		args->len);
 
 	ASSERT(args->len >= args->minlen);
 	ASSERT(args->len <= args->maxlen);
@@ -3742,6 +3781,7 @@ restart:
 		 */
 		if (args->agno == start_agno && target_agbno) {
 			args->agbno = target_agbno;
+			pr_err("%s args->agbno=%d\n", __func__, args->agbno);
 			error = xfs_alloc_ag_vextent_near(args, alloc_flags);
 		} else {
 			args->agbno = 0;
@@ -3798,7 +3838,7 @@ xfs_alloc_vextent_start_ag(
 
 	args->agno = NULLAGNUMBER;
 	args->agbno = NULLAGBLOCK;
-
+	pr_err("%s args->minlen=%d, maxlen=%d\n", __func__, args->minlen, args->maxlen);
 	trace_xfs_alloc_vextent_start_ag(args);
 
 	error = xfs_alloc_vextent_check_args(args, target, &minimum_agno);
@@ -3817,8 +3857,12 @@ xfs_alloc_vextent_start_ag(
 	}
 
 	start_agno = max(minimum_agno, XFS_FSB_TO_AGNO(mp, target));
+	pr_err("%s2 calling xfs_alloc_vextent_iterate_ags args->minlen=%d, maxlen=%d, prod=%d, mod=%d\n",
+			__func__, args->minlen, args->maxlen, args->prod, args->mod);
 	error = xfs_alloc_vextent_iterate_ags(args, minimum_agno, start_agno,
 			XFS_FSB_TO_AGBNO(mp, target), alloc_flags);
+	pr_err("%s2.1 called xfs_alloc_vextent_iterate_ags args->minlen=%d, maxlen=%d\n",
+			__func__, args->minlen, args->maxlen);
 
 	if (bump_rotor) {
 		if (args->agno == start_agno)
@@ -3886,6 +3930,7 @@ xfs_alloc_vextent_exact_bno(
 
 	args->agno = XFS_FSB_TO_AGNO(mp, target);
 	args->agbno = XFS_FSB_TO_AGBNO(mp, target);
+	pr_err("%s args->agbno=%d\n", __func__, args->agbno);
 
 	trace_xfs_alloc_vextent_exact_bno(args);
 
@@ -3925,6 +3970,7 @@ xfs_alloc_vextent_near_bno(
 
 	args->agno = XFS_FSB_TO_AGNO(mp, target);
 	args->agbno = XFS_FSB_TO_AGBNO(mp, target);
+	pr_err("%s args->agbno=%d\n", __func__, args->agbno);
 
 	trace_xfs_alloc_vextent_near_bno(args);
 
