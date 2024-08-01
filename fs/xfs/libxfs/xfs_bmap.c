@@ -5552,6 +5552,12 @@ __xfs_bunmapi(
 
 		mod = xfs_bunmapi_align(ip,
 				del.br_startblock + del.br_blockcount, &off);
+		if (isrt) {
+			xfs_extlen_t mod_rt = xfs_rtb_to_rtxoff(mp,
+					del.br_startblock + del.br_blockcount);
+			BUG_ON(mod != mod_rt);
+			pr_err_once("%s1 mod_rt ok\n", __func__);
+		}
 		if (mod) {
 			/*
 			 * Not aligned to allocation unit on the end.
@@ -5600,6 +5606,15 @@ __xfs_bunmapi(
 		}
 
 		mod = xfs_bunmapi_align(ip, del.br_startblock, &off);
+		if (isrt) {
+			xfs_extlen_t mod_rt = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+			BUG_ON(mod != mod_rt);
+			if (mod) {
+				xfs_extlen_t off_rt = mp->m_sb.sb_rextsize - mod;
+				BUG_ON(off_rt != off);
+			}
+			pr_err_once("%s2 mod_rt ok\n", __func__);
+		}
 		if (mod) {
 			/*
 			 * Extent is lined up to the allocation unit at the
