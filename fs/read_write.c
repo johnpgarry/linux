@@ -1740,6 +1740,7 @@ int generic_file_rw_checks(struct file *file_in, struct file *file_out)
 bool generic_atomic_write_valid(struct kiocb *iocb, struct iov_iter *iter)
 {
 	size_t len = iov_iter_count(iter);
+	pr_err("%s iter_is_ubuf=%d iov_iter_count(iter)=%zd\n", __func__, iter_is_ubuf(iter), iov_iter_count(iter));
 
 	if (!iter_is_ubuf(iter))
 		return false;

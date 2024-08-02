@@ -548,11 +548,30 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		     sector_t start)
 {
 	unsigned int top, bottom, alignment, ret = 0;
+#if 0
 
+
+	/* atomic write limits */
+	unsigned int		atomic_write_hw_max;
+	unsigned int		atomic_write_max_sectors;
+	unsigned int		atomic_write_hw_boundary;
+	unsigned int		atomic_write_boundary_sectors;
+	unsigned int		atomic_write_hw_unit_min;
+	unsigned int		atomic_write_unit_min;
+	unsigned int		atomic_write_hw_unit_max;
+	unsigned int		atomic_write_unit_max;
+
+#endif
+	
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
 	if (b->atomic_write_hw_max)
 		pr_err("%s t=%pS b=%pS (atomic_write_hw_max=%d)\n",
 			__func__, t, b, b->atomic_write_hw_max);
+
+	t->atomic_write_hw_max = min_not_zero(t->atomic_write_hw_max, b->atomic_write_hw_max);
+	t->atomic_write_boundary_sectors = min_not_zero(t->atomic_write_boundary_sectors, b->atomic_write_boundary_sectors);
+	t->atomic_write_hw_unit_min = max(t->atomic_write_hw_unit_min, b->atomic_write_hw_unit_min);
+	t->atomic_write_unit_max = min_not_zero(t->atomic_write_unit_max, b->atomic_write_unit_max);
 
 	/*
 	 * BLK_FEAT_NOWAIT and BLK_FEAT_POLL need to be supported both by the
