@@ -52,6 +52,7 @@ void blk_set_stacking_limits(struct queue_limits *lim)
 	lim->max_write_zeroes_sectors = UINT_MAX;
 	lim->max_zone_append_sectors = UINT_MAX;
 	lim->max_user_discard_sectors = UINT_MAX;
+	pr_err("%s lim=%pS\n", __func__, lim);
 }
 EXPORT_SYMBOL(blk_set_stacking_limits);
 
@@ -380,6 +381,7 @@ int blk_set_default_limits(struct queue_limits *lim)
 	 * initialization to the max value here.
 	 */
 	lim->max_user_discard_sectors = UINT_MAX;
+	pr_err("%s lim=%pS calling blk_validate_limits\n", __func__, lim);
 	return blk_validate_limits(lim);
 }
 
@@ -548,6 +550,9 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	unsigned int top, bottom, alignment, ret = 0;
 
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
+	if (b->atomic_write_hw_max)
+		pr_err("%s t=%pS b=%pS (atomic_write_hw_max=%d)\n",
+			__func__, t, b, b->atomic_write_hw_max);
 
 	/*
 	 * BLK_FEAT_NOWAIT and BLK_FEAT_POLL need to be supported both by the
@@ -703,6 +708,7 @@ EXPORT_SYMBOL(blk_stack_limits);
 void queue_limits_stack_bdev(struct queue_limits *t, struct block_device *bdev,
 		sector_t offset, const char *pfx)
 {
+	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS\n", __func__, t, bdev_get_queue(bdev));
 	if (blk_stack_limits(t, &bdev_get_queue(bdev)->limits,
 			get_start_sect(bdev) + offset))
 		pr_notice("%s: Warning: Device %pg is misaligned\n",

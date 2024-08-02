@@ -2547,6 +2547,7 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 		}
 	}
 
+	pr_err("%s calling dm_calculate_queue_limits\n", __func__);
 	r = dm_calculate_queue_limits(t, &limits);
 	if (r) {
 		DMERR("Cannot calculate initial queue limits");
@@ -2829,6 +2830,7 @@ struct dm_table *dm_swap_table(struct mapped_device *md, struct dm_table *table)
 	}
 
 	if (!live_map) {
+		pr_err("%s calling dm_calculate_queue_limits\n", __func__);
 		r = dm_calculate_queue_limits(table, &limits);
 		if (r) {
 			map = ERR_PTR(r);

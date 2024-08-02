@@ -1291,6 +1291,7 @@ void bdev_statx(struct path *path, struct kstat *stat,
 
 	if (request_mask & STATX_WRITE_ATOMIC && bdev_can_atomic_write(bdev)) {
 		struct request_queue *bd_queue = bdev->bd_queue;
+		pr_err("%s STATX_WRITE_ATOMIC\n", __func__);
 
 		generic_fill_statx_atomic_writes(stat,
 			queue_atomic_write_unit_min_bytes(bd_queue),
