@@ -2102,7 +2102,7 @@ static int raid10_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 			continue;
 		}
 
-		err = mddev_stack_new_rdev(mddev, rdev);
+		err = mddev_stack_new_rdev(mddev, rdev, true);
 		if (err)
 			return err;
 		p->head_position = 0;
@@ -2120,7 +2120,7 @@ static int raid10_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 		clear_bit(In_sync, &rdev->flags);
 		set_bit(Replacement, &rdev->flags);
 		rdev->raid_disk = repl_slot;
-		err = mddev_stack_new_rdev(mddev, rdev);
+		err = mddev_stack_new_rdev(mddev, rdev, true);
 		if (err)
 			return err;
 		conf->fullsync = 1;
