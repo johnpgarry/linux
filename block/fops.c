@@ -75,8 +75,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bio.bi_iter.bi_sector = pos >> SECTOR_SHIFT;
 	bio.bi_write_hint = file_inode(iocb->ki_filp)->i_write_hint;
 	bio.bi_ioprio = iocb->ki_ioprio;
-	if (iocb->ki_flags & IOCB_ATOMIC)
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, &bio);
 		bio.bi_opf |= REQ_ATOMIC;
+	}
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
 	if (unlikely(ret))
