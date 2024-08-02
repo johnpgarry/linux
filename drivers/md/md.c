@@ -5815,11 +5815,10 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 EXPORT_SYMBOL_GPL(mddev_stack_rdev_limits);
 
 /* apply the extra stacking limits from a new rdev into mddev */
-int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev)
+int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev,
+				bool disable_atomic_writes)
 {
 	struct queue_limits lim;
-	bool disable_atomic_writes = false;
-
 
 	if (mddev_is_dm(mddev))
 		return 0;
