@@ -44,6 +44,7 @@ static bool blkdev_dio_invalid(struct block_device *bdev, loff_t pos,
 		!bdev_iter_is_aligned(bdev, iter);
 }
 
+
 #define DIO_INLINE_BIO_VECS 4
 
 static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
