@@ -415,6 +415,16 @@ static int raid0_run(struct mddev *mddev)
 	}
 	conf = mddev->private;
 	if (!mddev_is_dm(mddev)) {
+		struct md_rdev *rdev;
+		bool disable_atomic_writes = !is_power_of_2(mddev->chunk_sectors);
+
+		pr_err("%s mddev=%pS chunk_sectors=%d\n", __func__, mddev, mddev->chunk_sectors);
+		rdev_for_each(rdev, mddev) {
+			pr_err("%s1 mddev=%pS chunksize=%ld chunk_sectors=%d calling disk_stack_limits for rdev=%pS disable_atomic_writes=%d\n",
+				__func__, mddev, mddev->bitmap_info.chunksize, mddev->chunk_sectors, rdev, disable_atomic_writes);
+	//		disk_stack_limits(mddev->gendisk, rdev->bdev,
+		//			  rdev->data_offset << 9, disable_atomic_writes);
+		}
 		ret = raid0_set_limits(mddev);
 		if (ret)
 			return ret;

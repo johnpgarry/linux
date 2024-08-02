@@ -7735,7 +7735,7 @@ static int raid5_set_limits(struct mddev *mddev)
 	mddev_stack_rdev_limits(mddev, &lim, 0);
 	rdev_for_each(rdev, mddev)
 		queue_limits_stack_bdev(&lim, rdev->bdev, rdev->new_data_offset,
-				mddev->gendisk->disk_name);
+				mddev->gendisk->disk_name, false);
 
 	/*
 	 * Zeroing is required for discard, otherwise data could be lost.

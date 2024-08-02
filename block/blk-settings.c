@@ -173,11 +173,11 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 		lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
 }
 
-static void blk_validate_atomic_write_limits(struct queue_limits *lim)
+static void blk_validate_atomic_write_limits(struct queue_limits *lim, bool disable_atomic_writes)
 {
 	unsigned int boundary_sectors;
 
-	if (!lim->atomic_write_hw_max)
+	if (!lim->atomic_write_hw_max || disable_atomic_writes)
 		goto unsupported;
 
 	boundary_sectors = lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
@@ -360,7 +360,7 @@ static int blk_validate_limits(struct queue_limits *lim)
 	if (!(lim->features & BLK_FEAT_WRITE_CACHE))
 		lim->features &= ~BLK_FEAT_FUA;
 
-	blk_validate_atomic_write_limits(lim);
+	blk_validate_atomic_write_limits(lim, false);
 
 	err = blk_validate_integrity_limits(lim);
 	if (err)
@@ -725,13 +725,15 @@ EXPORT_SYMBOL(blk_stack_limits);
  *    attempt to combine the values and ensure proper alignment.
  */
 void queue_limits_stack_bdev(struct queue_limits *t, struct block_device *bdev,
-		sector_t offset, const char *pfx)
+		sector_t offset, const char *pfx, bool disable_atomic_writes)
 {
-	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS\n", __func__, t, bdev_get_queue(bdev));
+	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS disable_atomic_writes=%d\n",
+		__func__, t, bdev_get_queue(bdev), disable_atomic_writes);
 	if (blk_stack_limits(t, &bdev_get_queue(bdev)->limits,
 			get_start_sect(bdev) + offset))
 		pr_notice("%s: Warning: Device %pg is misaligned\n",
 			pfx, bdev);
+	blk_validate_atomic_write_limits(t, disable_atomic_writes);
 }
 EXPORT_SYMBOL_GPL(queue_limits_stack_bdev);
 
