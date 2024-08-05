@@ -381,24 +381,28 @@ static int raid0_set_limits(struct mddev *mddev)
 	struct queue_limits lim;
 	int err;
 
+	pr_err("%s0 mddev=%pS calling md_init_stacking_limits\n", __func__, mddev);
 	md_init_stacking_limits(&lim);
 	lim.max_hw_sectors = mddev->chunk_sectors;
 	lim.max_write_zeroes_sectors = mddev->chunk_sectors;
 	lim.io_min = mddev->chunk_sectors << 9;
 	lim.io_opt = lim.io_min * mddev->raid_disks;
 	err = mddev_stack_rdev_limits(mddev, &lim, MDDEV_STACK_INTEGRITY);
+	pr_err("%s1 mddev=%pS err=%d called mddev_stack_rdev_limits\n", __func__, mddev, err);
 	if (err) {
 		queue_limits_cancel_update(mddev->gendisk->queue);
 		return err;
 	}
-	return queue_limits_set(mddev->gendisk->queue, &lim);
+	err = queue_limits_set(mddev->gendisk->queue, &lim);
+	pr_err("%s2 mddev=%pS err=%d called queue_limits_set\n", __func__, mddev, err);
+	return err;
 }
 
 static int raid0_run(struct mddev *mddev)
 {
 	struct r0conf *conf;
 	int ret;
-
+	pr_err("%s mddev=%pS\n", __func__, mddev);
 	if (mddev->chunk_sectors == 0) {
 		pr_warn("md/raid0:%s: chunk size must be set.\n", mdname(mddev));
 		return -EINVAL;
@@ -422,8 +426,6 @@ static int raid0_run(struct mddev *mddev)
 		rdev_for_each(rdev, mddev) {
 			pr_err("%s1 mddev=%pS chunksize=%ld chunk_sectors=%d calling disk_stack_limits for rdev=%pS disable_atomic_writes=%d\n",
 				__func__, mddev, mddev->bitmap_info.chunksize, mddev->chunk_sectors, rdev, disable_atomic_writes);
-	//		disk_stack_limits(mddev->gendisk, rdev->bdev,
-		//			  rdev->data_offset << 9, disable_atomic_writes);
 		}
 		ret = raid0_set_limits(mddev);
 		if (ret)
@@ -805,7 +807,7 @@ static void *raid0_takeover(struct mddev *mddev)
 	 */
 
 	if (mddev->bitmap) {
-		pr_warn("md/raid0: %s: cannot takeover array with bitmap\n",
+		pr_err("md/raid0: %s: cannot takeover array with bitmap\n",
 			mdname(mddev));
 		return ERR_PTR(-EBUSY);
 	}

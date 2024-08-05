@@ -947,10 +947,13 @@ EXPORT_SYMBOL_GPL(mddev_unlock);
 struct md_rdev *md_find_rdev_nr_rcu(struct mddev *mddev, int nr)
 {
 	struct md_rdev *rdev;
+	pr_err("%s nr=%d mddev=%pS\n", __func__, nr, mddev);
+	rdev_for_each_rcu(rdev, mddev) {
 
-	rdev_for_each_rcu(rdev, mddev)
+		pr_err("%s1 nr=%d mddev=%pS rdev=%pS desc_nr=%d\n", __func__, nr, mddev, rdev, rdev->desc_nr);
 		if (rdev->desc_nr == nr)
 			return rdev;
+	}
 
 	return NULL;
 }
@@ -2459,6 +2462,7 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 {
 	char b[BDEVNAME_SIZE];
 	int err;
+	pr_err("%s rdev=%pS (bdev=%pS) mddev=%pS\n", __func__, rdev, rdev ? rdev->bdev : NULL, mddev);
 
 	/* prevent duplicates */
 	if (find_rdev(mddev, rdev->bdev->bd_dev))
@@ -2488,6 +2492,7 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 	 */
 	rcu_read_lock();
 	if (rdev->desc_nr < 0) {
+	pr_err("%s1 rdev=%pS mddev=%pS\n", __func__, rdev, mddev);
 		int choice = 0;
 		if (mddev->pers)
 			choice = mddev->raid_disks;
@@ -2495,8 +2500,10 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 			choice++;
 		rdev->desc_nr = choice;
 	} else {
+	pr_err("%s2 rdev=%pS mddev=%pS rdev->desc_nr=%d\n", __func__, rdev, mddev, rdev->desc_nr);
 		if (md_find_rdev_nr_rcu(mddev, rdev->desc_nr)) {
 			rcu_read_unlock();
+			pr_err("%s1 EBUSY\n", __func__);
 			return -EBUSY;
 		}
 	}
@@ -2505,6 +2512,7 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 	    mddev->max_disks && rdev->desc_nr >= mddev->max_disks) {
 		pr_warn("md: %s: array is limited to %d devices\n",
 			mdname(mddev), mddev->max_disks);
+			pr_err("%s2 EBUSY\n", __func__);
 		return -EBUSY;
 	}
 	snprintf(b, sizeof(b), "%pg", rdev->bdev);
@@ -5803,6 +5811,8 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 	pr_err("%s mddev=%pS lim=%pS flags=0x%x disable_atomic_writes=%d\n",
 		__func__, mddev, lim, flags, disable_atomic_writes);
 	rdev_for_each(rdev, mddev) {
+	pr_err("%s1  mddev=%pS lim=%pS flags=0x%x disable_atomic_writes=%d rdev=%pS calling queue_limits_stack_bdev\n",
+		__func__, mddev, lim, flags, disable_atomic_writes, rdev);
 		queue_limits_stack_bdev(lim, rdev->bdev, rdev->data_offset,
 					mddev->gendisk->disk_name, disable_atomic_writes);
 		if ((flags & MDDEV_STACK_INTEGRITY) &&
@@ -5819,13 +5829,14 @@ int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev,
 				bool disable_atomic_writes)
 {
 	struct queue_limits lim;
+	int rc;
 
 	if (mddev_is_dm(mddev))
 		return 0;
 
 
 	lim = queue_limits_start_update(mddev->gendisk->queue);
-	pr_err("%s mddev=%pS rdev=%pS lim=%pS rdev=%pS disable_atomic_writes=%d\n",
+	pr_err("%s mddev=%pS rdev=%pS lim=%pS rdev=%pS disable_atomic_writes=%d calling queue_limits_stack_bdev\n",
 		__func__, mddev, rdev, &lim, rdev, disable_atomic_writes);
 	queue_limits_stack_bdev(&lim, rdev->bdev, rdev->data_offset,
 				mddev->gendisk->disk_name, disable_atomic_writes);
@@ -5837,7 +5848,10 @@ int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev,
 		return -ENXIO;
 	}
 
-	return queue_limits_commit_update(mddev->gendisk->queue, &lim);
+	pr_err("%s9 calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
+	rc = queue_limits_commit_update(mddev->gendisk->queue, &lim);
+	pr_err("%s10 called queue_limits_commit_update lim=%pS rc=%d\n", __func__, &lim, rc);
+	return rc;
 }
 EXPORT_SYMBOL_GPL(mddev_stack_new_rdev);
 
@@ -6055,11 +6069,15 @@ int md_run(struct mddev *mddev)
 		/* cannot run an array with no devices.. */
 		return -EINVAL;
 
-	if (mddev->pers)
+	if (mddev->pers) {
+		pr_err("%s EBUSY\n", __func__);
 		return -EBUSY;
+	}
 	/* Cannot run until previous stop completes properly */
-	if (mddev->sysfs_active)
+	if (mddev->sysfs_active) {
+		pr_err("%s2 EBUSY\n", __func__);
 		return -EBUSY;
+	}
 
 	/*
 	 * Analyze all RAID superblock(s)
@@ -6369,8 +6387,11 @@ static int restart_array(struct mddev *mddev)
 		return -ENXIO;
 	if (!mddev->pers)
 		return -EINVAL;
-	if (md_is_rdwr(mddev))
+	if (md_is_rdwr(mddev)) {
+		pr_err("%s EBUSY\n", __func__);
+
 		return -EBUSY;
+	}
 
 	rcu_read_lock();
 	rdev_for_each_rcu(rdev, mddev) {
@@ -6542,8 +6563,11 @@ static int md_set_readonly(struct mddev *mddev)
 	int err = 0;
 	int did_freeze = 0;
 
-	if (mddev->external && test_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags))
+	if (mddev->external && test_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags)) {
+		pr_err("%s EBUSY\n", __func__);
+
 		return -EBUSY;
+	}
 
 	if (!test_bit(MD_RECOVERY_FROZEN, &mddev->recovery)) {
 		did_freeze = 1;
@@ -6556,7 +6580,7 @@ static int md_set_readonly(struct mddev *mddev)
 	mddev_lock_nointr(mddev);
 
 	if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery)) {
-		pr_warn("md: %s still in use.\n",mdname(mddev));
+		pr_err("md: %s still in use. EBUSY\n",mdname(mddev));
 		err = -EBUSY;
 		goto out;
 	}
@@ -6605,6 +6629,7 @@ static int do_md_stop(struct mddev *mddev, int mode)
 			clear_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
 			set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 		}
+		pr_err("%s EBUSY\n", __func__);
 		return -EBUSY;
 	}
 	if (mddev->pers) {
@@ -6918,18 +6943,21 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 		!(info->state & ((1 << MD_DISK_CLUSTER_ADD) | (1 << MD_DISK_CANDIDATE)))) {
 		pr_warn("%s: Cannot add to clustered mddev.\n",
 			mdname(mddev));
+		pr_err("%s1 EINVAL\n", __func__);
 		return -EINVAL;
 	}
 
-	if (info->major != MAJOR(dev) || info->minor != MINOR(dev))
+	if (info->major != MAJOR(dev) || info->minor != MINOR(dev)) {
+		pr_err("%s2 EOVERFLOW\n", __func__);
 		return -EOVERFLOW;
+	}
 
 	if (!mddev->raid_disks) {
 		int err;
 		/* expecting a device which has a superblock */
 		rdev = md_import_device(dev, mddev->major_version, mddev->minor_version);
 		if (IS_ERR(rdev)) {
-			pr_warn("md: md_import_device returned %ld\n",
+			pr_err("md: md_import_device returned %ld\n",
 				PTR_ERR(rdev));
 			return PTR_ERR(rdev);
 		}
@@ -6940,16 +6968,20 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 			err = super_types[mddev->major_version]
 				.load_super(rdev, rdev0, mddev->minor_version);
 			if (err < 0) {
-				pr_warn("md: %pg has different UUID to %pg\n",
+				pr_err("md: %pg has different UUID to %pg\n",
 					rdev->bdev,
 					rdev0->bdev);
 				export_rdev(rdev, mddev);
 				return -EINVAL;
 			}
 		}
+			pr_err("%s7 calling bind_rdev_to_array rdev=%pS mddev=%pS\n", __func__, rdev, mddev);
 		err = bind_rdev_to_array(rdev, mddev);
-		if (err)
+		if (err) {
+			pr_err("%s8  bind_rdev_to_array error\n", __func__);
 			export_rdev(rdev, mddev);
+		}
+			pr_err("%s10 err=%d\n", __func__, err);
 		return err;
 	}
 
@@ -7019,6 +7051,7 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 			}
 			if (has_journal || mddev->bitmap) {
 				export_rdev(rdev, mddev);
+				pr_err("%s EBUSY\n", __func__);
 				return -EBUSY;
 			}
 			set_bit(Journal, &rdev->flags);
@@ -7150,6 +7183,7 @@ kick_rdev:
 busy:
 	pr_debug("md: cannot remove active disk %pg from %s ...\n",
 		 rdev->bdev, mdname(mddev));
+				pr_err("%s EBUSY\n", __func__);
 	return -EBUSY;
 }
 
@@ -7228,10 +7262,14 @@ static int set_bitmap_file(struct mddev *mddev, int fd)
 	int err = 0;
 
 	if (mddev->pers) {
-		if (!mddev->pers->quiesce || !mddev->thread)
+		if (!mddev->pers->quiesce || !mddev->thread) {
+				pr_err("%s EBUSY\n", __func__);
 			return -EBUSY;
-		if (mddev->recovery || mddev->sync_thread)
+		}
+		if (mddev->recovery || mddev->sync_thread) {
+				pr_err("%s2 EBUSY\n", __func__);
 			return -EBUSY;
+		}
 		/* we should be able to change the bitmap.. */
 	}
 
@@ -7270,6 +7308,7 @@ static int set_bitmap_file(struct mddev *mddev, int fd)
 		} else if (atomic_read(&inode->i_writecount) != 1) {
 			pr_warn("%s: error: bitmap file is already in use\n",
 				mdname(mddev));
+				pr_err("%s3 EBUSY\n", __func__);
 			err = -EBUSY;
 		}
 		if (err) {
@@ -7428,8 +7467,10 @@ static int update_size(struct mddev *mddev, sector_t num_sectors)
 	 * of each device.  If num_sectors is zero, we find the largest size
 	 * that fits.
 	 */
-	if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery))
+	if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery)) {
+				pr_err("%s4 EBUSY\n", __func__);
 		return -EBUSY;
+	}
 	if (!md_is_rdwr(mddev))
 		return -EROFS;
 
@@ -7466,8 +7507,11 @@ static int update_raid_disks(struct mddev *mddev, int raid_disks)
 		return -EINVAL;
 	if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery) ||
 	    test_bit(MD_RESYNCING_REMOTE, &mddev->recovery) ||
-	    mddev->reshape_position != MaxSector)
+	    mddev->reshape_position != MaxSector) {
+
+				pr_err("%s EBUSY\n", __func__);
 		return -EBUSY;
+	}
 
 	rdev_for_each(rdev, mddev) {
 		if (mddev->raid_disks < raid_disks &&
@@ -7563,6 +7607,7 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 			goto err;
 		}
 		if (mddev->recovery || mddev->sync_thread) {
+				pr_err("%s EBUSY\n", __func__);
 			rv = -EBUSY;
 			goto err;
 		}
@@ -7637,8 +7682,10 @@ static int set_disk_faulty(struct mddev *mddev, dev_t dev)
 		err =  -ENODEV;
 	else {
 		md_error(mddev, rdev);
-		if (test_bit(MD_BROKEN, &mddev->flags))
+		if (test_bit(MD_BROKEN, &mddev->flags)) {
+				pr_err("%s EBUSY\n", __func__);
 			err = -EBUSY;
+		}
 	}
 	rcu_read_unlock();
 	return err;
@@ -7720,11 +7767,13 @@ static int __md_set_array_info(struct mddev *mddev, void __user *argp)
 
 	if (!list_empty(&mddev->disks)) {
 		pr_warn("md: array %s already has disks!\n", mdname(mddev));
+				pr_err("%s EBUSY\n", __func__);
 		return -EBUSY;
 	}
 
 	if (mddev->raid_disks) {
 		pr_warn("md: array %s already initialised!\n", mdname(mddev));
+				pr_err("%s EBUSY\n", __func__);
 		return -EBUSY;
 	}
 
@@ -7742,6 +7791,7 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	void __user *argp = (void __user *)arg;
 	struct mddev *mddev = NULL;
 
+	pr_err("%s cmd=0x%x\n", __func__, cmd);
 	err = md_ioctl_valid(cmd);
 	if (err)
 		return err;
@@ -7764,17 +7814,21 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	case GET_ARRAY_INFO:
 		if (!mddev->raid_disks && !mddev->external)
 			return -ENODEV;
+		pr_err("%s calling get_array_info\n", __func__);
 		return get_array_info(mddev, argp);
 
 	case GET_DISK_INFO:
 		if (!mddev->raid_disks && !mddev->external)
 			return -ENODEV;
+		pr_err("%s calling get_disk_info\n", __func__);
 		return get_disk_info(mddev, argp);
 
 	case SET_DISK_FAULTY:
+		pr_err("%s calling set_disk_faulty\n", __func__);
 		return set_disk_faulty(mddev, new_decode_dev(arg));
 
 	case GET_BITMAP_FILE:
+		pr_err("%s calling get_bitmap_file\n", __func__);
 		return get_bitmap_file(mddev, argp);
 	}
 
@@ -7782,6 +7836,7 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 		/* Need to flush page cache, and ensure no-one else opens
 		 * and writes
 		 */
+		pr_err("%s calling mddev_set_closing_and_sync_blockdev\n", __func__);
 		err = mddev_set_closing_and_sync_blockdev(mddev, 1);
 		if (err)
 			return err;
@@ -7793,13 +7848,15 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	err = md_ioctl_need_suspend(cmd) ? mddev_suspend_and_lock(mddev) :
 					   mddev_lock(mddev);
 	if (err) {
-		pr_debug("md: ioctl lock interrupted, reason %d, cmd %d\n",
+		pr_err("md: ioctl lock interrupted, reason %d, cmd %d\n",
 			 err, cmd);
 		goto out;
 	}
 
 	if (cmd == SET_ARRAY_INFO) {
+		pr_err("%s calling __md_set_array_info\n", __func__);
 		err = __md_set_array_info(mddev, argp);
+		pr_err("%s1 called __md_set_array_info err=%d\n", __func__, err);
 		goto unlock;
 	}
 
@@ -7813,6 +7870,7 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	    && cmd != RUN_ARRAY && cmd != SET_BITMAP_FILE
 	    && cmd != GET_BITMAP_FILE) {
 		err = -ENODEV;
+		pr_err("%s12 ENODEV err=%d\n", __func__, err);
 		goto unlock;
 	}
 
@@ -7822,19 +7880,23 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	switch (cmd) {
 	case RESTART_ARRAY_RW:
 		err = restart_array(mddev);
+		pr_err("%s cmd=0x%x err=%d RESTART_ARRAY_RW\n", __func__, cmd, err);
 		goto unlock;
 
 	case STOP_ARRAY:
 		err = do_md_stop(mddev, 0);
+		pr_err("%s cmd=0x%x err=%d STOP_ARRAY\n", __func__, cmd, err);
 		goto unlock;
 
 	case STOP_ARRAY_RO:
 		if (mddev->pers)
 			err = md_set_readonly(mddev);
+		pr_err("%s cmd=0x%x err=%d STOP_ARRAY_RO\n", __func__, cmd, err);
 		goto unlock;
 
 	case HOT_REMOVE_DISK:
 		err = hot_remove_disk(mddev, new_decode_dev(arg));
+		pr_err("%s cmd=0x%x err=%d HOT_REMOVE_DISK\n", __func__, cmd, err);
 		goto unlock;
 
 	case ADD_NEW_DISK:
@@ -7851,6 +7913,7 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 				break;
 			else
 				err = md_add_new_disk(mddev, &info);
+			pr_err("%s cmd=0x%x err=%d ADD_NEW_DISK\n", __func__, cmd, err);
 			goto unlock;
 		}
 		break;
@@ -7889,6 +7952,7 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 			err = -EFAULT;
 		else
 			err = md_add_new_disk(mddev, &info);
+		pr_err("%s called md_add_new_disk err=%d\n", __func__, err);
 		goto unlock;
 	}
 
@@ -7897,18 +7961,22 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 			md_cluster_ops->new_disk_ack(mddev, false);
 		else
 			err = -EINVAL;
+		pr_err("%s called mddev_is_clustered err=%d\n", __func__, err);
 		goto unlock;
 
 	case HOT_ADD_DISK:
 		err = hot_add_disk(mddev, new_decode_dev(arg));
+		pr_err("%s called hot_add_disk err=%d\n", __func__, err);
 		goto unlock;
 
 	case RUN_ARRAY:
 		err = do_md_run(mddev);
+		pr_err("%s called do_md_run err=%d\n", __func__, err);
 		goto unlock;
 
 	case SET_BITMAP_FILE:
 		err = set_bitmap_file(mddev, (int)arg);
+		pr_err("%s called set_bitmap_file err=%d\n", __func__, err);
 		goto unlock;
 
 	default:
@@ -7983,6 +8051,7 @@ static int md_open(struct gendisk *disk, blk_mode_t mode)
 {
 	struct mddev *mddev;
 	int err;
+	pr_err("%s\n", __func__);
 
 	spin_lock(&all_mddevs_lock);
 	mddev = mddev_get(disk->private_data);
@@ -9924,6 +9993,7 @@ static void md_geninit(void)
 static int __init md_init(void)
 {
 	int ret = -ENOMEM;
+pr_err("%s\n", __func__);
 
 	md_wq = alloc_workqueue("md", WQ_MEM_RECLAIM, 0);
 	if (!md_wq)
@@ -10081,6 +10151,7 @@ static int read_rdev(struct mddev *mddev, struct md_rdev *rdev)
 	struct page *swapout = rdev->sb_page;
 	struct mdp_superblock_1 *sb;
 
+pr_err("%s\n", __func__);
 	/* Store the sb page of the rdev in the swapout temporary
 	 * variable in case we err in the future
 	 */

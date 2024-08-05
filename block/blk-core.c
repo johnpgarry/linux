@@ -405,7 +405,8 @@ struct request_queue *blk_alloc_queue(struct queue_limits *lim, int node_id)
 		error = -ENOMEM;
 		goto fail_id;
 	}
-
+	pr_err("%s calling blk_set_default_limits lim=%pS atomic_write_hw_max=%d\n",
+		__func__, lim, lim->atomic_write_hw_max);
 	error = blk_set_default_limits(lim);
 	if (error)
 		goto fail_stats;

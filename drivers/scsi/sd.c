@@ -179,6 +179,7 @@ cache_type_store(struct device *dev, struct device_attribute *attr,
 		lim = queue_limits_start_update(sdkp->disk->queue);
 		sd_set_flush_flag(sdkp, &lim);
 		blk_mq_freeze_queue(sdkp->disk->queue);
+		pr_err("%s calling queue_limits_commit_update\n", __func__);
 		ret = queue_limits_commit_update(sdkp->disk->queue, &lim);
 		blk_mq_unfreeze_queue(sdkp->disk->queue);
 		if (ret)
@@ -485,6 +486,7 @@ provisioning_mode_store(struct device *dev, struct device_attribute *attr,
 	lim = queue_limits_start_update(sdkp->disk->queue);
 	sd_config_discard(sdkp, &lim, mode);
 	blk_mq_freeze_queue(sdkp->disk->queue);
+		pr_err("%s calling queue_limits_commit_update\n", __func__);
 	err = queue_limits_commit_update(sdkp->disk->queue, &lim);
 	blk_mq_unfreeze_queue(sdkp->disk->queue);
 	if (err)
@@ -1608,6 +1610,7 @@ static int sd_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 	struct Scsi_Host *host = sdp->host;
 	sector_t capacity = logical_to_sectors(sdp, sdkp->capacity);
 	int diskinfo[4];
+	pr_err("%s bdev=%pS\n", __func__, bdev);
 
 	/* default to most commonly used values */
 	diskinfo[0] = 0x40;	/* 1 << 6 */
@@ -1648,6 +1651,7 @@ static int sd_ioctl(struct block_device *bdev, blk_mode_t mode,
 	struct scsi_device *sdp = sdkp->device;
 	void __user *p = (void __user *)arg;
 	int error;
+	//pr_err("%s bdev=%pS\n", __func__, bdev);
     
 	SCSI_LOG_IOCTL(1, sd_printk(KERN_INFO, sdkp, "sd_ioctl: disk=%s, "
 				    "cmd=0x%x\n", disk->disk_name, cmd));
@@ -1945,6 +1949,7 @@ static int sd_pr_in_command(struct block_device *bdev, u8 sa,
 		},
 		{}
 	};
+	pr_err("%s bdev=%pS\n", __func__, bdev);
 	struct scsi_failures failures = {
 		.failure_definitions = failure_defs,
 	};
@@ -1976,6 +1981,7 @@ static int sd_pr_read_keys(struct block_device *bdev, struct pr_keys *keys_info)
 	u32 num_keys = keys_info->num_keys;
 	int data_len = num_keys * 8 + 8;
 	u8 *data;
+	pr_err("%s bdev=%pS\n", __func__, bdev);
 
 	data = kzalloc(data_len, GFP_KERNEL);
 	if (!data)
@@ -2008,6 +2014,7 @@ static int sd_pr_read_reservation(struct block_device *bdev,
 	struct scsi_device *sdev = sdkp->device;
 	u8 data[24] = { };
 	int result, len;
+	pr_err("%s bdev=%pS\n", __func__, bdev);
 
 	result = sd_pr_in_command(bdev, READ_RESERVATION, data, sizeof(data));
 	if (result)

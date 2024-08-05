@@ -162,9 +162,13 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 
 	unit_limit = rounddown_pow_of_two(unit_limit);
 
+	pr_err("%s atomic_write_hw_max >> SECTOR_SHIFT=%d max_hw_sectors=%d\n",
+		__func__, lim->atomic_write_hw_max >> SECTOR_SHIFT, lim->max_hw_sectors);
 	lim->atomic_write_max_sectors =
 		min(lim->atomic_write_hw_max >> SECTOR_SHIFT,
 			lim->max_hw_sectors);
+	pr_err("%s2 atomic_write_hw_max >> SECTOR_SHIFT=%d max_hw_sectors=%d gives lim->atomic_write_max_sectors=%d\n",
+		__func__, lim->atomic_write_hw_max >> SECTOR_SHIFT, lim->max_hw_sectors, lim->atomic_write_max_sectors);
 	lim->atomic_write_unit_min =
 		min(lim->atomic_write_hw_unit_min, unit_limit);
 	lim->atomic_write_unit_max =
@@ -176,8 +180,9 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 static void blk_validate_atomic_write_limits(struct queue_limits *lim, bool disable_atomic_writes)
 {
 	unsigned int boundary_sectors;
-
-	if (!lim->atomic_write_hw_max || disable_atomic_writes)
+	pr_err("%s lim=%pS disable_atomic_writes=%d lim->atomic_write_hw_max=%d\n",
+		__func__, lim, disable_atomic_writes, lim->atomic_write_hw_max);
+	if (!lim->atomic_write_hw_max || lim->atomic_write_hw_max == -1 || disable_atomic_writes)
 		goto unsupported;
 
 	boundary_sectors = lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
@@ -214,6 +219,8 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim, bool disa
 	return;
 
 unsupported:
+	pr_err("%s2 unsupported lim=%pS disable_atomic_writes=%d lim->atomic_write_hw_max=%d\n",
+		__func__, lim, disable_atomic_writes, lim->atomic_write_hw_max);
 	lim->atomic_write_max_sectors = 0;
 	lim->atomic_write_boundary_sectors = 0;
 	lim->atomic_write_unit_min = 0;
@@ -230,6 +237,7 @@ static int blk_validate_limits(struct queue_limits *lim)
 	unsigned int logical_block_sectors;
 	int err;
 
+	pr_err("%s lim=%pS atomic_write_hw_max=%d\n", __func__, lim, lim->atomic_write_hw_max);
 	/*
 	 * Unless otherwise specified, default to 512 byte logical blocks and a
 	 * physical block size equal to the logical block size.
@@ -359,7 +367,7 @@ static int blk_validate_limits(struct queue_limits *lim)
 
 	if (!(lim->features & BLK_FEAT_WRITE_CACHE))
 		lim->features &= ~BLK_FEAT_FUA;
-
+	pr_err("%s calling blk_validate_atomic_write_limits\n", __func__);
 	blk_validate_atomic_write_limits(lim, false);
 
 	err = blk_validate_integrity_limits(lim);
@@ -375,14 +383,17 @@ static int blk_validate_limits(struct queue_limits *lim)
  */
 int blk_set_default_limits(struct queue_limits *lim)
 {
+	int rc;
 	/*
 	 * Most defaults are set by capping the bounds in blk_validate_limits,
 	 * but max_user_discard_sectors is special and needs an explicit
 	 * initialization to the max value here.
 	 */
 	lim->max_user_discard_sectors = UINT_MAX;
-	pr_err("%s lim=%pS calling blk_validate_limits\n", __func__, lim);
-	return blk_validate_limits(lim);
+	pr_err("%s lim=%pS calling blk_validate_limits atomic_write_hw_max=%d\n", __func__, lim, lim->atomic_write_hw_max);
+	rc = blk_validate_limits(lim);
+	pr_err("%s2 lim=%pS called blk_validate_limits rc=%d  atomic_write_hw_max=%d\n", __func__, lim, rc, lim->atomic_write_hw_max);
+	return rc;
 }
 
 /**
@@ -400,9 +411,12 @@ int queue_limits_commit_update(struct request_queue *q,
 {
 	int error;
 
+	pr_err("%s lim=%pS calling blk_validate_limits atomic_write_hw_max=%d\n", __func__, lim, lim->atomic_write_hw_max);
 	error = blk_validate_limits(lim);
-	if (error)
+	if (error) {
+		pr_err("%s2 lim=%pS called blk_validate_limits error=%d\n", __func__, lim, error);
 		goto out_unlock;
+	}
 
 #ifdef CONFIG_BLK_INLINE_ENCRYPTION
 	if (q->crypto_profile && lim->integrity.tag_size) {
@@ -417,6 +431,7 @@ int queue_limits_commit_update(struct request_queue *q,
 		blk_apply_bdi_limits(q->disk->bdi, lim);
 out_unlock:
 	mutex_unlock(&q->limits_lock);
+	pr_err("%s10 lim=%pS atomic_write_hw_max=%d error=%d\n", __func__, lim, lim->atomic_write_hw_max, error);
 	return error;
 }
 EXPORT_SYMBOL_GPL(queue_limits_commit_update);
@@ -435,6 +450,7 @@ EXPORT_SYMBOL_GPL(queue_limits_commit_update);
 int queue_limits_set(struct request_queue *q, struct queue_limits *lim)
 {
 	mutex_lock(&q->limits_lock);
+	pr_err("%s lim=%pS calling queue_limits_commit_update atomic_write_hw_max=%d\n", __func__, lim, lim->atomic_write_hw_max);
 	return queue_limits_commit_update(q, lim);
 }
 EXPORT_SYMBOL_GPL(queue_limits_set);
@@ -564,14 +580,21 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 #endif
 	
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
-	if (b->atomic_write_hw_max)
-		pr_err("%s t=%pS b=%pS (atomic_write_hw_max=%d)\n",
-			__func__, t, b, b->atomic_write_hw_max);
+	pr_err("%s t=%pS (atomic_write_hw_max=%d) b=%pS (atomic_write_hw_max=%d) start=%lld\n",
+			__func__, t, t->atomic_write_hw_max, b, b->atomic_write_hw_max, start);
+	if (t->atomic_write_hw_max != -1) {
+		if (!b->atomic_write_hw_max) {
+			t->atomic_write_hw_max = -1;
+		} else {
+			t->atomic_write_hw_max = min_not_zero(t->atomic_write_hw_max, b->atomic_write_hw_max);
+			t->atomic_write_boundary_sectors = min_not_zero(t->atomic_write_boundary_sectors, b->atomic_write_boundary_sectors);
+			t->atomic_write_hw_unit_min = max(t->atomic_write_hw_unit_min, b->atomic_write_hw_unit_min);
+			t->atomic_write_hw_unit_max = min_not_zero(t->atomic_write_hw_unit_max, b->atomic_write_hw_unit_max);
+		}
+	}
 
-	t->atomic_write_hw_max = min_not_zero(t->atomic_write_hw_max, b->atomic_write_hw_max);
-	t->atomic_write_boundary_sectors = min_not_zero(t->atomic_write_boundary_sectors, b->atomic_write_boundary_sectors);
-	t->atomic_write_hw_unit_min = max(t->atomic_write_hw_unit_min, b->atomic_write_hw_unit_min);
-	t->atomic_write_unit_max = min_not_zero(t->atomic_write_unit_max, b->atomic_write_unit_max);
+	pr_err("%s2 t=%pS (atomic_write_hw_max=%d) b=%pS (atomic_write_hw_max=%d)\n",
+			__func__, t, t->atomic_write_hw_max, b, b->atomic_write_hw_max);
 
 	/*
 	 * BLK_FEAT_NOWAIT and BLK_FEAT_POLL need to be supported both by the
@@ -727,13 +750,12 @@ EXPORT_SYMBOL(blk_stack_limits);
 void queue_limits_stack_bdev(struct queue_limits *t, struct block_device *bdev,
 		sector_t offset, const char *pfx, bool disable_atomic_writes)
 {
-	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS disable_atomic_writes=%d\n",
-		__func__, t, bdev_get_queue(bdev), disable_atomic_writes);
+	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS disable_atomic_writes=%d bdev=%pS\n",
+		__func__, t, bdev_get_queue(bdev), disable_atomic_writes, bdev);
 	if (blk_stack_limits(t, &bdev_get_queue(bdev)->limits,
 			get_start_sect(bdev) + offset))
 		pr_notice("%s: Warning: Device %pg is misaligned\n",
 			pfx, bdev);
-	blk_validate_atomic_write_limits(t, disable_atomic_writes);
 }
 EXPORT_SYMBOL_GPL(queue_limits_stack_bdev);
 
