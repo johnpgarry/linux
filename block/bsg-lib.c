@@ -385,6 +385,7 @@ struct request_queue *bsg_setup_queue(struct device *dev, const char *name,
 	if (blk_mq_alloc_tag_set(set))
 		goto out_tag_set;
 
+	pr_err("%s lim=%pS calling blk_mq_alloc_queue\n", __func__, &lim);
 	q = blk_mq_alloc_queue(set, lim, dev);
 	if (IS_ERR(q)) {
 		ret = PTR_ERR(q);

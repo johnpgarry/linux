@@ -1090,6 +1090,7 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 		return SCSI_SCAN_NO_RESPONSE;
 	}
 
+		pr_err("%s calling queue_limits_commit_update\n", __func__);
 	ret = queue_limits_commit_update(sdev->request_queue, &lim);
 	if (ret) {
 		sdev_printk(KERN_ERR, sdev, "failed to apply queue limits.\n");

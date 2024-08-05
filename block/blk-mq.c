@@ -4146,6 +4146,7 @@ struct request_queue *blk_mq_alloc_queue(struct blk_mq_tag_set *set,
 	struct queue_limits default_lim = { };
 	struct request_queue *q;
 	int ret;
+	pr_err("%s lim=%pS\n", __func__, &lim);
 
 	if (!lim)
 		lim = &default_lim;
@@ -4153,6 +4154,7 @@ struct request_queue *blk_mq_alloc_queue(struct blk_mq_tag_set *set,
 	if (blk_mq_can_poll(set))
 		lim->features |= BLK_FEAT_POLL;
 
+	pr_err("%s2 lim=%pS calling blk_alloc_queue\n", __func__, &lim);
 	q = blk_alloc_queue(lim, set->numa_node);
 	if (IS_ERR(q))
 		return q;
@@ -4200,6 +4202,7 @@ struct gendisk *__blk_mq_alloc_disk(struct blk_mq_tag_set *set,
 	struct request_queue *q;
 	struct gendisk *disk;
 
+	pr_err("%s lim=%pS calling blk_mq_alloc_queue\n", __func__, &lim);
 	q = blk_mq_alloc_queue(set, lim, queuedata);
 	if (IS_ERR(q))
 		return ERR_CAST(q);
