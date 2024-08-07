@@ -643,10 +643,14 @@ void xfs_inode_count_blocks(struct xfs_trans *tp, struct xfs_inode *ip,
 		xfs_filblks_t *dblocks, xfs_filblks_t *rblocks);
 unsigned int xfs_inode_alloc_fsbsize(struct xfs_inode *ip);
 unsigned int xfs_inode_alloc_unitsize(struct xfs_inode *ip);
-void xfs_roundout_to_alloc_fsbsize(struct xfs_inode *ip,
-		xfs_fileoff_t *start, xfs_fileoff_t *end);
-void xfs_roundin_to_alloc_fsbsize(struct xfs_inode *ip,
-		xfs_fileoff_t *start, xfs_fileoff_t *end);
+loff_t
+xfs_rounddown_to_alloc_unitsize(
+	struct xfs_inode	*ip,
+	loff_t			offset);
+loff_t
+xfs_roundup_to_alloc_unitsize(
+	struct xfs_inode	*ip,
+	loff_t			offset);
 xfs_extlen_t xfs_inode_alloc_fsbsize_align(struct xfs_inode *ip,
 		xfs_fileoff_t blkno, xfs_extlen_t *off);
 

@@ -3129,32 +3129,28 @@ xfs_inode_alloc_unitsize(
 	return XFS_FSB_TO_B(ip->i_mount, xfs_inode_alloc_fsbsize(ip));
 }
 
-void
-xfs_roundout_to_alloc_fsbsize(
+loff_t
+xfs_rounddown_to_alloc_unitsize(
 	struct xfs_inode	*ip,
-	xfs_fileoff_t		*start,
-	xfs_fileoff_t		*end)
+	loff_t			offset)
 {
 	unsigned int		blocks = xfs_inode_alloc_fsbsize(ip);
 
 	if (blocks == 1)
-		return;
-	*start = rounddown_64(*start, blocks);
-	*end = roundup_64(*end, blocks);
+		return offset;
+	return rounddown_64(offset,  XFS_FSB_TO_B(ip->i_mount, blocks));
 }
 
-void
-xfs_roundin_to_alloc_fsbsize(
+loff_t
+xfs_roundup_to_alloc_unitsize(
 	struct xfs_inode	*ip,
-	xfs_fileoff_t		*start,
-	xfs_fileoff_t		*end)
+	loff_t			offset)
 {
 	unsigned int		blocks = xfs_inode_alloc_fsbsize(ip);
 
 	if (blocks == 1)
-		return;
-	*start = roundup_64(*start, blocks);
-	*end = rounddown_64(*end, blocks);
+		return offset;
+	return roundup_64(offset,  XFS_FSB_TO_B(ip->i_mount, blocks));
 }
 
 /* Should we always be using copy on write for file writes? */
@@ -3172,10 +3168,16 @@ xfs_inode_alloc_fsbsize_align(
 	xfs_fileoff_t		blkno,
 	xfs_extlen_t		*off)
 {
-	xfs_fileoff_t		blkno_start = blkno;
-	xfs_fileoff_t		blkno_end = blkno;
+	unsigned int		blocks = xfs_inode_alloc_fsbsize(ip);
+	xfs_fileoff_t		blkno_start;
+	xfs_fileoff_t		blkno_end;
 
-	xfs_roundout_to_alloc_fsbsize(ip, &blkno_start, &blkno_end);
+	if (blocks == 1)
+		blkno_start = blkno;
+	else
+		blkno_start = rounddown_64(blkno, blocks);
+	blkno_end = blkno_start + blocks;
+	
 
 	*off = blkno_end - blkno;
 	return blkno - blkno_start;

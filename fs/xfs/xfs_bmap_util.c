@@ -496,7 +496,6 @@ xfs_can_free_eofblocks(
 	struct xfs_mount	*mp = ip->i_mount;
 	xfs_fileoff_t		end_fsb;
 	xfs_fileoff_t		last_fsb;
-	xfs_fileoff_t		dummy_fsb;
 	int			nimaps = 1;
 	int			error;
 
@@ -540,7 +539,7 @@ xfs_can_free_eofblocks(
 	end_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_ISIZE(ip));
 
 	/* Only try to free beyond the allocation unit that crosses EOF */
-	xfs_roundout_to_alloc_fsbsize(ip, &dummy_fsb, &end_fsb);
+	end_fsb = XFS_B_TO_FSB(mp , xfs_roundup_to_alloc_unitsize(ip, (xfs_ufsize_t)XFS_ISIZE(ip)));
 
 	last_fsb = XFS_B_TO_FSB(mp, mp->m_super->s_maxbytes);
 	if (last_fsb <= end_fsb)
@@ -855,7 +854,8 @@ xfs_free_file_space(
 	endoffset_fsb = XFS_B_TO_FSBT(mp, offset + len);
 
 	/* Free only complete extents. */
-	xfs_roundin_to_alloc_fsbsize(ip, &startoffset_fsb, &endoffset_fsb);
+	startoffset_fsb = XFS_B_TO_FSB(mp, xfs_roundup_to_alloc_unitsize(ip, offset));
+	endoffset_fsb = XFS_B_TO_FSB(mp, xfs_rounddown_to_alloc_unitsize(ip, offset + len));
 
 	/*
 	 * Need to zero the stuff we're not freeing, on disk.
@@ -924,7 +924,7 @@ xfs_prepare_shift(
 	 * boundary.
 	 */
 	rounding = xfs_inode_alloc_unitsize(ip);
-	offset = rounddown_64(offset, rounding);
+	offset = xfs_rounddown_to_alloc_unitsize(ip, offset);
 	if (offset)
 		offset -= rounding;
 
