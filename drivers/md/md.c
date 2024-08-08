@@ -378,7 +378,7 @@ static bool is_suspended(struct mddev *mddev, struct bio *bio)
 bool md_handle_request(struct mddev *mddev, struct bio *bio)
 {
 		if (bio->bi_opf & REQ_ATOMIC)
-			pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
+			pr_err_once("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 check_suspended:
 	if (is_suspended(mddev, bio)) {
 		DEFINE_WAIT(__wait);
@@ -400,7 +400,7 @@ check_suspended:
 		goto check_suspended;
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s2 REQ_ATOMIC bio=%pS calling make_request=%pS\n", __func__, bio, mddev->pers->make_request);
+		pr_err_once("%s2 REQ_ATOMIC bio=%pS calling make_request=%pS\n", __func__, bio, mddev->pers->make_request);
 	if (!mddev->pers->make_request(mddev, bio)) {
 		percpu_ref_put(&mddev->active_io);
 		if (!mddev->gendisk && mddev->pers->prepare_suspend)
@@ -418,7 +418,7 @@ static void md_submit_bio(struct bio *bio)
 	const int rw = bio_data_dir(bio);
 	struct mddev *mddev = bio->bi_bdev->bd_disk->private_data;
 		if (bio->bi_opf & REQ_ATOMIC)
-			pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
+			pr_err_once("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 
 	if (mddev == NULL || mddev->pers == NULL) {
 		bio_io_error(bio);
@@ -947,7 +947,7 @@ EXPORT_SYMBOL_GPL(mddev_unlock);
 struct md_rdev *md_find_rdev_nr_rcu(struct mddev *mddev, int nr)
 {
 	struct md_rdev *rdev;
-	pr_err("%s nr=%d mddev=%pS\n", __func__, nr, mddev);
+	pr_err_once("%s nr=%d mddev=%pS\n", __func__, nr, mddev);
 	rdev_for_each_rcu(rdev, mddev) {
 
 		pr_err("%s1 nr=%d mddev=%pS rdev=%pS desc_nr=%d\n", __func__, nr, mddev, rdev, rdev->desc_nr);
@@ -2462,7 +2462,7 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 {
 	char b[BDEVNAME_SIZE];
 	int err;
-	pr_err("%s rdev=%pS (bdev=%pS) mddev=%pS\n", __func__, rdev, rdev ? rdev->bdev : NULL, mddev);
+	pr_err_once("%s rdev=%pS (bdev=%pS) mddev=%pS\n", __func__, rdev, rdev ? rdev->bdev : NULL, mddev);
 
 	/* prevent duplicates */
 	if (find_rdev(mddev, rdev->bdev->bd_dev))
@@ -2492,7 +2492,7 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 	 */
 	rcu_read_lock();
 	if (rdev->desc_nr < 0) {
-	pr_err("%s1 rdev=%pS mddev=%pS\n", __func__, rdev, mddev);
+		pr_err_once("%s1 rdev=%pS mddev=%pS\n", __func__, rdev, mddev);
 		int choice = 0;
 		if (mddev->pers)
 			choice = mddev->raid_disks;
@@ -2500,7 +2500,7 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 			choice++;
 		rdev->desc_nr = choice;
 	} else {
-	pr_err("%s2 rdev=%pS mddev=%pS rdev->desc_nr=%d\n", __func__, rdev, mddev, rdev->desc_nr);
+		pr_err_once("%s2 rdev=%pS mddev=%pS rdev->desc_nr=%d\n", __func__, rdev, mddev, rdev->desc_nr);
 		if (md_find_rdev_nr_rcu(mddev, rdev->desc_nr)) {
 			rcu_read_unlock();
 			pr_err("%s1 EBUSY\n", __func__);
@@ -8051,7 +8051,7 @@ static int md_open(struct gendisk *disk, blk_mode_t mode)
 {
 	struct mddev *mddev;
 	int err;
-	pr_err("%s\n", __func__);
+	pr_err_once("%s\n", __func__);
 
 	spin_lock(&all_mddevs_lock);
 	mddev = mddev_get(disk->private_data);
@@ -8860,7 +8860,7 @@ static void md_clone_bio(struct mddev *mddev, struct bio **bio)
 		bio_alloc_clone(bdev, *bio, GFP_NOIO, &mddev->io_clone_set);
 
 	if ((*bio)->bi_opf & REQ_ATOMIC)
-		pr_err("%s REQ_ATOMIC *bio=%pS clone=%pS\n", __func__, *bio, clone);
+		pr_err_once("%s REQ_ATOMIC *bio=%pS clone=%pS\n", __func__, *bio, clone);
 	md_io_clone = container_of(clone, struct md_io_clone, bio_clone);
 	md_io_clone->orig_bio = *bio;
 	md_io_clone->mddev = mddev;
@@ -10151,7 +10151,7 @@ static int read_rdev(struct mddev *mddev, struct md_rdev *rdev)
 	struct page *swapout = rdev->sb_page;
 	struct mdp_superblock_1 *sb;
 
-pr_err("%s\n", __func__);
+	pr_err_once("%s\n", __func__);
 	/* Store the sb page of the rdev in the swapout temporary
 	 * variable in case we err in the future
 	 */

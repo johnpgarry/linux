@@ -574,14 +574,14 @@ static void raid0_map_submit_bio(struct mddev *mddev, struct bio *bio)
 #endif
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s REQ_ATOMIC bio=%pS calling md_account_bio bio_sector=%lld\n", __func__, bio, bio_sector);
+		pr_err_once("%s REQ_ATOMIC bio=%pS calling md_account_bio bio_sector=%lld\n", __func__, bio, bio_sector);
 
 	md_account_bio(mddev, &bio);
 
 
 	zone = find_zone(mddev->private, &sector);
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s2 REQ_ATOMIC bio=%pS mddev=%pS zone zone_end=%lld dev_start=%lld nb_dev=%d disk_shift=%d\n",
+		pr_err_once("%s2 REQ_ATOMIC bio=%pS mddev=%pS zone zone_end=%lld dev_start=%lld nb_dev=%d disk_shift=%d\n",
 			__func__, bio, mddev, zone->zone_end, zone->dev_start, zone->nb_dev, zone->disk_shift);
 	switch (conf->layout) {
 	case RAID0_ORIG_LAYOUT:
@@ -604,13 +604,13 @@ static void raid0_map_submit_bio(struct mddev *mddev, struct bio *bio)
 
 	bio_set_dev(bio, tmp_dev->bdev);
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s3 REQ_ATOMIC bio=%pS tmp_dev->bdev=%pS sector=%lld zone->dev_start=%lld\n", __func__, bio, tmp_dev->bdev, sector, zone->dev_start);
+		pr_err_once("%s3 REQ_ATOMIC bio=%pS tmp_dev->bdev=%pS sector=%lld zone->dev_start=%lld\n", __func__, bio, tmp_dev->bdev, sector, zone->dev_start);
 	bio->bi_iter.bi_sector = sector + zone->dev_start +
 		tmp_dev->data_offset;
 	mddev_trace_remap(mddev, bio, bio_sector);
 	mddev_check_write_zeroes(mddev, bio);
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s4 REQ_ATOMIC bio=%pS calling submit_bio_noacct\n", __func__, bio);
+		pr_err_once("%s4 REQ_ATOMIC bio=%pS calling submit_bio_noacct\n", __func__, bio);
 	submit_bio_noacct(bio);
 }
 
@@ -621,7 +621,7 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 	unsigned sectors;
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
+		pr_err_once("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
@@ -641,20 +641,20 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 		 : sector_div(sector, chunk_sects));
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s1 REQ_ATOMIC bio=%pS sectors=%d bio_sectors(bio)=%d\n", __func__, bio, sectors, bio_sectors(bio));
+		pr_err_once("%s1 REQ_ATOMIC bio=%pS sectors=%d bio_sectors(bio)=%d\n", __func__, bio, sectors, bio_sectors(bio));
 
 	if (sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, sectors, GFP_NOIO,
 					      &mddev->bio_set);
 		bio_chain(split, bio);
 		if (bio->bi_opf & REQ_ATOMIC)
-			pr_err("%s2 REQ_ATOMIC calling raid0_map_submit_bio for bio=%pS, split=%pS\n", __func__, bio, split);
+			pr_err_once("%s2 REQ_ATOMIC calling raid0_map_submit_bio for bio=%pS, split=%pS\n", __func__, bio, split);
 		raid0_map_submit_bio(mddev, bio);
 		bio = split;
 	}
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s3 REQ_ATOMIC calling raid0_map_submit_bio bio=%pS\n", __func__, bio);
+		pr_err_once("%s3 REQ_ATOMIC calling raid0_map_submit_bio bio=%pS\n", __func__, bio);
 	raid0_map_submit_bio(mddev, bio);
 	return true;
 }
