@@ -162,8 +162,8 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 
 	unit_limit = rounddown_pow_of_two(unit_limit);
 
-	pr_err("%s atomic_write_hw_max >> SECTOR_SHIFT=%d max_hw_sectors=%d\n",
-		__func__, lim->atomic_write_hw_max >> SECTOR_SHIFT, lim->max_hw_sectors);
+	pr_err("%s atomic_write_hw_max >> SECTOR_SHIFT=%d max_hw_sectors=%d lim=%pS\n",
+		__func__, lim->atomic_write_hw_max >> SECTOR_SHIFT, lim->max_hw_sectors, lim);
 	lim->atomic_write_max_sectors =
 		min(lim->atomic_write_hw_max >> SECTOR_SHIFT,
 			lim->max_hw_sectors);
