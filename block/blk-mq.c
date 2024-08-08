@@ -2071,7 +2071,7 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 		if (nr_budgets)
 			nr_budgets--;
 		if (rq->cmd_flags & REQ_ATOMIC)
-			pr_err("%s REQ_ATOMIC queue_rq=%pS bio=%pS\n", __func__, q->mq_ops->queue_rq, rq->bio);
+			pr_err_once("%s REQ_ATOMIC queue_rq=%pS bio=%pS\n", __func__, q->mq_ops->queue_rq, rq->bio);
 		blk_mq_check_atomic_write(rq);
 		ret = q->mq_ops->queue_rq(hctx, &bd);
 		switch (ret) {
@@ -2614,7 +2614,7 @@ static blk_status_t __blk_mq_issue_directly(struct blk_mq_hw_ctx *hctx,
 	 * previously would have done.
 	 */
 	if (rq->cmd_flags & REQ_ATOMIC)
-		pr_err("%s REQ_ATOMIC queue_rq=%pS rq=%pS\n", __func__, q->mq_ops->queue_rq, rq->bio);
+		pr_err_once("%s REQ_ATOMIC queue_rq=%pS rq=%pS\n", __func__, q->mq_ops->queue_rq, rq->bio);
 	blk_mq_check_atomic_write(rq);
 	ret = q->mq_ops->queue_rq(hctx, &bd);
 	switch (ret) {
