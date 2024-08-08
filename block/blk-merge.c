@@ -366,9 +366,9 @@ split:
 			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, max_bytes, bio->bi_bdev);
 		pr_err("%s3 split REQ_ATOMIC split_bio=%pS bi_sector=%lld bi_size=%d max_bytes=%d bi_bdev=%pS\n",
 			__func__, split_bio, split_bio->bi_iter.bi_sector, split_bio->bi_iter.bi_size, max_bytes, split_bio->bi_bdev);
-		//bio->bi_status = BLK_STS_IOERR;
-		//bio_endio(bio);
-		//return ERR_PTR(-EINVAL);
+		bio->bi_status = BLK_STS_IOERR;
+		bio_endio(bio);
+		return ERR_PTR(-EINVAL);
 	}
 	return split_bio;
 }
