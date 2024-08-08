@@ -2007,7 +2007,7 @@ static void blk_mq_check_atomic_write(struct request *rq)
 {
 	struct request_queue *q = rq->q;
 	unsigned int atomic_write_boundary = queue_atomic_write_boundary_bytes(q);
-	unsigned int atomic_max_bytes = queue_atomic_write_unit_max_bytes(q);
+	unsigned int atomic_max_bytes = queue_atomic_write_max_bytes(q);
 
 	if (req_op(rq) != REQ_OP_WRITE)
 		return;
@@ -2016,8 +2016,10 @@ static void blk_mq_check_atomic_write(struct request *rq)
 		return;	
 
 
-	if (blk_rq_bytes(rq) > atomic_max_bytes)
+	if (blk_rq_bytes(rq) > atomic_max_bytes) {
+		pr_err("%s atomic_max_bytes=%d blk_rq_bytes(rq)=%d\n", __func__, atomic_max_bytes, blk_rq_bytes(rq));
 		BUG();
+	}
 		
 	if (atomic_write_boundary) {
 		bool straddles = bio_straddles_boundary(rq->bio, blk_rq_bytes(rq), atomic_write_boundary);
