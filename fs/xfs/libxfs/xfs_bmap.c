@@ -5479,6 +5479,7 @@ __xfs_bunmapi(
 	xfs_extnum_t		extno;		/* extent number in list */
 	struct xfs_bmbt_irec	got;		/* current extent record */
 	struct xfs_ifork	*ifp;		/* inode fork pointer */
+	int			isrt;		/* freeing in rt area */
 	int			logflags;	/* transaction logging flags */
 	xfs_extlen_t		mod;		/* rt extent offset */
 	struct xfs_mount	*mp = ip->i_mount;
@@ -5572,6 +5573,12 @@ __xfs_bunmapi(
 
 		mod = xfs_bmap_alloc_unit_offset(ip, alloc_fsb,
 				del.br_startblock + del.br_blockcount);
+		if (isrt) {
+			xfs_extlen_t mod_rt = xfs_rtb_to_rtxoff(mp,
+					del.br_startblock + del.br_blockcount);
+			BUG_ON(mod != mod_rt);
+			pr_err_once("%s1 mod_rt ok\n", __func__);
+		}
 		if (mod) {
 			/*
 			 * Not aligned to allocation unit on the end.
@@ -5621,6 +5628,16 @@ __xfs_bunmapi(
 
 		mod = xfs_bmap_alloc_unit_offset(ip, alloc_fsb,
 					del.br_startblock);
+		if (isrt) {
+			xfs_extlen_t mod_rt = xfs_rtb_to_rtxoff(mp, del.br_startblock);
+			BUG_ON(mod != mod_rt);
+			if (mod) {
+				xfs_extlen_t off_rt = mp->m_sb.sb_rextsize - mod;
+				xfs_extlen_t off = alloc_fsb - mod;
+				BUG_ON(off_rt != off);
+			}
+			pr_err_once("%s2 mod_rt ok\n", __func__);
+		}
 		if (mod) {
 			xfs_extlen_t off = alloc_fsb - mod;
 			/*
