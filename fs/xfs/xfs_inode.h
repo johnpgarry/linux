@@ -645,6 +645,8 @@ unsigned int xfs_inode_alloc_fsbsize(struct xfs_inode *ip);
 unsigned int xfs_inode_alloc_unitsize(struct xfs_inode *ip);
 xfs_fileoff_t xfs_inode_roundup_alloc_unit(struct xfs_inode *ip,
 		xfs_fileoff_t offset);
+xfs_fileoff_t xfs_inode_rounddown_alloc_unit(struct xfs_inode *ip,
+		xfs_fileoff_t offset);
 
 int xfs_icreate_dqalloc(const struct xfs_icreate_args *args,
 		struct xfs_dquot **udqpp, struct xfs_dquot **gdqpp,
