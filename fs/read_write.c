@@ -1752,3 +1752,4 @@ bool generic_atomic_write_valid(struct kiocb *iocb, struct iov_iter *iter)
 
 	return true;
 }
+EXPORT_SYMBOL_GPL(generic_atomic_write_valid);
