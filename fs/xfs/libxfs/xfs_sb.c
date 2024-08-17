@@ -166,6 +166,8 @@ xfs_sb_version_to_features(
 		features |= XFS_FEAT_INOBTCNT;
 	if (sbp->sb_features_ro_compat & XFS_SB_FEAT_RO_COMPAT_FORCEALIGN)
 		features |= XFS_FEAT_FORCEALIGN;
+	if (sbp->sb_features_ro_compat & XFS_SB_FEAT_RO_COMPAT_ATOMICWRITES)
+		features |= XFS_FEAT_ATOMICWRITES;
 	if (sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_FTYPE)
 		features |= XFS_FEAT_FTYPE;
 	if (sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_SPINODES)
@@ -554,6 +556,11 @@ xfs_validate_sb_common(
 		xfs_warn(mp, "inode size of %d bytes not supported",
 				sbp->sb_inodesize);
 		return -ENOSYS;
+	}
+
+	if (xfs_has_atomicwrites(mp) && !xfs_has_forcealign(mp)) {
+		xfs_warn(mp, "forcealign required for atomicwrites!");
+		return -EINVAL;
 	}
 
 	return 0;

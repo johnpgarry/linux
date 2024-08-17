@@ -502,6 +502,49 @@ xfs_ioctl_setattr_forcealign(
 	return 0;
 }
 
+
+/*
+ * Forcealign requires a power-of-2 extent size hint.
+ */
+static int
+xfs_ioctl_setattr_atomicwrites(
+	struct xfs_inode	*ip,
+	struct fileattr		*fa)
+{
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	struct xfs_mount	*mp = ip->i_mount;
+	uint32_t		extsize = XFS_B_TO_FSB(mp, fa->fsx_extsize);
+	struct xfs_sb		*sbp = &mp->m_sb;
+
+	if (!xfs_has_atomicwrites(mp))
+		return -EINVAL;
+
+	if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
+		return -EINVAL;
+
+	if (!is_power_of_2(extsize))
+		return -EINVAL;
+
+	/* Required to guarantee data block alignment */
+	if (mp->m_sb.sb_agblocks % extsize)
+		return -EINVAL;
+
+	/* Requires stripe unit+width be a multiple of extsize */
+	if (mp->m_dalign && (mp->m_dalign % extsize))
+		return -EINVAL;
+
+	if (mp->m_swidth && (mp->m_swidth % extsize))
+		return -EINVAL;
+
+	if (target->bt_bdev_awu_min > sbp->sb_blocksize)
+		return -EINVAL;
+
+	if (target->bt_bdev_awu_max < fa->fsx_extsize)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int
 xfs_ioctl_setattr_xflags(
 	struct xfs_trans	*tp,
@@ -511,8 +554,11 @@ xfs_ioctl_setattr_xflags(
 	struct xfs_mount	*mp = ip->i_mount;
 	bool			rtflag = (fa->fsx_xflags & FS_XFLAG_REALTIME);
 	bool			forcealign = fa->fsx_xflags & FS_XFLAG_FORCEALIGN;
+	bool			atomic_writes;
 	uint64_t		i_flags2;
 	int			error;
+
+	atomic_writes = fa->fsx_xflags & FS_XFLAG_ATOMICWRITES;
 
 	/* Can't change RT or forcealign flags if any extents are allocated. */
 	if (rtflag != XFS_IS_REALTIME_INODE(ip) ||
@@ -550,6 +596,12 @@ xfs_ioctl_setattr_xflags(
 
 	if (forcealign) {
 		error = xfs_ioctl_setattr_forcealign(ip, fa);
+		if (error)
+			return error;
+	}
+
+	if (atomic_writes) {
+		error = xfs_ioctl_setattr_atomicwrites(ip, fa);
 		if (error)
 			return error;
 	}

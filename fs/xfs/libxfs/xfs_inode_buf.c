@@ -483,6 +483,40 @@ xfs_dinode_verify_nrext64(
 	return NULL;
 }
 
+static xfs_failaddr_t
+xfs_inode_validate_atomicwrites(
+	struct xfs_mount	*mp,
+	uint32_t		extsize,
+	uint64_t		flags2)
+{
+	/* superblock rocompat feature flag */
+	if (!xfs_has_atomicwrites(mp))
+		return __this_address;
+
+	/*
+	 * forcealign is required, so rely on sanity checks in
+	 * xfs_inode_validate_forcealign()
+	 */
+	if (!(flags2 & XFS_DIFLAG2_FORCEALIGN))
+		return __this_address;
+
+	if (!is_power_of_2(extsize))
+		return __this_address;
+
+	/* Required to guarantee data block alignment */
+	if (mp->m_sb.sb_agblocks % extsize)
+		return __this_address;
+
+	/* Requires stripe unit+width be a multiple of extsize */
+	if (mp->m_dalign && (mp->m_dalign % extsize))
+		return __this_address;
+
+	if (mp->m_swidth && (mp->m_swidth % extsize))
+		return __this_address;
+
+	return NULL;
+}
+
 xfs_failaddr_t
 xfs_dinode_verify(
 	struct xfs_mount	*mp,
@@ -662,6 +696,14 @@ xfs_dinode_verify(
 				be32_to_cpu(dip->di_extsize),
 				be32_to_cpu(dip->di_cowextsize),
 				mode, flags, flags2);
+		if (fa)
+			return fa;
+	}
+
+	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		fa = xfs_inode_validate_atomicwrites(mp,
+				be32_to_cpu(dip->di_extsize),
+				flags2);
 		if (fa)
 			return fa;
 	}
