@@ -1209,6 +1209,15 @@ out_unlock:
 	return remapped > 0 ? remapped : ret;
 }
 
+static bool xfs_file_open_can_atomicwrite(
+	struct inode		*inode,
+	struct file		*file)
+{
+	if (!(file->f_flags & O_DIRECT))
+		return false;
+	return xfs_inode_can_atomicwrite(XFS_I(inode));
+}
+
 STATIC int
 xfs_file_open(
 	struct inode	*inode,
@@ -1217,6 +1226,8 @@ xfs_file_open(
 	if (xfs_is_shutdown(XFS_M(inode->i_sb)))
 		return -EIO;
 	file->f_mode |= FMODE_NOWAIT | FMODE_CAN_ODIRECT;
+	if (xfs_file_open_can_atomicwrite(inode, file))
+		file->f_mode |= FMODE_CAN_ATOMIC_WRITE;
 	return generic_file_open(inode, file);
 }
 
