@@ -278,6 +278,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
 	unsigned int fs_block_size = i_blocksize(inode), pad;
+	struct iov_iter *i = dio->submit.iter;
 	loff_t length = iomap_length(iter);
 	loff_t pos = iter->pos;
 	blk_opf_t bio_opf;
@@ -289,7 +290,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
-	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
+	    !bdev_iter_is_aligned(iomap->bdev, i))
 		return -EINVAL;
 
 	if (iomap->type == IOMAP_UNWRITTEN) {
@@ -327,10 +328,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 * are operating on right now.  The iter will be re-expanded once
 	 * we are done.
 	 */
-	orig_count = iov_iter_count(dio->submit.iter);
-	iov_iter_truncate(dio->submit.iter, length);
+	orig_count = iov_iter_count(i);
+	iov_iter_truncate(i, length);
 
-	if (!iov_iter_count(dio->submit.iter))
+	if (!iov_iter_count(i))
 		goto out;
 
 	/*
@@ -367,11 +368,11 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 */
 	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua);
 
-	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
+	nr_pages = bio_iov_vecs_to_alloc(i, BIO_MAX_VECS);
 	do {
 		size_t n;
 		if (dio->error) {
-			iov_iter_revert(dio->submit.iter, copied);
+			iov_iter_revert(i, copied);
 			copied = ret = 0;
 			goto out;
 		}
@@ -385,7 +386,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		bio->bi_private = dio;
 		bio->bi_end_io = iomap_dio_bio_end_io;
 
-		ret = bio_iov_iter_get_pages(bio, dio->submit.iter);
+		ret = bio_iov_iter_get_pages(bio, i);
 		if (unlikely(ret)) {
 			/*
 			 * We have to stop part way through an IO. We must fall
@@ -408,8 +409,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		dio->size += n;
 		copied += n;
 
-		nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter,
-						 BIO_MAX_VECS);
+		nr_pages = bio_iov_vecs_to_alloc(i, BIO_MAX_VECS);
 		/*
 		 * We can only poll for single bio I/Os.
 		 */
@@ -435,7 +435,7 @@ zero_tail:
 	}
 out:
 	/* Undo iter limitation to current extent */
-	iov_iter_reexpand(dio->submit.iter, orig_count - copied);
+	iov_iter_reexpand(i, orig_count - copied);
 	if (copied)
 		return copied;
 	return ret;
