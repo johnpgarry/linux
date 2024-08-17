@@ -37,6 +37,7 @@ struct iomap_dio {
 	int			error;
 	size_t			done_before;
 	bool			wait_for_completion;
+	struct bio		*atomic_bio;
 
 	union {
 		/* used during submission and for synchronous completion: */
@@ -267,7 +268,7 @@ static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
  * clearing the WRITE_THROUGH flag in the dio request.
  */
 static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
-		const struct iomap *iomap, bool use_fua)
+		const struct iomap *iomap, bool use_fua, bool atomic)
 {
 	blk_opf_t opflags = REQ_SYNC | REQ_IDLE;
 
@@ -279,6 +280,8 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 		opflags |= REQ_FUA;
 	else
 		dio->flags &= ~IOMAP_DIO_WRITE_THROUGH;
+	if (atomic)
+		opflags |= REQ_ATOMIC;
 
 	return opflags;
 }
@@ -286,6 +289,7 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		struct iomap_dio *dio)
 {
+	bool atomic = dio->iocb->ki_flags & IOCB_ATOMIC;
 	const struct iomap *iomap = &iter->iomap;
 	struct inode *inode = iter->inode;
 	unsigned int fs_block_size = i_blocksize(inode), pad;
@@ -296,7 +300,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	struct bio *bio;
 	bool need_zeroout = false;
 	bool use_fua = false;
-	int nr_pages, ret = 0;
+	int nr_pages, orig_nr_pages, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
 
@@ -332,6 +336,26 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			use_fua = true;
 		else if (dio->flags & IOMAP_DIO_NEED_SYNC)
 			dio->flags &= ~IOMAP_DIO_CALLER_COMP;
+	}
+
+	if (dio->atomic_bio) {
+		/*
+		 * These should not fail, but check just in case.
+		 * Caller takes care of freeing the bio.
+		 */
+		if (iter->iomap.bdev != dio->atomic_bio->bi_bdev) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		if (dio->atomic_bio->bi_iter.bi_sector +
+		    (dio->atomic_bio->bi_iter.bi_size >> SECTOR_SHIFT) !=
+			iomap_sector(iomap, pos)) {
+			ret = -EINVAL;
+			goto out;
+		}
+	} else if (atomic) {
+		orig_nr_pages = bio_iov_vecs_to_alloc(i, BIO_MAX_VECS);
 	}
 
 	/*
@@ -377,7 +401,31 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	 * can set up the page vector appropriately for a ZONE_APPEND
 	 * operation.
 	 */
-	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua);
+	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, atomic);
+
+	if (atomic) {
+		size_t orig_atomic_size;
+
+		if (!dio->atomic_bio) {
+			dio->atomic_bio = iomap_dio_create_bio(iter,
+					dio, orig_nr_pages, bio_opf, pos);
+		}
+		orig_atomic_size = dio->atomic_bio->bi_iter.bi_size;
+
+		/*
+		 * In case of error, caller takes care of freeing the bio. The
+		 * smallest size of atomic write is i_blocksize size, so no
+		 * need for tail zeroing out.
+		 */
+		ret = bio_iov_iter_get_pages(dio->atomic_bio, i);
+		if (!ret) {
+			copied = dio->atomic_bio->bi_iter.bi_size -
+				orig_atomic_size;
+		}
+
+		dio->size += copied;
+		goto out;
+	}
 
 	nr_pages = bio_iov_vecs_to_alloc(i, BIO_MAX_VECS);
 	do {
@@ -559,6 +607,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	struct blk_plug plug;
 	struct iomap_dio *dio;
 	loff_t ret = 0;
+	size_t orig_count = iov_iter_count(iter);
 
 	trace_iomap_dio_rw_begin(iocb, iter, dio_flags, done_before);
 
@@ -583,6 +632,13 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iomi.flags |= IOMAP_NOWAIT;
+
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		if (bio_iov_vecs_to_alloc(iter, INT_MAX) > BIO_MAX_VECS)
+			return ERR_PTR(-EINVAL);
+		iomi.flags |= IOMAP_ATOMIC;
+	}
+	dio->atomic_bio = NULL;
 
 	if (iov_iter_rw(iter) == READ) {
 		/* reads can always complete inline */
@@ -667,6 +723,24 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		 * We can only poll for single bio I/Os.
 		 */
 		iocb->ki_flags &= ~IOCB_HIPRI;
+	}
+
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		if (ret >= 0) {
+			if (dio->size == orig_count) {
+				iomap_dio_submit_bio(&iomi, dio,
+					dio->atomic_bio, iocb->ki_pos);
+			} else {
+				if (dio->atomic_bio){
+					bio_put(dio->atomic_bio);
+					dio->atomic_bio = NULL;
+				}
+				ret = -EINVAL;
+			}
+		} else if (dio->atomic_bio) {
+			bio_put(dio->atomic_bio);
+			dio->atomic_bio = NULL;
+		}
 	}
 
 	blk_finish_plug(&plug);
