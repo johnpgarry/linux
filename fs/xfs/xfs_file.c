@@ -684,9 +684,20 @@ xfs_file_dio_write(
 	struct kiocb		*iocb,
 	struct iov_iter		*from)
 {
-	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
+	struct inode		*inode = file_inode(iocb->ki_filp);
+	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+	struct xfs_mount	*mp = ip->i_mount;
+
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		if (count < i_blocksize(inode))
+			return -EINVAL;
+		if (count > XFS_FSB_TO_B(mp, ip->i_extsize))
+			return -EINVAL;
+		if (!generic_atomic_write_valid(iocb, from))
+			return -EINVAL;
+	}
 
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
