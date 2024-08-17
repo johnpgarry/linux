@@ -688,6 +688,13 @@ xfs_file_dio_write(
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
 
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		if (count != ip->i_mount->m_sb.sb_blocksize)
+			return -EINVAL;
+		if (!generic_atomic_write_valid(iocb, from))
+			return -EINVAL;
+	}
+
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
