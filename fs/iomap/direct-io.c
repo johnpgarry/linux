@@ -61,6 +61,24 @@ static struct bio *iomap_dio_alloc_bio(const struct iomap_iter *iter,
 	return bio_alloc(iter->iomap.bdev, nr_vecs, opf, GFP_KERNEL);
 }
 
+static struct bio *iomap_dio_create_bio(const struct iomap_iter *iter,
+		struct iomap_dio *dio, unsigned short nr_vecs, blk_opf_t opf,
+		loff_t pos)
+{
+	struct bio *bio = iomap_dio_alloc_bio(iter, dio, nr_vecs, opf);
+	struct inode *inode = iter->inode;
+
+	fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
+					  GFP_KERNEL);
+	bio->bi_iter.bi_sector = iomap_sector(&iter->iomap, pos);
+	bio->bi_write_hint = inode->i_write_hint;
+	bio->bi_ioprio = dio->iocb->ki_ioprio;
+	bio->bi_private = dio;
+	bio->bi_end_io = iomap_dio_bio_end_io;
+
+	return bio;
+}
+
 static void iomap_dio_submit_bio(const struct iomap_iter *iter,
 		struct iomap_dio *dio, struct bio *bio, loff_t pos)
 {
@@ -235,16 +253,9 @@ EXPORT_SYMBOL_GPL(iomap_dio_bio_end_io);
 static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 		loff_t pos, unsigned len)
 {
-	struct inode *inode = file_inode(dio->iocb->ki_filp);
 	struct page *page = ZERO_PAGE(0);
-	struct bio *bio;
-
-	bio = iomap_dio_alloc_bio(iter, dio, 1, REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
-	fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
-				  GFP_KERNEL);
-	bio->bi_iter.bi_sector = iomap_sector(&iter->iomap, pos);
-	bio->bi_private = dio;
-	bio->bi_end_io = iomap_dio_bio_end_io;
+	struct bio *bio = iomap_dio_create_bio(iter, dio, 1,
+			REQ_OP_WRITE | REQ_SYNC | REQ_IDLE, pos);
 
 	__bio_add_page(bio, page, len, 0);
 	iomap_dio_submit_bio(iter, dio, bio, pos);
@@ -377,14 +388,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			goto out;
 		}
 
-		bio = iomap_dio_alloc_bio(iter, dio, nr_pages, bio_opf);
-		fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
-					  GFP_KERNEL);
-		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
-		bio->bi_write_hint = inode->i_write_hint;
-		bio->bi_ioprio = dio->iocb->ki_ioprio;
-		bio->bi_private = dio;
-		bio->bi_end_io = iomap_dio_bio_end_io;
+		bio = iomap_dio_create_bio(iter, dio, nr_pages, bio_opf, pos);
 
 		ret = bio_iov_iter_get_pages(bio, i);
 		if (unlikely(ret)) {
