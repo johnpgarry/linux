@@ -1157,8 +1157,7 @@ static bool xfs_file_open_can_atomicwrite(
 
 	if (!(file->f_flags & O_DIRECT))
 		return false;
-
-	return xfs_inode_has_atomicwrites(ip);
+	return xfs_inode_can_atomicwrite(ip);
 }
 
 STATIC int

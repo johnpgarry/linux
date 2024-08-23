@@ -326,6 +326,11 @@ static inline bool xfs_inode_has_atomicwrites(struct xfs_inode *ip)
 	return ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES;
 }
 
+unsigned int xfs_inode_alloc_unitsize(struct xfs_inode *ip);
+
+bool xfs_inode_can_atomicwrite(struct xfs_inode *ip);
+
+
 /*
  * Decide if this file is a realtime file whose data allocation unit is larger
  * than a single filesystem block.
@@ -647,7 +652,6 @@ bool xfs_ifork_zapped(const struct xfs_inode *ip, int whichfork);
 void xfs_inode_count_blocks(struct xfs_trans *tp, struct xfs_inode *ip,
 		xfs_filblks_t *dblocks, xfs_filblks_t *rblocks);
 unsigned int xfs_inode_alloc_fsbsize(struct xfs_inode *ip);
-unsigned int xfs_inode_alloc_unitsize(struct xfs_inode *ip);
 xfs_fileoff_t xfs_inode_roundup_alloc_unit(struct xfs_inode *ip,
 		xfs_fileoff_t offset);
 xfs_fileoff_t xfs_inode_rounddown_alloc_unit(struct xfs_inode *ip,

@@ -3160,3 +3160,21 @@ xfs_is_always_cow_inode(
 {
 	return ip->i_mount->m_always_cow && xfs_has_reflink(ip->i_mount);
 }
+
+bool xfs_inode_can_atomicwrite(struct xfs_inode *ip)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+
+	if (!xfs_inode_has_atomicwrites(ip))
+		return false;
+	if (mp->m_dalign && (mp->m_dalign % ip->i_extsize))
+		return false;
+	if (mp->m_swidth && (mp->m_swidth % ip->i_extsize))
+		return false;
+	if (mp->m_sb.sb_blocksize < target->bt_bdev_awu_min)
+		return false;
+	if (xfs_inode_alloc_unitsize(ip) > target->bt_bdev_awu_max)
+		return false;
+	return true;
+}

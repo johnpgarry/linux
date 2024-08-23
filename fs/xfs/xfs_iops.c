@@ -581,7 +581,7 @@ xfs_get_atomic_write_attr(
 	struct xfs_sb		*sbp = &mp->m_sb;
 	unsigned int		extsz_bytes = XFS_FSB_TO_B(mp, ip->i_extsize);
 
-	if (!xfs_inode_has_atomicwrites(ip)) {
+	if (!xfs_inode_can_atomicwrite(ip)) {
 		*unit_min = 0;
 		*unit_max = 0;
 		return;
