@@ -178,7 +178,10 @@ xfs_inode_from_disk(
 	struct xfs_inode	*ip,
 	struct xfs_dinode	*from)
 {
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct inode		*inode = VFS_I(ip);
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_sb		*sbp = &mp->m_sb;
 	int			error;
 	xfs_failaddr_t		fa;
 
@@ -261,6 +264,18 @@ xfs_inode_from_disk(
 	}
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
+
+	if (xfs_inode_has_atomicwrites(ip)) {
+		pr_err("%s xfs_inode_has_atomicwrites=1 i_ino=%lld\n", __func__,
+			ip->i_ino);
+		if (sbp->sb_blocksize < target->bt_bdev_awu_min ||
+			sbp->sb_blocksize * ip->i_extsize > target->bt_bdev_awu_max) {
+				ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
+				pr_err("%s2 xfs_inode_has_atomicwrites=1 i_ino=%lld clearing\n", __func__,
+					ip->i_ino);
+		}
+	}
+
 	return 0;
 
 out_destroy_data_fork:
