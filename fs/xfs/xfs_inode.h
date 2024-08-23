@@ -321,15 +321,10 @@ static inline bool xfs_inode_has_forcealign(struct xfs_inode *ip)
 	return ip->i_diflags2 & XFS_DIFLAG2_FORCEALIGN;
 }
 
-static inline bool xfs_inode_has_atomicwrites(struct xfs_inode *ip)
-{
-	return ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES;
-}
-
 unsigned int xfs_inode_alloc_unitsize(struct xfs_inode *ip);
+bool xfs_inode_has_atomicwrites(struct xfs_inode *ip);
 
-bool xfs_inode_can_atomicwrite(struct xfs_inode *ip);
-
+bool xfs_validate_atomicwrites_extsize(struct xfs_mount *mp, uint32_t extsize);
 
 /*
  * Decide if this file is a realtime file whose data allocation unit is larger

@@ -178,10 +178,7 @@ xfs_inode_from_disk(
 	struct xfs_inode	*ip,
 	struct xfs_dinode	*from)
 {
-	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct inode		*inode = VFS_I(ip);
-	struct xfs_mount	*mp = ip->i_mount;
-	struct xfs_sb		*sbp = &mp->m_sb;
 	int			error;
 	xfs_failaddr_t		fa;
 
@@ -264,17 +261,6 @@ xfs_inode_from_disk(
 	}
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
-
-	if (xfs_inode_has_atomicwrites(ip)) {
-		pr_err("%s xfs_inode_has_atomicwrites=1 i_ino=%lld\n", __func__,
-			ip->i_ino);
-		if (sbp->sb_blocksize < target->bt_bdev_awu_min ||
-			sbp->sb_blocksize * ip->i_extsize > target->bt_bdev_awu_max) {
-				ip->i_diflags2 &= ~XFS_DIFLAG2_ATOMICWRITES;
-				pr_err("%s2 xfs_inode_has_atomicwrites=1 i_ino=%lld clearing\n", __func__,
-					ip->i_ino);
-		}
-	}
 
 	return 0;
 
@@ -515,18 +501,7 @@ xfs_inode_validate_atomicwrites(
 	if (!(flags2 & XFS_DIFLAG2_FORCEALIGN))
 		return __this_address;
 
-	if (!is_power_of_2(extsize))
-		return __this_address;
-
-	/* Required to guarantee data block alignment */
-	if (mp->m_sb.sb_agblocks % extsize)
-		return __this_address;
-
-	/* Requires stripe unit+width be a multiple of extsize */
-	if (mp->m_dalign && (mp->m_dalign % extsize))
-		return __this_address;
-
-	if (mp->m_swidth && (mp->m_swidth % extsize))
+	if (!xfs_validate_atomicwrites_extsize(mp, extsize))
 		return __this_address;
 
 	return NULL;

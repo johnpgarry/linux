@@ -3161,16 +3161,33 @@ xfs_is_always_cow_inode(
 	return ip->i_mount->m_always_cow && xfs_has_reflink(ip->i_mount);
 }
 
-bool xfs_inode_can_atomicwrite(struct xfs_inode *ip)
+bool xfs_validate_atomicwrites_extsize(struct xfs_mount *mp, uint32_t extsize)
+{
+	if (!is_power_of_2(extsize))
+		return false;
+
+	/* Required to guarantee data block alignment */
+	if (mp->m_sb.sb_agblocks % extsize)
+		return false;
+
+	/* Requires stripe unit+width be a multiple of extsize */
+	if (mp->m_dalign && (mp->m_dalign % extsize))
+		return false;
+
+	if (mp->m_swidth && (mp->m_swidth % extsize))
+		return false;
+
+	return true;
+}
+
+bool xfs_inode_has_atomicwrites(struct xfs_inode *ip)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 
-	if (!xfs_inode_has_atomicwrites(ip))
+	if (!(ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES))
 		return false;
-	if (mp->m_dalign && (mp->m_dalign % ip->i_extsize))
-		return false;
-	if (mp->m_swidth && (mp->m_swidth % ip->i_extsize))
+	if (!xfs_validate_atomicwrites_extsize(mp, ip->i_extsize))
 		return false;
 	if (mp->m_sb.sb_blocksize < target->bt_bdev_awu_min)
 		return false;

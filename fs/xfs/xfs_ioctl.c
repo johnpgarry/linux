@@ -522,18 +522,7 @@ xfs_ioctl_setattr_atomicwrites(
 	if (!(fa->fsx_xflags & FS_XFLAG_FORCEALIGN))
 		return -EINVAL;
 
-	if (!is_power_of_2(extsize))
-		return -EINVAL;
-
-	/* Required to guarantee data block alignment */
-	if (mp->m_sb.sb_agblocks % extsize)
-		return -EINVAL;
-
-	/* Requires stripe unit+width be a multiple of extsize */
-	if (mp->m_dalign && (mp->m_dalign % extsize))
-		return -EINVAL;
-
-	if (mp->m_swidth && (mp->m_swidth % extsize))
+	if (!xfs_validate_atomicwrites_extsize(mp, extsize))
 		return -EINVAL;
 
 	if (target->bt_bdev_awu_min > sbp->sb_blocksize)
