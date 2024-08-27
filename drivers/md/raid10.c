@@ -2102,7 +2102,7 @@ static int raid10_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 			continue;
 		}
 
-		err = mddev_stack_new_rdev(mddev, rdev, true);
+		err = mddev_stack_new_rdev(mddev, rdev);
 		if (err)
 			return err;
 		p->head_position = 0;
@@ -2120,7 +2120,7 @@ static int raid10_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 		clear_bit(In_sync, &rdev->flags);
 		set_bit(Replacement, &rdev->flags);
 		rdev->raid_disk = repl_slot;
-		err = mddev_stack_new_rdev(mddev, rdev, true);
+		err = mddev_stack_new_rdev(mddev, rdev);
 		if (err)
 			return err;
 		conf->fullsync = 1;
@@ -3973,8 +3973,9 @@ static int raid10_set_queue_limits(struct mddev *mddev)
 	struct r10conf *conf = mddev->private;
 	struct queue_limits lim;
 	int err;
-
+	pr_err("%s mddev=%pS\n", __func__, mddev);
 	md_init_stacking_limits(&lim);
+	lim.max_write_zeroes_sectors = 0;
 	lim.max_write_zeroes_sectors = 0;
 	lim.io_min = mddev->chunk_sectors << 9;
 	lim.io_opt = lim.io_min * raid10_nr_stripes(conf);
