@@ -436,6 +436,11 @@ static void close_write(struct r10bio *r10_bio)
 
 static void one_write_done(struct r10bio *r10_bio)
 {
+
+	if (r10_bio->master_bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC r10_bio=%pS remaining=%d\n",
+				__func__, r10_bio, atomic_read(&r10_bio->remaining));
+
 	if (atomic_dec_and_test(&r10_bio->remaining)) {
 		if (test_bit(R10BIO_WriteError, &r10_bio->state))
 			reschedule_retry(r10_bio);
