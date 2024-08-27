@@ -8742,6 +8742,9 @@ void md_write_start(struct mddev *mddev, struct bio *bi)
 {
 	int did_change = 0;
 
+	if (bi->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bi=%pS\n", __func__, bi);
+
 	if (bio_data_dir(bi) != WRITE)
 		return;
 
