@@ -1159,6 +1159,8 @@ static void raid10_read_request(struct mddev *mddev, struct bio *bio,
 	struct md_rdev *err_rdev = NULL;
 	gfp_t gfp = GFP_NOIO;
 
+	pr_err("%s bio=%pS slot=%d\n", __func__, bio, slot);
+
 	if (slot >= 0 && r10_bio->devs[slot].rdev) {
 		/*
 		 * This is an error retry, but we cannot
@@ -1244,16 +1246,24 @@ static void raid10_write_one_disk(struct mddev *mddev, struct r10bio *r10_bio,
 	const enum req_op op = bio_op(bio);
 	const blk_opf_t do_sync = bio->bi_opf & REQ_SYNC;
 	const blk_opf_t do_fua = bio->bi_opf & REQ_FUA;
+	const blk_opf_t do_atomic = bio->bi_opf & REQ_ATOMIC;
 	unsigned long flags;
 	struct r10conf *conf = mddev->private;
 	struct md_rdev *rdev;
 	int devnum = r10_bio->devs[n_copy].devnum;
 	struct bio *mbio;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS r10_bio=%pS mddev_is_clustered=%d n_copy=%d mddev=%pS\n",
+				__func__, bio, r10_bio, mddev_is_clustered(mddev), n_copy, mddev);
+
 	rdev = replacement ? conf->mirrors[devnum].replacement :
 			     conf->mirrors[devnum].rdev;
 
 	mbio = bio_alloc_clone(rdev->bdev, bio, GFP_NOIO, &mddev->bio_set);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s1 REQ_ATOMIC bio=%pS r10_bio=%pS mddev_is_clustered=%d n_copy=%d mddev=%pS mbio=%pS\n",
+				__func__, bio, r10_bio, mddev_is_clustered(mddev), n_copy, mddev, mbio);
 	if (replacement)
 		r10_bio->devs[n_copy].repl_bio = mbio;
 	else
@@ -1262,7 +1272,7 @@ static void raid10_write_one_disk(struct mddev *mddev, struct r10bio *r10_bio,
 	mbio->bi_iter.bi_sector	= (r10_bio->devs[n_copy].addr +
 				   choose_data_offset(r10_bio, rdev));
 	mbio->bi_end_io	= raid10_end_write_request;
-	mbio->bi_opf = op | do_sync | do_fua;
+	mbio->bi_opf = op | do_sync | do_fua | do_atomic;
 	if (!replacement && test_bit(FailFast,
 				     &conf->mirrors[devnum].rdev->flags)
 			 && enough(conf, devnum))
@@ -1349,7 +1359,9 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 	int i;
 	sector_t sectors;
 	int max_sectors;
-
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS r10_bio=%pS mddev_is_clustered=%d\n",
+			__func__, bio, r10_bio, mddev_is_clustered(mddev));
 	if ((mddev_is_clustered(mddev) &&
 	     md_cluster_ops->area_resyncing(mddev, WRITE,
 					    bio->bi_iter.bi_sector,
@@ -1415,12 +1427,18 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 
 	max_sectors = r10_bio->sectors;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s8 REQ_ATOMIC bio=%pS r10_bio=%pS mddev_is_clustered=%d copies=%d\n",
+			__func__, bio, r10_bio, mddev_is_clustered(mddev), conf->copies);
 	for (i = 0;  i < conf->copies; i++) {
 		int d = r10_bio->devs[i].devnum;
 		struct md_rdev *rdev, *rrdev;
 
 		rdev = conf->mirrors[d].rdev;
 		rrdev = conf->mirrors[d].replacement;
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s8.1 REQ_ATOMIC bio=%pS r10_bio=%pS mddev_is_clustered=%d copies=%d rdev=%pS rrdev=%pS\n",
+				__func__, bio, r10_bio, mddev_is_clustered(mddev), conf->copies, rdev, rrdev);
 		if (rdev && (test_bit(Faulty, &rdev->flags)))
 			rdev = NULL;
 		if (rrdev && (test_bit(Faulty, &rrdev->flags)))
@@ -1495,6 +1513,9 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 	md_bitmap_startwrite(mddev->bitmap, r10_bio->sector, r10_bio->sectors, 0);
 
 	for (i = 0; i < conf->copies; i++) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s9 REQ_ATOMIC bio=%pS r10_bio=%pS mddev_is_clustered=%d copies=%d\n",
+				__func__, bio, r10_bio, mddev_is_clustered(mddev), conf->copies);
 		if (r10_bio->devs[i].bio)
 			raid10_write_one_disk(mddev, r10_bio, bio, false, i);
 		if (r10_bio->devs[i].repl_bio)
@@ -1507,8 +1528,14 @@ static void __make_request(struct mddev *mddev, struct bio *bio, int sectors)
 {
 	struct r10conf *conf = mddev->private;
 	struct r10bio *r10_bio;
+	bool is_read = bio_op(bio) == REQ_OP_READ;
 
 	r10_bio = mempool_alloc(&conf->r10bio_pool, GFP_NOIO);
+
+	if (is_read)
+		pr_err("%s bio=%pS r10_bio=%pS\n", __func__, bio, r10_bio);
+	else if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS r10_bio=%pS\n", __func__, bio, r10_bio);
 
 	r10_bio->master_bio = bio;
 	r10_bio->sectors = sectors;
@@ -1831,7 +1858,12 @@ static bool raid10_make_request(struct mddev *mddev, struct bio *bio)
 	sector_t chunk_mask = (conf->geo.chunk_mask & conf->prev.chunk_mask);
 	int chunk_sects = chunk_mask + 1;
 	int sectors = bio_sectors(bio);
+	bool is_read = bio_op(bio) == REQ_OP_READ;
 
+	if (is_read)
+		pr_err("%s bio=%pS sectors=%d\n", __func__, bio, sectors);
+	else if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS sectors=%d\n", __func__, bio, sectors);
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
 		return true;
