@@ -748,10 +748,10 @@ EXPORT_SYMBOL(blk_stack_limits);
  *    attempt to combine the values and ensure proper alignment.
  */
 void queue_limits_stack_bdev(struct queue_limits *t, struct block_device *bdev,
-		sector_t offset, const char *pfx, bool disable_atomic_writes)
+		sector_t offset, const char *pfx)
 {
-	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS disable_atomic_writes=%d bdev=%pS\n",
-		__func__, t, bdev_get_queue(bdev), disable_atomic_writes, bdev);
+	pr_err("%s calling blk_stack_limits t=%pS bdev_get_queue(bdev)=%pS bdev=%pS\n",
+		__func__, t, bdev_get_queue(bdev), bdev);
 	if (blk_stack_limits(t, &bdev_get_queue(bdev)->limits,
 			get_start_sect(bdev) + offset))
 		pr_notice("%s: Warning: Device %pg is misaligned\n",

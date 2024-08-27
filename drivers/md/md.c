@@ -5806,15 +5806,14 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 		unsigned int flags)
 {
 	struct md_rdev *rdev;
-	bool disable_atomic_writes = false;
 
-	pr_err("%s mddev=%pS lim=%pS flags=0x%x disable_atomic_writes=%d\n",
-		__func__, mddev, lim, flags, disable_atomic_writes);
+	pr_err("%s mddev=%pS lim=%pS flags=0x%x\n",
+		__func__, mddev, lim, flags);
 	rdev_for_each(rdev, mddev) {
-	pr_err("%s1  mddev=%pS lim=%pS flags=0x%x disable_atomic_writes=%d rdev=%pS calling queue_limits_stack_bdev\n",
-		__func__, mddev, lim, flags, disable_atomic_writes, rdev);
+	pr_err("%s1  mddev=%pS lim=%pS flags=0x%x rdev=%pS calling queue_limits_stack_bdev\n",
+		__func__, mddev, lim, flags, rdev);
 		queue_limits_stack_bdev(lim, rdev->bdev, rdev->data_offset,
-					mddev->gendisk->disk_name, disable_atomic_writes);
+					mddev->gendisk->disk_name);
 		if ((flags & MDDEV_STACK_INTEGRITY) &&
 		    !queue_limits_stack_integrity_bdev(lim, rdev->bdev))
 			return -EINVAL;
@@ -5825,8 +5824,7 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 EXPORT_SYMBOL_GPL(mddev_stack_rdev_limits);
 
 /* apply the extra stacking limits from a new rdev into mddev */
-int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev,
-				bool disable_atomic_writes)
+int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev)
 {
 	struct queue_limits lim;
 	int rc;
@@ -5836,10 +5834,10 @@ int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev,
 
 
 	lim = queue_limits_start_update(mddev->gendisk->queue);
-	pr_err("%s mddev=%pS rdev=%pS lim=%pS rdev=%pS disable_atomic_writes=%d calling queue_limits_stack_bdev\n",
-		__func__, mddev, rdev, &lim, rdev, disable_atomic_writes);
+	pr_err("%s mddev=%pS rdev=%pS lim=%pS rdev=%pS calling queue_limits_stack_bdev\n",
+		__func__, mddev, rdev, &lim, rdev);
 	queue_limits_stack_bdev(&lim, rdev->bdev, rdev->data_offset,
-				mddev->gendisk->disk_name, disable_atomic_writes);
+				mddev->gendisk->disk_name);
 
 	if (!queue_limits_stack_integrity_bdev(&lim, rdev->bdev)) {
 		pr_err("%s: incompatible integrity profile for %pg\n",
