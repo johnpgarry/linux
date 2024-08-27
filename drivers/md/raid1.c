@@ -1219,6 +1219,9 @@ static void alloc_behind_master_bio(struct r1bio *r1_bio,
 	int i = 0;
 	struct bio *behind_bio = NULL;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS r1_bio=%pS\n", __func__, bio, r1_bio);
+
 	behind_bio = bio_alloc_bioset(NULL, vcnt, 0, GFP_NOIO,
 				      &r1_bio->mddev->bio_set);
 
@@ -1319,6 +1322,9 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	bool r1bio_existed = !!r1_bio;
 	char b[BDEVNAME_SIZE];
 
+
+	pr_err("%s mddev=%pS bio=%pS max_read_sectors=%d r1_bio=%pS\n", __func__,
+		mddev, bio, max_read_sectors, r1_bio);
 	/*
 	 * If r1_bio is set, we are blocking the raid1d thread
 	 * so there is a tiny risk of deadlock.  So ask for
@@ -1357,7 +1363,8 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	 * used and no empty request is available.
 	 */
 	rdisk = read_balance(conf, r1_bio, &max_sectors);
-
+	pr_err("%s1 mddev=%pS bio=%pS max_read_sectors=%d r1_bio=%pS rdisk=%d from read_balance\n", __func__,
+		mddev, bio, max_read_sectors, r1_bio, rdisk);
 	if (rdisk < 0) {
 		/* couldn't find anywhere to read from */
 		if (r1bio_existed) {
@@ -1406,6 +1413,8 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	read_bio = bio_alloc_clone(mirror->rdev->bdev, bio, gfp,
 				   &mddev->bio_set);
 
+	pr_err("%s2 mddev=%pS bio=%pS max_read_sectors=%d r1_bio=%pS read_bio=%pS\n", __func__,
+		mddev, bio, max_read_sectors, r1_bio, read_bio);
 	r1_bio->bios[rdisk] = read_bio;
 
 	read_bio->bi_iter.bi_sector = r1_bio->sector +
@@ -1417,6 +1426,8 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	        read_bio->bi_opf |= MD_FAILFAST;
 	read_bio->bi_private = r1_bio;
 	mddev_trace_remap(mddev, read_bio, r1_bio->sector);
+	pr_err("%s3  mddev=%pS bio=%pS r1_bio=%pS read_bio=%pS calling submit_bio_noacct\n", __func__,
+		mddev, bio, r1_bio, read_bio);
 	submit_bio_noacct(read_bio);
 }
 
@@ -1434,6 +1445,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	bool write_behind = false;
 	bool is_discard = (bio_op(bio) == REQ_OP_DISCARD);
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS mddev=%pS max_write_sectors=%d\n",
+			__func__, bio, mddev, max_write_sectors);
 	if (mddev_is_clustered(mddev) &&
 	     md_cluster_ops->area_resyncing(mddev, WRITE,
 		     bio->bi_iter.bi_sector, bio_end_sector(bio))) {
@@ -1467,6 +1481,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	}
 
  retry_write:
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s1 retry_write REQ_ATOMIC bio=%pS mddev=%pS max_write_sectors=%d\n",
+			__func__, bio, mddev, max_write_sectors);
 	r1_bio = alloc_r1bio(mddev, bio);
 	r1_bio->sectors = max_write_sectors;
 
@@ -1486,7 +1503,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	max_sectors = r1_bio->sectors;
 	for (i = 0;  i < disks; i++) {
 		struct md_rdev *rdev = conf->mirrors[i].rdev;
-
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s1 loop disks REQ_ATOMIC bio=%pS mddev=%pS max_write_sectors=%d disk index i=%d disks=%d\n",
+				__func__, bio, mddev, max_write_sectors, i, disks);
 		/*
 		 * The write-behind io is only attempted on drives marked as
 		 * write-mostly, which means we could allocate write behind
@@ -1602,6 +1621,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	for (i = 0; i < disks; i++) {
 		struct bio *mbio = NULL;
 		struct md_rdev *rdev = conf->mirrors[i].rdev;
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s2 loop disks REQ_ATOMIC bio=%pS mddev=%pS max_write_sectors=%d disk index i=%d disks=%d r1_bio->bios[i]=%pS first_clone=%d raid_disks=%d\n",
+				__func__, bio, mddev, max_write_sectors, i, disks, r1_bio->bios[i], first_clone, conf->raid_disks);
 		if (!r1_bio->bios[i])
 			continue;
 
@@ -1610,6 +1632,11 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 			 * Not if there are too many, or cannot
 			 * allocate memory, or a reader on WriteMostly
 			 * is waiting for behind writes to flush */
+			if (bio->bi_opf & REQ_ATOMIC)
+				pr_err("%s2.0 REQ_ATOMIC bio=%pS bitmap=%pS write_behind=%d bitmap->behind_writes=%d max_write_behind=%ld waitqueue_active=%d\n",
+					__func__, bio, bitmap, write_behind, bitmap ? atomic_read(&bitmap->behind_writes) : -1,
+					mddev->bitmap_info.max_write_behind,
+					bitmap ? waitqueue_active(&bitmap->behind_wait) : 0);
 			if (bitmap && write_behind &&
 			    (atomic_read(&bitmap->behind_writes)
 			     < mddev->bitmap_info.max_write_behind) &&
@@ -1622,6 +1649,12 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 			first_clone = 0;
 		}
 
+		if (bio->bi_opf & REQ_ATOMIC) {
+			pr_err("%s2.1 loop disks REQ_ATOMIC bio=%pS mddev=%pS max_write_sectors=%d disk index i=%d disks=%d r1_bio->bios[i]=%pS r1_bio=%pS\n",
+				__func__, bio, mddev, max_write_sectors, i, disks, r1_bio->bios[i], r1_bio);
+			pr_err("%s2.1.1 behind_master_bio=%pS serialize_policy=%d CollisionCheck set=%d\n",
+				__func__, r1_bio->behind_master_bio, mddev->serialize_policy, test_bit(CollisionCheck, &rdev->flags));
+		}
 		if (r1_bio->behind_master_bio) {
 			mbio = bio_alloc_clone(rdev->bdev,
 					       r1_bio->behind_master_bio,
@@ -1638,11 +1671,14 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				wait_for_serialization(rdev, r1_bio);
 		}
 
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s2.3 loop disks REQ_ATOMIC bio=%pS mddev=%pS max_write_sectors=%d disk index i=%d disks=%d r1_bio->bios[i]=%pS r1_bio=%pS mbio=%pS\n",
+				__func__, bio, mddev, max_write_sectors, i, disks, r1_bio->bios[i], r1_bio, mbio);
 		r1_bio->bios[i] = mbio;
 
 		mbio->bi_iter.bi_sector	= (r1_bio->sector + rdev->data_offset);
 		mbio->bi_end_io	= raid1_end_write_request;
-		mbio->bi_opf = bio_op(bio) | (bio->bi_opf & (REQ_SYNC | REQ_FUA));
+		mbio->bi_opf = bio_op(bio) | (bio->bi_opf & (REQ_SYNC | REQ_FUA | REQ_ATOMIC));
 		if (test_bit(FailFast, &rdev->flags) &&
 		    !test_bit(WriteMostly, &rdev->flags) &&
 		    conf->raid_disks - mddev->degraded > 1)
@@ -1661,6 +1697,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		}
 	}
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s3 calling r1_bio_write_done REQ_ATOMIC bio=%pS mddev=%pS r1_bio=%pS\n",
+				__func__, bio, mddev, r1_bio);
 	r1_bio_write_done(r1_bio);
 
 	/* In case raid1d snuck in to freeze_array */
@@ -1670,7 +1709,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 static bool raid1_make_request(struct mddev *mddev, struct bio *bio)
 {
 	sector_t sectors;
-
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS mddev=%pS\n", __func__, bio, mddev);
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
 		return true;

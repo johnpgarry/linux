@@ -135,12 +135,17 @@ static inline bool raid1_add_bio_to_plug(struct mddev *mddev, struct bio *bio,
 {
 	struct raid1_plug_cb *plug = NULL;
 	struct blk_plug_cb *cb;
-
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS copies=%d mddev=%pS\n",
+				__func__, bio, copies, mddev);
 	/*
 	 * If bitmap is not enabled, it's safe to submit the io directly, and
 	 * this can get optimal performance.
 	 */
 	if (!md_bitmap_enabled(mddev->bitmap)) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s1 REQ_ATOMIC bio=%pS copies=%d mddev=%pS calling raid1_submit_write\n",
+					__func__, bio, copies, mddev);
 		raid1_submit_write(bio);
 		return true;
 	}
@@ -150,6 +155,9 @@ static inline bool raid1_add_bio_to_plug(struct mddev *mddev, struct bio *bio,
 		return false;
 
 	plug = container_of(cb, struct raid1_plug_cb, cb);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s2 REQ_ATOMIC bio=%pS copies=%d mddev=%pS calling bio_list_add cb=%pS\n",
+					__func__, bio, copies, mddev, cb);
 	bio_list_add(&plug->pending, bio);
 	if (++plug->count / MAX_PLUG_BIO >= copies) {
 		list_del(&cb->list);
