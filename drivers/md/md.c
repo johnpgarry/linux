@@ -1104,6 +1104,8 @@ int sync_page_io(struct md_rdev *rdev, sector_t sector, int size,
 	struct bio bio;
 	struct bio_vec bvec;
 
+	pr_err("%s sector=%lld size=%d rdev->bdev=%pS\n", __func__, sector, size, rdev->bdev);
+
 	if (metadata_op && rdev->meta_bdev)
 		bio_init(&bio, rdev->meta_bdev, &bvec, 1, opf);
 	else
@@ -9023,6 +9025,8 @@ void md_do_sync(struct md_thread *thread)
 	const char *desc;
 	struct blk_plug plug;
 	int ret;
+	static atomic_t countjj;
+	int _countjj = atomic_inc_return(&countjj);
 
 	/* just incase thread restarts... */
 	if (test_bit(MD_RECOVERY_DONE, &mddev->recovery))
@@ -9144,7 +9148,7 @@ void md_do_sync(struct md_thread *thread)
 	/*
 	 * Tune reconstruction:
 	 */
-	window = 32 * (PAGE_SIZE / 512);
+	window = 32 * (PAGE_SIZE / 1024);
 	pr_err("md: using %dk window, over a total of %lluk.\n",
 		 window/2, (unsigned long long)max_sectors/2);
 
@@ -9152,11 +9156,14 @@ void md_do_sync(struct md_thread *thread)
 	last_check = 0;
 
 	if (j >= MD_RESYNC_ACTIVE) {
-		pr_debug("md: resuming %s of %s from checkpoint.\n",
-			 desc, mdname(mddev));
+		pr_err("md: resuming %s of %s from checkpoint. max_sectors=%lld\n",
+			 desc, mdname(mddev), max_sectors);
 		mddev->curr_resync = j;
-	} else
+	} else {
+		pr_err("md: MD_RESYNC_ACTIVE no longer delayed j=%lld max_sectors=%lld\n",
+			 j, max_sectors);
 		mddev->curr_resync = MD_RESYNC_ACTIVE; /* no longer delayed */
+	}
 	mddev->curr_resync_completed = j;
 	sysfs_notify_dirent_safe(mddev->sysfs_completed);
 	md_new_event();
@@ -9205,10 +9212,14 @@ void md_do_sync(struct md_thread *thread)
 		if (test_bit(MD_RECOVERY_INTR, &mddev->recovery))
 			break;
 
+		if ((_countjj % 100) == 0)
+			pr_err("%s2.0 j=%lld max_sectors=%lld calling sync_request\n",
+				__func__, j, max_sectors);
 		sectors = mddev->pers->sync_request(mddev, j, max_sectors,
 						    &skipped);
-		pr_err("%s sectors=%lld after calling sync_request\n",
-			__func__, sectors);
+		if ((_countjj % 100) == 0)
+			pr_err("%s2.1 sectors=%lld called sync_request\n",
+				__func__, sectors);
 		if (sectors == 0) {
 			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 			break;
@@ -9298,7 +9309,14 @@ void md_do_sync(struct md_thread *thread)
 		mddev->curr_resync_completed = mddev->curr_resync;
 		sysfs_notify_dirent_safe(mddev->sysfs_completed);
 	}
+	//if ((_countjj % 100) == 0)
+			pr_err("%s3 max_sectors=%lld calling sync_request\n",
+				__func__, max_sectors);
 	mddev->pers->sync_request(mddev, max_sectors, max_sectors, &skipped);
+
+	if ((_countjj % 100) == 0)
+			pr_err("%s3.1 max_sectors=%lld after calling sync_request\n",
+				__func__, max_sectors);
 
 	if (!test_bit(MD_RECOVERY_CHECK, &mddev->recovery) &&
 	    mddev->curr_resync > MD_RESYNC_ACTIVE) {

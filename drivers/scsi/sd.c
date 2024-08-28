@@ -1340,6 +1340,17 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 	unsigned int dif;
 	bool dix;
 
+	static atomic_t countjj;
+	int _countjj = atomic_inc_return(&countjj);
+
+	if (nr_blocks > 20) {
+		if ((_countjj % 25) == 0)
+			pr_err("%s lba=%lld nr_blocks=%d sdp=%pS write=%d\n", __func__, lba, nr_blocks, sdp, write);
+		else if (lba == 2048)
+			pr_err("%s lba=%lld nr_blocks=%d sdp=%pS write=%d\n", __func__, lba, nr_blocks, sdp, write);
+
+	}
+
 	ret = scsi_alloc_sgtables(cmd);
 	if (ret != BLK_STS_OK)
 		return ret;
