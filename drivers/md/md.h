@@ -285,8 +285,13 @@ static inline int rdev_has_badblock(struct md_rdev *rdev, sector_t s,
 {
 	sector_t first_bad;
 	int bad_sectors;
+	int rc;
 
-	return is_badblock(rdev, s, sectors, &first_bad, &bad_sectors);
+	rc =  is_badblock(rdev, s, sectors, &first_bad, &bad_sectors);
+	if (rc)
+		pr_err("%s rc=%d from is_badblock s=%lld first_bad=%lld bad_sectors=%d s=%lld sectors=%d\n",
+			__func__, rc, s, first_bad, bad_sectors, s, sectors);
+	return rc;
 }
 
 extern int rdev_set_badblocks(struct md_rdev *rdev, sector_t s, int sectors,

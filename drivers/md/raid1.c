@@ -678,6 +678,7 @@ static int choose_slow_rdev(struct r1conf *conf, struct r1bio *r1_bio,
 
 		/* there are no bad blocks, we can use this disk */
 		len = r1_bio->sectors;
+		pr_err("%s1 no bad blocks\n", __func__);
 		read_len = raid1_check_read_range(rdev, this_sector, &len);
 		if (read_len == r1_bio->sectors) {
 			*max_sectors = read_len;
@@ -689,6 +690,7 @@ static int choose_slow_rdev(struct r1conf *conf, struct r1bio *r1_bio,
 		 * there are partial bad blocks, choose the rdev with largest
 		 * read length.
 		 */
+		pr_err("%s2 partial bad blocks\n", __func__);
 		if (read_len > bb_read_len) {
 			bb_disk = disk;
 			bb_read_len = read_len;
@@ -2054,6 +2056,8 @@ static void end_sync_read(struct bio *bio)
 {
 	struct r1bio *r1_bio = get_resync_r1bio(bio);
 
+	pr_err("%s r1_bio=%pS bio=%pS\n", __func__, r1_bio, bio);
+
 	update_head_pos(r1_bio->read_disk, r1_bio);
 
 	/*
@@ -2364,6 +2368,7 @@ static void sync_request_write(struct mddev *mddev, struct r1bio *r1_bio)
 	int i;
 	int disks = conf->raid_disks * 2;
 	struct bio *wbio;
+	pr_err("%s mddev=%pS r1_bio=%pS\n", __func__, mddev, r1_bio);
 
 	if (!test_bit(R1BIO_Uptodate, &r1_bio->state))
 		/* ouch - failed to read all of that. */
@@ -2811,6 +2816,9 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 	int idx = sector_to_idx(sector_nr);
 	int page_idx = 0;
 
+	pr_err("%s mddev=%pS sector_nr=%lld max_sector=%lld\n", __func__,
+		mddev, sector_nr, max_sector);
+
 	if (!mempool_initialized(&conf->r1buf_pool))
 		if (init_resync(conf))
 			return 0;
@@ -2956,6 +2964,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 		disk = wonly;
 	r1_bio->read_disk = disk;
 
+	pr_err("%s read_targets=%d min_bad=%d\n", __func__, read_targets, min_bad);
 	if (read_targets == 0 && min_bad > 0) {
 		/* These sectors are bad on all InSync devices, so we
 		 * need to mark them bad on all write targets
@@ -3014,13 +3023,16 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 		max_sector = sector_nr + good_sectors;
 	nr_sectors = 0;
 	sync_blocks = 0;
+	pr_err("%s1\n", __func__);
 	do {
 		struct page *page;
 		int len = PAGE_SIZE;
 		if (sector_nr + (len>>9) > max_sector)
 			len = (max_sector - sector_nr) << 9;
+		pr_err("%s2 len=%d\n", __func__, len);
 		if (len == 0)
 			break;
+		pr_err("%s3 sync_blocks=%lld\n", __func__, sync_blocks);
 		if (sync_blocks == 0) {
 			if (!md_bitmap_start_sync(mddev->bitmap, sector_nr,
 						  &sync_blocks, still_degraded) &&
@@ -3036,6 +3048,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 
 			bio = r1_bio->bios[i];
 			rp = get_resync_pages(bio);
+			pr_err("%s4 sync_blocks=%lld rp=%pS\n", __func__, sync_blocks, rp);
 			if (bio->bi_end_io) {
 				page = resync_fetch_page(rp, page_idx);
 
@@ -3053,6 +3066,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 
 	r1_bio->sectors = nr_sectors;
 
+	pr_err("%s5\n", __func__);
 	if (mddev_is_clustered(mddev) &&
 			conf->cluster_sync_high < sector_nr + nr_sectors) {
 		conf->cluster_sync_low = mddev->curr_resync_completed;

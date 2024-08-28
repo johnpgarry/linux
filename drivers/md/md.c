@@ -5076,6 +5076,7 @@ retry:
 		case ACTION_REPAIR:
 			set_bit(MD_RECOVERY_REQUESTED, &mddev->recovery);
 			set_bit(MD_RECOVERY_SYNC, &mddev->recovery);
+			pr_err("%s MD_RECOVERY_SYNC\n", __func__);
 			fallthrough;
 		case ACTION_RESYNC:
 		case ACTION_IDLE:
@@ -9125,8 +9126,8 @@ void md_do_sync(struct md_thread *thread)
 	j = md_sync_position(mddev, action);
 
 	pr_info("md: %s of RAID array %s\n", desc, mdname(mddev));
-	pr_debug("md: minimum _guaranteed_  speed: %d KB/sec/disk.\n", speed_min(mddev));
-	pr_debug("md: using maximum available idle IO bandwidth (but not more than %d KB/sec) for %s.\n",
+	pr_info("md: minimum _guaranteed_  speed: %d KB/sec/disk.\n", speed_min(mddev));
+	pr_info("md: using maximum available idle IO bandwidth (but not more than %d KB/sec) for %s.\n",
 		 speed_max(mddev), desc);
 
 	is_mddev_idle(mddev, 1); /* this initializes IO event counters */
@@ -9144,7 +9145,7 @@ void md_do_sync(struct md_thread *thread)
 	 * Tune reconstruction:
 	 */
 	window = 32 * (PAGE_SIZE / 512);
-	pr_debug("md: using %dk window, over a total of %lluk.\n",
+	pr_err("md: using %dk window, over a total of %lluk.\n",
 		 window/2, (unsigned long long)max_sectors/2);
 
 	atomic_set(&mddev->recovery_active, 0);
@@ -9206,6 +9207,8 @@ void md_do_sync(struct md_thread *thread)
 
 		sectors = mddev->pers->sync_request(mddev, j, max_sectors,
 						    &skipped);
+		pr_err("%s sectors=%lld after calling sync_request\n",
+			__func__, sectors);
 		if (sectors == 0) {
 			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 			break;
@@ -9537,6 +9540,7 @@ static bool md_choose_sync_action(struct mddev *mddev, int *spares)
 
 	/* Check if recovery is in progress. */
 	if (mddev->recovery_cp < MaxSector) {
+			pr_err("%s MD_RECOVERY_SYNC\n", __func__);
 		set_bit(MD_RECOVERY_SYNC, &mddev->recovery);
 		clear_bit(MD_RECOVERY_RECOVER, &mddev->recovery);
 		return true;
