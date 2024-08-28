@@ -9148,7 +9148,7 @@ void md_do_sync(struct md_thread *thread)
 	/*
 	 * Tune reconstruction:
 	 */
-	window = 32 * (PAGE_SIZE / 1024);
+	window = 128 * (PAGE_SIZE / 512);
 	pr_err("md: using %dk window, over a total of %lluk.\n",
 		 window/2, (unsigned long long)max_sectors/2);
 
@@ -9213,13 +9213,13 @@ void md_do_sync(struct md_thread *thread)
 			break;
 
 		if ((_countjj % 100) == 0)
-			pr_err("%s2.0 j=%lld max_sectors=%lld calling sync_request\n",
-				__func__, j, max_sectors);
+			pr_err("%s2.0 j=%lld max_sectors=%lld calling sync_request _countjj=%d\n",
+				__func__, j, max_sectors, _countjj);
 		sectors = mddev->pers->sync_request(mddev, j, max_sectors,
 						    &skipped);
 		if ((_countjj % 100) == 0)
-			pr_err("%s2.1 sectors=%lld called sync_request\n",
-				__func__, sectors);
+			pr_err("%s2.1 sectors=%lld called sync_request _countjj=%d\n",
+				__func__, sectors, _countjj);
 		if (sectors == 0) {
 			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 			break;
@@ -9310,13 +9310,13 @@ void md_do_sync(struct md_thread *thread)
 		sysfs_notify_dirent_safe(mddev->sysfs_completed);
 	}
 	//if ((_countjj % 100) == 0)
-			pr_err("%s3 max_sectors=%lld calling sync_request\n",
-				__func__, max_sectors);
+			pr_err("%s3 max_sectors=%lld calling sync_request _countjj=%d\n",
+				__func__, max_sectors, _countjj);
 	mddev->pers->sync_request(mddev, max_sectors, max_sectors, &skipped);
 
 	if ((_countjj % 100) == 0)
-			pr_err("%s3.1 max_sectors=%lld after calling sync_request\n",
-				__func__, max_sectors);
+			pr_err("%s3.1 max_sectors=%lld after calling sync_request _countjj=%d\n",
+				__func__, max_sectors, _countjj);
 
 	if (!test_bit(MD_RECOVERY_CHECK, &mddev->recovery) &&
 	    mddev->curr_resync > MD_RESYNC_ACTIVE) {
