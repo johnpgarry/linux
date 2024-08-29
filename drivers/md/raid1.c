@@ -316,10 +316,11 @@ static void raid_end_bio_io(struct r1bio *r1_bio)
 		static atomic_t countjj;
 		int _countjj = atomic_inc_return(&countjj);
 		if ((_countjj % 100) == 0)
-			pr_err("raid1: sync end %s on sectors %llu-%llu\n",
+			pr_err("raid1: sync end %s on sectors %llu-%llu _countjj=%d\n",
 			 (bio_data_dir(bio) == WRITE) ? "write" : "read",
 			 (unsigned long long) bio->bi_iter.bi_sector,
-			 (unsigned long long) bio_end_sector(bio) - 1);
+			 (unsigned long long) bio_end_sector(bio) - 1,
+			 _countjj);
 
 		call_bio_endio(r1_bio);
 	}
@@ -517,6 +518,7 @@ static void raid1_end_write_request(struct bio *bio)
 		    !discard_error) {
 			r1_bio->bios[mirror] = IO_MADE_GOOD;
 			set_bit(R1BIO_MadeGood, &r1_bio->state);
+			pr_err("%s set R1BIO_MadeGood\n", __func__);
 		}
 	}
 
@@ -1976,8 +1978,10 @@ static int raid1_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 			/* As all devices are equivalent, we don't need a full recovery
 			 * if this was recently any drive of the array
 			 */
-			if (rdev->saved_raid_disk < 0)
+			if (rdev->saved_raid_disk < 0) {
+				pr_err("%s set fullsync = 1\n", __func__);
 				conf->fullsync = 1;
+			}
 			break;
 		}
 		if (test_bit(WantReplacement, &p->rdev->flags) &&
@@ -1992,6 +1996,7 @@ static int raid1_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 		raid1_add_conf(conf, rdev, repl_slot, true);
 		err = 0;
 		conf->fullsync = 1;
+		pr_err("%s set fullsync = 1\n", __func__);
 	}
 
 	print_conf(conf);
@@ -2116,9 +2121,10 @@ static void end_sync_write(struct bio *bio)
 	int _countjj = atomic_inc_return(&countjj);
 
 	if ((_countjj % 250) == 0)
-		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d bi_bdev=%pS\n",
+		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d bi_bdev=%pS _countjj=%d\n",
 			__func__, bio, bio->bi_iter.bi_sector,
-			bio->bi_iter.bi_size, bio->bi_bdev);
+			bio->bi_iter.bi_size, bio->bi_bdev,
+			_countjj);
 	if (!uptodate) {
 		abort_sync_write(mddev, r1_bio);
 		set_bit(WriteErrorSeen, &rdev->flags);
@@ -2126,10 +2132,12 @@ static void end_sync_write(struct bio *bio)
 			set_bit(MD_RECOVERY_NEEDED, &
 				mddev->recovery);
 		set_bit(R1BIO_WriteError, &r1_bio->state);
+		pr_err("%s1 R1BIO_WriteError\n", __func__);
 	} else if (rdev_has_badblock(rdev, r1_bio->sector, r1_bio->sectors) &&
 		   !rdev_has_badblock(conf->mirrors[r1_bio->read_disk].rdev,
 				      r1_bio->sector, r1_bio->sectors)) {
 		set_bit(R1BIO_MadeGood, &r1_bio->state);
+		pr_err("%s2 R1BIO_MadeGood\n", __func__);
 	}
 
 	put_sync_write_buf(r1_bio, uptodate);
@@ -2175,6 +2183,10 @@ static int fix_sync_read_error(struct r1bio *r1_bio)
 	int sectors = r1_bio->sectors;
 	int idx = 0;
 	struct md_rdev *rdev;
+	static atomic_t countjj;
+	int _countjj = atomic_inc_return(&countjj);
+	if ((_countjj % 2) == 0)
+		pr_err("%s sect=%lld\n", __func__, sect);
 
 	rdev = conf->mirrors[r1_bio->read_disk].rdev;
 	if (test_bit(FailFast, &rdev->flags)) {
@@ -2182,13 +2194,12 @@ static int fix_sync_read_error(struct r1bio *r1_bio)
 		 * ... unless it is the last working device of course */
 		md_error(mddev, rdev);
 		if (test_bit(Faulty, &rdev->flags)) {
-			static atomic_t countjj;
-			int _countjj = atomic_inc_return(&countjj);
 			/* Don't try to read from here, but make sure
 			 * put_buf does it's thing
 			 */
-			if ((_countjj % 100) == 0)
-				pr_err("%s sect=%lld sectors=%d using end_sync_write\n", __func__, sect, sectors);
+			if ((_countjj % 2) == 0)
+				pr_err("%s1 sect=%lld sectors=%d using end_sync_write _countjj=%d\n",
+					__func__, sect, sectors, _countjj);
 			bio->bi_end_io = end_sync_write;
 		}
 	}
@@ -2357,8 +2368,10 @@ static void process_checks(struct r1bio *r1_bio)
 			for (j = vcnt; j-- ; ) {
 				if (memcmp(page_address(ppages[j]),
 					   page_address(spages[j]),
-					   page_len[j]))
+					   page_len[j])) {
+					pr_err("%s fail memcmp\n", __func__);
 					break;
+				}
 			}
 		} else
 			j = 0;
@@ -2385,7 +2398,8 @@ static void sync_request_write(struct mddev *mddev, struct r1bio *r1_bio)
 	static atomic_t countjj;
 	int _countjj = atomic_inc_return(&countjj);
 	if ((_countjj % 100) == 0)
-		pr_err("%s mddev=%pS r1_bio=%pS\n", __func__, mddev, r1_bio);
+		pr_err("%s mddev=%pS r1_bio=%pS _countjj=%d sector=%lld sectors=%d\n",
+			__func__, mddev, r1_bio, _countjj, r1_bio->sector, r1_bio->sectors);
 
 	if (!test_bit(R1BIO_Uptodate, &r1_bio->state))
 		/* ouch - failed to read all of that. */
@@ -2417,9 +2431,9 @@ static void sync_request_write(struct mddev *mddev, struct r1bio *r1_bio)
 			wbio->bi_opf |= MD_FAILFAST;
 
 		if ((_countjj % 100) == 0)
-			pr_err("%s2 using end_sync_write sector=%lld size=%d\n",
+			pr_err("%s2 using end_sync_write sector=%lld size=%d _countjj=%d\n",
 				__func__, wbio->bi_iter.bi_sector,
-				wbio->bi_iter.bi_size);
+				wbio->bi_iter.bi_size, _countjj);
 		wbio->bi_end_io = end_sync_write;
 		atomic_inc(&r1_bio->remaining);
 		md_sync_acct(conf->mirrors[i].rdev->bdev, bio_sectors(wbio));
@@ -2719,6 +2733,9 @@ static void raid1d(struct md_thread *thread)
 	struct list_head *head = &conf->retry_list;
 	struct blk_plug plug;
 	int idx;
+	static atomic_t countjj;
+	int _countjj = atomic_inc_return(&countjj);
+
 
 	md_check_recovery(mddev);
 
@@ -2761,6 +2778,25 @@ static void raid1d(struct md_thread *thread)
 
 		mddev = r1_bio->mddev;
 		conf = mddev->private;
+		if ((_countjj % 250) == 0)
+			pr_err("%s R1BIO_IsSync=%d MadeGood=%d WriteError=%d ReadError=%d Uptodate=%d _countjj=%d sector=%lld sectors=%d\n",
+				__func__, test_bit(R1BIO_IsSync, &r1_bio->state),
+				test_bit(R1BIO_MadeGood, &r1_bio->state),
+				test_bit(R1BIO_WriteError, &r1_bio->state),
+				test_bit(R1BIO_ReadError, &r1_bio->state),
+				test_bit(R1BIO_Uptodate, &r1_bio->state),
+				_countjj,
+				r1_bio->sector, r1_bio->sectors);
+
+		if test_bit(R1BIO_MadeGood, &r1_bio->state)
+			pr_err("%s X R1BIO_MadeGood=1\n", __func__);
+		if test_bit(R1BIO_WriteError, &r1_bio->state)
+			pr_err("%s X R1BIO_WriteError=1\n", __func__);
+		if test_bit(R1BIO_ReadError, &r1_bio->state)
+			pr_err("%s X R1BIO_ReadError\n", __func__);
+		if (!test_bit(R1BIO_Uptodate, &r1_bio->state))
+			pr_err("%s X R1BIO_Uptodate=0\n", __func__);
+
 		if (test_bit(R1BIO_IsSync, &r1_bio->state)) {
 			if (test_bit(R1BIO_MadeGood, &r1_bio->state) ||
 			    test_bit(R1BIO_WriteError, &r1_bio->state))
@@ -2841,8 +2877,8 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 	int _countjj = atomic_inc_return(&countjj);
 
 	if ((_countjj % 100) == 0)
-		pr_err("%s mddev=%pS sector_nr=%lld max_sector=%lld\n", __func__,
-			mddev, sector_nr, max_sector);
+		pr_err("%s mddev=%pS sector_nr=%lld max_sector=%lld _countjj=%d conf->fullsync=%d\n", __func__,
+			mddev, sector_nr, max_sector, _countjj, conf->fullsync);
 
 	if (!mempool_initialized(&conf->r1buf_pool))
 		if (init_resync(conf))
@@ -2857,8 +2893,11 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 		if (mddev->curr_resync < max_sector) /* aborted */
 			md_bitmap_end_sync(mddev->bitmap, mddev->curr_resync,
 					   &sync_blocks, 1);
-		else /* completed sync */
+		else /* completed sync */ {
+
+				pr_err("%s set fullsync = 0\n", __func__);
 			conf->fullsync = 0;
+		}
 
 		md_bitmap_close_sync(mddev->bitmap);
 		close_sync(conf);
@@ -2884,6 +2923,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 	    !conf->fullsync && !test_bit(MD_RECOVERY_REQUESTED, &mddev->recovery)) {
 		/* We can skip this block, and probably several more */
 		*skipped = 1;
+		pr_err("%s *skipped = 1\n", __func__);
 		return sync_blocks;
 	}
 
@@ -2937,7 +2977,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 			int _countjj = atomic_inc_return(&countjj);
 
 			if ((_countjj % 100) == 0)
-				pr_err("%s2 using end_sync_write\n", __func__);
+				pr_err("%s2 using end_sync_write countjj=%d\n", __func__, _countjj);
 			bio->bi_opf = REQ_OP_WRITE;
 			bio->bi_end_io = end_sync_write;
 			write_targets ++;
@@ -2976,7 +3016,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 				int _countjj = atomic_inc_return(&countjj);
 
 				if ((_countjj % 100) == 0)
-					pr_err("%s3 using end_sync_write\n", __func__);
+					pr_err("%s3 using end_sync_write _countjj=%d\n", __func__, _countjj);
 				/*
 				 * The device is suitable for reading (InSync),
 				 * but has bad block(s) here. Let's try to correct them,
@@ -3118,6 +3158,9 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 	 */
 	if (test_bit(MD_RECOVERY_REQUESTED, &mddev->recovery)) {
 		atomic_set(&r1_bio->remaining, read_targets);
+		if ((_countjj % 100) == 0)
+				pr_err("%s7 MD_RECOVERY_REQUESTED set _countjj=%d raid_disks=%d\n",
+					__func__, _countjj, conf->raid_disks);
 		for (i = 0; i < conf->raid_disks * 2 && read_targets; i++) {
 			bio = r1_bio->bios[i];
 			if (bio->bi_end_io == end_sync_read) {
@@ -3129,6 +3172,8 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 			}
 		}
 	} else {
+		if ((_countjj % 100) == 0)
+				pr_err("%s7.1 MD_RECOVERY_REQUESTED unset _countjj=%d\n", __func__, _countjj);
 		atomic_set(&r1_bio->remaining, 1);
 		bio = r1_bio->bios[r1_bio->read_disk];
 		md_sync_acct_bio(bio, nr_sectors);
@@ -3251,8 +3296,10 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 		    !test_bit(In_sync, &disk->rdev->flags)) {
 			disk->head_position = 0;
 			if (disk->rdev &&
-			    (disk->rdev->saved_raid_disk < 0))
+			    (disk->rdev->saved_raid_disk < 0)) {
+				pr_err("%s set fullsync = 1\n", __func__);
 				conf->fullsync = 1;
+			}
 		}
 	}
 

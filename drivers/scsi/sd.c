@@ -1341,13 +1341,36 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 	bool dix;
 
 	static atomic_t countjj;
+	static atomic_t countjj10240write;
+	static atomic_t countjj10240read;
 	int _countjj = atomic_inc_return(&countjj);
 
 	if (nr_blocks > 20) {
 		if ((_countjj % 25) == 0)
-			pr_err("%s lba=%lld nr_blocks=%d sdp=%pS write=%d\n", __func__, lba, nr_blocks, sdp, write);
-		else if (lba == 2048)
-			pr_err("%s lba=%lld nr_blocks=%d sdp=%pS write=%d\n", __func__, lba, nr_blocks, sdp, write);
+			pr_err("%s1 lba=%lld nr_blocks=%d sdp=%pS write=%d _countjj=%d\n",
+				__func__, lba, nr_blocks, sdp, write, _countjj);
+		else if (lba == 10240)
+			pr_err("%s2 lba=%lld nr_blocks=%d sdp=%pS write=%d _countjj=%d\n",
+				__func__, lba, nr_blocks, sdp, write, _countjj);
+		//WARN_ON(lba == 10240);
+	}
+
+	if (lba == 10240) {
+		int _countjj10240write, _countjj10240read;
+		if (write) {
+			_countjj10240write = atomic_inc_return(&countjj10240write);
+			_countjj10240read = atomic_read(&countjj10240read);
+		} else {
+			_countjj10240write = atomic_read(&countjj10240write);
+			_countjj10240read = atomic_inc_return(&countjj10240read);
+		}
+		pr_err("%s3 10240  _countjj10240write=%d _countjj10240read=%d write=%d\n",
+			__func__, _countjj10240write, _countjj10240read, write);
+	}
+
+	if (nr_blocks > 50 && lba < 8000) {
+		pr_err("%s4 nr_blocks=%d lba=%lld  write=%d sdp=%pS\n",
+			__func__, nr_blocks, lba, write, sdp);
 
 	}
 
