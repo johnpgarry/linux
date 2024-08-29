@@ -448,7 +448,7 @@ xfs_alloc_fix_len(
 	pr_err("%s args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, alignment=%d, len=%d (rlen) special=%s aligned=%d\n",
 			__func__, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->alignment, args->len,
 			(rlen == args->maxlen) ? "true, rlen==maxlen" : "false, rlen!=maxlen", args->prod ? (rlen % args->prod == 0) : -1);
-	if (args->prod <= 1 || rlen < args->mod ||
+	if (args->prod <= 1 || rlen < args->mod || (rlen == args->maxlen) ||
 	    (args->mod == 0 && rlen < args->prod))
 		return;
 	k = rlen % args->prod;
