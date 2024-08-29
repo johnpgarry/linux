@@ -3458,6 +3458,10 @@ xfs_bmap_compute_alignments(
 		align = xfs_get_extsz_hint(ap->ip);
 
 	if (align) {
+		pr_err("%s0 xfs_bmap_extsize_align div_u64_rem ap->offset=%lld (aligned=%d) args->prod=%d, mod=%d\n", __func__,
+			ap->offset, 
+			!(ap->offset % align),
+			args->prod, args->mod);
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
 					&ap->length))
@@ -3465,7 +3469,12 @@ xfs_bmap_compute_alignments(
 		ASSERT(ap->length);
 
 		args->prod = align;
+
 		div_u64_rem(ap->offset, args->prod, &args->mod);
+		pr_err("%s1 called div_u64_rem ap->offset=%lld (aligned=%d) args->prod=%d, mod=%d\n", __func__,
+			ap->offset, 
+			!(ap->offset % align),
+			args->prod, args->mod);
 		if (args->mod)
 			args->mod = args->prod - args->mod;
 	} else if (mp->m_sb.sb_blocksize >= PAGE_SIZE) {
