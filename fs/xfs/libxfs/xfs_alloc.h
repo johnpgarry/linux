@@ -58,6 +58,7 @@ typedef struct xfs_alloc_arg {
 #ifdef DEBUG
 	bool		alloc_minlen_only; /* allocate exact minlen extent */
 #endif
+	xfs_extlen_t	blen;
 } xfs_alloc_arg_t;
 
 /*

@@ -444,6 +444,10 @@ xfs_alloc_fix_len(
 	ASSERT(args->mod < args->prod);
 	ASSERT(rlen >= args->minlen);
 	ASSERT(rlen <= args->maxlen);
+
+	pr_err("%s args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, alignment=%d, len=%d (rlen) special=%s aligned=%d\n",
+			__func__, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->alignment, args->len,
+			(rlen == args->maxlen) ? "true, rlen==maxlen" : "false, rlen!=maxlen", args->prod ? (rlen % args->prod == 0) : -1);
 	if (args->prod <= 1 || rlen < args->mod ||
 	    (args->mod == 0 && rlen < args->prod))
 		return;
@@ -2500,6 +2504,8 @@ xfs_alloc_space_available(
 	int			available;
 	xfs_extlen_t		agflcount;
 
+	pr_err("%s args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, total=%d, alignment=%d, alignslop=%d, len=%d min_free=%d\n",
+			__func__, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->total, args->alignment, args->alignslop, args->len, min_free);
 	if (flags & XFS_ALLOC_FLAG_FREEING)
 		return true;
 
@@ -2508,8 +2514,14 @@ xfs_alloc_space_available(
 	/* do we have enough contiguous free space for the allocation? */
 	alloc_len = args->minlen + (args->alignment - 1) + args->alignslop;
 	longest = xfs_alloc_longest_free_extent(pag, min_free, reservation);
-	if (longest < alloc_len)
+	pr_err("%s1 longest=%d alloc_len=%d args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, total=%d, alignment=%d, alignslop=%d, len=%d min_free=%d\n",
+			__func__, longest, alloc_len, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->total, args->alignment, args->alignslop, args->len, min_free);
+	if (longest < alloc_len) {
+
+		pr_err("%s1.1 longest=%d < alloc_len=%d returning args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, total=%d, alignment=%d, alignslop=%d, len=%d min_free=%d\n",
+				__func__, longest, alloc_len, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->total, args->alignment, args->alignslop, args->len, min_free);
 		return false;
+	}
 
 	/*
 	 * Do we have enough free space remaining for the allocation? Don't
@@ -2519,8 +2531,11 @@ xfs_alloc_space_available(
 	agflcount = min_t(xfs_extlen_t, pag->pagf_flcount, min_free);
 	available = (int)(pag->pagf_freeblks + agflcount -
 			  reservation - min_free - args->minleft);
-	if (available < (int)max(args->total, alloc_len))
+	if (available < (int)max(args->total, alloc_len)) {
+		pr_err("%s2 available=%d < max=%d alloc_len=%d returning args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, total=%d, alignment=%d, alignslop=%d, len=%d min_free=%d\n",
+				__func__, available, max(args->total, alloc_len), alloc_len, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->total, args->alignment, args->alignslop, args->len, min_free);
 		return false;
+	}
 
 	if (flags & XFS_ALLOC_FLAG_CHECK)
 		return true;
@@ -2537,10 +2552,18 @@ xfs_alloc_space_available(
 	 */
 	alloc_len = args->maxlen + (args->alignment - 1) + args->alignslop;
 	if (longest < alloc_len) {
+		pr_err("%s3 longest=%d < alloc_len=%d args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, total=%d, alignment=%d, alignslop=%d, len=%d min_free=%d\n",
+				__func__, longest, alloc_len, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->total, args->alignment, args->alignslop, args->len, min_free);
+
 		args->maxlen = args->minlen;
+		pr_err("%s3.1 reduced maxlen to minlen args->minlen=%d, maxlen=%d, mod=%d, prod=%d, minleft=%d, total=%d, alignment=%d, alignslop=%d, len=%d min_free=%d\n",
+				__func__, args->minlen, args->maxlen, args->mod, args->prod, args->minleft, args->total, args->alignment, args->alignslop, args->len, min_free);
+	
 		ASSERT(args->maxlen > 0);
 	}
-
+	pr_err("%s10 args->maxlen=%d\n",
+				__func__, args->maxlen);
+	
 	return true;
 }
 
