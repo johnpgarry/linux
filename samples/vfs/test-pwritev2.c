@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <linux/stat.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 #define statx foo
 #define statx_timestamp foo_timestamp
@@ -64,6 +65,11 @@ int main(int argc, char **argv)
 	char *read_buffer = NULL;
 	int verify = 0;
 	int demo_hch_problem = 0;
+	struct timeval tv;
+	struct timezone tz;
+	int rcg = gettimeofday(&tv, &tz);
+	srandom((unsigned int)tv.tv_usec);
+	printf("%s tv.tv_usec=%d\n", __func__, (unsigned int)tv.tv_usec);
 
 	argv_orig++;
 	for (argc_i = 0; argc_i < argc - 1; argc_i++, argv_orig++) {
