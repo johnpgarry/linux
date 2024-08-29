@@ -3462,6 +3462,7 @@ xfs_bmap_compute_alignments(
 			ap->offset, 
 			!(ap->offset % align),
 			args->prod, args->mod);
+		BUG_ON(ap->offset % align);
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
 					&ap->length))
@@ -3475,6 +3476,7 @@ xfs_bmap_compute_alignments(
 			ap->offset, 
 			!(ap->offset % align),
 			args->prod, args->mod);
+		BUG_ON(ap->offset % align);
 		if (args->mod)
 			args->mod = args->prod - args->mod;
 	} else if (mp->m_sb.sb_blocksize >= PAGE_SIZE) {
