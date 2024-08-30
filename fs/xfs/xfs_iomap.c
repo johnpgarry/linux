@@ -256,6 +256,9 @@ xfs_iomap_write_direct(
 	int			bmapi_flags = XFS_BMAPI_PREALLOC;
 	int			nr_exts = XFS_IEXT_ADD_NOSPLIT_CNT;
 
+	pr_err("%s offset_fsb=%lld count_fsb=%lld\n", __func__,
+		offset_fsb, count_fsb);
+
 	ASSERT(count_fsb > 0);
 
 	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
@@ -308,6 +311,8 @@ xfs_iomap_write_direct(
 	 * caller gave to us.
 	 */
 	nimaps = 1;
+	pr_err("%s2 offset_fsb=%lld count_fsb=%lld calling xfs_bmapi_write\n", __func__,
+		offset_fsb, count_fsb);
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb, bmapi_flags, 0,
 				imap, &nimaps);
 	if (error)
@@ -316,6 +321,8 @@ xfs_iomap_write_direct(
 	/*
 	 * Complete the transaction
 	 */
+	pr_err("%s3 offset_fsb=%lld count_fsb=%lld calling xfs_trans_commit tp=%pS\n", __func__,
+		offset_fsb, count_fsb, tp);
 	error = xfs_trans_commit(tp);
 	if (error)
 		goto out_unlock;
@@ -583,6 +590,9 @@ xfs_iomap_write_unwritten(
 	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
 	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 
+	pr_err("%s offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld\n", __func__,
+		offset, count, offset_fsb, count_fsb);
+
 	/*
 	 * Reserve enough blocks in this transaction for two complete extent
 	 * btree splits.  We may be converting the middle part of an unwritten
@@ -624,6 +634,8 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
+		pr_err("%s1 calling xfs_bmapi_write offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld tp=%pS\n", __func__,
+			offset, count, offset_fsb, count_fsb, tp);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);
@@ -646,6 +658,8 @@ xfs_iomap_write_unwritten(
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		}
 
+		pr_err("%s2 calling xfs_trans_commit offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld tp=%pS\n", __func__,
+			offset, count, offset_fsb, count_fsb, tp);
 		error = xfs_trans_commit(tp);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		if (error)
@@ -783,6 +797,8 @@ xfs_direct_write_iomap_begin(
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
+	pr_err("%s offset=%lld length=%lld\n", __func__, offset, length);
+
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -896,6 +912,8 @@ allocate_blocks:
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
 	xfs_iunlock(ip, lockmode);
 
+	pr_err("%s1 offset=%lld length=%lld calling xfs_iomap_write_direct offset_fsb=%lld end_fsb=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb);
 	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
 			flags, &imap, &seq);
 	if (error)

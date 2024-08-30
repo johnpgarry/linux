@@ -4293,6 +4293,15 @@ xfs_bmapi_allocate(
 	return 0;
 }
 
+#if 0
+
+
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+#endif
+
 STATIC int
 xfs_bmapi_convert_unwritten(
 	struct xfs_bmalloca	*bma,
@@ -4304,6 +4313,11 @@ xfs_bmapi_convert_unwritten(
 	struct xfs_ifork	*ifp = xfs_ifork_ptr(bma->ip, whichfork);
 	int			tmp_logflags = 0;
 	int			error;
+
+	pr_err("%s len=%lld mval->br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=0x%x %s flags=0x%x\n",
+		__func__, len, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
+		mval->br_state == XFS_EXT_UNWRITTEN ? "UNWRITTEN" : "NORM",
+		flags);
 
 	/* check if we need to do unwritten->real conversion */
 	if (mval->br_state == XFS_EXT_UNWRITTEN &&
@@ -4454,6 +4468,8 @@ xfs_bmapi_write(
 	int			n;		/* current extent index */
 	xfs_fileoff_t		obno;		/* old block number (offset) */
 
+	pr_err("%s bno=%lld len=%lld total=%d tp=%pS\n", __func__,
+		bno, len, total, tp);
 #ifdef DEBUG
 	xfs_fileoff_t		orig_bno;	/* original block number value */
 	int			orig_flags;	/* original flags arg value */
@@ -4586,8 +4602,20 @@ xfs_bmapi_write(
 		/* Deal with the allocated space we found.  */
 		xfs_bmapi_trim_map(mval, &bma.got, &bno, len, obno,
 							end, n, flags);
+#if 0
 
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+
+#endif
 		/* Execute unwritten extent conversion if necessary */
+		pr_err("%s1 calling xfs_bmapi_convert_unwritten bno=%lld len=%lld mval->br_startoff=%lld, startblock=%lld, blockcount=%lld, state=0x%x\n",
+			__func__,
+			bno, len, mval->br_startoff, mval->br_startblock,
+			mval->br_blockcount, mval->br_state);
 		error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
 		if (error == -EAGAIN)
 			continue;

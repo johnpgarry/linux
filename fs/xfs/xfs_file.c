@@ -475,6 +475,8 @@ xfs_dio_write_end_io(
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
+	pr_err("%s size=%zd\n", __func__, size);
+
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
@@ -509,6 +511,7 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
+		pr_err("%s1 offset=%lld size=%zd calling xfs_iomap_write_unwritten\n", __func__, offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}

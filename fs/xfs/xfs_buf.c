@@ -1535,6 +1535,7 @@ xfs_buf_ioapply_map(
 	sector_t	sector =  bp->b_maps[map].bm_bn;
 	int		size;
 	int		offset;
+	pr_err("%s bio used\n", __func__);
 
 	/* skip the pages in the buffer before the start offset */
 	page_index = 0;
@@ -1607,6 +1608,7 @@ _xfs_buf_ioapply(
 	int		offset;
 	int		size;
 	int		i;
+	pr_err("%s bp=%pS\n", __func__, bp);
 
 	/*
 	 * Make sure we capture only current IO errors rather than stale errors
@@ -1671,6 +1673,7 @@ _xfs_buf_ioapply(
 	size = BBTOB(bp->b_length);
 	blk_start_plug(&plug);
 	for (i = 0; i < bp->b_map_count; i++) {
+		pr_err("%s1 bp=%pS calling xfs_buf_ioapply_map\n", __func__, bp);
 		xfs_buf_ioapply_map(bp, i, &offset, &size, op);
 		if (bp->b_error)
 			break;

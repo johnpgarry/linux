@@ -932,6 +932,7 @@ int
 xfs_trans_commit(
 	struct xfs_trans	*tp)
 {
+	pr_err("%s tp=%pS\n", __func__, tp);
 	return __xfs_trans_commit(tp, false);
 }
 
