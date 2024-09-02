@@ -1975,6 +1975,9 @@ static void nvme_update_atomic_write_disk_info(struct nvme_ns *ns,
 	lim->atomic_write_hw_boundary = boundary;
 	lim->atomic_write_hw_unit_min = bs;
 	lim->atomic_write_hw_unit_max = rounddown_pow_of_two(atomic_bs);
+	if (atomic_bs > bs)
+		lim->features |= BLK_FEAT_ATOMIC_WRITES;
+	pr_err("%s atomic_bs=%d bs=%d\n", __func__, atomic_bs, bs);
 }
 
 static u32 nvme_max_drv_segments(struct nvme_ctrl *ctrl)
