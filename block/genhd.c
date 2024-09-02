@@ -1401,9 +1401,12 @@ struct gendisk *__blk_alloc_disk(struct queue_limits *lim, int node,
 	struct request_queue *q;
 	struct gendisk *disk;
 
+	pr_err("%s lim=%pS calling blk_alloc_queue\n", __func__, lim);
 	q = blk_alloc_queue(lim ? lim : &default_lim, node);
+	pr_err("%s1 lim=%pS called blk_alloc_queue q=%pS\n", __func__, lim, q);
 	if (IS_ERR(q))
 		return ERR_CAST(q);
+	pr_err("%s2 lim=%pS q=%pS (lim=%pS)\n", __func__, lim, q, &q->limits);
 
 	disk = __alloc_disk_node(q, node, lkclass);
 	if (!disk) {

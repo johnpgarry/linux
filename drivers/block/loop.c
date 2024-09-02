@@ -311,6 +311,7 @@ static void loop_clear_limits(struct loop_device *lo, int mode)
 		lim.discard_granularity = 0;
 	}
 
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	queue_limits_commit_update(lo->lo_queue, &lim);
 }
 
@@ -1011,6 +1012,7 @@ static int loop_reconfigure_limits(struct loop_device *lo, unsigned short bsize)
 	if (backing_bdev && !bdev_nonrot(backing_bdev))
 		lim.features |= BLK_FEAT_ROTATIONAL;
 	loop_config_discard(lo, &lim);
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	return queue_limits_commit_update(lo->lo_queue, &lim);
 }
 
@@ -1156,6 +1158,7 @@ static void __loop_clr_fd(struct loop_device *lo)
 	lim.logical_block_size = SECTOR_SIZE;
 	lim.physical_block_size = SECTOR_SIZE;
 	lim.io_min = SECTOR_SIZE;
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	queue_limits_commit_update(lo->lo_queue, &lim);
 
 	invalidate_disk(lo->lo_disk);

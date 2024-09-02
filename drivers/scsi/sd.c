@@ -486,7 +486,7 @@ provisioning_mode_store(struct device *dev, struct device_attribute *attr,
 	lim = queue_limits_start_update(sdkp->disk->queue);
 	sd_config_discard(sdkp, &lim, mode);
 	blk_mq_freeze_queue(sdkp->disk->queue);
-		pr_err("%s calling queue_limits_commit_update\n", __func__);
+	pr_err("%s calling queue_limits_commit_update\n", __func__);
 	err = queue_limits_commit_update(sdkp->disk->queue, &lim);
 	blk_mq_unfreeze_queue(sdkp->disk->queue);
 	if (err)
@@ -598,6 +598,7 @@ max_write_same_blocks_store(struct device *dev, struct device_attribute *attr,
 	lim = queue_limits_start_update(sdkp->disk->queue);
 	sd_config_write_same(sdkp, &lim);
 	blk_mq_freeze_queue(sdkp->disk->queue);
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	err = queue_limits_commit_update(sdkp->disk->queue, &lim);
 	blk_mq_unfreeze_queue(sdkp->disk->queue);
 	if (err)
@@ -3849,6 +3850,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	kfree(buffer);
 
 	blk_mq_freeze_queue(sdkp->disk->queue);
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	err = queue_limits_commit_update(sdkp->disk->queue, &lim);
 	blk_mq_unfreeze_queue(sdkp->disk->queue);
 	if (err)

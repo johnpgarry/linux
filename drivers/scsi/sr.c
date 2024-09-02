@@ -798,6 +798,7 @@ static int get_sectorsize(struct scsi_cd *cd)
 	lim = queue_limits_start_update(q);
 	lim.logical_block_size = sector_size;
 	blk_mq_freeze_queue(q);
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	err = queue_limits_commit_update(q, &lim);
 	blk_mq_unfreeze_queue(q);
 	return err;

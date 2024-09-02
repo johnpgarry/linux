@@ -4887,6 +4887,7 @@ fallback:
 			lim.features |= BLK_FEAT_POLL;
 		else
 			lim.features &= ~BLK_FEAT_POLL;
+		pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 		if (queue_limits_commit_update(q, &lim) < 0)
 			pr_warn("updating the poll flag failed\n");
 		blk_mq_map_swqueue(q);

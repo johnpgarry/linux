@@ -171,6 +171,7 @@ static ssize_t queue_max_discard_sectors_store(struct gendisk *disk,
 
 	lim = queue_limits_start_update(disk->queue);
 	lim.max_user_discard_sectors = max_discard_bytes >> SECTOR_SHIFT;
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	err = queue_limits_commit_update(disk->queue, &lim);
 	if (err)
 		return err;
@@ -203,6 +204,7 @@ queue_max_sectors_store(struct gendisk *disk, const char *page, size_t count)
 
 	lim = queue_limits_start_update(disk->queue);
 	lim.max_user_sectors = max_sectors_kb << 1;
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	err = queue_limits_commit_update(disk->queue, &lim);
 	if (err)
 		return err;
@@ -225,6 +227,7 @@ static ssize_t queue_feature_store(struct gendisk *disk, const char *page,
 		lim.features |= feature;
 	else
 		lim.features &= ~feature;
+	pr_err("%s calling queue_limits_commit_update lim=%pS\n", __func__, &lim);
 	ret = queue_limits_commit_update(disk->queue, &lim);
 	if (ret)
 		return ret;
