@@ -950,7 +950,7 @@ struct md_rdev *md_find_rdev_nr_rcu(struct mddev *mddev, int nr)
 	pr_err_once("%s nr=%d mddev=%pS\n", __func__, nr, mddev);
 	rdev_for_each_rcu(rdev, mddev) {
 
-		pr_err("%s1 nr=%d mddev=%pS rdev=%pS desc_nr=%d\n", __func__, nr, mddev, rdev, rdev->desc_nr);
+		pr_err_once("%s1 nr=%d mddev=%pS rdev=%pS desc_nr=%d\n", __func__, nr, mddev, rdev, rdev->desc_nr);
 		if (rdev->desc_nr == nr)
 			return rdev;
 	}
@@ -2502,7 +2502,7 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 			choice++;
 		rdev->desc_nr = choice;
 	} else {
-		pr_err_once("%s2 rdev=%pS mddev=%pS rdev->desc_nr=%d\n", __func__, rdev, mddev, rdev->desc_nr);
+		pr_err("%s2 rdev=%pS mddev=%pS rdev->desc_nr=%d\n", __func__, rdev, mddev, rdev->desc_nr);
 		if (md_find_rdev_nr_rcu(mddev, rdev->desc_nr)) {
 			rcu_read_unlock();
 			pr_err("%s1 EBUSY\n", __func__);
@@ -6944,6 +6944,9 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 	struct md_rdev *rdev;
 	dev_t dev = MKDEV(info->major,info->minor);
 
+	pr_err("%s mddev=%pS (raid_disks=%d) info major=%d minor=%d\n", __func__, mddev,
+		mddev->raid_disks,
+		info->major, info->minor);
 	if (mddev_is_clustered(mddev) &&
 		!(info->state & ((1 << MD_DISK_CLUSTER_ADD) | (1 << MD_DISK_CANDIDATE)))) {
 		pr_warn("%s: Cannot add to clustered mddev.\n",
@@ -6966,6 +6969,9 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 				PTR_ERR(rdev));
 			return PTR_ERR(rdev);
 		}
+		pr_err("%s1 mddev=%pS after md_import_device rdev=%pS (bd_queue=%pS, limits=%pS)\n",
+			__func__, mddev, rdev, rdev->bdev,
+			rdev->bdev ? &rdev->bdev->bd_queue->limits : NULL);
 		if (!list_empty(&mddev->disks)) {
 			struct md_rdev *rdev0
 				= list_entry(mddev->disks.next,
@@ -7796,7 +7802,7 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	void __user *argp = (void __user *)arg;
 	struct mddev *mddev = NULL;
 
-	pr_err("%s cmd=0x%x\n", __func__, cmd);
+	pr_err_once("%s cmd=0x%x\n", __func__, cmd);
 	err = md_ioctl_valid(cmd);
 	if (err)
 		return err;
@@ -7825,15 +7831,15 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	case GET_DISK_INFO:
 		if (!mddev->raid_disks && !mddev->external)
 			return -ENODEV;
-		pr_err("%s calling get_disk_info\n", __func__);
+		pr_err_once("%s calling get_disk_info\n", __func__);
 		return get_disk_info(mddev, argp);
 
 	case SET_DISK_FAULTY:
-		pr_err("%s calling set_disk_faulty\n", __func__);
+		pr_err_once("%s calling set_disk_faulty\n", __func__);
 		return set_disk_faulty(mddev, new_decode_dev(arg));
 
 	case GET_BITMAP_FILE:
-		pr_err("%s calling get_bitmap_file\n", __func__);
+		pr_err_once("%s calling get_bitmap_file\n", __func__);
 		return get_bitmap_file(mddev, argp);
 	}
 

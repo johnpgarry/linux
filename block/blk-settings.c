@@ -52,7 +52,7 @@ void blk_set_stacking_limits(struct queue_limits *lim)
 	lim->max_write_zeroes_sectors = UINT_MAX;
 	lim->max_zone_append_sectors = UINT_MAX;
 	lim->max_user_discard_sectors = UINT_MAX;
-//	pr_err("%s lim=%pS\n", __func__, lim);
+	pr_err("%s10 lim=%pS atomic_write_hw_max=%d\n", __func__, lim, lim->atomic_write_hw_max);
 }
 EXPORT_SYMBOL(blk_set_stacking_limits);
 

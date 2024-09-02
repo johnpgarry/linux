@@ -381,7 +381,7 @@ static int raid0_set_limits(struct mddev *mddev)
 	struct queue_limits lim;
 	int err;
 
-	pr_err("%s0 mddev=%pS calling md_init_stacking_limits\n", __func__, mddev);
+	pr_err("%s0 mddev=%pS calling md_init_stacking_limits &lim=%pS\n", __func__, mddev, &lim);
 	md_init_stacking_limits(&lim);
 	lim.max_hw_sectors = mddev->chunk_sectors;
 	lim.max_write_zeroes_sectors = mddev->chunk_sectors;
@@ -421,13 +421,13 @@ static int raid0_run(struct mddev *mddev)
 	pr_err("%s1 mddev=%pS mddev_is_dm=%d\n", __func__, mddev, mddev_is_dm(mddev));
 	if (!mddev_is_dm(mddev)) {
 		struct md_rdev *rdev;
-		bool disable_atomic_writes = !is_power_of_2(mddev->chunk_sectors);
 
 		pr_err("%s2 mddev=%pS chunk_sectors=%d\n", __func__, mddev, mddev->chunk_sectors);
 		rdev_for_each(rdev, mddev) {
-			pr_err("%s3 mddev=%pS chunksize=%ld chunk_sectors=%d calling disk_stack_limits for rdev=%pS disable_atomic_writes=%d\n",
-				__func__, mddev, mddev->bitmap_info.chunksize, mddev->chunk_sectors, rdev, disable_atomic_writes);
+			pr_err("%s3 mddev=%pS chunksize=%ld chunk_sectors=%d calling disk_stack_limits for rdev=%pS\n",
+				__func__, mddev, mddev->bitmap_info.chunksize, mddev->chunk_sectors, rdev);
 		}
+		pr_err("%s3 mddev=%pS chunk_sectors=%d calling raid0_set_limits\n", __func__, mddev, mddev->chunk_sectors);
 		ret = raid0_set_limits(mddev);
 		if (ret)
 			return ret;
