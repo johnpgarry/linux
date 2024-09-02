@@ -3458,10 +3458,15 @@ static inline int kiocb_set_rw_flags(struct kiocb *ki, rwf_t flags,
 		kiocb_flags |= IOCB_NOIO;
 	}
 	if (flags & RWF_ATOMIC) {
-		if (rw_type != WRITE)
+		if (rw_type != WRITE) {
+			pr_err("%s1 error WRITE rw_type=%d WRITE=%d\n", __func__, rw_type, WRITE);
+			WARN_ON_ONCE(1);
 			return -EOPNOTSUPP;
-		if (!(ki->ki_filp->f_mode & FMODE_CAN_ATOMIC_WRITE))
+		}
+		if (!(ki->ki_filp->f_mode & FMODE_CAN_ATOMIC_WRITE)) {
+			pr_err("%s2 error FMODE_CAN_ATOMIC_WRITE\n", __func__);
 			return -EOPNOTSUPP;
+		}
 	}
 	kiocb_flags |= (__force int) (flags & RWF_SUPPORTED);
 	if (flags & RWF_SYNC)

@@ -691,12 +691,18 @@ xfs_file_dio_write(
 	struct xfs_mount	*mp = ip->i_mount;
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
-		if (count < i_blocksize(inode))
+		if (count < i_blocksize(inode)) {
+			pr_err("%s i_blocksize EINVAL\n", __func__);
 			return -EINVAL;
-		if (count > XFS_FSB_TO_B(mp, ip->i_extsize))
+		}
+		if (count > XFS_FSB_TO_B(mp, ip->i_extsize)) {
+			pr_err("%s XFS_FSB_TO_B EINVAL\n", __func__);
 			return -EINVAL;
-		if (!generic_atomic_write_valid(iocb, from))
+		}
+		if (!generic_atomic_write_valid(iocb, from)) {
+			pr_err("%s generic_atomic_write_valid EINVAL\n", __func__);
 			return -EINVAL;
+		}
 	}
 
 	/* direct I/O must be aligned to device logical sector size */
@@ -1169,8 +1175,10 @@ xfs_file_open(
 	if (xfs_is_shutdown(XFS_M(inode->i_sb)))
 		return -EIO;
 	file->f_mode |= FMODE_NOWAIT | FMODE_CAN_ODIRECT;
-	if (xfs_file_open_can_atomicwrite(inode, file))
+	if (xfs_file_open_can_atomicwrite(inode, file)) {
+		//pr_err("%s setting FMODE_CAN_ATOMIC_WRITE\n", __func__);
 		file->f_mode |= FMODE_CAN_ATOMIC_WRITE;
+	}
 	return generic_file_open(inode, file);
 }
 

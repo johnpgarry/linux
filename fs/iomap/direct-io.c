@@ -352,6 +352,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		 */
 		if (iter->iomap.bdev != dio->atomic_bio->bi_bdev) {
 			ret = -EINVAL;
+			pr_err("%s ATOMIC bdev error\n", __func__);
 			goto out;
 		}
 
@@ -359,6 +360,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		    (dio->atomic_bio->bi_iter.bi_size >> SECTOR_SHIFT) !=
 			iomap_sector(iomap, pos)) {
 			ret = -EINVAL;
+			pr_err("%s2 ATOMIC iomap_sector error\n", __func__);
 			goto out;
 		}
 	} else if (atomic) {
@@ -428,6 +430,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		if (!ret) {
 			copied = dio->atomic_bio->bi_iter.bi_size -
 				orig_atomic_size;
+		} else {
+			
+			pr_err("%s ATOMIC bio_iov_iter_get_pages error\n", __func__);
 		}
 
 		dio->size += copied;

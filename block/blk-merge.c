@@ -329,7 +329,7 @@ struct bio *bio_split_rw(struct bio *bio, const struct queue_limits *lim,
 split:
 	if (bio->bi_opf & REQ_ATOMIC) {
 		bio->bi_status = BLK_STS_INVAL;
-		pr_err("%s split REQ_ATOMIC bio=%pS bi_sector=%lld bi_size=%d max_bytes=%d bi_bdev=%pS\n",
+		pr_err("%s split ERROR REQ_ATOMIC bio=%pS bi_sector=%lld bi_size=%d max_bytes=%d bi_bdev=%pS\n",
 			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, max_bytes, bio->bi_bdev);
 		bio_endio(bio);
 		return ERR_PTR(-EINVAL);

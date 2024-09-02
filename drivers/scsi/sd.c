@@ -1307,7 +1307,7 @@ static blk_status_t sd_setup_atomic_cmnd(struct scsi_cmnd *cmd,
 
 	struct scsi_device *sdev = cmd->device;
 	dev_err_once(&sdev->sdev_gendev, "%s bio=%pS device=%pS lba=%lld nr_blocks=%d\n", __func__, rq->bio, cmd->device, lba, nr_blocks);
-	WARN_ON_ONCE(1);
+	//WARN_ON_ONCE(1);
 	cmd->cmd_len  = 16;
 	cmd->cmnd[0]  = WRITE_ATOMIC_16;
 	cmd->cmnd[1]  = flags;
@@ -1347,10 +1347,10 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 
 	if (nr_blocks > 20) {
 		if ((_countjj % 25) == 0)
-			pr_err("%s1 lba=%lld nr_blocks=%d sdp=%pS write=%d _countjj=%d\n",
+			pr_err_once("%s1 lba=%lld nr_blocks=%d sdp=%pS write=%d _countjj=%d\n",
 				__func__, lba, nr_blocks, sdp, write, _countjj);
 		else if (lba == 10240)
-			pr_err("%s2 lba=%lld nr_blocks=%d sdp=%pS write=%d _countjj=%d\n",
+			pr_err_once("%s2 lba=%lld nr_blocks=%d sdp=%pS write=%d _countjj=%d\n",
 				__func__, lba, nr_blocks, sdp, write, _countjj);
 		//WARN_ON(lba == 10240);
 	}
@@ -1364,12 +1364,12 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 			_countjj10240write = atomic_read(&countjj10240write);
 			_countjj10240read = atomic_inc_return(&countjj10240read);
 		}
-		pr_err("%s3 10240  _countjj10240write=%d _countjj10240read=%d write=%d\n",
+		pr_err_once("%s3 10240  _countjj10240write=%d _countjj10240read=%d write=%d\n",
 			__func__, _countjj10240write, _countjj10240read, write);
 	}
 
 	if (nr_blocks > 50 && lba < 8000) {
-		pr_err("%s4 nr_blocks=%d lba=%lld  write=%d sdp=%pS\n",
+		pr_err_once("%s4 nr_blocks=%d lba=%lld  write=%d sdp=%pS\n",
 			__func__, nr_blocks, lba, write, sdp);
 
 	}
