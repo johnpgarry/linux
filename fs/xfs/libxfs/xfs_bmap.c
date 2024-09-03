@@ -4301,6 +4301,48 @@ xfs_bmapi_allocate(
 	xfs_filblks_t	br_blockcount;	/* number of blocks */
 	xfs_exntst_t	br_state;	/* extent state */
 #endif
+#if 0
+
+#define XFS_BMAPI_ENTIRE	(1u << 0) /* return entire extent untrimmed */
+#define XFS_BMAPI_METADATA	(1u << 1) /* mapping metadata not user data */
+#define XFS_BMAPI_ATTRFORK	(1u << 2) /* use attribute fork not data */
+#define XFS_BMAPI_PREALLOC	(1u << 3) /* preallocating unwritten space */
+#define XFS_BMAPI_CONTIG	(1u << 4) /* must allocate only one extent */
+/*
+ * unwritten extent conversion - this needs write cache flushing and no additional
+ * allocation alignments. When specified with XFS_BMAPI_PREALLOC it converts
+ * from written to unwritten, otherwise convert from unwritten to written.
+ */
+#define XFS_BMAPI_CONVERT	(1u << 5)
+
+/*
+ * allocate zeroed extents - this requires all newly allocated user data extents
+ * to be initialised to zero. It will be ignored if XFS_BMAPI_METADATA is set.
+ * Use in conjunction with XFS_BMAPI_CONVERT to convert unwritten extents found
+ * during the allocation range to zeroed written extents.
+ */
+#define XFS_BMAPI_ZERO		(1u << 6)
+
+/*
+ * Map the inode offset to the block given in ap->firstblock.  Primarily
+ * used for reflink.  The range must be in a hole, and this flag cannot be
+ * turned on with PREALLOC or CONVERT, and cannot be used on the attr fork.
+ *
+ * For bunmapi, this flag unmaps the range without adjusting quota, reducing
+ * refcount, or freeing the blocks.
+ */
+#define XFS_BMAPI_REMAP		(1u << 7)
+
+/* Map something in the CoW fork. */
+#define XFS_BMAPI_COWFORK	(1u << 8)
+
+/* Skip online discard of freed extents */
+#define XFS_BMAPI_NODISCARD	(1u << 9)
+
+/* Do not update the rmap btree.  Used for reconstructing bmbt from rmapbt. */
+#define XFS_BMAPI_NORMAP	(1u << 10)
+
+#endif
 
 STATIC int
 xfs_bmapi_convert_unwritten(
@@ -4318,17 +4360,34 @@ xfs_bmapi_convert_unwritten(
 		__func__, len, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
 		mval->br_state == XFS_EXT_UNWRITTEN ? "UNWRITTEN" : "NORM",
 		flags);
+	pr_err("%s0 ENTIRE=%d METADATA=%d ATTRFORK=%d PREALLOC=%d CONTIG=%d CONVERT=%d ZERO=%d REMAP=%d COWFORK=%d NODISCARD=%d NORMAP=%d\n",
+		__func__,
+		!!(flags & XFS_BMAPI_ENTIRE),
+		!!(flags & XFS_BMAPI_METADATA),
+		!!(flags & XFS_BMAPI_ATTRFORK),
+		!!(flags & XFS_BMAPI_PREALLOC),
+		!!(flags & XFS_BMAPI_CONTIG),
+		!!(flags & XFS_BMAPI_CONVERT),
+		!!(flags & XFS_BMAPI_ZERO),
+		!!(flags & XFS_BMAPI_REMAP),
+		!!(flags & XFS_BMAPI_COWFORK),
+		!!(flags & XFS_BMAPI_NODISCARD),
+		!!(flags & XFS_BMAPI_NORMAP));
 
 	/* check if we need to do unwritten->real conversion */
 	if (mval->br_state == XFS_EXT_UNWRITTEN &&
-	    (flags & XFS_BMAPI_PREALLOC))
+	    (flags & XFS_BMAPI_PREALLOC)) {
+		pr_err("%s0.0 need to do unwritten->real conversion, return\n", __func__);
 		return 0;
+	}
 
 	/* check if we need to do real->unwritten conversion */
 	if (mval->br_state == XFS_EXT_NORM &&
 	    (flags & (XFS_BMAPI_PREALLOC | XFS_BMAPI_CONVERT)) !=
-			(XFS_BMAPI_PREALLOC | XFS_BMAPI_CONVERT))
+			(XFS_BMAPI_PREALLOC | XFS_BMAPI_CONVERT)) {
+		pr_err("%s0.1 need to do real->unwritten conversion, return\n", __func__);
 		return 0;
+	}
 
 	/*
 	 * Modify (by adding) the state flag, if writing.
