@@ -1672,6 +1672,15 @@ static inline bool bdev_can_atomic_write(struct block_device *bdev)
 	if (!limits->atomic_write_unit_min)
 		return false;
 
+	if (!IS_ALIGNED(size, limits->atomic_write_unit_max)) {
+			pr_err("%s0 size not aligned bdev_nr_bytes=%lld atomic_write_unit_min,max=%d,%d atomic_write_hw_boundary=%d\n",
+				__func__, size,
+				limits->atomic_write_unit_min,
+				limits->atomic_write_unit_max,
+				limits->atomic_write_hw_boundary); 
+			return false;
+	}
+
 	if (bdev_is_partition(bdev)) {
 		sector_t bd_start_sect = bdev->bd_start_sect;
 		unsigned int alignment =
