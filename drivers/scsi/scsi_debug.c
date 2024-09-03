@@ -111,7 +111,7 @@ static const char *sdebug_version_date = "20210520";
 #define ACK_NAK_TO 0x3
 
 /* Default values for driver parameters */
-#define DEF_NUM_HOST   2
+#define DEF_NUM_HOST   4
 #define DEF_NUM_TGTS   1
 #define DEF_MAX_LUNS   1
 /* With these defaults, this driver will make 1 host with 1 target
@@ -155,7 +155,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_VIRTUAL_GB   0
 #define DEF_VPD_USE_HOSTNO 1
 #define DEF_WRITESAME_LENGTH 0xFFFF
-#define DEF_ATOMIC_WR 0
+#define DEF_ATOMIC_WR 1
 #define DEF_ATOMIC_WR_MAX_LENGTH 8192
 #define DEF_ATOMIC_WR_ALIGN 2
 #define DEF_ATOMIC_WR_GRAN 2
