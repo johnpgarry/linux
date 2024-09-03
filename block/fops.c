@@ -702,6 +702,8 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 
 	size -= iocb->ki_pos;
 	if (iov_iter_count(from) > size) {
+		if (iocb->ki_flags & IOCB_ATOMIC)
+			return -EINVAL;
 		shorted = iov_iter_count(from) - size;
 		iov_iter_truncate(from, size);
 	}
