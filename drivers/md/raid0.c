@@ -601,20 +601,42 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 	sector = bio->bi_iter.bi_sector;
 	chunk_sects = mddev->chunk_sectors;
 
+	//WARN_ON_ONCE(bio->bi_opf & REQ_ATOMIC);
+
+
 	sectors = chunk_sects -
 		(likely(is_power_of_2(chunk_sects))
 		 ? (sector & (chunk_sects-1))
 		 : sector_div(sector, chunk_sects));
 
+	if (bio->bi_opf & REQ_ATOMIC) {
+		static int largest;
+
+		if (bio_sectors(bio) > largest) {
+			largest = bio_sectors(bio);
+			pr_err_once("%s1 REQ_ATOMIC bio=%pS sectors=%d bio_sectors(bio)=%d sectors=%d bio_sectors(bio)=%d chunk_sects=%d largest=%d\n",
+				__func__, bio, sectors, bio_sectors(bio), sectors, bio_sectors(bio), chunk_sects, largest);
+		}
+	}
+
 	if (sectors < bio_sectors(bio)) {
 		struct bio *split;
 
-		if (bio->bi_opf & REQ_ATOMIC)
+		/*
+		 * This gives rise to BLK_STS_IOERR, when it should really be
+		 * BLK_STS_INVAL
+		 */
+		if (bio->bi_opf & REQ_ATOMIC) {
+			pr_err("%s2 REQ_ATOMIC bio=%pS sectors=%d bio_sectors(bio)=%d sectors=%d bio_sectors(bio)=%d chunk_sects=%d\n",
+				__func__, bio, sectors, bio_sectors(bio), sectors, bio_sectors(bio), chunk_sects);
+			BUG();
 			return false;
+		}
 
-		split = bio_split(bio, sectors, GFP_NOIO,
-					      &mddev->bio_set);
+		split = bio_split(bio, sectors, GFP_NOIO, &mddev->bio_set);
 		bio_chain(split, bio);
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err_once("%s3 REQ_ATOMIC calling raid0_map_submit_bio for bio=%pS, split=%pS\n", __func__, bio, split);
 		raid0_map_submit_bio(mddev, bio);
 		bio = split;
 	}
