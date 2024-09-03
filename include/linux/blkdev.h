@@ -1664,7 +1664,7 @@ static inline bool bdev_can_atomic_write(struct block_device *bdev)
 	loff_t size = bdev_nr_bytes(bdev);
 
 
-	pr_err("%s size=%lld atomic_write_unit_min,max=%d,%d atomic_write_hw_boundary=%d\n",
+	pr_err("%s bdev_nr_bytes=%lld atomic_write_unit_min,max=%d,%d atomic_write_hw_boundary=%d\n",
 			__func__, size,
 			limits->atomic_write_unit_min,
 			limits->atomic_write_unit_max,
@@ -1683,17 +1683,14 @@ static inline bool bdev_can_atomic_write(struct block_device *bdev)
 
 	if (bdev_is_partition(bdev)) {
 		sector_t bd_start_sect = bdev->bd_start_sect;
-		unsigned int alignment =
-			max(limits->atomic_write_unit_min,
-			    limits->atomic_write_hw_boundary);
 		pr_err("%s1 bd_start_sect=%lld atomic_write_unit_min,max=%d,%d atomic_write_hw_boundary=%d IS_ALIGNED=%d\n",
 			__func__, bd_start_sect, 
 			limits->atomic_write_unit_min,
 			limits->atomic_write_unit_max,
 			limits->atomic_write_hw_boundary,
-			IS_ALIGNED(bd_start_sect, alignment >> SECTOR_SHIFT)); 
+			IS_ALIGNED(bd_start_sect, limits->atomic_write_unit_max >> SECTOR_SHIFT)); 
 
-		if (!IS_ALIGNED(bd_start_sect, alignment >> SECTOR_SHIFT))
+		if (!IS_ALIGNED(bd_start_sect, limits->atomic_write_unit_max >> SECTOR_SHIFT))
 			return false;
 	}
 
