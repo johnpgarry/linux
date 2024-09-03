@@ -588,6 +588,7 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 	sector_t sector;
 	unsigned chunk_sects;
 	unsigned sectors;
+	unsigned long flags;
 
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
@@ -611,11 +612,14 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 
 	if (bio->bi_opf & REQ_ATOMIC) {
 		static int largest;
-
+		spin_lock_irqsave(&mddev->lock, flags);
 		if (bio_sectors(bio) > largest) {
 			largest = bio_sectors(bio);
-			pr_err_once("%s1 REQ_ATOMIC bio=%pS sectors=%d bio_sectors(bio)=%d sectors=%d bio_sectors(bio)=%d chunk_sects=%d largest=%d\n",
+			spin_unlock_irqrestore(&mddev->lock, flags);
+			pr_err("%s REQ_ATOMIC bio=%pS sectors=%d bio_sectors(bio)=%d sectors=%d bio_sectors(bio)=%d chunk_sects=%d largest=%d\n",
 				__func__, bio, sectors, bio_sectors(bio), sectors, bio_sectors(bio), chunk_sects, largest);
+		} else {
+			spin_unlock_irqrestore(&mddev->lock, flags);
 		}
 	}
 

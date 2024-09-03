@@ -1311,7 +1311,7 @@ static blk_status_t sd_setup_atomic_cmnd(struct scsi_cmnd *cmd,
 	struct request *rq = scsi_cmd_to_rq(cmd);
 
 	struct scsi_device *sdev = cmd->device;
-	dev_err_once(&sdev->sdev_gendev, "%s bio=%pS device=%pS lba=%lld nr_blocks=%d\n", __func__, rq->bio, cmd->device, lba, nr_blocks);
+	dev_err(&sdev->sdev_gendev, "%s bio=%pS device=%pS lba=%lld nr_blocks=%d\n", __func__, rq->bio, cmd->device, lba, nr_blocks);
 	cmd->cmd_len  = 16;
 	cmd->cmnd[0]  = WRITE_ATOMIC_16;
 	cmd->cmnd[1]  = flags;

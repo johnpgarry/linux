@@ -56,6 +56,11 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	struct bio bio;
 	ssize_t ret;
 
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s ATOMIC\n", __func__);
+		
+	}
+
 	if (nr_pages <= DIO_INLINE_BIO_VECS)
 		vecs = inline_vecs;
 	else {
@@ -370,11 +375,20 @@ static ssize_t blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	bool is_atomic = iocb->ki_flags & IOCB_ATOMIC;
 	unsigned int nr_pages;
 
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s ATOMIC\n", __func__);
+		
+	}
+
 	if (!iov_iter_count(iter))
 		return 0;
 
-	if (blkdev_dio_invalid(bdev, iocb->ki_pos, iter, is_atomic))
+	if (blkdev_dio_invalid(bdev, iocb->ki_pos, iter, is_atomic)) {
+		if (iocb->ki_flags & IOCB_ATOMIC) {
+			pr_err("%s1 ATOMIC EINVAL\n", __func__);
+		}
 		return -EINVAL;
+	}
 
 	nr_pages = bio_iov_vecs_to_alloc(iter, BIO_MAX_VECS + 1);
 	if (likely(nr_pages <= BIO_MAX_VECS)) {
@@ -684,6 +698,11 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	size_t shorted = 0;
 	ssize_t ret;
 
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s ATOMIC bdev_nr_bytes=%lld iov_iter_count=%zd\n",
+			__func__, size, iov_iter_count(from));
+	}
+
 	if (bdev_read_only(bdev))
 		return -EPERM;
 
@@ -693,8 +712,14 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if (!iov_iter_count(from))
 		return 0;
 
-	if (iocb->ki_pos >= size)
+	if (iocb->ki_pos >= size) {
+
+		if (iocb->ki_flags & IOCB_ATOMIC) {
+			pr_err("%s1 ATOMIC iocb->ki_pos > bdev_nr_bytes ENOSPC\n", __func__);
+		}
+
 		return -ENOSPC;
+	}
 
 	if ((iocb->ki_flags & (IOCB_NOWAIT | IOCB_DIRECT)) == IOCB_NOWAIT)
 		return -EOPNOTSUPP;
@@ -702,6 +727,10 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	size -= iocb->ki_pos;
 	if (iov_iter_count(from) > size) {
 		shorted = iov_iter_count(from) - size;
+		if (iocb->ki_flags & IOCB_ATOMIC) {
+			pr_err("%s2 ATOMIC bdev_nr_bytes=%lld shorted=%zd iov_iter_count=%zd iocb->ki_pos=%lld\n",
+				__func__, size, shorted, iov_iter_count(from), iocb->ki_pos);
+		}
 		iov_iter_truncate(from, size);
 	}
 
@@ -709,6 +738,10 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if (ret)
 		return ret;
 
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s3 ATOMIC bdev_nr_bytes=%lld calling blkdev_direct_write iov_iter_count=%zd\n",
+			__func__, size, iov_iter_count(from));
+	}
 	if (iocb->ki_flags & IOCB_DIRECT) {
 		ret = blkdev_direct_write(iocb, from);
 		if (ret >= 0 && iov_iter_count(from))

@@ -413,6 +413,20 @@ static void md_submit_bio(struct bio *bio)
 {
 	const int rw = bio_data_dir(bio);
 	struct mddev *mddev = bio->bi_bdev->bd_disk->private_data;
+	unsigned long flags;
+
+	if (bio->bi_opf & REQ_ATOMIC) {
+		static int largest;
+		spin_lock_irqsave(&mddev->lock, flags);
+		if (bio_sectors(bio) > largest) {
+			largest = bio_sectors(bio);
+			spin_unlock_irqrestore(&mddev->lock, flags);
+			pr_err("%s REQ_ATOMIC bio=%pS bio_sectors(bio)=%d largest=%d\n",
+				__func__, bio, bio_sectors(bio), largest);
+		} else {
+			spin_unlock_irqrestore(&mddev->lock, flags);
+		}
+	}
 
 	if (mddev == NULL || mddev->pers == NULL) {
 		bio_io_error(bio);

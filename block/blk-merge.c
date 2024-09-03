@@ -846,6 +846,9 @@ static bool blk_atomic_write_mergeable_rqs(struct request *rq,
 static struct request *attempt_merge(struct request_queue *q,
 				     struct request *req, struct request *next)
 {
+	unsigned int req_sectors = blk_rq_sectors(req);
+	unsigned int next_sectors = blk_rq_sectors(next);
+
 	if (!rq_mergeable(req) || !rq_mergeable(next))
 		return NULL;
 
@@ -916,7 +919,8 @@ static struct request *attempt_merge(struct request_queue *q,
 		elv_merge_requests(q, req, next);
 
 	if (req->cmd_flags & REQ_ATOMIC)
-		pr_err_once("%s merged atomic\n", __func__);
+		pr_err_once("%s merged atomic req_sectors=%d next_sectors=%d\n",
+			__func__, req_sectors, next_sectors);
 
 	blk_crypto_rq_put_keyslot(next);
 
@@ -1029,6 +1033,8 @@ static void blk_account_io_merge_bio(struct request *req)
 enum bio_merge_status bio_attempt_back_merge(struct request *req,
 		struct bio *bio, unsigned int nr_segs)
 {
+	unsigned int req_sectors = blk_rq_sectors(req);
+	unsigned int bio_sectors = bio->bi_iter.bi_size >> SECTOR_SHIFT;
 	const blk_opf_t ff = bio_failfast(bio);
 
 	if (!ll_back_merge_fn(req, bio, nr_segs))
@@ -1052,7 +1058,8 @@ enum bio_merge_status bio_attempt_back_merge(struct request *req,
 	bio_crypt_free_ctx(bio);
 
 	if (req->cmd_flags & REQ_ATOMIC)
-		pr_err_once("%s merged atomic\n", __func__);
+		pr_err_once("%s merged atomic req_sectors=%d bio_sectors=%d\n",
+			__func__, req_sectors, bio_sectors);
 	blk_account_io_merge_bio(req);
 	return BIO_MERGE_OK;
 }
@@ -1060,6 +1067,8 @@ enum bio_merge_status bio_attempt_back_merge(struct request *req,
 static enum bio_merge_status bio_attempt_front_merge(struct request *req,
 		struct bio *bio, unsigned int nr_segs)
 {
+	unsigned int req_sectors = blk_rq_sectors(req);
+	unsigned int bio_sectors = bio->bi_iter.bi_size >> SECTOR_SHIFT;
 	const blk_opf_t ff = bio_failfast(bio);
 
 	/*
@@ -1090,7 +1099,8 @@ static enum bio_merge_status bio_attempt_front_merge(struct request *req,
 	bio_crypt_do_front_merge(req, bio);
 
 	if (req->cmd_flags & REQ_ATOMIC)
-		pr_err_once("%s merged atomic\n", __func__);
+		pr_err_once("%s merged atomic req_sectors=%d bio_sectors=%d\n", __func__,
+			req_sectors, bio_sectors);
 	blk_account_io_merge_bio(req);
 	return BIO_MERGE_OK;
 }

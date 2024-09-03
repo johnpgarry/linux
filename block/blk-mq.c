@@ -2029,6 +2029,16 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 		 */
 		if (nr_budgets)
 			nr_budgets--;
+		if (rq->cmd_flags & REQ_ATOMIC) {
+			static int largest;
+			if (blk_rq_sectors(rq) > largest) {
+
+				largest = blk_rq_sectors(rq);
+				pr_err("%s REQ_ATOMIC largest=%d sectors\n", __func__, largest);
+			}
+
+		}
+
 		ret = q->mq_ops->queue_rq(hctx, &bd);
 		switch (ret) {
 		case BLK_STS_OK:

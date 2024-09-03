@@ -1741,14 +1741,20 @@ bool generic_atomic_write_valid(struct iov_iter *iter, loff_t pos)
 {
 	size_t len = iov_iter_count(iter);
 
-	if (!iter_is_ubuf(iter))
+	if (!iter_is_ubuf(iter)) {
+		pr_err("%s iter_is_ubuf error\n", __func__);
 		return false;
+	}
 
-	if (!is_power_of_2(len))
+	if (!is_power_of_2(len)) {
+		pr_err("%s is_power_of_2 error len=%zd\n", __func__, len);
 		return false;
+	}
 
-	if (!IS_ALIGNED(pos, len))
+	if (!IS_ALIGNED(pos, len)) {
+		pr_err("%s IS_ALIGNED error\n", __func__);
 		return false;
+	}
 
 	return true;
 }
