@@ -3767,9 +3767,11 @@ static int raid_message(struct dm_target *ti, unsigned int argc, char **argv,
 			set_bit(MD_RECOVERY_CHECK, &mddev->recovery);
 			set_bit(MD_RECOVERY_REQUESTED, &mddev->recovery);
 			set_bit(MD_RECOVERY_SYNC, &mddev->recovery);
+			pr_err("%s MD_RECOVERY_SYNC\n", __func__);
 		} else if (!strcasecmp(argv[0], "repair")) {
 			set_bit(MD_RECOVERY_REQUESTED, &mddev->recovery);
 			set_bit(MD_RECOVERY_SYNC, &mddev->recovery);
+			pr_err("%s2 MD_RECOVERY_SYNC\n", __func__);
 		} else
 			return -EINVAL;
 	}

@@ -117,6 +117,10 @@ static void md_bio_reset_resync_pages(struct bio *bio, struct resync_pages *rp,
 static inline void raid1_submit_write(struct bio *bio)
 {
 	struct md_rdev *rdev = (void *)bio->bi_bdev;
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
+
+	if (atomic)
+		pr_err("%s REQ_ATOMIC bio=%pS (bi_end_io=%pS)\n", __func__, bio, bio->bi_end_io);
 
 	bio->bi_next = NULL;
 	bio_set_dev(bio, rdev->bdev);
@@ -135,7 +139,11 @@ static inline bool raid1_add_bio_to_plug(struct mddev *mddev, struct bio *bio,
 {
 	struct raid1_plug_cb *plug = NULL;
 	struct blk_plug_cb *cb;
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
 
+	if (atomic)
+		pr_err("%s REQ_ATOMIC bio=%pS unplug=%pS copies=%d md_bitmap_enabled=%d\n",
+				__func__, bio, unplug, copies, md_bitmap_enabled(mddev->bitmap));
 	/*
 	 * If bitmap is not enabled, it's safe to submit the io directly, and
 	 * this can get optimal performance.
@@ -146,11 +154,17 @@ static inline bool raid1_add_bio_to_plug(struct mddev *mddev, struct bio *bio,
 	}
 
 	cb = blk_check_plugged(unplug, mddev, sizeof(*plug));
+	if (atomic)
+		pr_err("%s2 REQ_ATOMIC bio=%pS cb=%pS\n",
+				__func__, bio, cb);
 	if (!cb)
 		return false;
 
 	plug = container_of(cb, struct raid1_plug_cb, cb);
 	bio_list_add(&plug->pending, bio);
+	if (atomic)
+		pr_err("%s3 REQ_ATOMIC bio=%pS cb=%pS plug->count=%d\n",
+				__func__, bio, cb, plug->count);
 	if (++plug->count / MAX_PLUG_BIO >= copies) {
 		list_del(&cb->list);
 		cb->callback(cb, false);

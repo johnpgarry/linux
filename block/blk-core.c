@@ -753,6 +753,10 @@ void submit_bio_noacct(struct bio *bio)
 	struct block_device *bdev = bio->bi_bdev;
 	struct request_queue *q = bdev_get_queue(bdev);
 	blk_status_t status = BLK_STS_IOERR;
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
+
+	if (atomic)
+		pr_err("%s REQ_ATOMIC bio=%pS\n", __func__, bio);
 
 	might_sleep();
 
