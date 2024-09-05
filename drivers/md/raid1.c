@@ -3038,8 +3038,12 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 					if (wonly < 0)
 						wonly = i;
 				} else {
-					if (disk < 0)
+					if (disk < 0) {
 						disk = i;
+						if (print)
+							pr_err("%s2.3.2 r1_bio=%pS countjj=%d sector_nr=%lld first_bad=%lld set disk=%d\n",
+								__func__, r1_bio, _countjj, sector_nr, first_bad, disk);
+					}
 				}
 				bio->bi_opf = REQ_OP_READ;
 				bio->bi_end_io = end_sync_read;
@@ -3084,7 +3088,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 	if (disk < 0)
 		disk = wonly;
 	r1_bio->read_disk = disk;
-	BUG_ON(disk != 0);
+	//BUG_ON(disk != 0);
 
 	
 	if (print)

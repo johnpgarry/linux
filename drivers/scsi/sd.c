@@ -946,6 +946,9 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 	unsigned int logical_block_size = sdkp->device->sector_size,
 		physical_block_size_sectors, max_atomic, unit_min, unit_max;
 
+	pr_err("%s sdkp->max_atomic=%d sdkp->max_atomic_with_boundary=%d\n", __func__,
+				sdkp->max_atomic, sdkp->max_atomic_with_boundary); 
+
 	if ((!sdkp->max_atomic && !sdkp->max_atomic_with_boundary) ||
 	    sdkp->protection_type == T10_PI_TYPE2_PROTECTION)
 		goto out_unsupported;
@@ -971,6 +974,9 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 		sdkp->use_atomic_write_boundary = 1;
 	}
 
+	pr_err("%s0 unit_min=%d max_atomic=%d sdkp->use_atomic_write_boundary=%d, atomic_granularity=%d\n", __func__,
+				unit_min, max_atomic, sdkp->use_atomic_write_boundary, sdkp->atomic_granularity); 
+
 	/*
 	 * Ensure compliance with granularity and alignment. For now, keep it
 	 * simple and just don't support atomic writes for values mismatched
@@ -980,17 +986,29 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 	 * We're really being distrustful by checking unit_max also...
 	 */
 	if (sdkp->atomic_granularity > 1) {
-		if (unit_min > 1 && unit_min % sdkp->atomic_granularity)
-			return;
-		if (unit_max > 1 && unit_max % sdkp->atomic_granularity)
-			return;
+		if (unit_min > 1 && unit_min % sdkp->atomic_granularity) {
+			pr_err("%s1 unit_min=%d sdkp->atomic_granularity=%d goto out_unsupported\n", __func__,
+				unit_min, sdkp->atomic_granularity); 
+			goto out_unsupported;
+		}
+		if (unit_max > 1 && unit_max % sdkp->atomic_granularity) {
+			pr_err("%s2 unit_max=%d sdkp->atomic_granularity=%d goto out_unsupported\n", __func__,
+				unit_max, sdkp->atomic_granularity); 
+			goto out_unsupported;
+		}
 	}
 
 	if (sdkp->atomic_alignment > 1) {
-		if (unit_min > 1 && unit_min % sdkp->atomic_alignment)
+		if (unit_min > 1 && unit_min % sdkp->atomic_alignment) {
+			pr_err("%s3 unit_min=%d sdkp->atomic_alignment=%d goto out_unsupported\n", __func__,
+				unit_min, sdkp->atomic_alignment); 
 			goto out_unsupported;
-		if (unit_max > 1 && unit_max % sdkp->atomic_alignment)
+		}
+		if (unit_max > 1 && unit_max % sdkp->atomic_alignment) {
+			pr_err("%s4 unit_max=%d sdkp->atomic_alignment=%d goto out_unsupported\n", __func__,
+				unit_max, sdkp->atomic_alignment); 
 			goto out_unsupported;
+		}
 	}
 
 	lim->atomic_write_hw_max = max_atomic * logical_block_size;
@@ -998,6 +1016,9 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 	lim->atomic_write_hw_unit_min = unit_min * logical_block_size;
 	lim->atomic_write_hw_unit_max = unit_max * logical_block_size;
 
+
+	pr_err("%s9 setting BLK_FEAT_ATOMIC_WRITES unit_min=%d max_atomic=%d sdkp->use_atomic_write_boundary=%d, atomic_granularity=%d\n", __func__,
+				unit_min, max_atomic, sdkp->use_atomic_write_boundary, sdkp->atomic_granularity); 
 	lim->features |= BLK_FEAT_ATOMIC_WRITES;
 	return;
 

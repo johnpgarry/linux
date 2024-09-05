@@ -1244,16 +1244,25 @@ static void raid10_write_one_disk(struct mddev *mddev, struct r10bio *r10_bio,
 	const enum req_op op = bio_op(bio);
 	const blk_opf_t do_sync = bio->bi_opf & REQ_SYNC;
 	const blk_opf_t do_fua = bio->bi_opf & REQ_FUA;
+	const blk_opf_t do_atomic = bio->bi_opf & REQ_ATOMIC;
 	unsigned long flags;
 	struct r10conf *conf = mddev->private;
 	struct md_rdev *rdev;
 	int devnum = r10_bio->devs[n_copy].devnum;
 	struct bio *mbio;
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS r10_bio=%pS replacement=%d n_copy=%d\n",
+			__func__, bio, r10_bio, replacement, n_copy);
 
 	rdev = replacement ? conf->mirrors[devnum].replacement :
 			     conf->mirrors[devnum].rdev;
 
 	mbio = bio_alloc_clone(rdev->bdev, bio, GFP_NOIO, &mddev->bio_set);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s1 REQ_ATOMIC after bio_alloc_clone  bio=%pS r10_bio=%pS replacement=%d n_copy=%d mbio=%pS (REQ_ATOMIC=%d) rdev=%pS\n",
+			__func__, bio, r10_bio, replacement, n_copy, mbio,
+			!!(mbio->bi_opf & REQ_ATOMIC),
+			rdev);
 	if (replacement)
 		r10_bio->devs[n_copy].repl_bio = mbio;
 	else
@@ -1262,7 +1271,7 @@ static void raid10_write_one_disk(struct mddev *mddev, struct r10bio *r10_bio,
 	mbio->bi_iter.bi_sector	= (r10_bio->devs[n_copy].addr +
 				   choose_data_offset(r10_bio, rdev));
 	mbio->bi_end_io	= raid10_end_write_request;
-	mbio->bi_opf = op | do_sync | do_fua;
+	mbio->bi_opf = op | do_sync | do_fua | do_atomic;
 	if (!replacement && test_bit(FailFast,
 				     &conf->mirrors[devnum].rdev->flags)
 			 && enough(conf, devnum))
@@ -1274,6 +1283,12 @@ static void raid10_write_one_disk(struct mddev *mddev, struct r10bio *r10_bio,
 
 	atomic_inc(&r10_bio->remaining);
 
+
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s8 REQ_ATOMIC calling raid1_add_bio_to_plug  bio=%pS r10_bio=%pS replacement=%d n_copy=%d mbio=%pS (REQ_ATOMIC=%d, bi_bdev=%pS)\n",
+			__func__, bio, r10_bio, replacement, n_copy, mbio,
+			!!(mbio->bi_opf & REQ_ATOMIC),
+			mbio->bi_bdev);
 	if (!raid1_add_bio_to_plug(mddev, mbio, raid10_unplug, conf->copies)) {
 		spin_lock_irqsave(&conf->device_lock, flags);
 		bio_list_add(&conf->pending_bio_list, mbio);
@@ -1415,6 +1430,11 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 
 	max_sectors = r10_bio->sectors;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS mddev=%pS sectors=%lld r10_bio=%pS (sectors=%d) max_sectors=%d\n",
+			__func__, bio, mddev, sectors, r10_bio, r10_bio->sectors,
+			max_sectors);
+
 	for (i = 0;  i < conf->copies; i++) {
 		int d = r10_bio->devs[i].devnum;
 		struct md_rdev *rdev, *rrdev;
@@ -1475,12 +1495,23 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 		}
 	}
 
-	if (max_sectors < r10_bio->sectors)
+	if (max_sectors < r10_bio->sectors) {
 		r10_bio->sectors = max_sectors;
+
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s2 reduced r10_bio->sectors REQ_ATOMIC bio=%pS mddev=%pS sectors=%lld r10_bio=%pS (sectors=%d) max_sectors=%d\n",
+				__func__, bio, mddev, sectors, r10_bio, r10_bio->sectors,
+				max_sectors);
+	}
 
 	if (r10_bio->sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, r10_bio->sectors,
 					      GFP_NOIO, &conf->bio_split);
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s3 REQ_ATOMIC split bio split=%pS (REQ_ATOMIC=%d) bio=%pS mddev=%pS sectors=%lld r10_bio=%pS (sectors=%d) max_sectors=%d\n",
+				__func__, split, !!(split->bi_opf & REQ_ATOMIC),
+				bio, mddev, sectors, r10_bio, r10_bio->sectors,
+				max_sectors);
 		bio_chain(split, bio);
 		allow_barrier(conf);
 		submit_bio_noacct(bio);
@@ -1495,6 +1526,12 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 	md_bitmap_startwrite(mddev->bitmap, r10_bio->sector, r10_bio->sectors, 0);
 
 	for (i = 0; i < conf->copies; i++) {
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s8 REQ_ATOMIC bio=%pS sectors=%lld r10_bio=%pS max_sectors=%d i=%d conf->copied=%d .bio=%pS .repl_bio=%pS\n",
+			__func__, bio, sectors, r10_bio, max_sectors, i, conf->copies,
+			r10_bio->devs[i].bio,
+			r10_bio->devs[i].repl_bio);
+
 		if (r10_bio->devs[i].bio)
 			raid10_write_one_disk(mddev, r10_bio, bio, false, i);
 		if (r10_bio->devs[i].repl_bio)
@@ -1509,6 +1546,10 @@ static void __make_request(struct mddev *mddev, struct bio *bio, int sectors)
 	struct r10bio *r10_bio;
 
 	r10_bio = mempool_alloc(&conf->r10bio_pool, GFP_NOIO);
+
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS mddev=%pS sectors=%d r10_bio=%pS\n",
+			__func__, bio, mddev, sectors, r10_bio);
 
 	r10_bio->master_bio = bio;
 	r10_bio->sectors = sectors;
@@ -1831,6 +1872,9 @@ static bool raid10_make_request(struct mddev *mddev, struct bio *bio)
 	sector_t chunk_mask = (conf->geo.chunk_mask & conf->prev.chunk_mask);
 	int chunk_sects = chunk_mask + 1;
 	int sectors = bio_sectors(bio);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s REQ_ATOMIC bio=%pS mddev=%pS sectors=%d chunk_sects=%d\n",
+			__func__, bio, mddev, sectors, chunk_sects);
 
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
@@ -1854,6 +1898,8 @@ static bool raid10_make_request(struct mddev *mddev, struct bio *bio)
 		sectors = chunk_sects -
 			(bio->bi_iter.bi_sector &
 			 (chunk_sects - 1));
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s2 REQ_ATOMIC bio=%pS mddev=%pS sectors=%d\n", __func__, bio, mddev, sectors);
 	__make_request(mddev, bio, sectors);
 
 	/* In case raid10d snuck in to freeze_array */
@@ -2073,6 +2119,8 @@ static int raid10_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 	int first = 0;
 	int last = conf->geo.raid_disks - 1;
 	struct raid10_info *p;
+
+	pr_err("%s rdev=%pS (bdev=%pS)\n", __func__, rdev, rdev->bdev);
 
 	if (mddev->recovery_cp < MaxSector)
 		/* only hot-add to in-sync arrays, as recovery is
@@ -3828,8 +3876,10 @@ static int setup_geo(struct geom *geo, struct mddev *mddev, enum geo_type new)
 	if (layout >> 19)
 		return -1;
 	if (chunk < (PAGE_SIZE >> 9) ||
-	    !is_power_of_2(chunk))
+	    !is_power_of_2(chunk)) {
+		pr_err("%s must be a power of 2 chunk=%d\n", __func__, chunk);
 		return -2;
+	}
 	nc = layout & 255;
 	fc = (layout >> 8) & 255;
 	fo = layout & (1<<16);
@@ -3978,6 +4028,7 @@ static int raid10_set_queue_limits(struct mddev *mddev)
 	lim.max_write_zeroes_sectors = 0;
 	lim.io_min = mddev->chunk_sectors << 9;
 	lim.io_opt = lim.io_min * raid10_nr_stripes(conf);
+	lim.features |= BLK_FEAT_ATOMIC_WRITES;
 	err = mddev_stack_rdev_limits(mddev, &lim, MDDEV_STACK_INTEGRITY);
 	if (err) {
 		queue_limits_cancel_update(mddev->gendisk->queue);

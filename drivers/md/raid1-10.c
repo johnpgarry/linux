@@ -119,11 +119,12 @@ static inline void raid1_submit_write(struct bio *bio)
 	struct md_rdev *rdev = (void *)bio->bi_bdev;
 	bool atomic = bio->bi_opf & REQ_ATOMIC;
 
-	if (atomic)
-		pr_err("%s REQ_ATOMIC bio=%pS (bi_end_io=%pS)\n", __func__, bio, bio->bi_end_io);
 
 	bio->bi_next = NULL;
 	bio_set_dev(bio, rdev->bdev);
+	if (atomic)
+		pr_err("%s REQ_ATOMIC bio=%pS (bi_end_io=%pS, bi_bdev=%pS)\n",
+			__func__, bio, bio->bi_end_io, bio->bi_bdev);
 	if (test_bit(Faulty, &rdev->flags))
 		bio_io_error(bio);
 	else if (unlikely(bio_op(bio) ==  REQ_OP_DISCARD &&

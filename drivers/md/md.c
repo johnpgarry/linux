@@ -5799,6 +5799,14 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 {
 	struct md_rdev *rdev;
 
+	lim->atomic_write_hw_boundary = mddev->chunk_sectors << 9;
+
+	pr_err("%s mddev=%pS lim->BLK_FEAT_ATOMIC_WRITES set=%d lim->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d mddev->chunk_sectors=%d\n",
+					__func__, mddev, !!(lim->features & BLK_FEAT_ATOMIC_WRITES),
+					lim->atomic_write_hw_max, lim->atomic_write_hw_boundary,
+					mddev->chunk_sectors);
+
+
 	rdev_for_each(rdev, mddev) {
 		queue_limits_stack_bdev(lim, rdev->bdev, rdev->data_offset,
 					mddev->gendisk->disk_name);
@@ -5806,6 +5814,7 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 		    !queue_limits_stack_integrity_bdev(lim, rdev->bdev))
 			return -EINVAL;
 	}
+
 
 	return 0;
 }
