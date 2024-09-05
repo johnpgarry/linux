@@ -215,10 +215,9 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 		 * Furthermore, if needed, unit_max could even be reduced so
 		 * that it is compliant with a !power-of-2 boundary.
 		 */
-		if ((lim->atomic_write_hw_max >> SECTOR_SHIFT) % boundary_sectors) {
-			pr_err("%s3 unsupported atomic_write_hw_max=%d per boundary_sectors boundary_sectors=%d\n",
-				__func__, lim->atomic_write_hw_max >> SECTOR_SHIFT,
-				boundary_sectors);
+		if (!is_power_of_2(boundary_sectors)) {
+			pr_err("%s3 unsupported !is_power_of_2 boundary_sectors=%d\n",
+				__func__, boundary_sectors);
 			goto unsupported;
 		}
 	}
@@ -708,8 +707,6 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		t->atomic_write_hw_boundary = 0;
 		t->features &= ~BLK_FEAT_ATOMIC_WRITES;
 	} else if (t->features & BLK_FEAT_ATOMIC_WRITES) {
-
-
 		pr_err("%s t->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d b->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d\n",
 					__func__, t->atomic_write_hw_max, t->atomic_write_hw_boundary,
 					b->atomic_write_hw_max, b->atomic_write_hw_boundary);
@@ -724,6 +721,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		t->atomic_write_hw_unit_max =
 					min_not_zero(t->atomic_write_hw_unit_max,
 						b->atomic_write_hw_unit_max);
+
 		
 		pr_err("%s1 t->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d b->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d\n",
 					__func__, t->atomic_write_hw_max, t->atomic_write_hw_boundary,
