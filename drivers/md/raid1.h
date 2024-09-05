@@ -176,6 +176,8 @@ struct r1bio {
 	 */
 	struct bio		*behind_master_bio;
 
+	bool print_me;
+
 	/*
 	 * if the IO is in WRITE direction, then multiple bios are used.
 	 * We choose the number when they are allocated.
