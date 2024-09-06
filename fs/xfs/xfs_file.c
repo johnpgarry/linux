@@ -936,6 +936,7 @@ xfs_file_fallocate(
 
 		new_size = i_size_read(inode) - len;
 
+		pr_err("%s FALLOC_FL_COLLAPSE_RANGE calling xfs_collapse_file_space\n", __func__);
 		error = xfs_collapse_file_space(ip, offset, len);
 		if (error)
 			goto out_unlock;

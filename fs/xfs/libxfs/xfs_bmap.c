@@ -5465,6 +5465,7 @@ __xfs_bunmapi(
 	bool			done = false;
 	unsigned int		alloc_fsb = xfs_inode_alloc_fsbsize(ip);
 
+	pr_err("%s start=%lld *rlen=%lld alloc_fsb=%d\n", __func__, start, *rlen, alloc_fsb);
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
 
 	whichfork = xfs_bmapi_whichfork(flags);
@@ -5545,7 +5546,14 @@ __xfs_bunmapi(
 			goto delete;
 
 		mod = xfs_bmap_alloc_unit_offset(ip, alloc_fsb,
-				del.br_startblock + del.br_blockcount);
+				del.br_startblock + del.br_blockcount);		if (mod)
+		#if 0
+
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+		#endif
 		if (mod) {
 			/*
 			 * Not aligned to allocation unit on the end.
@@ -5554,7 +5562,12 @@ __xfs_bunmapi(
 			 * unmapping part of it.  But we can't really
 			 * get rid of part of an extent.
 			 */
+			pr_err("%s1 NOT END ALIGNED start=%lld *rlen=%lld mod=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+				__func__, start, *rlen, mod,
+				del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 			if (del.br_state == XFS_EXT_UNWRITTEN) {
+				pr_err("%s1.1 NOT END ALIGNED XFS_EXT_UNWRITTEN we're not using unwritten extents.  Skip over it\n",
+						__func__);
 				/*
 				 * This piece is unwritten, or we're not
 				 * using unwritten extents.  Skip over it.
@@ -5565,8 +5578,14 @@ __xfs_bunmapi(
 				if (end < got.br_startoff &&
 				    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 					done = true;
+					pr_err("%s1.2 NOT END ALIGNED break start=%lld *rlen=%lld mod=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+						__func__, start, *rlen, mod,
+						del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 					break;
 				}
+				pr_err("%s1.3 NOT END ALIGNED continue start=%lld *rlen=%lld mod=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, start, *rlen, mod,
+					del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 				continue;
 			}
 			/*
@@ -5585,6 +5604,9 @@ __xfs_bunmapi(
 				del.br_blockcount = mod;
 			}
 			del.br_state = XFS_EXT_UNWRITTEN;
+			pr_err("%s1.4 NOT END ALIGNED calling xfs_bmap_add_extent_unwritten_real start=%lld *rlen=%lld mod=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, start, *rlen, mod,
+					del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 			error = xfs_bmap_add_extent_unwritten_real(tp, ip,
 					whichfork, &icur, &cur, &del,
 					&logflags);
@@ -5595,8 +5617,12 @@ __xfs_bunmapi(
 
 		mod = xfs_bmap_alloc_unit_offset(ip, alloc_fsb,
 					del.br_startblock);
+		
 		if (mod) {
 			xfs_extlen_t off = alloc_fsb - mod;
+			pr_err("%s2 NOT FRONT ALIGNED start=%lld *rlen=%lld mod=%d off=%d del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+				__func__, start, *rlen, mod, off,
+				del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 			/*
 			 * Extent is lined up to the allocation unit at the
 			 * end but not at the front.  We'll get rid of full
@@ -5606,6 +5632,8 @@ __xfs_bunmapi(
 				del.br_blockcount -= off;
 				del.br_startoff += off;
 				del.br_startblock += off;
+				pr_err("%s2.1 NOT FRONT ALIGNED br_blockcount > off, tweak del\n",
+						__func__);
 			} else if (del.br_startoff == start &&
 				   (del.br_state == XFS_EXT_UNWRITTEN ||
 				    tp->t_blk_res == 0)) {
@@ -5618,6 +5646,8 @@ __xfs_bunmapi(
 				if (got.br_startoff > end &&
 				    !xfs_iext_prev_extent(ifp, &icur, &got)) {
 					done = true;
+					pr_err("%s2.2 NOT FRONT ALIGNED Can't make it unwritten. There isn't a full extent here so just skip it.\n",
+						__func__);
 					break;
 				}
 				continue;
@@ -5645,6 +5675,8 @@ __xfs_bunmapi(
 				prev.br_startblock += mod;
 				prev.br_blockcount -= mod;
 				prev.br_state = XFS_EXT_UNWRITTEN;
+				pr_err("%s2.3 NOT FRONT ALIGNED XFS_EXT_UNWRITTEN calling xfs_bmap_add_extent_unwritten_real\n",
+						__func__);
 				error = xfs_bmap_add_extent_unwritten_real(tp,
 						ip, whichfork, &icur, &cur,
 						&prev, &logflags);
@@ -5654,6 +5686,8 @@ __xfs_bunmapi(
 			} else {
 				ASSERT(del.br_state == XFS_EXT_NORM);
 				del.br_state = XFS_EXT_UNWRITTEN;
+				pr_err("%s2.3 NOT FRONT ALIGNED XFS_EXT_NORM calling xfs_bmap_add_extent_unwritten_real del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+						__func__, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 				error = xfs_bmap_add_extent_unwritten_real(tp,
 						ip, whichfork, &icur, &cur,
 						&del, &logflags);
@@ -5665,8 +5699,12 @@ __xfs_bunmapi(
 
 delete:
 		if (wasdel) {
+			pr_err("%s3 calling xfs_bmap_del_extent_delay\n",
+						__func__);
 			xfs_bmap_del_extent_delay(ip, whichfork, &icur, &got, &del);
 		} else {
+			pr_err("%s4 calling xfs_bmap_del_extent_real del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+						__func__, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 			error = xfs_bmap_del_extent_real(ip, tp, &icur, cur,
 					&del, &tmp_logflags, whichfork,
 					flags);
@@ -5677,6 +5715,7 @@ delete:
 
 		end = del.br_startoff - 1;
 nodelete:
+	pr_err("%s5 nodelete:\n", __func__);
 		/*
 		 * If not done go on to the next (previous) record.
 		 */
@@ -5700,10 +5739,12 @@ nodelete:
 	 */
 	if (xfs_bmap_needs_btree(ip, whichfork)) {
 		ASSERT(cur == NULL);
+		pr_err("%s6 calling xfs_bmap_extents_to_btree\n", __func__);
 		error = xfs_bmap_extents_to_btree(tp, ip, &cur, 0,
 				&tmp_logflags, whichfork);
 		logflags |= tmp_logflags;
 	} else {
+		pr_err("%s7 calling xfs_bmap_btree_to_extents\n", __func__);
 		error = xfs_bmap_btree_to_extents(tp, ip, cur, &logflags,
 			whichfork);
 	}
@@ -6421,6 +6462,7 @@ xfs_bunmapi_range(
 	int			error = 0;
 
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
+	pr_err("%s startoff=%lld endoff=%lld unmap_len=%lld\n", __func__, startoff, endoff, unmap_len);
 
 	while (unmap_len > 0) {
 		ASSERT((*tpp)->t_highest_agno == NULLAGNUMBER);

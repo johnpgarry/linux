@@ -536,12 +536,17 @@ xfs_can_free_eofblocks(
 	 * range supported by the page cache, because the truncation will loop
 	 * forever.
 	 */
+
 	end_fsb = xfs_inode_roundup_alloc_unit(ip,
 			XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_ISIZE(ip)));
 
 	last_fsb = XFS_B_TO_FSB(mp, mp->m_super->s_maxbytes);
-	if (last_fsb <= end_fsb)
+	pr_err("%s end_fsb=%lld XFS_ISIZE(ip)=%lld last_fsb=%lld ip->i_delayed_blks=%lld\n",
+		__func__, end_fsb, XFS_ISIZE(ip), last_fsb, ip->i_delayed_blks);
+	if (last_fsb <= end_fsb) {
+		pr_err("%s1 last_fsb=%lld end_fsb=%lld returning false\n", __func__, last_fsb, end_fsb);
 		return false;
+	}
 
 	/*
 	 * Look up the mapping for the first block past EOF.  If we can't find
@@ -558,6 +563,8 @@ xfs_can_free_eofblocks(
 	 * If there's a real mapping there or there are delayed allocation
 	 * reservations, then we have post-EOF blocks to try to free.
 	 */
+	pr_err("%s10 return true if imap.br_startblock=%lld != HOLESTARTBLOCK=%lld OR ip->i_delayed_blks=%lld\n",
+		__func__, imap.br_startblock, HOLESTARTBLOCK, ip->i_delayed_blks);
 	return imap.br_startblock != HOLESTARTBLOCK || ip->i_delayed_blks;
 }
 
@@ -574,6 +581,7 @@ xfs_free_eofblocks(
 	struct xfs_mount	*mp = ip->i_mount;
 	int			error;
 
+	pr_err("%s free any blocks beyond eof\n", __func__);
 	/* Attach the dquots to the inode up front. */
 	error = xfs_qm_dqattach(ip);
 	if (error)
@@ -613,6 +621,7 @@ xfs_free_eofblocks(
 	 * flushed to disk then the files may be full of holes (ie NULL files
 	 * bug).
 	 */
+	pr_err("%s1 calling xfs_itruncate_extents_flags XFS_ISIZE(ip)=%lld\n", __func__, XFS_ISIZE(ip));
 	error = xfs_itruncate_extents_flags(&tp, ip, XFS_DATA_FORK,
 				XFS_ISIZE(ip), XFS_BMAPI_NODISCARD);
 	if (error)
@@ -907,6 +916,7 @@ xfs_prepare_shift(
 	 * Trim eofblocks to avoid shifting uninitialized post-eof preallocation
 	 * into the accessible region of the file.
 	 */
+	pr_err("%s calling xfs_can_free_eofblocks\n", __func__);
 	if (xfs_can_free_eofblocks(ip)) {
 		error = xfs_free_eofblocks(ip);
 		if (error)
@@ -978,10 +988,13 @@ xfs_collapse_file_space(
 
 	trace_xfs_collapse_file_space(ip);
 
+	pr_err("%s offset=%lld len=%lld calling xfs_free_file_space\n", __func__, offset, len);
 	error = xfs_free_file_space(ip, offset, len);
 	if (error)
 		return error;
 
+
+	pr_err("%s1 offset=%lld calling xfs_prepare_shift\n", __func__, offset);
 	error = xfs_prepare_shift(ip, offset);
 	if (error)
 		return error;

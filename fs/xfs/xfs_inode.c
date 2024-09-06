@@ -1050,7 +1050,9 @@ xfs_itruncate_extents_flags(
 		WARN_ON_ONCE(first_unmap_block > XFS_MAX_FILEOFF);
 		return 0;
 	}
-
+	//first_unmap_block = xfs_inode_roundup_alloc_unit(ip, first_unmap_block);
+	pr_err("%s first_unmap_block=%lld XFS_MAX_FILEOFF=%lld new_size=%lld\n",
+		__func__, first_unmap_block, XFS_MAX_FILEOFF, new_size);
 	error = xfs_bunmapi_range(&tp, ip, flags, first_unmap_block,
 			XFS_MAX_FILEOFF);
 	if (error)
@@ -1129,6 +1131,7 @@ xfs_release(
 	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL))
 		return 0;
 
+	pr_err("%s calling xfs_can_free_eofblocks\n", __func__);
 	if (xfs_can_free_eofblocks(ip)) {
 		/*
 		 * Check if the inode is being opened, written and closed
@@ -1147,6 +1150,7 @@ xfs_release(
 		if (xfs_iflags_test(ip, XFS_IDIRTY_RELEASE))
 			goto out_unlock;
 
+		pr_err("%s2 calling xfs_free_eofblocks\n", __func__);
 		error = xfs_free_eofblocks(ip);
 		if (error)
 			goto out_unlock;
@@ -1396,6 +1400,7 @@ xfs_inode_needs_inactive(
 	 * acquiring it in reclaim context. We have the only reference to the
 	 * inode at this point anyways.
 	 */
+	pr_err("%s calling xfs_can_free_eofblocks\n", __func__);
 	return xfs_can_free_eofblocks(ip);
 }
 
@@ -1483,6 +1488,7 @@ xfs_inactive(
 		 * about acquiring it in reclaim context. We have the only
 		 * reference to the inode at this point anyways.
 		 */
+		pr_err("%s calling xfs_can_free_eofblocks\n", __func__);
 		if (xfs_can_free_eofblocks(ip))
 			error = xfs_free_eofblocks(ip);
 

@@ -829,6 +829,8 @@ xfs_setattr_size(
 	oldsize = inode->i_size;
 	newsize = iattr->ia_size;
 
+	pr_err("%s oldsize=%lld newsize=%lld\n", __func__, oldsize, newsize);
+
 	/*
 	 * Short circuit the truncate case for zero length files.
 	 */
@@ -867,6 +869,8 @@ xfs_setattr_size(
 	 */
 	if (newsize > oldsize) {
 		trace_xfs_zero_eof(ip, oldsize, newsize - oldsize);
+
+		pr_err("%s1 calling xfs_zero_range oldsize=%lld newsize=%lld\n", __func__, oldsize, newsize);
 		error = xfs_zero_range(ip, oldsize, newsize - oldsize,
 				&did_zeroing);
 	} else {
@@ -880,6 +884,7 @@ xfs_setattr_size(
 						     newsize);
 		if (error)
 			return error;
+		pr_err("%s2 calling xfs_truncate_page oldsize=%lld newsize=%lld\n", __func__, oldsize, newsize);
 		error = xfs_truncate_page(ip, newsize, &did_zeroing);
 	}
 
@@ -907,6 +912,7 @@ xfs_setattr_size(
 	 * before writeback the [i_disk_size, newsize] range, so we're
 	 * guaranteed not to write stale data past the new EOF on truncate down.
 	 */
+	pr_err("%s3 calling truncate_setsize newsize=%lld\n", __func__, newsize);
 	truncate_setsize(inode, newsize);
 
 	/*
@@ -933,6 +939,7 @@ xfs_setattr_size(
 	 */
 	if (xfs_inode_alloc_fsbsize(ip) > 1)
 		resblks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
+	pr_err("%s3 resblks=%d\n", __func__, resblks);
 
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate, resblks,
 				0, 0, &tp);
@@ -976,6 +983,7 @@ xfs_setattr_size(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 	if (newsize <= oldsize) {
+		pr_err("%s4 calling xfs_itruncate_extents newsize=%lld\n", __func__, newsize);
 		error = xfs_itruncate_extents(&tp, ip, XFS_DATA_FORK, newsize);
 		if (error)
 			goto out_trans_cancel;
@@ -990,6 +998,7 @@ xfs_setattr_size(
 		xfs_iflags_set(ip, XFS_ITRUNCATED);
 
 		/* A truncate down always removes post-EOF blocks. */
+		pr_err("%s4.1 calling xfs_inode_clear_eofblocks_tag newsize=%lld\n", __func__, newsize);
 		xfs_inode_clear_eofblocks_tag(ip);
 	}
 
