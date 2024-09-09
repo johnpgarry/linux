@@ -1131,7 +1131,7 @@ xfs_release(
 	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL))
 		return 0;
 
-	pr_err("%s calling xfs_can_free_eofblocks\n", __func__);
+	pr_err_once("%s calling xfs_can_free_eofblocks\n", __func__);
 	if (xfs_can_free_eofblocks(ip)) {
 		/*
 		 * Check if the inode is being opened, written and closed
@@ -1150,7 +1150,7 @@ xfs_release(
 		if (xfs_iflags_test(ip, XFS_IDIRTY_RELEASE))
 			goto out_unlock;
 
-		pr_err("%s2 calling xfs_free_eofblocks\n", __func__);
+		pr_err_once("%s2 calling xfs_free_eofblocks\n", __func__);
 		error = xfs_free_eofblocks(ip);
 		if (error)
 			goto out_unlock;
