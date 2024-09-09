@@ -255,6 +255,10 @@ xfs_iomap_write_direct(
 	int			error;
 	int			bmapi_flags = XFS_BMAPI_PREALLOC;
 	int			nr_exts = XFS_IEXT_ADD_NOSPLIT_CNT;
+	pr_err("%s offset_fsb=%lld count_fsb=%lld\n", __func__,
+		offset_fsb, count_fsb);
+	pr_err("%s0 imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 
 	ASSERT(count_fsb > 0);
 
@@ -308,6 +312,10 @@ xfs_iomap_write_direct(
 	 * caller gave to us.
 	 */
 	nimaps = 1;
+	pr_err("%s1 offset_fsb=%lld count_fsb=%lld\n", __func__,
+		offset_fsb, count_fsb);
+	pr_err("%s1.0 calling xfs_bmapi_write imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb, bmapi_flags, 0,
 				imap, &nimaps);
 	if (error)
@@ -576,6 +584,7 @@ xfs_iomap_write_unwritten(
 	xfs_fsize_t	i_size;
 	uint		resblks;
 	int		error;
+	pr_err("%s offset=%lld count=%lld\n", __func__, offset, count);
 
 	trace_xfs_unwritten_convert(ip, offset, count);
 
@@ -624,6 +633,7 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
+		pr_err("%s3 calling xfs_bmapi_write offset=%lld count=%lld\n", __func__, offset, count);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);
@@ -760,7 +770,21 @@ imap_spans_range(
 		return false;
 	return true;
 }
-
+#if 0
+#define IOMAP_WRITE		(1 << 0) /* writing, must allocate blocks */
+#define IOMAP_ZERO		(1 << 1) /* zeroing operation, may skip holes */
+#define IOMAP_REPORT		(1 << 2) /* report extent status, e.g. FIEMAP */
+#define IOMAP_FAULT		(1 << 3) /* mapping for page fault */
+#define IOMAP_DIRECT		(1 << 4) /* direct I/O */
+#define IOMAP_NOWAIT		(1 << 5) /* do not block */
+#define IOMAP_OVERWRITE_ONLY	(1 << 6) /* only pure overwrites allowed */
+#define IOMAP_UNSHARE		(1 << 7) /* unshare_file_range */
+#ifdef CONFIG_FS_DAX
+#define IOMAP_DAX		(1 << 8) /* DAX mapping */
+#else
+#define IOMAP_DAX		0
+#endif /* CONFIG_FS_DAX */
+#endif
 static int
 xfs_direct_write_iomap_begin(
 	struct inode		*inode,
@@ -780,9 +804,19 @@ xfs_direct_write_iomap_begin(
 	u16			iomap_flags = 0;
 	unsigned int		lockmode;
 	u64			seq;
+	bool atomic = flags & IOMAP_DIRECT;
+	struct xfs_bmbt_irec	imap2[3] = {0};
+	int loop_index;
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
+	pr_err("%s offset=%lld length=%lld flags=0x%x (WRITE=%d, ZERO=%d, DIRECT=%d, OVERWRITE_ONLY=%d\n",
+		__func__, offset, length, flags,
+		!!(flags &IOMAP_WRITE),
+		!!(flags &IOMAP_ZERO),
+		!!(flags &IOMAP_DIRECT),
+		!!(flags &IOMAP_OVERWRITE_ONLY)
+		);
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -840,8 +874,10 @@ relock:
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 	}
 
-	if (imap_needs_alloc(inode, flags, &imap, nimaps))
+	if (imap_needs_alloc(inode, flags, &imap, nimaps)) {
+		pr_err("%s1.0 atomic goto allocate_blocks\n", __func__);
 		goto allocate_blocks;
+	}
 
 	/*
 	 * NOWAIT and OVERWRITE I/O needs to span the entire requested I/O with
@@ -849,6 +885,15 @@ relock:
 	 * the I/O range not covered by this map triggering an EAGAIN condition
 	 * when it is subsequently mapped and aborting the I/O.
 	 */
+	if (atomic) {
+		pr_err("%s2.0 atomic offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d nimaps=%d imap_spans_range=%d\n",
+			__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, nimaps, imap_spans_range(&imap, offset_fsb, end_fsb));
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
+			pr_err("%s2.0 atomic goto out_atomic_allocate\n", __func__);
+			goto out_atomic_allocate;
+		}
+	}
+
 	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
 		error = -EAGAIN;
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
@@ -874,6 +919,7 @@ relock:
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 allocate_blocks:
+	pr_err("%s3.0 allocate_blocks:\n", __func__);
 	error = -EAGAIN;
 	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY))
 		goto out_unlock;
@@ -917,6 +963,44 @@ out_found_cow:
 	seq = xfs_iomap_inode_sequence(ip, IOMAP_F_SHARED);
 	xfs_iunlock(ip, lockmode);
 	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
+
+out_atomic_allocate:
+	pr_err("%s4 ****** out_atomic_allocate calling xfs_bmapi_read offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
+	nimaps = 3;
+
+	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap2[0],
+			       &nimaps, 0);
+	pr_err("%s4.1 called xfs_bmapi_read error=%d offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld nimaps=%d\n",
+		__func__, error, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, nimaps);
+	for (loop_index = 0; loop_index < nimaps; loop_index++) {
+		struct xfs_bmbt_irec *_imap2 = &imap2[loop_index];
+		pr_err("%s4.1.1 _imap2[%d].br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, loop_index, _imap2->br_startoff, _imap2->br_startblock, _imap2->br_blockcount, _imap2->br_state);
+	}
+	if (error)
+		goto out_unlock;
+
+	error = -EAGAIN;
+	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY))
+		goto out_unlock;
+
+	xfs_iunlock(ip, lockmode);
+
+	pr_err("%s4.2 calling xfs_iomap_write_direct offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
+	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
+			flags, &imap, &seq);
+	pr_err("%s4.2 called xfs_iomap_write_direct offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
+	if (error)
+		return error;
+
+	trace_xfs_iomap_alloc(ip, offset, length, XFS_DATA_FORK, &imap);
+	pr_err("%s4.4 calling xfs_bmbt_to_iomap imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
+	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags,
+				 iomap_flags | IOMAP_F_NEW, seq);
 
 out_unlock:
 	if (lockmode)
