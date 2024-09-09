@@ -1400,16 +1400,24 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 	loff_t length = iomap_length(iter);
 	loff_t written = 0;
 
-	/* already zeroed?  we're done. */
-	if (srcmap->type == IOMAP_HOLE || srcmap->type == IOMAP_UNWRITTEN)
-		return length;
+	pr_err("%s pos=%lld length=%lld srcmap->type=%d\n",
+		__func__, pos, length, srcmap->type);
 
+	/* already zeroed?  we're done. */
+	if (srcmap->type == IOMAP_HOLE || srcmap->type == IOMAP_UNWRITTEN) {
+		pr_err("%s1 we're already done pos=%lld length=%lld\n", __func__, pos, length);
+		return length;
+	}
+
+	
 	do {
 		struct folio *folio;
 		int status;
 		size_t offset;
 		size_t bytes = min_t(u64, SIZE_MAX, length);
 		bool ret;
+
+		pr_err("%s2 calling iomap_write_begin pos=%lld bytes=%zd\n", __func__, pos, bytes);
 
 		status = iomap_write_begin(iter, pos, bytes, &folio);
 		if (status)
@@ -1451,6 +1459,7 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	};
 	int ret;
 
+	pr_err("%s pos=%lld len=%lld\n", __func__, pos, len);
 	while ((ret = iomap_iter(&iter, ops)) > 0)
 		iter.processed = iomap_zero_iter(&iter, did_zero);
 	return ret;

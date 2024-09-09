@@ -288,6 +288,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
+	pr_err("%s pos=%lld length=%lld iomap->type=%d, flags=0x%x\n",
+		__func__, pos, length, iomap->type, iomap->flags);
+
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
@@ -564,6 +567,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
 	if (!dio)
 		return ERR_PTR(-ENOMEM);
+
+	pr_err("%s pos=%lld length=%zd\n", __func__,
+		iocb->ki_pos, iov_iter_count(iter));
 
 	dio->iocb = iocb;
 	atomic_set(&dio->ref, 1);
