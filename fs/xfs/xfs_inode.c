@@ -988,19 +988,6 @@ xfs_itruncate_clear_reflink_flags(
 		xfs_inode_clear_cowblocks_tag(ip);
 }
 
-static bool
-xfs_is_truncate_aligned(
-	struct xfs_inode	*ip,
-	long long int		len)
-{
-	unsigned int		alloc_unit = xfs_inode_alloc_unitsize(ip);
-
-	if (!is_power_of_2(alloc_unit))
-		return isaligned_64(len, alloc_unit);
-
-	return !(len & (alloc_unit - 1));
-}
-
 /*
  * Free up the underlying blocks past new_size.  The new size must be smaller
  * than the current size.  This routine can be used both for the attribute and
@@ -1045,10 +1032,6 @@ xfs_itruncate_extents_flags(
 	ASSERT(!XFS_NOT_DQATTACHED(mp, ip));
 
 	trace_xfs_itruncate_extents_start(ip, new_size);
-
-	if (!xfs_is_truncate_aligned(ip, new_size))
-		return 0;
-
 
 	flags |= xfs_bmapi_aflag(whichfork);
 
