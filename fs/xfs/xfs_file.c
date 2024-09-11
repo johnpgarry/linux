@@ -475,6 +475,7 @@ xfs_dio_write_end_io(
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
+	pr_err("%s offset=%lld size=%zd\n", __func__, offset, size);
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
@@ -508,6 +509,10 @@ xfs_dio_write_end_io(
 	 * earlier allows a racing dio read to find unwritten extents before
 	 * they are converted.
 	 */
+
+	pr_err("%s1 offset=%lld size=%zd flags & IOMAP_DIO_UNWRITTEN=%d\n",
+		__func__, offset, size,
+		!!(flags & IOMAP_DIO_UNWRITTEN));
 	if (flags & IOMAP_DIO_UNWRITTEN) {
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
@@ -563,10 +568,14 @@ xfs_file_dio_write_aligned(
 {
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	ssize_t			ret;
+	int count = 0;
 
+	iolock = XFS_IOLOCK_SHARED;
+	pr_err("%s0 start: calling xfs_ilock_iocb_for_write\n", __func__);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
+	pr_err("%s1 calling xfs_file_write_checks\n", __func__);
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
@@ -581,10 +590,19 @@ xfs_file_dio_write_aligned(
 		iolock = XFS_IOLOCK_SHARED;
 	}
 	trace_xfs_file_direct_write(iocb, from);
-	pr_err("%s1 calling iomap_dio_rw\n", __func__);
+retry:
+	pr_err("%s3 retry: calling iomap_dio_rw\n", __func__);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			   &xfs_dio_write_ops, 0, NULL, 0);
-	pr_err("%s2 called iomap_dio_rw ret=%zd\n", __func__, ret);
+	pr_err("%s4 called iomap_dio_rw ret=%zd\n", __func__, ret);
+	if (ret == -EAGAIN) {
+
+		pr_err("%s5 goto retry:\n", __func__);
+		count++;
+		if (count > 3)
+			BUG();
+		goto retry;
+	}
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);

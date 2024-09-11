@@ -20,6 +20,7 @@
  * Private flags for iomap_dio, must not overlap with the public ones in
  * iomap.h:
  */
+#define IOMAP_DIO_RETRY		(1U << 25)
 #define IOMAP_DIO_CALLER_COMP	(1U << 26)
 #define IOMAP_DIO_INLINE_COMP	(1U << 27)
 #define IOMAP_DIO_WRITE_THROUGH	(1U << 28)
@@ -162,11 +163,15 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	bool should_dirty = (dio->flags & IOMAP_DIO_DIRTY);
 	struct kiocb *iocb = dio->iocb;
 
+	pr_err("%s dio->ref=%d\n", __func__, atomic_read(&dio->ref));	
 	if (bio->bi_status)
 		iomap_dio_set_error(dio, blk_status_to_errno(bio->bi_status));
 	if (!atomic_dec_and_test(&dio->ref))
 		goto release_bio;
-
+	pr_err("%s0 dio->ref=%d doing the checks IOMAP_DIO_INLINE_COMP set=%d IOMAP_DIO_CALLER_COMP=%d\n",
+		__func__, atomic_read(&dio->ref),
+		!!(dio->flags & IOMAP_DIO_INLINE_COMP),
+		!!(dio->flags & IOMAP_DIO_CALLER_COMP));
 	/*
 	 * Synchronous dio, task itself will handle any completion work
 	 * that needs after IO. All we need to do is wake the task.
@@ -175,6 +180,7 @@ void iomap_dio_bio_end_io(struct bio *bio)
 		struct task_struct *waiter = dio->submit.waiter;
 
 		WRITE_ONCE(dio->submit.waiter, NULL);
+		pr_err("%s1 dio->ref=%d calling queue_work calling blk_wake_io_task\n", __func__, atomic_read(&dio->ref));
 		blk_wake_io_task(waiter);
 		goto release_bio;
 	}
@@ -184,6 +190,7 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	 */
 	if (dio->flags & IOMAP_DIO_INLINE_COMP) {
 		WRITE_ONCE(iocb->private, NULL);
+		pr_err("%s1.1 dio->ref=%d calling queue_work calling iomap_dio_complete_work\n", __func__, atomic_read(&dio->ref));
 		iomap_dio_complete_work(&dio->aio.work);
 		goto release_bio;
 	}
@@ -220,9 +227,11 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	 * guarantee data integrity.
 	 */
 	INIT_WORK(&dio->aio.work, iomap_dio_complete_work);
+	pr_err("%s1 dio->ref=%d calling queue_work\n", __func__, atomic_read(&dio->ref));
 	queue_work(file_inode(iocb->ki_filp)->i_sb->s_dio_done_wq,
 			&dio->aio.work);
 release_bio:
+	pr_err("%s2 dio->ref=%d\n", __func__, atomic_read(&dio->ref));
 	if (should_dirty) {
 		bio_check_pages_dirty(bio);
 	} else {
@@ -238,6 +247,7 @@ static void iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 	struct inode *inode = file_inode(dio->iocb->ki_filp);
 	struct page *page = ZERO_PAGE(0);
 	struct bio *bio;
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
 
 	bio = iomap_dio_alloc_bio(iter, dio, 1, REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
 	fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
@@ -309,6 +319,14 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
+		if (iter->flags & IOMAP_ATOMIC) {
+			pr_err("%s0 calling iomap_dio_zero\n", __func__);
+			iomap_dio_zero(iter, dio, pos, length);
+			dio->size = length;
+			dio->flags |= IOMAP_DIO_RETRY;
+			dio->flags &= ~IOMAP_DIO_CALLER_COMP;
+			return length;
+		}
 		need_zeroout = true;
 	}
 
@@ -510,8 +528,12 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 		return iomap_dio_hole_iter(iter, dio);
 	case IOMAP_UNWRITTEN:
 		pr_err("%s IOMAP_UNWRITTEN IOMAP_ATOMIC set=%d\n", __func__, !!(iter->flags & IOMAP_ATOMIC));
-		if (iter->flags & IOMAP_ATOMIC)
-			BUG();
+		if (iter->flags & IOMAP_ATOMIC) {
+		//	bool did_zero = false;
+		//	loff_t rtt = iomap_zero_iter(&iter, &did_zero);
+		//	pr_err("%s1 IOMAP_UNWRITTEN IOMAP_ATOMIC set=%d rtt=%lld did_zero=%d\n",
+		//		__func__, !!(iter->flags & IOMAP_ATOMIC), rtt, did_zero);
+		}
 		if (!(dio->flags & IOMAP_DIO_WRITE))
 			return iomap_dio_hole_iter(iter, dio);
 		return iomap_dio_bio_iter(iter, dio);
@@ -716,6 +738,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		wait_for_completion = true;
 		ret = 0;
 	}
+	pr_err("%s1.1 ret=%lld pos=%lld length=%zd iomi.processed=%lld dio->size=%lld\n", __func__,
+		ret,
+		iocb->ki_pos, iov_iter_count(iter), iomi.processed, dio->size);
 	if (ret < 0)
 		iomap_dio_set_error(dio, ret);
 
@@ -743,7 +768,11 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	 *	after we got woken by the I/O completion handler.
 	 */
 	dio->wait_for_completion = wait_for_completion;
+
+	pr_err("%s1.2 calling atomic_dec_and_test dio->ref=%d\n", __func__, atomic_read(&dio->ref));
 	if (!atomic_dec_and_test(&dio->ref)) {
+
+		pr_err("%s2 inside atomic_dec_and_test() loop\n", __func__);
 		if (!wait_for_completion) {
 			trace_iomap_dio_rw_queued(inode, iomi.pos, iomi.len);
 			return ERR_PTR(-EIOCBQUEUED);
@@ -758,7 +787,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		}
 		__set_current_state(TASK_RUNNING);
 	}
-
+	if (dio->flags & IOMAP_DIO_RETRY)
+		return ERR_PTR(-EAGAIN);
+	pr_err("%s9 return dio\n", __func__);
 	return dio;
 
 out_free_dio:
