@@ -509,10 +509,14 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 			return -EIO;
 		return iomap_dio_hole_iter(iter, dio);
 	case IOMAP_UNWRITTEN:
+		pr_err("%s IOMAP_UNWRITTEN IOMAP_ATOMIC set=%d\n", __func__, !!(iter->flags & IOMAP_ATOMIC));
+		if (iter->flags & IOMAP_ATOMIC)
+			BUG();
 		if (!(dio->flags & IOMAP_DIO_WRITE))
 			return iomap_dio_hole_iter(iter, dio);
 		return iomap_dio_bio_iter(iter, dio);
 	case IOMAP_MAPPED:
+		pr_err("%s IOMAP_MAPPED IOMAP_ATOMIC set=%d\n", __func__, !!(iter->flags & IOMAP_ATOMIC));
 		return iomap_dio_bio_iter(iter, dio);
 	case IOMAP_INLINE:
 		return iomap_dio_inline_iter(iter, dio);
@@ -597,6 +601,11 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iomi.flags |= IOMAP_NOWAIT;
+
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s0 setting IOMAP_ATOMIC in iomi.flags\n", __func__);
+		iomi.flags |= IOMAP_ATOMIC;
+	}
 
 	if (iov_iter_rw(iter) == READ) {
 		/* reads can always complete inline */
