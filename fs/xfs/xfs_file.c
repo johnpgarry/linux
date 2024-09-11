@@ -581,8 +581,10 @@ xfs_file_dio_write_aligned(
 		iolock = XFS_IOLOCK_SHARED;
 	}
 	trace_xfs_file_direct_write(iocb, from);
+	pr_err("%s1 calling iomap_dio_rw\n", __func__);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			   &xfs_dio_write_ops, 0, NULL, 0);
+	pr_err("%s2 called iomap_dio_rw ret=%zd\n", __func__, ret);
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);
@@ -618,6 +620,7 @@ xfs_file_dio_write_unaligned(
 	unsigned int		flags = IOMAP_DIO_OVERWRITE_ONLY;
 	ssize_t			ret;
 
+	pr_err("%s\n", __func__);
 	/*
 	 * Extending writes need exclusivity because of the sub-block zeroing
 	 * that the DIO code always does for partial tail blocks beyond EOF, so
@@ -659,8 +662,11 @@ retry_exclusive:
 		inode_dio_wait(VFS_I(ip));
 
 	trace_xfs_file_direct_write(iocb, from);
+
+	pr_err("%s1 calling iomap_dio_rw\n", __func__);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			   &xfs_dio_write_ops, flags, NULL, 0);
+	pr_err("%s2 called iomap_dio_rw ret=%zd\n", __func__, ret);
 
 	/*
 	 * Retry unaligned I/O with exclusive blocking semantics if the DIO

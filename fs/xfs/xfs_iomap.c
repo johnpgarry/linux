@@ -823,7 +823,7 @@ xfs_direct_write_iomap_begin(
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
-	pr_err("%s offset=%lld length=%lld flags=0x%x (WRITE=%d, ZERO=%d, DIRECT=%d, OVERWRITE_ONLY=%d\n",
+	pr_err("%s offset=%lld length=%lld flags=0x%x (WRITE=%d, ZERO=%d, DIRECT=%d, OVERWRITE_ONLY=%d)\n",
 		__func__, offset, length, flags,
 		!!(flags &IOMAP_WRITE),
 		!!(flags &IOMAP_ZERO),

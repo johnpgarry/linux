@@ -289,8 +289,13 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 
-	pr_err("%s pos=%lld length=%lld iomap->type=%d, flags=0x%x extent_size=%d\n",
-		__func__, pos, length, iomap->type, iomap->flags, iomap->extent_size);
+	pr_err("%s pos=%lld length=%lld iomap->type=%d (UNWRITTEN=%d, MAPPED=%d), flags=0x%x (NEW set=%d, DIRTY set=%d) extent_size=%d\n",
+		__func__, pos, length, iomap->type,
+		IOMAP_UNWRITTEN, IOMAP_MAPPED,
+		 iomap->flags,
+		 !!(iomap->flags & IOMAP_F_NEW),
+		 !!(iomap->flags & IOMAP_F_DIRTY),
+		 iomap->extent_size);
 
 	if (iomap->extent_size)
 		zeroing_size = iomap->extent_size;
@@ -679,6 +684,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	}
 
 	blk_finish_plug(&plug);
+
+	pr_err("%s1 pos=%lld length=%zd iomi.processed=%lld dio->size=%lld\n", __func__,
+		iocb->ki_pos, iov_iter_count(iter), iomi.processed, dio->size);
 
 	/*
 	 * We only report that we've read data up to i_size.
