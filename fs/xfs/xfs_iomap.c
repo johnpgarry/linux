@@ -923,7 +923,7 @@ relock:
 	 */
 	if (atomic) {
 		myoffset_fsb = xfs_inode_rounddown_alloc_unit(ip, offset_fsb);
-		myend_fsb = xfs_inode_rounddown_alloc_unit(ip, end_fsb);
+		myend_fsb = xfs_inode_roundup_alloc_unit(ip, end_fsb);
 
 		pr_err("%s2.0 atomic offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d nimaps=%d spans=%d\n",
 			__func__, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, nimaps, imap_spans_range(&imap, offset_fsb, end_fsb));
@@ -1015,7 +1015,7 @@ out_atomic_allocate:
 		__func__, offset, length, offset_fsb, end_fsb, myoffset_fsb, myend_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount);
 	nimaps = XFS_BMAP_MAX_NMAP;
 
-	error = xfs_bmapi_read(ip, offset_fsb, myend_fsb - myoffset_fsb, &imap2[0],
+	error = xfs_bmapi_read(ip, myoffset_fsb, myend_fsb - myoffset_fsb, &imap2[0],
 			       &nimaps, 0);
 	pr_err("%s4.1 called xfs_bmapi_read error=%d offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld imap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld nimaps=%d\n",
 		__func__, error, offset, length, offset_fsb, end_fsb, imap.br_startoff, imap.br_startblock, imap.br_blockcount, nimaps);

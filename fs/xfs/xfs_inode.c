@@ -1050,7 +1050,7 @@ xfs_itruncate_extents_flags(
 		WARN_ON_ONCE(first_unmap_block > XFS_MAX_FILEOFF);
 		return 0;
 	}
-	//first_unmap_block = xfs_inode_roundup_alloc_unit(ip, first_unmap_block);
+	first_unmap_block = xfs_inode_roundup_alloc_unit(ip, first_unmap_block);
 	pr_err("%s first_unmap_block=%lld XFS_MAX_FILEOFF=%lld new_size=%lld\n",
 		__func__, first_unmap_block, XFS_MAX_FILEOFF, new_size);
 	error = xfs_bunmapi_range(&tp, ip, flags, first_unmap_block,

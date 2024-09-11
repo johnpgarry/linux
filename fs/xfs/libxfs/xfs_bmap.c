@@ -4245,6 +4245,8 @@ xfs_bmapi_allocate(
 	}
 
 	if (bma->flags & XFS_BMAPI_ZERO) {
+		pr_err("%s XFS_BMAPI_ZERO set bma->blkno=%lld, length=%d\n",
+			__func__, bma->blkno, bma->length);
 		error = xfs_zero_extent(bma->ip, bma->blkno, bma->length);
 		if (error)
 			return error;
@@ -4332,6 +4334,8 @@ xfs_bmapi_convert_unwritten(
 	 * if required.
 	 */
 	if (flags & XFS_BMAPI_ZERO) {
+		pr_err("%s XFS_BMAPI_ZERO set mval->br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, mval->br_startblock, mval->br_blockcount);
 		error = xfs_zero_extent(bma->ip, mval->br_startblock,
 					mval->br_blockcount);
 		if (error)
