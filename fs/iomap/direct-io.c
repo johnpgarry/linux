@@ -87,9 +87,16 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 	struct kiocb *iocb = dio->iocb;
 	loff_t offset = iocb->ki_pos;
 	ssize_t ret = dio->error;
+	bool retry = dio->flags & IOMAP_DIO_RETRY;
 
+	pr_err("%s dops->end_io=%pS dio->error=%d retry=%d\n", __func__, dops->end_io, dio->error, retry);
 	if (dops && dops->end_io)
 		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
+	pr_err("%s2 dops->end_io=%pS dio->error=%d ret=%zd\n", __func__, dops->end_io, dio->error, ret);
+	if (retry) {
+		ret = -EAGAIN;
+		goto end;
+	}
 
 	if (likely(!ret)) {
 		ret = dio->size;
@@ -128,6 +135,7 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 		if (ret > 0)
 			ret += dio->done_before;
 	}
+end:
 	trace_iomap_dio_complete(iocb, dio->error, ret);
 	kfree(dio);
 	return ret;
@@ -163,7 +171,7 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	bool should_dirty = (dio->flags & IOMAP_DIO_DIRTY);
 	struct kiocb *iocb = dio->iocb;
 
-	pr_err("%s dio->ref=%d\n", __func__, atomic_read(&dio->ref));	
+	pr_err("%s dio->ref=%d wait_for_completion=%d\n", __func__, atomic_read(&dio->ref), dio->wait_for_completion);	
 	if (bio->bi_status)
 		iomap_dio_set_error(dio, blk_status_to_errno(bio->bi_status));
 	if (!atomic_dec_and_test(&dio->ref))
@@ -227,11 +235,11 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	 * guarantee data integrity.
 	 */
 	INIT_WORK(&dio->aio.work, iomap_dio_complete_work);
-	pr_err("%s1 dio->ref=%d calling queue_work\n", __func__, atomic_read(&dio->ref));
+	pr_err("%s8 dio->ref=%d calling queue_work\n", __func__, atomic_read(&dio->ref));
 	queue_work(file_inode(iocb->ki_filp)->i_sb->s_dio_done_wq,
 			&dio->aio.work);
 release_bio:
-	pr_err("%s2 dio->ref=%d\n", __func__, atomic_read(&dio->ref));
+	pr_err("%s9 release_bio: dio->ref=%d\n", __func__, atomic_read(&dio->ref));
 	if (should_dirty) {
 		bio_check_pages_dirty(bio);
 	} else {
@@ -787,8 +795,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		}
 		__set_current_state(TASK_RUNNING);
 	}
-	if (dio->flags & IOMAP_DIO_RETRY)
-		return ERR_PTR(-EAGAIN);
+	if (dio->flags & IOMAP_DIO_RETRY) {
+		pr_err("%s8 IOMAP_DIO_RETRY set\n", __func__);
+	//	return ERR_PTR(-EAGAIN);
+	}
 	pr_err("%s9 return dio\n", __func__);
 	return dio;
 

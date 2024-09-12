@@ -510,7 +510,7 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 
-	pr_err("%s1 offset=%lld size=%zd flags & IOMAP_DIO_UNWRITTEN=%d\n",
+	pr_err("%s1 offset=%lld size=%zd flags & IOMAP_DIO_UNWRITTEN=%d maybe calling xfs_iomap_write_unwritten\n",
 		__func__, offset, size,
 		!!(flags & IOMAP_DIO_UNWRITTEN));
 	if (flags & IOMAP_DIO_UNWRITTEN) {
