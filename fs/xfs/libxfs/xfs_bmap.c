@@ -5565,6 +5565,8 @@ __xfs_bunmapi(
 			 * unmapping part of it.  But we can't really
 			 * get rid of part of an extent.
 			 */
+			WARN_ONCE(1, "%s1 Not aligned to allocation unit on the end mod=%d del.br_startblock=%lld, br_blockcount=%lld\n", __func__,
+				mod, del.br_startblock, del.br_blockcount);
 			if (del.br_state == XFS_EXT_UNWRITTEN) {
 				/*
 				 * This piece is unwritten, or we're not
@@ -5608,6 +5610,8 @@ __xfs_bunmapi(
 					del.br_startblock);
 		if (mod) {
 			xfs_extlen_t off = alloc_fsb - mod;
+			WARN_ONCE(1, "%s2 Not aligned to allocation unit on the front mod=%d del.br_startblock=%lld\n", __func__,
+				mod, del.br_startblock);
 			/*
 			 * Extent is lined up to the allocation unit at the
 			 * end but not at the front.  We'll get rid of full
