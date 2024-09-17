@@ -700,6 +700,8 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if ((iocb->ki_flags & (IOCB_NOWAIT | IOCB_DIRECT)) == IOCB_NOWAIT)
 		return -EOPNOTSUPP;
 
+	pr_err("%s size=%lld iocb->ki_pos=%lld iov_iter_count(from)=%zd\n",
+		__func__, size, iocb->ki_pos, iov_iter_count(from));
 	size -= iocb->ki_pos;
 	if (iov_iter_count(from) > size) {
 		if (iocb->ki_flags & IOCB_ATOMIC)
@@ -708,6 +710,8 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		iov_iter_truncate(from, size);
 	}
 
+	pr_err("%s2 size=%lld iocb->ki_pos=%lld iov_iter_count(from)=%zd\n",
+		__func__, size, iocb->ki_pos, iov_iter_count(from));
 	ret = file_update_time(file);
 	if (ret)
 		return ret;

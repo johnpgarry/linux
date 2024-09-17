@@ -160,6 +160,13 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 					blk_queue_max_guaranteed_bio(lim));
 
 	unit_limit = rounddown_pow_of_two(unit_limit);
+	pr_err("%s lim->max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim->chunk_sectors=%d\n",
+			__func__, lim->max_hw_sectors,
+			lim->atomic_write_unit_max, lim->atomic_write_hw_unit_max,
+			lim->atomic_write_unit_min, lim->atomic_write_hw_unit_min,
+			lim->atomic_write_boundary_sectors,
+			lim->atomic_write_max_sectors, lim->atomic_write_hw_max,
+			lim->chunk_sectors);
 
 	lim->atomic_write_max_sectors =
 		min(lim->atomic_write_hw_max >> SECTOR_SHIFT,
@@ -170,11 +177,27 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 		min(lim->atomic_write_hw_unit_max, unit_limit);
 	lim->atomic_write_boundary_sectors =
 		lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
+
+	pr_err("%s10 lim->max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim->chunk_sectors=%d\n",
+			__func__, lim->max_hw_sectors,
+			lim->atomic_write_unit_max, lim->atomic_write_hw_unit_max,
+			lim->atomic_write_unit_min, lim->atomic_write_hw_unit_min,
+			lim->atomic_write_boundary_sectors,
+			lim->atomic_write_max_sectors, lim->atomic_write_hw_max,
+			lim->chunk_sectors);
 }
 
 static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 {
 	unsigned int boundary_sectors;
+
+	pr_err("%s BLK_FEAT_ATOMIC_WRITES set=%d lim->max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim->chunk_sectors=%d\n",
+		__func__, !!(lim->features & BLK_FEAT_ATOMIC_WRITES), lim->max_hw_sectors,
+		lim->atomic_write_unit_max, lim->atomic_write_hw_unit_max,
+		lim->atomic_write_unit_min, lim->atomic_write_hw_unit_min,
+		lim->atomic_write_boundary_sectors,
+		lim->atomic_write_max_sectors, lim->atomic_write_hw_max,
+		lim->chunk_sectors);
 
 	if (!(lim->features & BLK_FEAT_ATOMIC_WRITES) || !lim->atomic_write_hw_max)
 		goto unsupported;
@@ -206,6 +229,12 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 	return;
 
 unsupported:
+	pr_err("%s11 unsupported: lim->max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d)\n",
+		__func__, lim->max_hw_sectors,
+		lim->atomic_write_unit_max, lim->atomic_write_hw_unit_max,
+		lim->atomic_write_unit_min, lim->atomic_write_hw_unit_min,
+		lim->atomic_write_boundary_sectors,
+		lim->atomic_write_max_sectors, lim->atomic_write_hw_max);
 	lim->atomic_write_max_sectors = 0;
 	lim->atomic_write_boundary_sectors = 0;
 	lim->atomic_write_unit_min = 0;
@@ -682,16 +711,25 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		t->atomic_write_hw_boundary = 0;
 		t->features &= ~BLK_FEAT_ATOMIC_WRITES;
 	} else if (t->features & BLK_FEAT_ATOMIC_WRITES) {
+		pr_err("%s t->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d b->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d\n",
+					__func__, t->atomic_write_hw_max, t->atomic_write_hw_boundary,
+					b->atomic_write_hw_max, b->atomic_write_hw_boundary);
+
 		t->atomic_write_hw_max = min_not_zero(t->atomic_write_hw_max,
 						b->atomic_write_hw_max);
-		t->atomic_write_boundary_sectors =
-					min_not_zero(t->atomic_write_boundary_sectors,
-						b->atomic_write_boundary_sectors);
+		t->atomic_write_hw_boundary =
+					min_not_zero(t->atomic_write_hw_boundary,
+						b->atomic_write_hw_boundary);
 		t->atomic_write_hw_unit_min = max(t->atomic_write_hw_unit_min,
 						b->atomic_write_hw_unit_min);
 		t->atomic_write_hw_unit_max =
 					min_not_zero(t->atomic_write_hw_unit_max,
 						b->atomic_write_hw_unit_max);
+
+		
+		pr_err("%s1 t->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d b->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d\n",
+					__func__, t->atomic_write_hw_max, t->atomic_write_hw_boundary,
+					b->atomic_write_hw_max, b->atomic_write_hw_boundary);
 	}
 
 	return ret;
