@@ -198,14 +198,7 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 		if (WARN_ON_ONCE(lim->chunk_sectors % boundary_sectors))
 			goto unsupported;
 
-		/*
-		 * The boundary size just needs to be a multiple of unit_max
-		 * (and not necessarily a power-of-2), so this following check
-		 * could be relaxed in future.
-		 * Furthermore, if needed, unit_max could even be reduced so
-		 * that it is compliant with a !power-of-2 boundary.
-		 */
-		if (!is_power_of_2(boundary_sectors))
+		if (boundary_sectors % lim->atomic_write_hw_unit_max)
 			goto unsupported;
 	}
 
