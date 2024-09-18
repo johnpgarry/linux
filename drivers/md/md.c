@@ -378,6 +378,7 @@ static bool is_suspended(struct mddev *mddev, struct bio *bio)
 bool md_handle_request(struct mddev *mddev, struct bio *bio)
 {
 check_suspended:
+	pr_err("%s check_suspended:\n", __func__);
 	if (is_suspended(mddev, bio)) {
 		DEFINE_WAIT(__wait);
 		/* Bail out if REQ_NOWAIT is set for the bio */
@@ -397,10 +398,14 @@ check_suspended:
 	if (!percpu_ref_tryget_live(&mddev->active_io))
 		goto check_suspended;
 
+	pr_err("%s0 calling make_request=%pS\n", __func__, mddev->pers->make_request);
 	if (!mddev->pers->make_request(mddev, bio)) {
 		percpu_ref_put(&mddev->active_io);
-		if (!mddev->gendisk && mddev->pers->prepare_suspend)
+		if (!mddev->gendisk && mddev->pers->prepare_suspend) {
+			pr_err("%s1 return false\n", __func__);
 			return false;
+		}
+			pr_err("%s2 goto check_suspended:\n", __func__);
 		goto check_suspended;
 	}
 

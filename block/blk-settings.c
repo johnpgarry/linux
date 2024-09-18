@@ -202,6 +202,20 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 	if (!(lim->features & BLK_FEAT_ATOMIC_WRITES) || !lim->atomic_write_hw_max)
 		goto unsupported;
 
+
+	if (!is_power_of_2(lim->atomic_write_hw_unit_min))
+		goto unsupported;
+
+	if (!is_power_of_2(lim->atomic_write_hw_unit_max))
+		goto unsupported;
+
+	if (lim->atomic_write_hw_unit_min > lim->atomic_write_hw_unit_max)
+		goto unsupported;
+
+	if (lim->atomic_write_hw_unit_max > lim->atomic_write_hw_max)
+		goto unsupported;
+
+
 	boundary_sectors = lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
 
 	if (boundary_sectors) {
@@ -226,6 +240,13 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 	}
 
 	blk_atomic_writes_update_limits(lim);
+	pr_err("%s9 exiting after blk_atomic_writes_update_limits BLK_FEAT_ATOMIC_WRITES set=%d lim->max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim->chunk_sectors=%d\n",
+		__func__, !!(lim->features & BLK_FEAT_ATOMIC_WRITES), lim->max_hw_sectors,
+		lim->atomic_write_unit_max, lim->atomic_write_hw_unit_max,
+		lim->atomic_write_unit_min, lim->atomic_write_hw_unit_min,
+		lim->atomic_write_boundary_sectors,
+		lim->atomic_write_max_sectors, lim->atomic_write_hw_max,
+		lim->chunk_sectors);
 	return;
 
 unsupported:
@@ -252,6 +273,7 @@ static int blk_validate_limits(struct queue_limits *lim)
 	unsigned int logical_block_sectors;
 	int err;
 
+	pr_err("%s lim->atomic_write_hw_max=%d\n", __func__, lim->atomic_write_hw_max);
 	/*
 	 * Unless otherwise specified, default to 512 byte logical blocks and a
 	 * physical block size equal to the logical block size.
@@ -544,6 +566,121 @@ static unsigned int blk_round_down_sectors(unsigned int sectors, unsigned int lb
 	return sectors;
 }
 
+/* Find largest val for which n is a power-of-2 and divisable into m  */
+static unsigned int find_max_divisible_power_of_2(unsigned int atomic_write_unit, const unsigned int chunk)
+{
+	pr_err_once("%s atomic_write_unit=4194304 per chunk=24576 =%d\n", __func__,
+		4194304 % 24576);
+	pr_err_once("%s chunk=24576 per atomic_write_unit=4194304 =%d\n", __func__,
+		24576 % 4194304);
+
+	pr_err("%s atomic_write_unit=%d chunk=%d\n", __func__, atomic_write_unit, chunk);
+	do {
+		atomic_write_unit /= 2;
+		pr_err("%s 1 looping atomic_write_unit=%d\n", __func__, atomic_write_unit);
+		pr_err("%s 1.1 looping chunk per atomic_write_unit=%d\n", __func__, chunk % atomic_write_unit);
+
+	} while (chunk % atomic_write_unit);
+
+
+	pr_err("%s 10 returning atomic_write_unit=%d\n", __func__, atomic_write_unit);
+	return atomic_write_unit;
+}
+
+static void blk_stack_atomic_writes_limits(struct queue_limits *t, struct queue_limits *b)
+{
+	pr_err("%s t->atomic_write_hw_{min, max}=%d %d, atomic_write_hw_boundary=%d, atomic_write_hw_max=%d, chunk_sectors=%d, max_hw_sectors=%d, io_min=%d\n",
+		__func__, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, t->atomic_write_hw_boundary, t->atomic_write_hw_max,
+		t->chunk_sectors, t->max_hw_sectors, t->io_min);
+	if (!(t->features & BLK_FEAT_ATOMIC_WRITES))
+		return;
+	if (!(b->features & BLK_FEAT_ATOMIC_WRITES))
+		goto unsupported;
+
+	/* If atomic_write_hw_max is set, we have already stacked 1x bottom device, so check for compliance */
+	if (t->atomic_write_hw_max) {
+
+		pr_err("%s1 SECOND+ BOTTOM DEVICE before b->atomic_write_hw_unit_{min, max}=%d %d, atomic_write_hw_max=%d b->atomic_write_hw_boundary=%d\n",
+					__func__,
+					b->atomic_write_hw_unit_min,
+					b->atomic_write_hw_unit_max,
+					b->atomic_write_hw_max,
+					b->atomic_write_hw_boundary);
+		pr_err("%s1.1 SECOND+ BOTTOM DEVICE before t->atomic_write_hw_unit_{min, max}=%d %d, atomic_write_hw_max=%d b->atomic_write_hw_boundary=%d\n",
+					__func__,
+					t->atomic_write_hw_unit_min,
+					t->atomic_write_hw_unit_max,
+					t->atomic_write_hw_max,
+					t->atomic_write_hw_boundary);
+
+		/* We're not going to support different boundary sizes ... yet */
+		if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary)
+			goto unsupported;
+
+		/* Can't support this */
+		if (t->atomic_write_hw_unit_min > b->atomic_write_hw_unit_max)
+			goto unsupported;
+
+		/* Or this */
+		if (t->atomic_write_hw_unit_max < b->atomic_write_hw_unit_min)
+			goto unsupported;
+
+		t->atomic_write_hw_max = min(t->atomic_write_hw_max,
+						b->atomic_write_hw_max);
+		t->atomic_write_hw_unit_min = max(t->atomic_write_hw_unit_min,
+							b->atomic_write_hw_unit_min);
+		t->atomic_write_hw_unit_max =
+						min(t->atomic_write_hw_unit_max,
+							b->atomic_write_hw_unit_max);
+		pr_err("%s1.1 SECOND+ BOTTOM DEVICE after t->atomic_write_hw_unit_{min, max}=%d %d, atomic_write_hw_max=%d b->atomic_write_hw_boundary=%d\n",
+					__func__,
+					t->atomic_write_hw_unit_min,
+					t->atomic_write_hw_unit_max,
+					t->atomic_write_hw_max,
+					t->atomic_write_hw_boundary);
+	} else {
+		pr_err("%s2 FIRST BOTTOM DEVICE before b->atomic_write_hw_unit_{min, max}=%d %d, atomic_write_hw_max=%d b->atomic_write_hw_boundary=%d t->io_min=%d\n",
+					__func__,
+					b->atomic_write_hw_unit_min,
+					b->atomic_write_hw_unit_max,
+					b->atomic_write_hw_max,
+					b->atomic_write_hw_boundary,
+					t->io_min);
+		/* We have a chunk sectors limit */
+		if (b->atomic_write_hw_boundary) {
+
+			if (b->atomic_write_hw_boundary % t->io_min)
+				goto unsupported;
+		}
+
+		t->atomic_write_hw_unit_max = find_max_divisible_power_of_2(b->atomic_write_hw_unit_max, t->io_min);
+		t->atomic_write_hw_unit_min = find_max_divisible_power_of_2(b->atomic_write_hw_unit_min, t->io_min);
+
+		t->atomic_write_hw_max = min(b->atomic_write_hw_max, t->io_min);
+		pr_err("%s2.1 FIRST BOTTOM DEVICE after t->atomic_write_hw_unit_{min, max}=%d %d, atomic_write_hw_max=%d b->atomic_write_hw_boundary=%d\n",
+					__func__,
+					t->atomic_write_hw_unit_min,
+					t->atomic_write_hw_unit_max,
+					t->atomic_write_hw_max,
+					t->atomic_write_hw_boundary);
+	}
+
+	pr_err("%s1 t->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d b->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d\n",
+				__func__, t->atomic_write_hw_max, t->atomic_write_hw_boundary,
+			b->atomic_write_hw_max, b->atomic_write_hw_boundary);
+	
+	return;
+
+
+unsupported:
+	pr_err("%s11 unsupported:\n", __func__);
+	t->atomic_write_hw_max = 0;
+	t->atomic_write_hw_unit_max = 0;
+	t->atomic_write_hw_unit_min = 0;
+	t->atomic_write_hw_boundary = 0;
+	t->features &= ~BLK_FEAT_ATOMIC_WRITES;
+}
+
 /**
  * blk_stack_limits - adjust queue_limits for stacked devices
  * @t:	the stacking driver limits (top device)
@@ -704,33 +841,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		t->zone_write_granularity = 0;
 		t->max_zone_append_sectors = 0;
 	}
-	if (!(b->features & BLK_FEAT_ATOMIC_WRITES)) {
-		t->atomic_write_hw_max = 0;
-		t->atomic_write_hw_unit_max = 0;
-		t->atomic_write_hw_unit_min = 0;
-		t->atomic_write_hw_boundary = 0;
-		t->features &= ~BLK_FEAT_ATOMIC_WRITES;
-	} else if (t->features & BLK_FEAT_ATOMIC_WRITES) {
-		pr_err("%s t->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d b->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d\n",
-					__func__, t->atomic_write_hw_max, t->atomic_write_hw_boundary,
-					b->atomic_write_hw_max, b->atomic_write_hw_boundary);
-
-		t->atomic_write_hw_max = min_not_zero(t->atomic_write_hw_max,
-						b->atomic_write_hw_max);
-		t->atomic_write_hw_boundary =
-					min_not_zero(t->atomic_write_hw_boundary,
-						b->atomic_write_hw_boundary);
-		t->atomic_write_hw_unit_min = max(t->atomic_write_hw_unit_min,
-						b->atomic_write_hw_unit_min);
-		t->atomic_write_hw_unit_max =
-					min_not_zero(t->atomic_write_hw_unit_max,
-						b->atomic_write_hw_unit_max);
-
-		
-		pr_err("%s1 t->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d b->atomic_write_hw_max=%d, atomic_write_hw_boundary=%d\n",
-					__func__, t->atomic_write_hw_max, t->atomic_write_hw_boundary,
-					b->atomic_write_hw_max, b->atomic_write_hw_boundary);
-	}
+	blk_stack_atomic_writes_limits(t, b);
 
 	return ret;
 }

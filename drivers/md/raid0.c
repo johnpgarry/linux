@@ -385,31 +385,33 @@ static int raid0_set_limits(struct mddev *mddev)
 	lim.io_min = mddev->chunk_sectors << 9;
 	lim.io_opt = lim.io_min * mddev->raid_disks;
 	lim.features |= BLK_FEAT_ATOMIC_WRITES;
-	pr_err("%s before mddev_stack_rdev_limits lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d)\n",
+	pr_err("%s before mddev_stack_rdev_limits lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) mddev->chunk_sectors=%d\n",
 		__func__, lim.max_hw_sectors,
 		lim.atomic_write_unit_max, lim.atomic_write_hw_unit_max,
 		lim.atomic_write_unit_min, lim.atomic_write_hw_unit_min,
 		lim.atomic_write_boundary_sectors,
-		lim.atomic_write_max_sectors, lim.atomic_write_hw_max);
+		lim.atomic_write_max_sectors, lim.atomic_write_hw_max, mddev->chunk_sectors);
 	err = mddev_stack_rdev_limits(mddev, &lim, MDDEV_STACK_INTEGRITY);
-	pr_err("%s1 after mddev_stack_rdev_limits lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d)\n",
+	pr_err("%s1 after mddev_stack_rdev_limits lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim.chunk_sectors=%d\n",
 		__func__, lim.max_hw_sectors,
 		lim.atomic_write_unit_max, lim.atomic_write_hw_unit_max,
 		lim.atomic_write_unit_min, lim.atomic_write_hw_unit_min,
 		lim.atomic_write_boundary_sectors,
-		lim.atomic_write_max_sectors, lim.atomic_write_hw_max);
+		lim.atomic_write_max_sectors, lim.atomic_write_hw_max,
+		lim.chunk_sectors);
 	if (err) {
 		queue_limits_cancel_update(mddev->gendisk->queue);
 		return err;
 	}
 	err = queue_limits_set(mddev->gendisk->queue, &lim);
 
-	pr_err("%s9 after queue_limits_set lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d)\n",
+	pr_err("%s9 after queue_limits_set lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim.chunk_sectors=%d\n",
 		__func__, lim.max_hw_sectors,
 		lim.atomic_write_unit_max, lim.atomic_write_hw_unit_max,
 		lim.atomic_write_unit_min, lim.atomic_write_hw_unit_min,
 		lim.atomic_write_boundary_sectors,
-		lim.atomic_write_max_sectors, lim.atomic_write_hw_max);
+		lim.atomic_write_max_sectors, lim.atomic_write_hw_max,
+		lim.chunk_sectors);
 	return err;
 }
 
@@ -621,16 +623,26 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 	sector = bio->bi_iter.bi_sector;
 	chunk_sects = mddev->chunk_sectors;
 
+
+
 	sectors = chunk_sects -
 		(likely(is_power_of_2(chunk_sects))
 		 ? (sector & (chunk_sects-1))
 		 : sector_div(sector, chunk_sects));
 
+
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s1 sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
+
 	if (sectors < bio_sectors(bio)) {
 		struct bio *split;
 
-		if (bio->bi_opf & REQ_ATOMIC)
-			return false;
+		if (bio->bi_opf & REQ_ATOMIC) {
+			pr_err("%s2 need to split ERROR sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
+			bio->bi_status = BLK_STS_INVAL;
+			bio_endio(bio);
+			return true;
+		}
 
 		split = bio_split(bio, sectors, GFP_NOIO,
 					      &mddev->bio_set);
@@ -639,6 +651,8 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 		bio = split;
 	}
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s3 calling raid0_map_submit_bio sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
 	raid0_map_submit_bio(mddev, bio);
 	return true;
 }

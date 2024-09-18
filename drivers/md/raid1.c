@@ -3192,12 +3192,35 @@ static int raid1_set_limits(struct mddev *mddev)
 
 	md_init_stacking_limits(&lim);
 	lim.max_write_zeroes_sectors = 0;
+	pr_err("%s before mddev_stack_rdev_limits lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) mddev->chunk_sectors=%d\n",
+		__func__, lim.max_hw_sectors,
+		lim.atomic_write_unit_max, lim.atomic_write_hw_unit_max,
+		lim.atomic_write_unit_min, lim.atomic_write_hw_unit_min,
+		lim.atomic_write_boundary_sectors,
+		lim.atomic_write_max_sectors, lim.atomic_write_hw_max, mddev->chunk_sectors);
 	err = mddev_stack_rdev_limits(mddev, &lim, MDDEV_STACK_INTEGRITY);
+	pr_err("%s1 after mddev_stack_rdev_limits lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim.chunk_sectors=%d\n",
+		__func__, lim.max_hw_sectors,
+		lim.atomic_write_unit_max, lim.atomic_write_hw_unit_max,
+		lim.atomic_write_unit_min, lim.atomic_write_hw_unit_min,
+		lim.atomic_write_boundary_sectors,
+		lim.atomic_write_max_sectors, lim.atomic_write_hw_max,
+		lim.chunk_sectors);
 	if (err) {
 		queue_limits_cancel_update(mddev->gendisk->queue);
 		return err;
 	}
-	return queue_limits_set(mddev->gendisk->queue, &lim);
+	err = queue_limits_set(mddev->gendisk->queue, &lim);
+
+	pr_err("%s9 after queue_limits_set lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim.chunk_sectors=%d\n",
+		__func__, lim.max_hw_sectors,
+		lim.atomic_write_unit_max, lim.atomic_write_hw_unit_max,
+		lim.atomic_write_unit_min, lim.atomic_write_hw_unit_min,
+		lim.atomic_write_boundary_sectors,
+		lim.atomic_write_max_sectors, lim.atomic_write_hw_max,
+		lim.chunk_sectors);
+
+	return err;
 }
 
 static int raid1_run(struct mddev *mddev)
