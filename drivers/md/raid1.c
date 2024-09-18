@@ -3198,6 +3198,7 @@ static int raid1_set_limits(struct mddev *mddev)
 		lim.atomic_write_unit_min, lim.atomic_write_hw_unit_min,
 		lim.atomic_write_boundary_sectors,
 		lim.atomic_write_max_sectors, lim.atomic_write_hw_max, mddev->chunk_sectors);
+	lim.features |= BLK_FEAT_ATOMIC_WRITES;
 	err = mddev_stack_rdev_limits(mddev, &lim, MDDEV_STACK_INTEGRITY);
 	pr_err("%s1 after mddev_stack_rdev_limits lim.max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim.chunk_sectors=%d\n",
 		__func__, lim.max_hw_sectors,
