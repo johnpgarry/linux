@@ -632,7 +632,7 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s1 sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
+		pr_err_once("%s1 sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
 
 	if (sectors < bio_sectors(bio)) {
 		struct bio *split;
@@ -652,7 +652,7 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 	}
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s3 calling raid0_map_submit_bio sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
+		pr_err_once("%s3 calling raid0_map_submit_bio sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
 	raid0_map_submit_bio(mddev, bio);
 	return true;
 }
