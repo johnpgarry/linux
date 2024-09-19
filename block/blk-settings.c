@@ -235,8 +235,9 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 		if (WARN_ON_ONCE(lim->chunk_sectors % boundary_sectors))
 			goto unsupported;
 
-		if (boundary_sectors % lim->atomic_write_hw_unit_max)
+		if (boundary_sectors % lim->atomic_write_hw_unit_max >> SECTOR_SHIFT) {
 			goto unsupported;
+		}
 	}
 
 	blk_atomic_writes_update_limits(lim);
