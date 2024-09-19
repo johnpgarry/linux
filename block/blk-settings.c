@@ -203,17 +203,25 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 		goto unsupported;
 
 
-	if (!is_power_of_2(lim->atomic_write_hw_unit_min))
+	if (!is_power_of_2(lim->atomic_write_hw_unit_min)) {
+		pr_err("%s goto unsupported atomic_write_hw_unit_min\n", __func__);
 		goto unsupported;
+	}
 
-	if (!is_power_of_2(lim->atomic_write_hw_unit_max))
+	if (!is_power_of_2(lim->atomic_write_hw_unit_max)) {
+		pr_err("%s goto unsupported atomic_write_hw_unit_max\n", __func__);
 		goto unsupported;
+	}
 
-	if (lim->atomic_write_hw_unit_min > lim->atomic_write_hw_unit_max)
+	if (lim->atomic_write_hw_unit_min > lim->atomic_write_hw_unit_max) {
+		pr_err("%s goto unsupported atomic_write_hw_unit_min > atomic_write_hw_unit_max\n", __func__);
 		goto unsupported;
+	}
 
-	if (lim->atomic_write_hw_unit_max > lim->atomic_write_hw_max)
+	if (lim->atomic_write_hw_unit_max > lim->atomic_write_hw_max) {
+		pr_err("%s goto unsupported atomic_write_hw_unit_max > atomic_write_hw_max\n", __func__);
 		goto unsupported;
+	}
 
 
 	boundary_sectors = lim->atomic_write_hw_boundary >> SECTOR_SHIFT;
@@ -232,10 +240,16 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 		 * Devices which do not conform to these rules can be dealt
 		 * with if and when they show up.
 		 */
-		if (WARN_ON_ONCE(lim->chunk_sectors % boundary_sectors))
+		if (WARN_ON_ONCE(lim->chunk_sectors % boundary_sectors)) {
+			pr_err("%s goto unsupported chunk_sectors=%d per boundary_sectors=%d = %d\n",
+				__func__, lim->chunk_sectors, boundary_sectors, lim->chunk_sectors % boundary_sectors);
 			goto unsupported;
+		}
 
 		if (boundary_sectors % lim->atomic_write_hw_unit_max >> SECTOR_SHIFT) {
+			pr_err("%s goto unsupported boundary_sectors=%d per atomic_write_hw_unit_max >> SECTOR_SHIFT=%d = %d\n",
+				__func__, boundary_sectors, lim->atomic_write_hw_unit_max,
+				boundary_sectors % (lim->atomic_write_hw_unit_max >> SECTOR_SHIFT));
 			goto unsupported;
 		}
 	}
