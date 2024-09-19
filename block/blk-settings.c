@@ -681,10 +681,15 @@ static void blk_stack_atomic_writes_limits(struct queue_limits *t, struct queue_
 		/* We have a chunk sectors limit */
 		if (b->atomic_write_hw_boundary) {
 
-			if (b->atomic_write_hw_boundary % t->io_min) {
-				pr_err("%s b->atomic_write_hw_boundary=%d t->io_min=%d goto unsupported;\n", __func__, b->atomic_write_hw_boundary, t->io_min);
+			if (b->atomic_write_hw_boundary > t->io_min && b->atomic_write_hw_boundary % t->io_min) {
+				pr_err("%s BAD1 b->atomic_write_hw_boundary=%d t->io_min=%d goto unsupported;\n", __func__, b->atomic_write_hw_boundary, t->io_min);
+				goto unsupported;
+			} else if (t->io_min > b->atomic_write_hw_boundary && t->io_min % b->atomic_write_hw_boundary) {
+				pr_err("%s BAD1 b->atomic_write_hw_boundary=%d t->io_min=%d goto unsupported;\n", __func__, b->atomic_write_hw_boundary, t->io_min);
 				goto unsupported;
 			}
+
+			t->atomic_write_hw_boundary = b->atomic_write_hw_boundary;
 		}
 
 		if (t->io_min > SECTOR_SIZE) {
