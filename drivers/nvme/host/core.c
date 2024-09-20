@@ -1977,6 +1977,8 @@ static void nvme_update_atomic_write_disk_info(struct nvme_ns *ns,
 	lim->atomic_write_hw_unit_min = bs;
 	lim->atomic_write_hw_unit_max = rounddown_pow_of_two(atomic_bs);
 	lim->features |= BLK_FEAT_ATOMIC_WRITES;
+
+	pr_err("%s bs=%d atomic_bs=%d boundary=%d\n", __func__, bs, atomic_bs, boundary);
 }
 
 static u32 nvme_max_drv_segments(struct nvme_ctrl *ctrl)
@@ -2078,6 +2080,7 @@ static void nvme_set_chunk_sectors(struct nvme_ns *ns, struct nvme_id_ns *id,
 	else
 		iob = nvme_lba_to_sect(ns->head, le16_to_cpu(id->noiob));
 
+	pr_err("%s iob=%d\n", __func__, iob);
 	if (!iob)
 		return;
 

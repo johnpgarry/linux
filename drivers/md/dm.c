@@ -1178,6 +1178,7 @@ static sector_t __max_io_len(struct dm_target *ti, sector_t sector,
 {
 	sector_t target_offset = dm_target_offset(ti, sector);
 	sector_t len = max_io_len_target_boundary(ti, target_offset);
+	pr_err("%s\n", __func__);
 
 	/*
 	 * Does the target need to split IO even further?
@@ -1194,11 +1195,13 @@ static sector_t __max_io_len(struct dm_target *ti, sector_t sector,
 
 static inline sector_t max_io_len(struct dm_target *ti, sector_t sector)
 {
+	pr_err("%s\n", __func__);
 	return __max_io_len(ti, sector, ti->max_io_len, 0);
 }
 
 int dm_set_target_max_io_len(struct dm_target *ti, sector_t len)
 {
+	pr_err("%s\n", __func__);
 	if (len > UINT_MAX) {
 		DMERR("Specified maximum size of target IO (%llu) exceeds limit (%u)",
 		      (unsigned long long)len, UINT_MAX);

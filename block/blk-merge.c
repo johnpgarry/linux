@@ -216,7 +216,10 @@ static inline unsigned get_max_io_size(struct bio *bio,
 	else
 		max_sectors = lim->max_sectors;
 
+	pr_err_once("%s0 boundary_sectors=%d max_sectors=%d pbs=%d lbs=%d\n",
+		__func__, boundary_sectors, max_sectors, pbs, lbs);
 	if (boundary_sectors) {
+		pr_err_once("%s1 boundary_sectors=%d\n", __func__, boundary_sectors);
 		max_sectors = min(max_sectors,
 			blk_boundary_sectors_left(bio->bi_iter.bi_sector,
 					      boundary_sectors));
@@ -614,6 +617,7 @@ static inline unsigned int blk_rq_get_max_sectors(struct request *rq,
 	    req_op(rq) == REQ_OP_DISCARD ||
 	    req_op(rq) == REQ_OP_SECURE_ERASE)
 		return max_sectors;
+	pr_err_once("%s boundary_sectors=%d\n", __func__, boundary_sectors);
 	return min(max_sectors,
 		   blk_boundary_sectors_left(offset, boundary_sectors));
 }

@@ -631,14 +631,16 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 		 : sector_div(sector, chunk_sects));
 
 
+	pr_err("%s1 sectors=%d bio_sectors(bio)=%d chunk_sectors=%d\n", __func__, sectors, bio_sectors(bio), chunk_sects);
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err_once("%s1 sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
+		pr_err_once("%s1.1 REQ_ATOMIC sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
 
 	if (sectors < bio_sectors(bio)) {
 		struct bio *split;
-
+		/* This bio crosses the stripe unit boundary, so we gotta split */
+		pr_err("%s2 need to split sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
 		if (bio->bi_opf & REQ_ATOMIC) {
-			pr_err("%s2 need to split ERROR sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
+			pr_err("%s2.1 need to split REQ_ATOMIC ERROR sectors=%d bio_sectors(bio)=%d\n", __func__, sectors, bio_sectors(bio));
 			bio->bi_status = BLK_STS_INVAL;
 			bio_endio(bio);
 			return true;

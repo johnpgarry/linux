@@ -378,7 +378,7 @@ static bool is_suspended(struct mddev *mddev, struct bio *bio)
 bool md_handle_request(struct mddev *mddev, struct bio *bio)
 {
 check_suspended:
-	pr_err_once("%s check_suspended:\n", __func__);
+	pr_err("%s check_suspended: bio_sectors(bio)=%d\n", __func__, bio_sectors(bio));
 	if (is_suspended(mddev, bio)) {
 		DEFINE_WAIT(__wait);
 		/* Bail out if REQ_NOWAIT is set for the bio */
@@ -419,6 +419,7 @@ static void md_submit_bio(struct bio *bio)
 	const int rw = bio_data_dir(bio);
 	struct mddev *mddev = bio->bi_bdev->bd_disk->private_data;
 
+	pr_err("%s bio=%pS bio_sectors(bio)=%d\n", __func__, bio, bio_sectors(bio));
 	if (mddev == NULL || mddev->pers == NULL) {
 		bio_io_error(bio);
 		return;
@@ -430,6 +431,7 @@ static void md_submit_bio(struct bio *bio)
 	}
 
 	bio = bio_split_to_limits(bio);
+	pr_err("%s2 bio=%pS bio_sectors(bio)=%d\n", __func__, bio, bio_sectors(bio));
 	if (!bio)
 		return;
 
