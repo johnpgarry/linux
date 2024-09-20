@@ -191,11 +191,11 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 {
 	unsigned int boundary_sectors;
 
-	pr_err("%s BLK_FEAT_ATOMIC_WRITES set=%d lim->max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary sectors=%d max sectors=%d (hw=%d) lim->chunk_sectors=%d\n",
+	pr_err("%s BLK_FEAT_ATOMIC_WRITES set=%d lim->max_hw_sectors=%d atomic unit max=%d (hw=%d) unit min=%d (hw=%d) boundary hw=%d max sectors=%d (hw=%d) lim->chunk_sectors=%d\n",
 		__func__, !!(lim->features & BLK_FEAT_ATOMIC_WRITES), lim->max_hw_sectors,
 		lim->atomic_write_unit_max, lim->atomic_write_hw_unit_max,
 		lim->atomic_write_unit_min, lim->atomic_write_hw_unit_min,
-		lim->atomic_write_boundary_sectors,
+		lim->atomic_write_hw_boundary,
 		lim->atomic_write_max_sectors, lim->atomic_write_hw_max,
 		lim->chunk_sectors);
 
@@ -246,9 +246,9 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 			goto unsupported;
 		}
 
-		if (boundary_sectors % lim->atomic_write_hw_unit_max >> SECTOR_SHIFT) {
+		if (boundary_sectors % (lim->atomic_write_hw_unit_max >> SECTOR_SHIFT)) {
 			pr_err("%s goto unsupported boundary_sectors=%d per atomic_write_hw_unit_max >> SECTOR_SHIFT=%d = %d\n",
-				__func__, boundary_sectors, lim->atomic_write_hw_unit_max,
+				__func__, boundary_sectors, lim->atomic_write_hw_unit_max >> SECTOR_SHIFT,
 				boundary_sectors % (lim->atomic_write_hw_unit_max >> SECTOR_SHIFT));
 			goto unsupported;
 		}
