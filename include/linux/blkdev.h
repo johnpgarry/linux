@@ -31,14 +31,12 @@ struct request_queue;
 struct elevator_queue;
 struct blk_trace;
 struct request;
-struct sg_io_hdr;
 struct blkcg_gq;
 struct blk_flush_queue;
 struct kiocb;
 struct pr_ops;
 struct rq_qos;
 struct blk_queue_stats;
-struct blk_stat_callback;
 struct blk_crypto_profile;
 
 extern const struct device_type disk_type;
@@ -211,7 +209,7 @@ struct gendisk {
 	struct badblocks *bb;
 	struct lockdep_map lockdep_map;
 	u64 diskseq;
-	blk_mode_t open_mode;
+	blk_mode_t open_mode1;
 
 	/*
 	 * Independent sector access ranges. This is always NULL for
