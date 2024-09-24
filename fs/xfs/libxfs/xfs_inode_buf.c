@@ -483,6 +483,36 @@ xfs_dinode_verify_nrext64(
 	return NULL;
 }
 
+static xfs_failaddr_t
+xfs_inode_validate_atomicwrites(
+	struct xfs_mount	*mp,
+	uint32_t		cowextsize,
+	uint16_t		mode,
+	int64_t			flags2)
+{
+	/* superblock rocompat feature flag */
+	if (!xfs_has_atomicwrites(mp))
+		return __this_address;
+
+	/* Only regular files and directories */
+	if (!S_ISREG(mode) && !(S_ISDIR(mode)))
+		return __this_address;
+
+	/* COW extsize disallowed */
+	if (flags2 & XFS_DIFLAG2_COWEXTSIZE)
+		return __this_address;
+
+	/* cowextsize must be zero */
+	if (cowextsize)
+		return __this_address;
+
+	/* reflink is disallowed */
+	if (flags2 & XFS_DIFLAG2_REFLINK)
+		return __this_address;
+
+	return NULL;
+}
+
 xfs_failaddr_t
 xfs_dinode_verify(
 	struct xfs_mount	*mp,
@@ -662,6 +692,14 @@ xfs_dinode_verify(
 	if (xfs_dinode_has_bigtime(dip) &&
 	    !xfs_has_bigtime(mp))
 		return __this_address;
+
+	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		fa = xfs_inode_validate_atomicwrites(mp,
+				be32_to_cpu(dip->di_cowextsize),
+				mode, flags2);
+		if (fa)
+			return fa;
+	}
 
 	return NULL;
 }
