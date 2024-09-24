@@ -169,6 +169,13 @@ static void dump_statx(struct statx *stx)
 			"?dai?c??"	/*  7- 0	0x00000000-000000ff */
 			;
 
+               if (stx->stx_attributes & STATX_ATTR_WRITE_ATOMIC) {
+                       printf("\tSTATX_ATTR_WRITE_ATOMIC set\n");
+                       printf("\tunit min: %d\n", stx->stx_atomic_write_unit_min);
+                       printf("\tunit max: %d\n", stx->stx_atomic_write_unit_max);
+                       printf("\tsegments max: %d\n", stx->stx_atomic_write_segments_max);
+               }
+
 		printf("Attributes: %016llx (",
 		       (unsigned long long)stx->stx_attributes);
 		for (byte = 64 - 8; byte >= 0; byte -= 8) {
