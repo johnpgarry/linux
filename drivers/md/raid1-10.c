@@ -118,6 +118,8 @@ static inline void raid1_submit_write(struct bio *bio)
 {
 	struct md_rdev *rdev = (void *)bio->bi_bdev;
 
+	pr_err("%s1 bio=%pS (sectors=%d)\n", __func__, bio, bio_sectors(bio));
+
 	bio->bi_next = NULL;
 	bio_set_dev(bio, rdev->bdev);
 	if (test_bit(Faulty, &rdev->flags))
