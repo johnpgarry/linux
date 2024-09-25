@@ -487,6 +487,12 @@ xfs_ioctl_setattr_atomicwrites(
 	if (target->bt_bdev_awu_max < sbp->sb_blocksize)
 		return -EINVAL;
 
+	pr_err("%s XFS_DIFLAG2_REFLINK set=%d FS_XFLAG_COWEXTSIZE set=%d fsx_cowextsize=%d XFS_DIFLAG2_COWEXTSIZE set=%d\n", __func__,
+		!!(ip->i_diflags2 & XFS_DIFLAG2_REFLINK),
+		!!(fa->fsx_xflags & FS_XFLAG_COWEXTSIZE),
+		fa->fsx_cowextsize,
+		!!(ip->i_diflags2 & XFS_DIFLAG2_COWEXTSIZE));
+
 	if (xfs_is_reflink_inode(ip))
 		return -EINVAL;
 

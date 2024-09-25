@@ -1471,6 +1471,11 @@ xfs_reflink_remap_prep(
 	if (XFS_IS_REALTIME_INODE(src) || XFS_IS_REALTIME_INODE(dest))
 		goto out_unlock;
 
+	pr_err("%s xfs_inode_has_atomicwrites src=%d XFS_DIFLAG2_REFLINK set src=%d xfs_inode_has_atomicwrites dest=%d XFS_DIFLAG2_REFLINK set dest=%d\n",
+		__func__, xfs_inode_has_atomicwrites(src),
+		!!(src->i_diflags2 & XFS_DIFLAG2_REFLINK),
+		 xfs_inode_has_atomicwrites(dest),
+		!!(dest->i_diflags2 & XFS_DIFLAG2_REFLINK));
 	/* Don't reflink atomic write inodes */
 	if (xfs_inode_has_atomicwrites(src) || xfs_inode_has_atomicwrites(dest))
 		goto out_unlock;

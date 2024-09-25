@@ -1749,6 +1749,11 @@ xfs_fs_fill_super(
 			xfs_info(mp, "using DEBUG-only always_cow mode.");
 			mp->m_always_cow = true;
 		}
+		xfs_warn(mp,
+			"xfs_has_reflink feature in use. Use at your own risk!");
+	} else {
+		xfs_warn(mp,
+			"xfs_has_reflink feature not in use. Use at your own risk!");
 	}
 
 	if (xfs_has_rmapbt(mp) && mp->m_sb.sb_rblocks) {
