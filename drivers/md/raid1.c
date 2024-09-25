@@ -299,6 +299,9 @@ static void call_bio_endio(struct r1bio *r1_bio)
 {
 	struct bio *bio = r1_bio->master_bio;
 
+	pr_err("%s r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Uptodate set=%d\n",
+		__func__, r1_bio, bio, bio_sectors(bio), test_bit(R1BIO_Uptodate, &r1_bio->state));
+
 	if (!test_bit(R1BIO_Uptodate, &r1_bio->state))
 		bio->bi_status = BLK_STS_IOERR;
 
@@ -310,6 +313,9 @@ static void raid_end_bio_io(struct r1bio *r1_bio)
 	struct bio *bio = r1_bio->master_bio;
 	struct r1conf *conf = r1_bio->mddev->private;
 	sector_t sector = r1_bio->sector;
+
+	pr_err("%s r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Returned set=%d\n",
+		__func__, r1_bio, bio, bio_sectors(bio), test_bit(R1BIO_Returned, &r1_bio->state));
 
 	/* if nobody has done the final endio yet, do it now */
 	if (!test_and_set_bit(R1BIO_Returned, &r1_bio->state)) {
@@ -366,6 +372,9 @@ static void raid1_end_read_request(struct bio *bio)
 	struct r1conf *conf = r1_bio->mddev->private;
 	struct md_rdev *rdev = conf->mirrors[r1_bio->read_disk].rdev;
 
+	pr_err("%s bio=%pS (sectors=%d) r1_bio=%pS rdev=%pS uptodate=%d\n",
+		__func__, bio, bio_sectors(bio), r1_bio, rdev, uptodate);
+
 	/*
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
@@ -393,6 +402,8 @@ static void raid1_end_read_request(struct bio *bio)
 	}
 
 	if (uptodate) {
+		pr_err("%s2 bio=%pS (sectors=%d) r1_bio=%pS rdev=%pS uptodate=%d calling raid_end_bio_io\n",
+			__func__, bio, bio_sectors(bio), r1_bio, rdev, uptodate);
 		raid_end_bio_io(r1_bio);
 		rdev_dec_pending(rdev, conf->mddev);
 	} else {
@@ -404,6 +415,8 @@ static void raid1_end_read_request(struct bio *bio)
 				   rdev->bdev,
 				   (unsigned long long)r1_bio->sector);
 		set_bit(R1BIO_ReadError, &r1_bio->state);
+		pr_err("%s3 bio=%pS (sectors=%d) r1_bio=%pS rdev=%pS uptodate=%d calling reschedule_retry\n",
+			__func__, bio, bio_sectors(bio), r1_bio, rdev, uptodate);
 		reschedule_retry(r1_bio);
 		/* don't drop the reference on read_disk yet */
 	}
@@ -429,6 +442,7 @@ static void close_write(struct r1bio *r1_bio)
 
 static void r1_bio_write_done(struct r1bio *r1_bio)
 {
+	pr_err("%s r1_bio=%pS remaining=%d\n", __func__, r1_bio, atomic_read(&r1_bio->remaining));
 	if (!atomic_dec_and_test(&r1_bio->remaining))
 		return;
 
@@ -455,6 +469,7 @@ static void raid1_end_write_request(struct bio *bio)
 	sector_t lo = r1_bio->sector;
 	sector_t hi = r1_bio->sector + r1_bio->sectors;
 
+	pr_err("%s bio=%pS (sectors=%d)\n", __func__, bio, bio_sectors(bio));
 	discard_error = bio->bi_status && bio_op(bio) == REQ_OP_DISCARD;
 
 	/*
@@ -553,6 +568,7 @@ static void raid1_end_write_request(struct bio *bio)
 	 * Let's see if all mirrored write operations have finished
 	 * already.
 	 */
+	pr_err("%s1 bio=%pS (sectors=%d) calling r1_bio_write_done\n", __func__, bio, bio_sectors(bio));
 	r1_bio_write_done(r1_bio);
 
 	if (to_put)
@@ -1325,6 +1341,10 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	int rdisk;
 	bool r1bio_existed = !!r1_bio;
 
+
+	pr_err("%s bio=%pS (sectors=%d) r1_bio=%pS\n",
+		__func__, bio, bio_sectors(bio), r1_bio);
+
 	/*
 	 * If r1_bio is set, we are blocking the raid1d thread
 	 * so there is a tiny risk of deadlock.  So ask for
@@ -1346,6 +1366,9 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 		r1_bio = alloc_r1bio(mddev, bio);
 	else
 		init_r1bio(r1_bio, mddev, bio);
+
+	pr_err("%s1 bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d\n",
+		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors);
 	r1_bio->sectors = max_read_sectors;
 
 	/*
@@ -1353,6 +1376,8 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	 * used and no empty request is available.
 	 */
 	rdisk = read_balance(conf, r1_bio, &max_sectors);
+	pr_err("%s2 bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d rdisk=%d\n",
+		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors, rdisk);
 	if (rdisk < 0) {
 		/* couldn't find anywhere to read from */
 		if (r1bio_existed)
@@ -1402,6 +1427,9 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	}
 	read_bio = bio_alloc_clone(mirror->rdev->bdev, bio, gfp,
 				   &mddev->bio_set);
+	pr_err("%s3 bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d rdisk=%d read_bio=%pS (sectors=%d)\n",
+		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors, rdisk,
+		read_bio, bio_sectors(read_bio));
 
 	r1_bio->bios[rdisk] = read_bio;
 
@@ -1414,6 +1442,9 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	        read_bio->bi_opf |= MD_FAILFAST;
 	read_bio->bi_private = r1_bio;
 	mddev_trace_remap(mddev, read_bio, r1_bio->sector);
+	pr_err("%s5 calling submit_bio_noacct() bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d rdisk=%d read_bio=%pS (sectors=%d)\n",
+		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors, rdisk,
+		read_bio, bio_sectors(read_bio));
 	submit_bio_noacct(read_bio);
 }
 
@@ -1429,6 +1460,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	int max_sectors;
 	bool write_behind = false;
 	bool is_discard = (bio_op(bio) == REQ_OP_DISCARD);
+
+	pr_err("%s bio=%pS (sectors=%d) max_write_sectors=%d\n",
+		__func__, bio, bio_sectors(bio), max_write_sectors);
 
 	if (mddev_is_clustered(mddev) &&
 	     md_cluster_ops->area_resyncing(mddev, WRITE,
@@ -1465,6 +1499,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
  retry_write:
 	r1_bio = alloc_r1bio(mddev, bio);
 	r1_bio->sectors = max_write_sectors;
+	pr_err("%s1  retry_write: bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS\n",
+		__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio);
 
 	/* first select target devices under rcu_lock and
 	 * inc refcount on their rdev.  Record them by setting
@@ -1482,6 +1518,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	max_sectors = r1_bio->sectors;
 	for (i = 0;  i < disks; i++) {
 		struct md_rdev *rdev = conf->mirrors[i].rdev;
+
+		pr_err("%s2 looping disks bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS i=%d rdev=%pS nr_pending=%d\n",
+			__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, i , rdev, rdev ? atomic_read(&rdev->nr_pending) : 0);
 
 		/*
 		 * The write-behind io is only attempted on drives marked as
@@ -1575,9 +1614,27 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	 * at a time and thus needs a new bio that can fit the whole payload
 	 * this bio in page sized chunks.
 	 */
+
+	pr_err("%s3 conf=%pS\n", __func__, conf);
+	pr_err("%s3.0 mirrors=%pS\n", __func__, conf->mirrors);
+
+	for (i = 0;  i < disks; i++) {
+		struct md_rdev *rdev;
+
+		//break;
+
+		rdev = conf->mirrors[i].rdev;
+		pr_err("%s3.1 rdev=%pS\n", __func__, rdev);
+		pr_err("%s3.2 considering splitting i=%d rdev=%pS nr_pending=%d\n",
+			__func__, i, rdev, rdev ? atomic_read(&rdev->nr_pending) : 0);
+	}
+
+	pr_err("%s4.0 max_sectors=%d write_behind=%d mddev->bitmap=%pS\n",
+		__func__, max_sectors, write_behind, mddev->bitmap);
 	if (write_behind && mddev->bitmap)
 		max_sectors = min_t(int, max_sectors,
 				    BIO_MAX_VECS * (PAGE_SIZE >> 9));
+	pr_err("%s4.1 max_sectors=%d\n", __func__, max_sectors);
 	if (max_sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, max_sectors,
 					      GFP_NOIO, &conf->bio_split);
@@ -1643,6 +1700,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				wait_for_serialization(rdev, r1_bio);
 		}
 
+		pr_err("%s1 retry_write: bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS i=%d mbio=%pS\n",
+			__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, i, mbio);
+
 		r1_bio->bios[i] = mbio;
 
 		mbio->bi_iter.bi_sector	= (r1_bio->sector + rdev->data_offset);
@@ -1689,6 +1749,11 @@ static bool raid1_make_request(struct mddev *mddev, struct bio *bio)
 	 */
 	sectors = align_to_barrier_unit_end(
 		bio->bi_iter.bi_sector, bio_sectors(bio));
+
+	pr_err("%s bio=%pS (sectors=%d) READ=%d sectors=%lld\n",
+		__func__, bio,
+		bio_sectors(bio), bio_data_dir(bio) == READ,
+		sectors);
 
 	if (bio_data_dir(bio) == READ)
 		raid1_read_request(mddev, bio, sectors, NULL);
@@ -2070,6 +2135,9 @@ static void end_sync_write(struct bio *bio)
 	struct mddev *mddev = r1_bio->mddev;
 	struct r1conf *conf = mddev->private;
 	struct md_rdev *rdev = conf->mirrors[find_bio_disk(r1_bio, bio)].rdev;
+
+	if (bio_sectors(bio))
+		pr_err("%s bio=%pS (sectors=%d) uptodate=%d\n", __func__, bio, bio_sectors(bio), uptodate);
 
 	if (!uptodate) {
 		abort_sync_write(mddev, r1_bio);
