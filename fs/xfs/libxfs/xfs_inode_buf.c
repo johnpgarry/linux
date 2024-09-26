@@ -496,8 +496,8 @@ xfs_inode_validate_atomicwrites(
 		return __this_address;
 	}
 
-	/* Only regular files */
-	if (!S_ISREG(mode)) {
+	/* Only regular files and directories */
+	if (!S_ISDIR(mode) && !S_ISREG(mode)) {
 		pr_err("%s S_ISREG ERROR S_ISDIR=%d\n", __func__, S_ISDIR(mode));
 		return __this_address;
 	}
