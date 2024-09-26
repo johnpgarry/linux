@@ -311,11 +311,6 @@ static inline bool xfs_inode_has_large_extent_counts(struct xfs_inode *ip)
 	return ip->i_diflags2 & XFS_DIFLAG2_NREXT64;
 }
 
-static inline bool xfs_inode_has_atomicwrites(struct xfs_inode *ip)
-{
-	return ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES;
-}
-
 /*
  * Decide if this file is a realtime file whose data allocation unit is larger
  * than a single filesystem block.
@@ -331,6 +326,26 @@ static inline bool xfs_inode_has_bigrtalloc(struct xfs_inode *ip)
 #define xfs_inode_buftarg(ip) \
 	(XFS_IS_REALTIME_INODE(ip) ? \
 		(ip)->i_mount->m_rtdev_targp : (ip)->i_mount->m_ddev_targp)
+
+static inline bool xfs_inode_has_atomicwrites(struct xfs_inode *ip)
+{
+	return ip->i_diflags2 & XFS_DIFLAG2_ATOMICWRITES;
+}
+
+static inline bool xfs_inode_can_atomicwrite(struct xfs_inode *ip)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+
+	if (!xfs_inode_has_atomicwrites(ip))
+		return false;
+	if (mp->m_sb.sb_blocksize < target->bt_bdev_awu_min)
+		return false;
+	if (mp->m_sb.sb_blocksize > target->bt_bdev_awu_max)
+		return false;
+
+	return true;
+}
 
 /*
  * In-core inode flags.

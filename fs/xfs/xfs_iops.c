@@ -576,33 +576,16 @@ xfs_get_atomic_write_attr(
 	unsigned int		*unit_min,
 	unsigned int		*unit_max)
 {
-	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_sb		*sbp = &mp->m_sb;
 
-	if (!xfs_inode_has_atomicwrites(ip)) {
-		pr_err("%s unsupported xfs_inode_has_atomicwrites\n", __func__);
-		goto unsupported;
-	}
-
-	if (target->bt_bdev_awu_min > sbp->sb_blocksize) {
-		pr_err("%s unsupported bt_bdev_awu_min=%d > sb_blocksize=%d\n",
-			__func__, target->bt_bdev_awu_min, sbp->sb_blocksize);
-		goto unsupported;
-	}
-
-	if (target->bt_bdev_awu_max < sbp->sb_blocksize) {
-		pr_err("%s unsupported bt_bdev_awu_max=%d < sb_blocksize=%d\n",
-			__func__, target->bt_bdev_awu_max, sbp->sb_blocksize);
-		goto unsupported;
+	if (!xfs_inode_can_atomicwrite(ip)) {
+		pr_err("%s unsupported xfs_inode_can_atomicwrite\n", __func__);
+		*unit_min = *unit_max = 0;
+		return;
 	}
 
 	*unit_min = *unit_max = sbp->sb_blocksize;
-
-	return;
-
-unsupported:
-	*unit_min = *unit_max = 0;
 }
 
 STATIC int

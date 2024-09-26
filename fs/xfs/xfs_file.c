@@ -1213,20 +1213,9 @@ static bool xfs_file_open_can_atomicwrite(
 	struct inode		*inode,
 	struct file		*file)
 {
-	struct xfs_inode	*ip = XFS_I(inode);
-	struct xfs_mount	*mp = ip->i_mount;
-	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
-
 	if (!(file->f_flags & O_DIRECT))
 		return false;
-	if (!xfs_inode_has_atomicwrites(ip))
-		return false;
-	if (mp->m_sb.sb_blocksize < target->bt_bdev_awu_min)
-		return false;
-	if (mp->m_sb.sb_blocksize > target->bt_bdev_awu_max)
-		return false;
-
-	return true;
+	return xfs_inode_can_atomicwrite(XFS_I(inode));
 }
 
 STATIC int
