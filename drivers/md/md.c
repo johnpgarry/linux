@@ -9793,6 +9793,9 @@ int rdev_set_badblocks(struct md_rdev *rdev, sector_t s, int sectors,
 {
 	struct mddev *mddev = rdev->mddev;
 	int rv;
+
+	pr_err("%s rdev=%pS (desc_nr=%d) s=%lld sectors=%d is_new=%d\n", __func__,
+		rdev, rdev->desc_nr, s, sectors, is_new);
 	if (is_new)
 		s += rdev->new_data_offset;
 	else

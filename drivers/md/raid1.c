@@ -1461,8 +1461,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	bool write_behind = false;
 	bool is_discard = (bio_op(bio) == REQ_OP_DISCARD);
 
-	pr_err("%s bio=%pS (sectors=%d) max_write_sectors=%d\n",
-		__func__, bio, bio_sectors(bio), max_write_sectors);
+	pr_err("%s bio=%pS (sector=%lld, sectors=%d) max_write_sectors=%d (from barrier_unit_end, which is 64MB)\n",
+		__func__, bio, bio->bi_iter.bi_sector, bio_sectors(bio), max_write_sectors);
 
 	if (mddev_is_clustered(mddev) &&
 	     md_cluster_ops->area_resyncing(mddev, WRITE,
@@ -1499,8 +1499,6 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
  retry_write:
 	r1_bio = alloc_r1bio(mddev, bio);
 	r1_bio->sectors = max_write_sectors;
-	pr_err("%s1  retry_write: bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS\n",
-		__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio);
 
 	/* first select target devices under rcu_lock and
 	 * inc refcount on their rdev.  Record them by setting
@@ -1514,13 +1512,19 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	 */
 
 	disks = conf->raid_disks * 2;
+	pr_err("%s1  retry_write: bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS raid_disks=%d\n",
+		__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, conf->raid_disks);
 	blocked_rdev = NULL;
 	max_sectors = r1_bio->sectors;
 	for (i = 0;  i < disks; i++) {
 		struct md_rdev *rdev = conf->mirrors[i].rdev;
 
-		pr_err("%s2 looping disks bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS i=%d rdev=%pS nr_pending=%d\n",
-			__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, i , rdev, rdev ? atomic_read(&rdev->nr_pending) : 0);
+		pr_err("%s2 looping disks bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS i=%d rdev=%pS (desc_nr=%d) nr_pending=%d Faulty=%d WriteErrorSeen=%d\n",
+			__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, i , rdev,
+			rdev ? rdev-> desc_nr : -1,
+			rdev ? atomic_read(&rdev->nr_pending) : 0,
+			rdev ? test_bit(Faulty, &rdev->flags) : 0,
+			rdev ? test_bit(WriteErrorSeen, &rdev->flags) : 0);
 
 		/*
 		 * The write-behind io is only attempted on drives marked as
@@ -1550,6 +1554,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 
 			is_bad = is_badblock(rdev, r1_bio->sector, max_sectors,
 					     &first_bad, &bad_sectors);
+			pr_err("%s2.1 WriteErrorSeen is_bad=%d\n", __func__, is_bad);
 			if (is_bad < 0) {
 				/* mustn't write here until the bad block is
 				 * acknowledged*/
@@ -1557,6 +1562,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				blocked_rdev = rdev;
 				break;
 			}
+
+			pr_err("%s2.2 is_bad=%d first_bad=%lld r1_bio->sector=%lld\n",
+				__func__, is_bad, first_bad, r1_bio->sector);
 			if (is_bad && first_bad <= r1_bio->sector) {
 				/* Cannot write here at all */
 				bad_sectors -= (r1_bio->sector - first_bad);
@@ -1580,8 +1588,13 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 			}
 			if (is_bad) {
 				int good_sectors = first_bad - r1_bio->sector;
-				if (good_sectors < max_sectors)
+				pr_err("%s2.3 is_bad=%d first_bad=%lld r1_bio->sector=%lld good_sectors=%d first_bad=%lld max_sectors=%d\n",
+					__func__, is_bad, first_bad, r1_bio->sector, good_sectors, first_bad, max_sectors);
+				if (good_sectors < max_sectors) {
 					max_sectors = good_sectors;
+					pr_err("%s2.4 first_bad=%lld r1_bio->sector=%lld good_sectors=%d first_bad=%lld max_sectors=%d\n",
+						__func__, first_bad, r1_bio->sector, good_sectors, first_bad, max_sectors);
+				}
 			}
 		}
 		r1_bio->bios[i] = bio;
@@ -1594,6 +1607,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		for (j = 0; j < i; j++)
 			if (r1_bio->bios[j])
 				rdev_dec_pending(conf->mirrors[j].rdev, mddev);
+		pr_err("%s2.5 blocked_rdev\n", __func__);
 		mempool_free(r1_bio, &conf->r1bio_pool);
 		allow_barrier(conf, bio->bi_iter.bi_sector);
 
@@ -1634,11 +1648,12 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	if (write_behind && mddev->bitmap)
 		max_sectors = min_t(int, max_sectors,
 				    BIO_MAX_VECS * (PAGE_SIZE >> 9));
-	pr_err("%s4.1 max_sectors=%d\n", __func__, max_sectors);
+	pr_err("%s4.1 max_sectors=%d bio_sectors(bio)=%d\n", __func__, max_sectors, bio_sectors(bio));
 	if (max_sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, max_sectors,
 					      GFP_NOIO, &conf->bio_split);
 
+		pr_err("%s4.2 split=%pS max_sectors=%d bio_sectors(bio)=%d\n", __func__, split, max_sectors, bio_sectors(bio));
 		if (IS_ERR(split)) {
 			raid_end_bio_io(r1_bio);
 			return;
@@ -2158,6 +2173,11 @@ static void end_sync_write(struct bio *bio)
 static int r1_sync_page_io(struct md_rdev *rdev, sector_t sector,
 			   int sectors, struct page *page, blk_opf_t rw)
 {
+	static atomic_t count;
+	int _count = atomic_inc_return(&count);
+
+	if ((_count % 100) == 0)
+		pr_err("%s sector=%lld sectors=%d rw=0x%x\n", __func__, sector, sectors, rw);
 	if (sync_page_io(rdev, sector, sectors << 9, page, rw, false))
 		/* success */
 		return 1;
