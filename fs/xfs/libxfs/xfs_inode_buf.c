@@ -483,6 +483,22 @@ xfs_dinode_verify_nrext64(
 	return NULL;
 }
 
+static xfs_failaddr_t
+xfs_inode_validate_atomicwrites(
+	struct xfs_mount	*mp,
+	uint16_t		mode)
+{
+	/* superblock rocompat feature flag */
+	if (!xfs_has_atomicwrites(mp))
+		return __this_address;
+
+	/* Only regular files and directories */
+	if (!S_ISREG(mode) && !(S_ISDIR(mode)))
+		return __this_address;
+
+	return NULL;
+}
+
 xfs_failaddr_t
 xfs_dinode_verify(
 	struct xfs_mount	*mp,
@@ -662,6 +678,12 @@ xfs_dinode_verify(
 	if (xfs_dinode_has_bigtime(dip) &&
 	    !xfs_has_bigtime(mp))
 		return __this_address;
+
+	if (flags2 & XFS_DIFLAG2_ATOMICWRITES) {
+		fa = xfs_inode_validate_atomicwrites(mp, mode);
+		if (fa)
+			return fa;
+	}
 
 	return NULL;
 }
