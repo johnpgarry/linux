@@ -1554,18 +1554,22 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 
 			is_bad = is_badblock(rdev, r1_bio->sector, max_sectors,
 					     &first_bad, &bad_sectors);
-			pr_err("%s2.1 WriteErrorSeen is_bad=%d\n", __func__, is_bad);
+			pr_err("%s2.1 WriteErrorSeen set, is_bad=%d bad_sectors=%d\n", __func__, is_bad, bad_sectors);
 			if (is_bad < 0) {
 				/* mustn't write here until the bad block is
 				 * acknowledged*/
 				set_bit(BlockedBadBlocks, &rdev->flags);
 				blocked_rdev = rdev;
+				pr_err("%s2.1.1 mustn't write here until the bad block is acknowledged, is_bad=%d\n", __func__, is_bad);
 				break;
 			}
 
 			pr_err("%s2.2 is_bad=%d first_bad=%lld r1_bio->sector=%lld\n",
 				__func__, is_bad, first_bad, r1_bio->sector);
 			if (is_bad && first_bad <= r1_bio->sector) {
+
+				pr_err("%s2.2.1 Cannot write here at all is_bad=%d first_bad=%lld r1_bio->sector=%lld bad_sectors=%d max_sectors=%d\n",
+					__func__, is_bad, first_bad, r1_bio->sector, bad_sectors, max_sectors);
 				/* Cannot write here at all */
 				bad_sectors -= (r1_bio->sector - first_bad);
 				if (bad_sectors < max_sectors)
@@ -1573,6 +1577,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 					 * to other devices yet
 					 */
 					max_sectors = bad_sectors;
+				pr_err("%s2.2.1.1 recalc what we can write bad_sectors=%d max_sectors=%d, call rdev_dec_pending, and continue\n",
+					__func__, bad_sectors, max_sectors);
 				rdev_dec_pending(rdev, mddev);
 				/* We don't set R1BIO_Degraded as that
 				 * only applies if the disk is
@@ -1597,6 +1603,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				}
 			}
 		}
+		pr_err("%s2.4.1 setting r1_bio->bios[%d] = bio (=%pS)\n", __func__, i, bio);
 		r1_bio->bios[i] = bio;
 	}
 
@@ -1619,6 +1626,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				blocked_rdev->raid_disk);
 		md_wait_for_blocked_rdev(blocked_rdev, mddev);
 		wait_barrier(conf, bio->bi_iter.bi_sector, false);
+		pr_err("%s2.5.1 goto retry_write\n", __func__);
 		goto retry_write;
 	}
 
@@ -1629,7 +1637,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	 * this bio in page sized chunks.
 	 */
 
-	pr_err("%s3 conf=%pS\n", __func__, conf);
+	pr_err("%s3 conf=%pS max_sectors=%d\n", __func__, conf, max_sectors);
 	pr_err("%s3.0 mirrors=%pS\n", __func__, conf->mirrors);
 
 	for (i = 0;  i < disks; i++) {
@@ -1645,9 +1653,12 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 
 	pr_err("%s4.0 max_sectors=%d write_behind=%d mddev->bitmap=%pS\n",
 		__func__, max_sectors, write_behind, mddev->bitmap);
-	if (write_behind && mddev->bitmap)
+	if (write_behind && mddev->bitmap) {
+		pr_err("%s4.0.1 work out reduced max_sectors=%d write_behind=%d mddev->bitmap=%pS\n",
+			__func__, max_sectors, write_behind, mddev->bitmap);
 		max_sectors = min_t(int, max_sectors,
 				    BIO_MAX_VECS * (PAGE_SIZE >> 9));
+	}
 	pr_err("%s4.1 max_sectors=%d bio_sectors(bio)=%d\n", __func__, max_sectors, bio_sectors(bio));
 	if (max_sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, max_sectors,
@@ -1675,6 +1686,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	for (i = 0; i < disks; i++) {
 		struct bio *mbio = NULL;
 		struct md_rdev *rdev = conf->mirrors[i].rdev;
+
+		pr_err("%s5.1 looping i=%d r1_bio->bios[i]=%pS first_clone=%d\n", __func__, i, r1_bio->bios[i], first_clone);
 		if (!r1_bio->bios[i])
 			continue;
 
@@ -1699,6 +1712,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 			first_clone = 0;
 		}
 
+		pr_err("%s5.2 looping i=%d r1_bio->bios[i]=%pS behind_master_bio=%pS\n",
+			__func__, i, r1_bio->bios[i], r1_bio->behind_master_bio);
 		if (r1_bio->behind_master_bio) {
 			mbio = bio_alloc_clone(rdev->bdev,
 					       r1_bio->behind_master_bio,
@@ -1715,8 +1730,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				wait_for_serialization(rdev, r1_bio);
 		}
 
-		pr_err("%s1 retry_write: bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS i=%d mbio=%pS\n",
-			__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, i, mbio);
+		pr_err("%s6.2 setting r1_bio->bios[%d] = mbio (%pS) bio_sectors(mbio)=%d\n",
+			__func__, i, mbio, bio_sectors(mbio));
 
 		r1_bio->bios[i] = mbio;
 
@@ -1730,6 +1745,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		mbio->bi_private = r1_bio;
 
 		atomic_inc(&r1_bio->remaining);
+		pr_err("%s6.3 i=%d mbio=%pS r1_bio->remaining=%d\n",
+			__func__, i, mbio, atomic_read(&r1_bio->remaining));
 		mddev_trace_remap(mddev, mbio, r1_bio->sector);
 		/* flush_pending_writes() needs access to the rdev so...*/
 		mbio->bi_bdev = (void *)rdev;
@@ -1741,10 +1758,13 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		}
 	}
 
+	pr_err("%s8 r1_bio=%pS calling r1_bio_write_done\n", __func__, r1_bio);
 	r1_bio_write_done(r1_bio);
 
 	/* In case raid1d snuck in to freeze_array */
+	pr_err("%s9 r1_bio=%pS calling wake_up_barrier\n", __func__, r1_bio);
 	wake_up_barrier(conf);
+	pr_err("%s10 out\n", __func__);
 }
 
 static bool raid1_make_request(struct mddev *mddev, struct bio *bio)

@@ -1378,6 +1378,9 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 	else
 		protect = 0;
 
+	//if (nr_blocks == 8)
+	//	pr_err("%s lba=%lld nr_blocks=%d\n", __func__, lba, nr_blocks);
+
 	if (protect && sdkp->protection_type == T10_PI_TYPE2_PROTECTION) {
 		ret = sd_setup_rw32_cmnd(cmd, write, lba, nr_blocks,
 					 protect | fua, dld);
