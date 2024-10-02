@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 	int multi_vector_alloc_size = -1;
 	int ret;
 	loff_t pos = 0;
-	char *read_buffer = NULL;
+	void *read_buffer = NULL;
 	int verify = 0;
 	int demo_hch_problem = 0;
 	struct timeval tv;
@@ -303,7 +303,7 @@ do_write:
 	if (verify == 0)
 		goto end;
 
-	read_buffer = malloc(write_size);
+	posix_memalign(&read_buffer, 4096, write_size);
 	if (!read_buffer) {
 		printf("could not alloc read buffer\n");
 		return -1;
