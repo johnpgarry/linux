@@ -688,26 +688,39 @@ static int choose_slow_rdev(struct r1conf *conf, struct r1bio *r1_bio,
 	int bb_read_len = 0;
 	int disk;
 
+	pr_err("%s r1_bio=%pS (sectors=%d) *max_sectors=%d\n",
+			__func__, r1_bio, r1_bio->sectors, *max_sectors);
+
 	for (disk = 0 ; disk < conf->raid_disks * 2 ; disk++) {
 		struct md_rdev *rdev;
 		int len;
 		int read_len;
 
-		if (r1_bio->bios[disk] == IO_BLOCKED)
+		if (r1_bio->bios[disk] == IO_BLOCKED) {
+			pr_err("%s1 r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d IO_BLOCKED, trying next\n",
+					__func__, r1_bio, r1_bio->sectors, *max_sectors, disk);
 			continue;
+		}
 
 		rdev = conf->mirrors[disk].rdev;
 		if (!rdev || test_bit(Faulty, &rdev->flags) ||
 		    !test_bit(WriteMostly, &rdev->flags) ||
-		    rdev_in_recovery(rdev, r1_bio))
+		    rdev_in_recovery(rdev, r1_bio)) {
+			pr_err("%s2 problem r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d rdev=%pS Faulty set=%d, trying next\n",
+					__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, rdev, rdev ? test_bit(Faulty, &rdev->flags) : 0);
 			continue;
+		}
 
 		/* there are no bad blocks, we can use this disk */
 		len = r1_bio->sectors;
 		read_len = raid1_check_read_range(rdev, this_sector, &len);
+		pr_err("%s2 r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d read_len=%d from raid1_check_read_range\n",
+					__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, read_len);
 		if (read_len == r1_bio->sectors) {
 			*max_sectors = read_len;
 			update_read_sectors(conf, disk, this_sector, read_len);
+			pr_err("%s3 r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d read_len=%d returning this disk\n",
+						__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, read_len);
 			return disk;
 		}
 
@@ -719,13 +732,21 @@ static int choose_slow_rdev(struct r1conf *conf, struct r1bio *r1_bio,
 			bb_disk = disk;
 			bb_read_len = read_len;
 		}
+		pr_err("%s3.1 r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d read_len=%d bb_disk=%d bb_read_len=%d, trying next\n",
+						__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, read_len, bb_disk, bb_read_len);
 	}
 
 	if (bb_disk != -1) {
+		pr_err("%s4.0 r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d calling update_read_sectors for bb_read_len=%d bb_disk=%d\n",
+						__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, bb_read_len, bb_disk);
 		*max_sectors = bb_read_len;
+
+		pr_err("%s4.1 r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d calling update_read_sectors for bb_read_len=%d bb_disk=%d\n",
+						__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, bb_read_len, bb_disk);
 		update_read_sectors(conf, bb_disk, this_sector, bb_read_len);
 	}
 
+	pr_err("%s10 return bb_disk=%d\n", __func__, bb_disk);
 	return bb_disk;
 }
 
@@ -767,8 +788,10 @@ static bool rdev_readable(struct md_rdev *rdev, struct r1bio *r1_bio)
 		return false;
 
 	/* don't split IO for bad blocks unless have to */
-	if (rdev_has_badblock(rdev, r1_bio->sector, r1_bio->sectors))
+	if (rdev_has_badblock(rdev, r1_bio->sector, r1_bio->sectors)) {
+		pr_err("%s found BAD BLOCK rdev=%pS desc_nr=%d\n", __func__, rdev, rdev->desc_nr);
 		return false;
+	}
 
 	return true;
 }
@@ -793,17 +816,26 @@ static int choose_best_rdev(struct r1conf *conf, struct r1bio *r1_bio)
 		.sequential_disk	= -1,
 	};
 
+	pr_err("%s\n", __func__);
 	for (disk = 0 ; disk < conf->raid_disks * 2 ; disk++) {
 		struct md_rdev *rdev;
 		sector_t dist;
 		unsigned int pending;
 
+		pr_err("%s1 looping disk=%d r1_bio=%pS\n",
+			__func__, disk, r1_bio);
+		pr_err("%s1.1 r1_bio->bios=%pS\n",
+			__func__, r1_bio->bios);
+		pr_err("%s1.2 IO_BLOCKED=%d\n",
+			__func__, r1_bio->bios[disk] == IO_BLOCKED);
 		if (r1_bio->bios[disk] == IO_BLOCKED)
 			continue;
 
 		rdev = conf->mirrors[disk].rdev;
-		if (!rdev_readable(rdev, r1_bio))
+		if (!rdev_readable(rdev, r1_bio)) {
+			pr_err("%s2 disk=%d !rdev_readable, try next\n", __func__, disk);
 			continue;
+		}
 
 		/* At least two disks to choose from so failfast is OK */
 		if (ctl.readable_disks++ == 1)
@@ -814,8 +846,10 @@ static int choose_best_rdev(struct r1conf *conf, struct r1bio *r1_bio)
 
 		/* Don't change to another disk for sequential reads */
 		if (is_sequential(conf, disk, r1_bio)) {
-			if (!should_choose_next(conf, disk))
+			if (!should_choose_next(conf, disk)) {
+				pr_err("%s3 is_sequential return disk=%d\n", __func__, disk);
 				return disk;
+			}
 
 			/*
 			 * Add 'pending' to avoid choosing this disk if
@@ -840,6 +874,8 @@ static int choose_best_rdev(struct r1conf *conf, struct r1bio *r1_bio)
 		}
 	}
 
+	pr_err("%s8 is_sequential return closest_dist_disk=%d min_pending_disk=%d min_pending_disk=%d\n", 
+		__func__, ctl.closest_dist_disk, ctl.min_pending_disk, ctl.min_pending_disk);
 	/*
 	 * sequential IO size exceeds optimal iosize, however, there is no other
 	 * idle disk, so choose the sequential disk.
@@ -886,10 +922,18 @@ static int read_balance(struct r1conf *conf, struct r1bio *r1_bio,
 	clear_bit(R1BIO_FailFast, &r1_bio->state);
 
 	if (raid1_should_read_first(conf->mddev, r1_bio->sector,
-				    r1_bio->sectors))
+				    r1_bio->sectors)) {
+		pr_err("%s1 r1_bio=%pS (sectors=%d) calling choose_first_rdev\n",
+			__func__, r1_bio, r1_bio->sectors);
 		return choose_first_rdev(conf, r1_bio, max_sectors);
 
+	}
+
+	pr_err("%s2 r1_bio=%pS (sectors=%d) calling choose_best_rdev\n",
+			__func__, r1_bio, r1_bio->sectors);
 	disk = choose_best_rdev(conf, r1_bio);
+	pr_err("%s2.1 r1_bio=%pS (sectors=%d) called choose_best_rdev disk=%d\n",
+			__func__, r1_bio, r1_bio->sectors, disk);
 	if (disk >= 0) {
 		*max_sectors = r1_bio->sectors;
 		update_read_sectors(conf, disk, r1_bio->sector,
@@ -902,10 +946,16 @@ static int read_balance(struct r1conf *conf, struct r1bio *r1_bio,
 	 * now spend a bit more time trying to find one with the most good
 	 * sectors.
 	 */
+	pr_err("%s3 r1_bio=%pS (sectors=%d) calling choose_bb_rdev\n",
+			__func__, r1_bio, r1_bio->sectors);
 	disk = choose_bb_rdev(conf, r1_bio, max_sectors);
+	pr_err("%s3.1 r1_bio=%pS (sectors=%d) called choose_bb_rdev disk=%d\n",
+			__func__, r1_bio, r1_bio->sectors, disk);
 	if (disk >= 0)
 		return disk;
 
+	pr_err("%s4.1 r1_bio=%pS (sectors=%d) calling choose_slow_rdev \n",
+			__func__, r1_bio, r1_bio->sectors);
 	return choose_slow_rdev(conf, r1_bio, max_sectors);
 }
 
@@ -1342,8 +1392,8 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	bool r1bio_existed = !!r1_bio;
 
 
-	pr_err("%s bio=%pS (sectors=%d) r1_bio=%pS\n",
-		__func__, bio, bio_sectors(bio), r1_bio);
+	pr_err("%s bio=%pS (sector=%lld, sectors=%d) max_read_sectors=%d (from barrier_unit_end, which is 64MB)\n",
+		__func__, bio, bio->bi_iter.bi_sector, bio_sectors(bio), max_read_sectors);
 
 	/*
 	 * If r1_bio is set, we are blocking the raid1d thread
@@ -1367,8 +1417,8 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	else
 		init_r1bio(r1_bio, mddev, bio);
 
-	pr_err("%s1 bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d\n",
-		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors);
+	pr_err("%s1 bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d max_sectors=%d\n",
+		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors, max_sectors);
 	r1_bio->sectors = max_read_sectors;
 
 	/*
@@ -1376,8 +1426,8 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	 * used and no empty request is available.
 	 */
 	rdisk = read_balance(conf, r1_bio, &max_sectors);
-	pr_err("%s2 bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d rdisk=%d\n",
-		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors, rdisk);
+	pr_err("%s2 after read_balance bio=%pS (sectors=%d) r1_bio=%pS max_read_sectors=%d rdisk=%d max_sectors=%d\n",
+		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors, rdisk, max_sectors);
 	if (rdisk < 0) {
 		/* couldn't find anywhere to read from */
 		if (r1bio_existed)
@@ -1405,10 +1455,15 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 		mddev->bitmap_ops->wait_behind_writes(mddev);
 	}
 
+	pr_err("%s2.5 bio=%pS (sectors=%d) r1_bio=%pS max_sectors=%d rdisk=%d\n",
+		__func__, bio, bio_sectors(bio), r1_bio, max_sectors, rdisk);
+
 	if (max_sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, max_sectors,
 					      gfp, &conf->bio_split);
 
+		pr_err("%s2.6 split=%pS bio=%pS (sectors=%d) r1_bio=%pS max_sectors=%d rdisk=%d\n",
+			__func__, split, bio, bio_sectors(bio), r1_bio, max_sectors, rdisk);
 		if (IS_ERR(split)) {
 			raid_end_bio_io(r1_bio);
 			return;
