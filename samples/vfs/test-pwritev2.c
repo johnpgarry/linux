@@ -56,6 +56,7 @@ int main(int argc, char **argv)
 	int large_vectors = 0;
 	int i, remain;
 	int multi_vectors = 0;
+	int fcntl_odirect_enable = 0;
 	int max_vectors;
 	int vectors;
 	int byte_index;
@@ -76,7 +77,7 @@ int main(int argc, char **argv)
 		file = *argv_orig;
 	}
 
-	while ((opt = getopt(argc, argv, "l:p:PadmhS:vH")) != -1) {
+	while ((opt = getopt(argc, argv, "l:p:PadmhS:vHD")) != -1) {
 		switch (opt) {
 			case 'l':
 				write_size = atoi(optarg);
@@ -104,6 +105,9 @@ int main(int argc, char **argv)
 				break;
 			case 'd':
 				o_flags |= O_DIRECT;
+				break;
+			case 'D':
+				fcntl_odirect_enable = 1;
 				break;
 			case 'v':
 				verify = 1;
@@ -135,6 +139,7 @@ int main(int argc, char **argv)
 				printf("m: multi-vectors\n");
 				printf("a: atomic\n");
 				printf("d: direct I/O\n");
+				printf("D: enable direct I/O with fcntl\n");
 				printf("S: vector size\n");
 				printf("P: middle start+end align to 4096\n");
 				printf("v: verify data written properly\n");
@@ -205,6 +210,16 @@ int main(int argc, char **argv)
 		printf("could not open %s\n", file);
 		return -1;
 	}
+
+	if (fcntl_odirect_enable) {
+		ret = fcntl(fd, F_SETFL, O_DIRECT, 1);
+		if  (ret < 0) {
+			printf("fcntl enable failed ret=%d\n", ret);
+		}
+	}
+
+	int open_flag = fcntl(fd, F_GETFL);
+	printf("open_flag=0x%x O_DIRECT set=%d\n", open_flag, !!(open_flag & O_DIRECT));
 
 	for (i = 0; i < max_vectors; i++)
 		buffers[i] = NULL;
