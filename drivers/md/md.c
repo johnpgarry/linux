@@ -8729,6 +8729,9 @@ static void md_end_clone_io(struct bio *bio)
 	struct bio *orig_bio = md_io_clone->orig_bio;
 	struct mddev *mddev = md_io_clone->mddev;
 
+	pr_err("%s bio=%pS bi_status=%d orig_bio=%pS bi_status=%d bi_end_io=%pS\n",
+		__func__, bio, bio->bi_status, orig_bio, orig_bio->bi_status, orig_bio->bi_end_io);
+
 	if (bio->bi_status && !orig_bio->bi_status)
 		orig_bio->bi_status = bio->bi_status;
 

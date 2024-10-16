@@ -299,11 +299,21 @@ static void call_bio_endio(struct r1bio *r1_bio)
 {
 	struct bio *bio = r1_bio->master_bio;
 
-	pr_err("%s r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Uptodate set=%d\n",
-		__func__, r1_bio, bio, bio_sectors(bio), test_bit(R1BIO_Uptodate, &r1_bio->state));
+	pr_err("%s r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Returned set=%d R1BIO_Uptodate set=%d bio->bi_status=%d bi_end_io=%pS\n",
+		__func__, r1_bio, bio, bio_sectors(bio),
+		test_bit(R1BIO_Returned, &r1_bio->state),
+		test_bit(R1BIO_Uptodate, &r1_bio->state),
+		bio->bi_status,
+		bio->bi_end_io);
 
-	if (!test_bit(R1BIO_Uptodate, &r1_bio->state))
+	if (!test_bit(R1BIO_Uptodate, &r1_bio->state)) {
+		pr_err("%s2 r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Returned set=%d R1BIO_Uptodate set=%d bio->bi_status=%d setting BLK_STS_IOERR\n",
+			__func__, r1_bio, bio, bio_sectors(bio),
+			test_bit(R1BIO_Returned, &r1_bio->state),
+			test_bit(R1BIO_Uptodate, &r1_bio->state),
+			bio->bi_status);
 		bio->bi_status = BLK_STS_IOERR;
+	}
 
 	bio_endio(bio);
 }
@@ -314,12 +324,17 @@ static void raid_end_bio_io(struct r1bio *r1_bio)
 	struct r1conf *conf = r1_bio->mddev->private;
 	sector_t sector = r1_bio->sector;
 
-	pr_err("%s r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Returned set=%d\n",
-		__func__, r1_bio, bio, bio_sectors(bio), test_bit(R1BIO_Returned, &r1_bio->state));
+
+	pr_err("%s r1_bio=%pS remaining=%d R1BIO_Returned set=%d R1BIO_Uptodate set=%d R1BIO_WriteError set=%d R1BIO_MadeGood set=%d\n",
+		__func__, r1_bio, atomic_read(&r1_bio->remaining),
+		test_bit(R1BIO_Returned, &r1_bio->state),
+		test_bit(R1BIO_Uptodate, &r1_bio->state),
+		test_bit(R1BIO_WriteError, &r1_bio->state),
+		test_bit(R1BIO_MadeGood, &r1_bio->state));
 
 	/* if nobody has done the final endio yet, do it now */
 	if (!test_and_set_bit(R1BIO_Returned, &r1_bio->state)) {
-		pr_debug("raid1: sync end %s on sectors %llu-%llu\n",
+		pr_err("raid1: sync end %s on sectors %llu-%llu and calling call_bio_endio\n",
 			 (bio_data_dir(bio) == WRITE) ? "write" : "read",
 			 (unsigned long long) bio->bi_iter.bi_sector,
 			 (unsigned long long) bio_end_sector(bio) - 1);
@@ -442,18 +457,43 @@ static void close_write(struct r1bio *r1_bio)
 
 static void r1_bio_write_done(struct r1bio *r1_bio)
 {
-	pr_err("%s r1_bio=%pS remaining=%d\n", __func__, r1_bio, atomic_read(&r1_bio->remaining));
+
+	pr_err("%s r1_bio=%pS remaining=%d R1BIO_Returned set=%d R1BIO_Uptodate set=%d R1BIO_WriteError set=%d R1BIO_MadeGood set=%d\n",
+		__func__, r1_bio, atomic_read(&r1_bio->remaining),
+		test_bit(R1BIO_Returned, &r1_bio->state),
+		test_bit(R1BIO_Uptodate, &r1_bio->state),
+		test_bit(R1BIO_WriteError, &r1_bio->state),
+		test_bit(R1BIO_MadeGood, &r1_bio->state));
 	if (!atomic_dec_and_test(&r1_bio->remaining))
 		return;
 
+	pr_err("%s2 r1_bio=%pS remaining=%d R1BIO_Returned set=%d R1BIO_Uptodate set=%d R1BIO_WriteError set=%d R1BIO_MadeGood set=%d\n",
+		__func__, r1_bio, atomic_read(&r1_bio->remaining),
+		test_bit(R1BIO_Returned, &r1_bio->state),
+		test_bit(R1BIO_Uptodate, &r1_bio->state),
+		test_bit(R1BIO_WriteError, &r1_bio->state),
+		test_bit(R1BIO_MadeGood, &r1_bio->state));
 	if (test_bit(R1BIO_WriteError, &r1_bio->state))
 		reschedule_retry(r1_bio);
 	else {
+		pr_err("%s3 r1_bio=%pS remaining=%d R1BIO_Returned set=%d R1BIO_Uptodate set=%d R1BIO_WriteError set=%d R1BIO_MadeGood set=%d calling close_write\n",
+			__func__, r1_bio, atomic_read(&r1_bio->remaining),
+			test_bit(R1BIO_Returned, &r1_bio->state),
+			test_bit(R1BIO_Uptodate, &r1_bio->state),
+			test_bit(R1BIO_WriteError, &r1_bio->state),
+			test_bit(R1BIO_MadeGood, &r1_bio->state));
 		close_write(r1_bio);
-		if (test_bit(R1BIO_MadeGood, &r1_bio->state))
+		if (test_bit(R1BIO_MadeGood, &r1_bio->state)) {
 			reschedule_retry(r1_bio);
-		else
+		} else {
+			pr_err("%s4 r1_bio=%pS remaining=%d R1BIO_Returned set=%d R1BIO_Uptodate set=%d R1BIO_WriteError set=%d R1BIO_MadeGood set=%d calling raid_end_bio_io\n",
+				__func__, r1_bio, atomic_read(&r1_bio->remaining),
+				test_bit(R1BIO_Returned, &r1_bio->state),
+				test_bit(R1BIO_Uptodate, &r1_bio->state),
+				test_bit(R1BIO_WriteError, &r1_bio->state),
+				test_bit(R1BIO_MadeGood, &r1_bio->state));
 			raid_end_bio_io(r1_bio);
+		}
 	}
 }
 
@@ -469,7 +509,11 @@ static void raid1_end_write_request(struct bio *bio)
 	sector_t lo = r1_bio->sector;
 	sector_t hi = r1_bio->sector + r1_bio->sectors;
 
-	pr_err("%s bio=%pS (sectors=%d)\n", __func__, bio, bio_sectors(bio));
+	pr_err("%s bio=%pS (sectors=%d) R1BIO_Returned set=%d R1BIO_Uptodate set=%d nr_pending=%d\n",
+		__func__, bio, bio_sectors(bio),
+		test_bit(R1BIO_Returned, &r1_bio->state),
+		test_bit(R1BIO_Uptodate, &r1_bio->state),
+		atomic_read(&rdev->nr_pending));
 	discard_error = bio->bi_status && bio_op(bio) == REQ_OP_DISCARD;
 
 	/*
@@ -523,8 +567,15 @@ static void raid1_end_write_request(struct bio *bio)
 		 * check this here.
 		 */
 		if (test_bit(In_sync, &rdev->flags) &&
-		    !test_bit(Faulty, &rdev->flags))
+		    !test_bit(Faulty, &rdev->flags)) {
+			pr_err("%s2 bio=%pS (sectors=%d) R1BIO_Returned set=%d R1BIO_Uptodate set=%d nr_pending=%d setting R1BIO_Uptodate\n",
+					__func__, bio, bio_sectors(bio),
+					test_bit(R1BIO_Returned, &r1_bio->state),
+					test_bit(R1BIO_Uptodate, &r1_bio->state),
+					atomic_read(&rdev->nr_pending));
 			set_bit(R1BIO_Uptodate, &r1_bio->state);
+		}
+
 
 		/* Maybe we can clear some bad blocks. */
 		if (rdev_has_badblock(rdev, r1_bio->sector, r1_bio->sectors) &&
@@ -552,8 +603,8 @@ static void raid1_end_write_request(struct bio *bio)
 			/* Maybe we can return now */
 			if (!test_and_set_bit(R1BIO_Returned, &r1_bio->state)) {
 				struct bio *mbio = r1_bio->master_bio;
-				pr_debug("raid1: behind end write sectors"
-					 " %llu-%llu\n",
+				pr_err("raid1: behind end write sectors"
+					 " %llu-%llu and calling call_bio_endio\n",
 					 (unsigned long long) mbio->bi_iter.bi_sector,
 					 (unsigned long long) bio_end_sector(mbio) - 1);
 				call_bio_endio(r1_bio);
@@ -568,7 +619,7 @@ static void raid1_end_write_request(struct bio *bio)
 	 * Let's see if all mirrored write operations have finished
 	 * already.
 	 */
-	pr_err("%s1 bio=%pS (sectors=%d) calling r1_bio_write_done\n", __func__, bio, bio_sectors(bio));
+	pr_err("%s8 bio=%pS (sectors=%d) calling r1_bio_write_done\n", __func__, bio, bio_sectors(bio));
 	r1_bio_write_done(r1_bio);
 
 	if (to_put)
@@ -707,7 +758,7 @@ static int choose_slow_rdev(struct r1conf *conf, struct r1bio *r1_bio,
 		    !test_bit(WriteMostly, &rdev->flags) ||
 		    rdev_in_recovery(rdev, r1_bio)) {
 			pr_err("%s2 problem r1_bio=%pS (sectors=%d) *max_sectors=%d disk=%d rdev=%pS Faulty set=%d, trying next\n",
-					__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, rdev, rdev ? test_bit(Faulty, &rdev->flags) : 0);
+					__func__, r1_bio, r1_bio->sectors, *max_sectors, disk, rdev, rdev ? test_bit(Faulty, &rdev->flags) : -1);
 			continue;
 		}
 
@@ -1516,6 +1567,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	bool write_behind = false;
 	bool is_discard = (bio_op(bio) == REQ_OP_DISCARD);
 
+//	bio->bi_status = BLK_STS_TRANSPORT;
+
 	pr_err("%s bio=%pS (sector=%lld, sectors=%d) max_write_sectors=%d (from barrier_unit_end, which is 64MB)\n",
 		__func__, bio, bio->bi_iter.bi_sector, bio_sectors(bio), max_write_sectors);
 
@@ -1567,7 +1620,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	 */
 
 	disks = conf->raid_disks * 2;
-	pr_err("%s1  retry_write: bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS raid_disks=%d\n",
+	pr_err("%s1 retry_write: bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS raid_disks=%d\n",
 		__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, conf->raid_disks);
 	blocked_rdev = NULL;
 	max_sectors = r1_bio->sectors;
@@ -1577,9 +1630,9 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		pr_err("%s2 looping disks bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS i=%d rdev=%pS (desc_nr=%d) nr_pending=%d Faulty=%d WriteErrorSeen=%d\n",
 			__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, i , rdev,
 			rdev ? rdev-> desc_nr : -1,
-			rdev ? atomic_read(&rdev->nr_pending) : 0,
-			rdev ? test_bit(Faulty, &rdev->flags) : 0,
-			rdev ? test_bit(WriteErrorSeen, &rdev->flags) : 0);
+			rdev ? atomic_read(&rdev->nr_pending) : -1,
+			rdev ? test_bit(Faulty, &rdev->flags) : -1,
+			rdev ? test_bit(WriteErrorSeen, &rdev->flags) : -1);
 
 		/*
 		 * The write-behind io is only attempted on drives marked as
@@ -1602,6 +1655,12 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		}
 
 		atomic_inc(&rdev->nr_pending);
+		pr_err("%s2.0 looping disks bio=%pS (sectors=%d) max_write_sectors=%d r1_bio=%pS i=%d rdev=%pS (desc_nr=%d) nr_pending=%d Faulty=%d WriteErrorSeen=%d\n",
+			__func__, bio, bio_sectors(bio), max_write_sectors, r1_bio, i , rdev,
+			rdev ? rdev-> desc_nr : -1,
+			rdev ? atomic_read(&rdev->nr_pending) : -1,
+			rdev ? test_bit(Faulty, &rdev->flags) : -1,
+			rdev ? test_bit(WriteErrorSeen, &rdev->flags) : -1);
 		if (test_bit(WriteErrorSeen, &rdev->flags)) {
 			sector_t first_bad;
 			int bad_sectors;
@@ -1658,7 +1717,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				}
 			}
 		}
-		pr_err("%s2.4.1 setting r1_bio->bios[%d] = bio (=%pS)\n", __func__, i, bio);
+		pr_err("%s2.4.1 setting r1_bio->bios[%d] = bio (=%pS) nr_pending=%d\n", __func__, i, bio, atomic_read(&rdev->nr_pending));
 		r1_bio->bios[i] = bio;
 	}
 
@@ -1703,7 +1762,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		rdev = conf->mirrors[i].rdev;
 		pr_err("%s3.1 rdev=%pS\n", __func__, rdev);
 		pr_err("%s3.2 considering splitting i=%d rdev=%pS nr_pending=%d\n",
-			__func__, i, rdev, rdev ? atomic_read(&rdev->nr_pending) : 0);
+			__func__, i, rdev, rdev ? atomic_read(&rdev->nr_pending) : -1);
 	}
 
 	pr_err("%s4.0 max_sectors=%d write_behind=%d mddev->bitmap=%pS\n",
