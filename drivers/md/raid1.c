@@ -1569,7 +1569,7 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 }
 
 static void raid1_write_request(struct mddev *mddev, struct bio *bio,
-				int max_write_sectors)
+				const int max_write_sectors)
 {
 	struct r1conf *conf = mddev->private;
 	struct r1bio *r1_bio;
@@ -1580,6 +1580,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	int max_sectors;
 	bool write_behind = false;
 	bool is_discard = (bio_op(bio) == REQ_OP_DISCARD);
+	int err;
 
 //	bio->bi_status = BLK_STS_TRANSPORT;
 
@@ -1693,8 +1694,15 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 				break;
 			}
 
-			pr_err("%s2.2 is_bad=%d first_bad=%lld r1_bio->sector=%lld\n",
-				__func__, is_bad, first_bad, r1_bio->sector);
+			pr_err("%s2.2 is_bad=%d first_bad=%lld r1_bio->sector=%lld bad_sectors=%d\n",
+				__func__, is_bad, first_bad, r1_bio->sector, bad_sectors);
+			//bio->bi_opf |= REQ_ATOMIC;
+			if (is_bad && bio->bi_opf & REQ_ATOMIC) {
+				/* We just cannot atomically write this ... */
+				err = -EIO;
+				goto err_handle;
+			}
+
 			if (is_bad && first_bad <= r1_bio->sector) {
 
 				pr_err("%s2.2.1 Cannot write here at all is_bad=%d first_bad=%lld r1_bio->sector=%lld bad_sectors=%d max_sectors=%d\n",
@@ -1804,7 +1812,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		pr_err("%s4.2 split=%pS max_sectors=%d bio_sectors(bio)=%d\n", __func__, split, max_sectors, bio_sectors(bio));
 
 		if (IS_ERR(split)) {
-			goto handle_bio_split_err;
+			err = PTR_ERR(split);
+			goto err_handle;
 		}
 		bio_chain(split, bio);
 		submit_bio_noacct(bio);
@@ -1903,8 +1912,10 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 	wake_up_barrier(conf);
 	pr_err("%s10 out\n", __func__);
 	return;
-handle_bio_split_err:
-	pr_err("%s11 handle_bio_split_err: i=%d disks=%d r1_bio=%pS\n", __func__, i, disks, r1_bio);
+
+
+err_handle:
+	pr_err("%s11 err_handle: i=%d disks=%d r1_bio=%pS\n", __func__, i, disks, r1_bio);
 	for (k = 0; k < i; k++) {
 		if (r1_bio->bios[k]) {
 			pr_err("%s11.0 r1_bio->bios[%d]=%pS\n", __func__, k, r1_bio->bios[k]);
@@ -1937,7 +1948,30 @@ handle_bio_split_err:
 		test_bit(R1BIO_Uptodate, &r1_bio->state),
 		bio->bi_status,
 		bio->bi_end_io);
-	raid_end_bio_io(r1_bio);
+
+	pr_err("%s12 err=%d bio=%pS r1_bio=%pS\n", __func__, err, bio, r1_bio);
+
+
+	pr_err("%s12.0 i=%d disks=%d r1_bio=%pS\n", __func__, i, disks, r1_bio);
+	for (k = 0; k < i; k++) {
+		if (r1_bio->bios[k]) {
+			pr_err("%s12.0 r1_bio->bios[%d]=%pS\n", __func__, k, r1_bio->bios[k]);
+		}
+	}
+
+	for (k = 0;  k < disks; k++) {
+		struct md_rdev *rdev = conf->mirrors[k].rdev;
+		if (rdev)
+			pr_err("%s12.1 k=%d rdev=%pS nr_pending=%d r1_bio->bios[]=%pS\n", __func__, k, rdev, atomic_read(&rdev->nr_pending), r1_bio->bios[k]);
+		else
+			pr_err("%s12.1 k=%d rdev=%pS r1_bio->bios[]=%pS\n", __func__, k, rdev, r1_bio->bios[k]);
+
+	}
+
+	bio->bi_status = errno_to_blk_status(err); 
+	set_bit(R1BIO_Uptodate, &r1_bio->state);
+	call_bio_endio(r1_bio);
+	free_r1bio(r1_bio);
 }
 
 static bool raid1_make_request(struct mddev *mddev, struct bio *bio)

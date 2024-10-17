@@ -1454,6 +1454,9 @@ int submit_bio_wait(struct bio *bio)
 	submit_bio(bio);
 	blk_wait_io(&done);
 
+	if (bio->bi_status)
+		pr_err("%s bio=%pS err=%d\n", __func__, bio, blk_status_to_errno(bio->bi_status));
+
 	return blk_status_to_errno(bio->bi_status);
 }
 EXPORT_SYMBOL(submit_bio_wait);
