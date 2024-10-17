@@ -917,6 +917,8 @@ static inline bool is_rdev_broken(struct md_rdev *rdev)
 static inline void rdev_dec_pending(struct md_rdev *rdev, struct mddev *mddev)
 {
 	int faulty = test_bit(Faulty, &rdev->flags);
+	pr_err_once("%s rdev=%pS nr_pending=%d and going to dec\n", __func__,
+		rdev, atomic_read(&rdev->nr_pending));
 	if (atomic_dec_and_test(&rdev->nr_pending) && faulty) {
 		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 		md_wakeup_thread(mddev->thread);
