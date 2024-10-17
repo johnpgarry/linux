@@ -242,8 +242,10 @@ static void put_all_bios(struct r1conf *conf, struct r1bio *r1_bio)
 
 	for (i = 0; i < conf->raid_disks * 2; i++) {
 		struct bio **bio = r1_bio->bios + i;
-		if (!BIO_SPECIAL(*bio))
+		if (!BIO_SPECIAL(*bio)) {
+			pr_err("%s calling bio_put *bio=%pS i=%d\n", __func__, *bio, i);
 			bio_put(*bio);
+		}
 		*bio = NULL;
 	}
 }
@@ -252,7 +254,9 @@ static void free_r1bio(struct r1bio *r1_bio)
 {
 	struct r1conf *conf = r1_bio->mddev->private;
 
+	pr_err("%s calling put_all_bios r1_bio=%pS\n", __func__, r1_bio);
 	put_all_bios(conf, r1_bio);
+	pr_err("%s1 calling mempool_free r1_bio=%pS\n", __func__, r1_bio);
 	mempool_free(r1_bio, &conf->r1bio_pool);
 }
 
@@ -317,6 +321,11 @@ static void call_bio_endio(struct r1bio *r1_bio)
 		bio->bi_status = BLK_STS_IOERR;
 	}
 
+	pr_err("%s3 r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Returned set=%d R1BIO_Uptodate set=%d bio->bi_status=%d calling bio_endio\n",
+			__func__, r1_bio, bio, bio_sectors(bio),
+			test_bit(R1BIO_Returned, &r1_bio->state),
+			test_bit(R1BIO_Uptodate, &r1_bio->state),
+			bio->bi_status);
 	bio_endio(bio);
 }
 
@@ -1521,6 +1530,7 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 			__func__, split, bio, bio_sectors(bio), r1_bio, max_sectors, rdisk);
 		if (IS_ERR(split)) {
 			raid_end_bio_io(r1_bio);
+			BUG();
 			return;
 		}
 		bio_chain(split, bio);
@@ -1573,8 +1583,8 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 
 //	bio->bi_status = BLK_STS_TRANSPORT;
 
-	pr_err("%s bio=%pS (sector=%lld, sectors=%d) max_write_sectors=%d (from barrier_unit_end, which is 64MB)\n",
-		__func__, bio, bio->bi_iter.bi_sector, bio_sectors(bio), max_write_sectors);
+	pr_err("%s bio=%pS (sector=%lld, sectors=%d, bi_pool=%pS) max_write_sectors=%d (from barrier_unit_end, which is 64MB)\n",
+		__func__, bio, bio->bi_iter.bi_sector, bio_sectors(bio), bio->bi_pool, max_write_sectors);
 
 	if (mddev_is_clustered(mddev) &&
 	     md_cluster_ops->area_resyncing(mddev, WRITE,
@@ -1784,12 +1794,15 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		max_sectors = min_t(int, max_sectors,
 				    BIO_MAX_VECS * (PAGE_SIZE >> 9));
 	}
-	pr_err("%s4.1 considering splitting max_sectors=%d bio_sectors(bio)=%d\n", __func__, max_sectors, bio_sectors(bio));
+	pr_err("%s4.1 consider splitting max_sectors=%d bio_sectors(bio)=%d\n", __func__, max_sectors, bio_sectors(bio));
+	//hack
+	bio->bi_opf |= REQ_ATOMIC;
 	if (max_sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, max_sectors,
 					      GFP_NOIO, &conf->bio_split);
 
 		pr_err("%s4.2 split=%pS max_sectors=%d bio_sectors(bio)=%d\n", __func__, split, max_sectors, bio_sectors(bio));
+
 		if (IS_ERR(split)) {
 			goto handle_bio_split_err;
 		}
@@ -1894,9 +1907,37 @@ handle_bio_split_err:
 	pr_err("%s11 handle_bio_split_err: i=%d disks=%d r1_bio=%pS\n", __func__, i, disks, r1_bio);
 	for (k = 0; k < i; k++) {
 		if (r1_bio->bios[k]) {
-			pr_err("%s11.0 calling rdev_dec_pending rdev=%pS\n", __func__, r1_bio->bios[k]);
+			pr_err("%s11.0 r1_bio->bios[%d]=%pS\n", __func__, k, r1_bio->bios[k]);
 		}
 	}
+
+	for (k = 0;  k < disks; k++) {
+		struct md_rdev *rdev = conf->mirrors[k].rdev;
+		if (rdev)
+			pr_err("%s11.1 k=%d rdev=%pS nr_pending=%d r1_bio->bios[]=%pS\n", __func__, k, rdev, atomic_read(&rdev->nr_pending), r1_bio->bios[k]);
+		else
+			pr_err("%s11.1 k=%d rdev=%pS r1_bio->bios[]=%pS\n", __func__, k, rdev, r1_bio->bios[k]);
+
+	}
+
+	for (k = 0; k < i; k++) {
+		if (r1_bio->bios[k]) {
+			pr_err("%s11.2 r1_bio->bios[%d]=%pS calling rdev_dec_pending for rdev=%pS pending=%d\n",
+				__func__, k, r1_bio->bios[k], conf->mirrors[k].rdev, atomic_read(&conf->mirrors[k].rdev->nr_pending));
+			rdev_dec_pending(conf->mirrors[k].rdev, mddev);
+			pr_err("%s11.2.1 r1_bio->bios[%d]=%pS called rdev_dec_pending for rdev=%pS pending=%d\n",
+				__func__, k, r1_bio->bios[k], conf->mirrors[k].rdev, atomic_read(&conf->mirrors[k].rdev->nr_pending));
+			r1_bio->bios[k] = NULL;
+		}
+	}
+
+	pr_err("%s11.3 r1_bio=%pS bio=%pS (sectors=%d) R1BIO_Returned set=%d R1BIO_Uptodate set=%d bio->bi_status=%d bi_end_io=%pS calling raid_end_bio_io\n",
+		__func__, r1_bio, bio, bio_sectors(bio),
+		test_bit(R1BIO_Returned, &r1_bio->state),
+		test_bit(R1BIO_Uptodate, &r1_bio->state),
+		bio->bi_status,
+		bio->bi_end_io);
+	raid_end_bio_io(r1_bio);
 }
 
 static bool raid1_make_request(struct mddev *mddev, struct bio *bio)
