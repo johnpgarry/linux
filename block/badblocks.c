@@ -501,12 +501,12 @@ static int prev_badblocks(struct badblocks *bb, struct badblocks_context *bad,
 
 	/* The following bisect search might be unnecessary */
 	if (BB_OFFSET(p[lo]) > s) {
-          pr_err("%s1 BB_OFFSET(p[lo]) > s\n", __func__);
+          pr_err_once("%s1 BB_OFFSET(p[lo]) > s\n", __func__);
 		return -1;
      }
 	if (BB_OFFSET(p[hi - 1]) <= s) {
 
-          pr_err("%s2 p[hi - 1]) <= s return hi(%d) - 1, BB_OFFSET(p[hi - 1])=%lld BB_LEN=%lld\n",
+          pr_err_once("%s2 p[hi - 1]) <= s return hi(%d) - 1, BB_OFFSET(p[hi - 1])=%lld BB_LEN=%lld\n",
                __func__, hi, BB_OFFSET(p[hi - 1]),
                BB_LEN(p[hi - 1]));
 		return hi - 1;
@@ -517,7 +517,7 @@ static int prev_badblocks(struct badblocks *bb, struct badblocks_context *bad,
 		int mid = (lo + hi)/2;
 		sector_t a = BB_OFFSET(p[mid]);
 
-          pr_err("%s3 a=%lld BB_LEN(x)=%lld\n", __func__, a, BB_LEN(p[mid]));
+          pr_err_once("%s3 a=%lld BB_LEN(x)=%lld\n", __func__, a, BB_LEN(p[mid]));
 
 		if (a == s) {
 			ret = mid;
@@ -1292,7 +1292,7 @@ static int _badblocks_check(struct badblocks *bb, sector_t s, int sectors,
 
 	WARN_ON(bb->shift < 0 || sectors == 0);
 
-     pr_err("%s s=%lld sectors=%d bb->count=%d\n", __func__, s, sectors, bb->count);
+     pr_err_once("%s s=%lld sectors=%d bb->count=%d\n", __func__, s, sectors, bb->count);
 
 	if (bb->shift > 0) {
 		sector_t target;
@@ -1304,35 +1304,35 @@ static int _badblocks_check(struct badblocks *bb, sector_t s, int sectors,
 		sectors = target - s;
 	}
 
-     pr_err("%s1 s=%lld sectors=%d bb->count=%d\n", __func__, s, sectors, bb->count);
+     pr_err_once("%s1 s=%lld sectors=%d bb->count=%d\n", __func__, s, sectors, bb->count);
 retry:
 	seq = read_seqbegin(&bb->lock);
 
 	p = bb->page;
 	unacked_badblocks = 0;
 	acked_badblocks = 0;
-     pr_err("%s1.1 retry: s=%lld sectors=%d bb->count=%d\n", __func__, s, sectors, bb->count);
+     pr_err_once("%s1.1 retry: s=%lld sectors=%d bb->count=%d\n", __func__, s, sectors, bb->count);
 
 re_check:
 	bad.start = s;
 	bad.len = sectors;
-     pr_err("%s2.1 re_check: s=%lld sectors=%d bb->count=%d hint=%d\n", __func__, s, sectors, bb->count, hint);
+     pr_err_once("%s2.1 re_check: s=%lld sectors=%d bb->count=%d hint=%d\n", __func__, s, sectors, bb->count, hint);
 
 	if (badblocks_empty(bb)) {
-          pr_err("%s2.1 badblocks_empty\n", __func__);
+          pr_err_once("%s2.1 badblocks_empty\n", __func__);
 		len = sectors;
 		goto update_sectors;
 	}
 
 	prev = prev_badblocks(bb, &bad, hint);
-     pr_err("%s2.1 bad.start=%lld, len=%lld, ack=%d prev=%d\n", __func__,
+     pr_err_once("%s2.1 bad.start=%lld, len=%lld, ack=%d prev=%d\n", __func__,
           bad.start, bad.len, bad.ack, prev);
 
 	/* start after all badblocks */
 	if ((prev >= 0) &&
 	    ((prev + 1) >= bb->count) && !overlap_front(bb, prev, &bad)) {
 		len = sectors;
-          pr_err("%s2.1.1 start after all badblocks bad.start=%lld, len=%lld, ack=%d prev=%d\n", __func__,
+          pr_err_once("%s2.1.1 start after all badblocks bad.start=%lld, len=%lld, ack=%d prev=%d\n", __func__,
                bad.start, bad.len, bad.ack, prev);
 		goto update_sectors;
 	}
@@ -1340,7 +1340,7 @@ re_check:
 	/* Overlapped with front badblocks record */
 	if ((prev >= 0) && overlap_front(bb, prev, &bad)) {
 
-          pr_err("%s2.1.2 Overlapped with front bad.start=%lld, len=%lld, ack=%d\n", __func__,
+          pr_err_once("%s2.1.2 Overlapped with front bad.start=%lld, len=%lld, ack=%d\n", __func__,
                bad.start, bad.len, bad.ack);
 		if (BB_ACK(p[prev]))
 			acked_badblocks++;
@@ -1362,7 +1362,7 @@ re_check:
 
 	/* Not front overlap, but behind overlap */
 	if ((prev + 1) < bb->count && overlap_behind(bb, &bad, prev + 1)) {
-          pr_err("%s2.1.3 behind overlap bad.start=%lld, len=%lld, ack=%d\n", __func__,
+          pr_err_once("%s2.1.3 behind overlap bad.start=%lld, len=%lld, ack=%d\n", __func__,
                bad.start, bad.len, bad.ack);
 		len = BB_OFFSET(p[prev + 1]) - bad.start;
 		hint = prev + 1;
@@ -1376,7 +1376,7 @@ update_sectors:
 	s += len;
 	sectors -= len;
 
-     pr_err("%s2.1.4 update_sectors: behind overlap s=%lld, len=%d, sectors=%d unacked_badblocks=%d acked_badblocks=%d\n", __func__,
+     pr_err_once("%s2.1.4 update_sectors: behind overlap s=%lld, len=%d, sectors=%d unacked_badblocks=%d acked_badblocks=%d\n", __func__,
           s, len, sectors, unacked_badblocks, acked_badblocks);
 
 	if (sectors > 0)
@@ -1394,7 +1394,7 @@ update_sectors:
 	if (read_seqretry(&bb->lock, seq))
 		goto retry;
 
-     pr_err("%s10 rv=%d\n", __func__,
+     pr_err_once("%s10 rv=%d\n", __func__,
           rv);
 
 	return rv;
