@@ -713,23 +713,36 @@ static int choose_bb_rdev(struct r1conf *conf, struct r1bio *r1_bio,
 	int best_len = 0;
 	int disk;
 
+	pr_err("%s\n", __func__);
+
 	for (disk = 0 ; disk < conf->raid_disks * 2 ; disk++) {
 		struct md_rdev *rdev;
 		int len;
 		int read_len;
 
+		pr_err("%s1 disk=%d best_disk=%d\n", __func__, disk, best_disk);
 		if (r1_bio->bios[disk] == IO_BLOCKED)
 			continue;
 
+		pr_err("%s2 disk=%d best_disk=%d rdev=%pS\n", __func__, disk, best_disk, rdev);
 		rdev = conf->mirrors[disk].rdev;
 		if (!rdev || test_bit(Faulty, &rdev->flags) ||
 		    rdev_in_recovery(rdev, r1_bio) ||
-		    test_bit(WriteMostly, &rdev->flags))
+		    test_bit(WriteMostly, &rdev->flags)) {
+		    if (rdev)
+				pr_err("%s3 continue as Faulty=%d or inrecovery=%d or writemostly=%d disk=%d best_disk=%d\n",
+					__func__, 
+					test_bit(Faulty, &rdev->flags),
+					rdev_in_recovery(rdev, r1_bio),
+			   		test_bit(WriteMostly, &rdev->flags),
+			   		disk, best_disk);
 			continue;
+		}
 
 		/* keep track of the disk with the most readable sectors. */
 		len = r1_bio->sectors;
 		read_len = raid1_check_read_range(rdev, this_sector, &len);
+		pr_err("%s4 disk=%d best_disk=%d read_len=%d len=%d after raid1_check_read_range\n", __func__, disk, best_disk, read_len, len);
 		if (read_len > best_len) {
 			best_disk = disk;
 			best_len = read_len;
@@ -741,6 +754,8 @@ static int choose_bb_rdev(struct r1conf *conf, struct r1bio *r1_bio,
 		update_read_sectors(conf, best_disk, this_sector, best_len);
 	}
 
+
+	pr_err("%s10 best_disk=%d\n", __func__, best_disk);
 	return best_disk;
 }
 
@@ -1454,6 +1469,7 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 	int max_sectors;
 	int rdisk;
 	bool r1bio_existed = !!r1_bio;
+	int err;
 
 
 	pr_err("%s bio=%pS (sector=%lld, sectors=%d) max_read_sectors=%d (from barrier_unit_end, which is 64MB)\n",
@@ -1523,15 +1539,19 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 		__func__, bio, bio_sectors(bio), r1_bio, max_sectors, rdisk);
 
 	if (max_sectors < bio_sectors(bio)) {
-		struct bio *split = bio_split(bio, max_sectors,
+		struct bio *split;
+
+		// hack
+		bio->bi_opf |= REQ_ATOMIC;
+		split = bio_split(bio, max_sectors,
 					      gfp, &conf->bio_split);
 
 		pr_err("%s2.6 split=%pS bio=%pS (sectors=%d) r1_bio=%pS max_sectors=%d rdisk=%d\n",
 			__func__, split, bio, bio_sectors(bio), r1_bio, max_sectors, rdisk);
+
 		if (IS_ERR(split)) {
-			raid_end_bio_io(r1_bio);
-			BUG();
-			return;
+			err = PTR_ERR(split);
+			goto err_handle;
 		}
 		bio_chain(split, bio);
 		submit_bio_noacct(bio);
@@ -1566,6 +1586,13 @@ static void raid1_read_request(struct mddev *mddev, struct bio *bio,
 		__func__, bio, bio_sectors(bio), r1_bio, max_read_sectors, rdisk,
 		read_bio, bio_sectors(read_bio));
 	submit_bio_noacct(read_bio);
+	return;
+
+err_handle:
+	pr_err("%s11 err_handle: err=%d bio=%pS r1_bio=%pS\n", __func__, err, bio, r1_bio);
+	bio->bi_status = errno_to_blk_status(err); 
+	set_bit(R1BIO_Uptodate, &r1_bio->state);
+	raid_end_bio_io(r1_bio);
 }
 
 static void raid1_write_request(struct mddev *mddev, struct bio *bio,
@@ -1970,8 +1997,7 @@ err_handle:
 
 	bio->bi_status = errno_to_blk_status(err); 
 	set_bit(R1BIO_Uptodate, &r1_bio->state);
-	call_bio_endio(r1_bio);
-	free_r1bio(r1_bio);
+	raid_end_bio_io(r1_bio);
 }
 
 static bool raid1_make_request(struct mddev *mddev, struct bio *bio)
