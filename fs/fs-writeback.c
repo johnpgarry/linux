@@ -2008,10 +2008,19 @@ static long __writeback_inodes_wb(struct bdi_writeback *wb,
 {
 	unsigned long start_time = jiffies;
 	long wrote = 0;
+	int loop_count = 0;
+	unsigned long timeout = jiffies + msecs_to_jiffies(15000);
+	bool printed = false;
 
 	while (!list_empty(&wb->b_io)) {
 		struct inode *inode = wb_inode(wb->b_io.prev);
 		struct super_block *sb = inode->i_sb;
+		loop_count++;
+		if (time_after(jiffies, timeout) && (printed == false)) {
+			pr_err("%s loop_count=%d\n", __func__, loop_count);
+			WARN_ON(1);
+			printed = true;
+		}
 
 		if (!super_trylock_shared(sb)) {
 			/*
@@ -2307,10 +2316,16 @@ void wb_workfn(struct work_struct *work)
 						struct bdi_writeback, dwork);
 	long pages_written;
 
+
+
 	set_worker_desc("flush-%s", bdi_dev_name(wb->bdi));
 
 	if (likely(!current_is_workqueue_rescuer() ||
 		   !test_bit(WB_registered, &wb->state))) {
+		int loop_count = 0;
+		unsigned long timeout = jiffies + msecs_to_jiffies(15000);
+		bool printed = false;
+
 		/*
 		 * The normal path.  Keep writing back @wb until its
 		 * work_list is empty.  Note that this path is also taken
@@ -2320,6 +2335,12 @@ void wb_workfn(struct work_struct *work)
 		do {
 			pages_written = wb_do_writeback(wb);
 			trace_writeback_pages_written(pages_written);
+			loop_count++;
+			if (time_after(jiffies, timeout) && (printed == false)) {
+				pr_err("%s loop_count=%d pages_written=%ld\n", __func__, loop_count, pages_written);
+				WARN_ON(1);
+				printed = true;
+			}
 		} while (!list_empty(&wb->work_list));
 	} else {
 		/*
