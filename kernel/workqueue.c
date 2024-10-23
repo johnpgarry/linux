@@ -3111,6 +3111,21 @@ static bool manage_workers(struct worker *worker)
 	return true;
 }
 
+struct workqueue_timedout_struct {
+	struct timer_list timer;
+	void *current_func;
+};
+
+static void workqueue_timedout(struct timer_list *t)
+{
+	struct workqueue_timedout_struct *_workqueue_timedout;
+	pr_err("%s t=%pS\n", __func__, t);
+	_workqueue_timedout = from_timer(_workqueue_timedout, t, timer);
+	pr_err("%s2 _workqueue_timedout=%pS\n", __func__, _workqueue_timedout);
+	pr_err("%s3 current_func=%pS\n", __func__, _workqueue_timedout->current_func);
+	WARN_ON_ONCE(1);
+}
+
 /**
  * process_one_work - process single work
  * @worker: self
@@ -3134,6 +3149,8 @@ __acquires(&pool->lock)
 	unsigned long work_data;
 	int lockdep_start_depth, rcu_start_depth;
 	bool bh_draining = pool->flags & POOL_BH_DRAINING;
+	struct workqueue_timedout_struct _workqueue_timedout;
+	struct timer_list *timer = &_workqueue_timedout.timer;
 #ifdef CONFIG_LOCKDEP
 	/*
 	 * It is permissible to free the struct work_struct from
@@ -3226,7 +3243,19 @@ __acquires(&pool->lock)
 	 */
 	lockdep_invariant_state(true);
 	trace_workqueue_execute_start(work);
+	#define WORKQUEUE_J_TIMEOUT	(10 * HZ)
+	
+	timer_setup(timer, workqueue_timedout, 0);
+	timer->expires = jiffies + WORKQUEUE_J_TIMEOUT;
+	pr_err_once("%s calling add_timer current_func=%pS work=%pS\n", __func__, worker->current_func, work);
+	add_timer(timer);
+	pr_err_once("%s2 calling current_func=%pS\n", __func__, worker->current_func);
+	_workqueue_timedout.current_func = worker->current_func;
 	worker->current_func(work);
+	
+	pr_err_once("%s3 calling del_timer_sync work=%pS current_func=%pS\n", __func__, work, worker->current_func);
+	del_timer_sync(timer);
+	
 	/*
 	 * While we must be careful to not use "work" after this, the trace
 	 * point will only record its address.
