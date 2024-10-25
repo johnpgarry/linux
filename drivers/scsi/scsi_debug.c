@@ -133,7 +133,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_HOST_LOCK 0
 #define DEF_LBPU 0
 #define DEF_LBPWS 0
-#define DEF_LBPWS10 0
+#define DEF_LBPWS10 1
 #define DEF_LBPRZ 1
 #define DEF_LOWEST_ALIGNED 0
 #define DEF_NDELAY   0		/* if > 0 unit is a nanosecond */
@@ -150,7 +150,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_SECTOR_SIZE 512
 #define DEF_UNMAP_ALIGNMENT 0
 #define DEF_UNMAP_GRANULARITY 1
-#define DEF_UNMAP_MAX_BLOCKS 0xFFFFFFFF
+#define DEF_UNMAP_MAX_BLOCKS 256
 #define DEF_UNMAP_MAX_DESC 256
 #define DEF_VIRTUAL_GB   0
 #define DEF_VPD_USE_HOSTNO 1
