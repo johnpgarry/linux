@@ -125,6 +125,8 @@ static int blk_ioctl_discard(struct block_device *bdev, blk_mode_t mode,
 	struct blk_plug plug;
 	int err;
 
+	pr_err("%s bdev=%pS\n", __func__, bdev);
+
 	if (copy_from_user(range, (void __user *)arg, sizeof(range)))
 		return -EFAULT;
 	start = range[0];
@@ -163,8 +165,10 @@ static int blk_ioctl_discard(struct block_device *bdev, blk_mode_t mode,
 			break;
 		prev = bio_chain_and_submit(prev, bio);
 	}
+	pr_err("%s2 bdev=%pS prev=%pS err=%d\n", __func__, bdev, prev, err);
 	if (prev) {
 		err = submit_bio_wait(prev);
+		pr_err("%s3 after submit_bio_wait bdev=%pS prev=%pS err=%d\n", __func__, bdev, prev, err);
 		if (err == -EOPNOTSUPP)
 			err = 0;
 		bio_put(prev);
