@@ -313,8 +313,20 @@ static struct bio *__bio_chain_endio(struct bio *bio)
 {
 	struct bio *parent = bio->bi_private;
 
-	if (bio->bi_status && !parent->bi_status)
+	
+	if (unlikely((bio_op(bio) == REQ_OP_DISCARD))) {
+			pr_err("%s parent=%pS (bi_status=%d) bio=%pS (bi_status=%d)\n",
+			__func__, parent, parent->bi_status, bio, bio->bi_status);
+	}
+
+	if (bio->bi_status && !parent->bi_status) {
+		if (unlikely((bio_op(bio) == REQ_OP_DISCARD))) {
+
+			pr_err("%s2 error parent=%pS (bi_status=%d) bio=%pS (bi_status=%d)\n",
+				__func__, parent, parent->bi_status, bio, bio->bi_status);
+		}
 		parent->bi_status = bio->bi_status;
+	}
 	bio_put(bio);
 	return parent;
 }

@@ -113,6 +113,11 @@ static struct bio *bio_submit_split(struct bio *bio, int split_sectors)
 		return NULL;
 	}
 
+
+	if (unlikely((bio_op(bio) == REQ_OP_DISCARD)))
+		pr_err("%s split_sectors=%d bio=%pS (sector=%lld, sectors=%d, bi_private=%pS) REQ_OP_DISCARD\n",
+			__func__, split_sectors, bio, bio->bi_iter.bi_sector, bio_sectors(bio), bio->bi_private);
+
 	if (split_sectors) {
 		struct bio *split;
 
