@@ -580,7 +580,7 @@ static int blk_rq_map_user_bvec(struct request *rq, const struct iov_iter *iter)
 	if (bio == NULL)
 		return -ENOMEM;
 
-	bio_iov_bvec_set(bio, (struct iov_iter *)iter);
+	bio_iov_bvec_set(bio, iter);
 	blk_rq_bio_prep(rq, bio, nr_segs);
 
 	/* loop to perform a bunch of sanity checks */
