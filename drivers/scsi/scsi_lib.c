@@ -33,6 +33,7 @@
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport.h> /* scsi_init_limits() */
+#include <scsi/scsi_multipath.h>
 #include <scsi/scsi_dh.h>
 
 #include <trace/events/scsi.h>
@@ -627,6 +628,14 @@ static void scsi_run_queue_async(struct scsi_device *sdev)
 	}
 }
 
+static inline void __scsi_mpath_end_request(struct request *req,
+    blk_status_t status)
+{
+	if (req->cmd_flags & REQ_SCSI_MPATH)
+		scsi_mpath_end_request(req);
+	blk_mq_end_request(req, status);
+}
+
 /* Returns false when no more bytes to process, true if there are more */
 static bool scsi_end_request(struct request *req, blk_status_t error,
 		unsigned int bytes)
@@ -667,6 +676,9 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	 * from being cleaned up during running queue.
 	 */
 	percpu_ref_get(&q->q_usage_counter);
+
+	if (req->cmd_flags & REQ_SCSI_MPATH)
+		scsi_mpath_end_request(req);
 
 	__blk_mq_end_request(req, error);
 
@@ -1549,6 +1561,9 @@ static void scsi_complete(struct request *rq)
 	case ADD_TO_MLQUEUE:
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 		break;
+	case FAILOVER:
+		scsi_mpath_failover_req(rq);
+		break;
 	default:
 		scsi_eh_scmd_add(cmd);
 		break;
@@ -1860,6 +1875,9 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	scsi_set_resid(cmd, 0);
 	memset(cmd->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
 	cmd->submitter = SUBMITTED_BY_BLOCK_LAYER;
+
+	if (req->cmd_flags & REQ_SCSI_MPATH)
+		scsi_mpath_start_request(req);
 
 	blk_mq_start_request(req);
 	reason = scsi_dispatch_cmd(cmd);
@@ -2832,6 +2850,9 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
+	if (scsi_mpath_enabled(sdev))
+		scsi_mpath_clear_current_path(sdev);
+
 	if (scsi_device_set_state(sdev, SDEV_BLOCK))
 		return scsi_device_set_state(sdev, SDEV_CREATED_BLOCK);
 
@@ -2947,6 +2968,10 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 	default:
 		return -EINVAL;
 	}
+
+	/* For multipath device set the path live */
+	if (scsi_mpath_enabled(sdev))
+		scsi_mpath_set_live(sdev);
 
 	/*
 	 * Try to transition the scsi device to SDEV_RUNNING or one of the
