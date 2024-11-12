@@ -125,7 +125,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_ZBC_DEV_SIZE_MB   128
 #define DEF_DIF 0
 #define DEF_DIX 0
-#define DEF_PER_HOST_STORE false
+#define DEF_PER_HOST_STORE true
 #define DEF_D_SENSE   0
 #define DEF_EVERY_NTH   0
 #define DEF_FAKE_RW	0
