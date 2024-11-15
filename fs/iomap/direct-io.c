@@ -239,31 +239,46 @@ release_bio:
 }
 EXPORT_SYMBOL_GPL(iomap_dio_bio_end_io);
 
-static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
-		loff_t pos, unsigned len)
+static int iomap_dio_zero_page(const struct iomap_iter *iter,
+		struct iomap_dio *dio, loff_t pos, unsigned len)
 {
 	struct inode *inode = file_inode(dio->iocb->ki_filp);
 	struct bio *bio;
 
 	if (!len)
 		return 0;
-	/*
-	 * Max block size supported is 64k
-	 */
-	if (WARN_ON_ONCE(len > IOMAP_ZERO_PAGE_SIZE))
-		return -EINVAL;
 
-	bio = iomap_dio_alloc_bio(iter, dio, 1, REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
+	bio = iomap_dio_alloc_bio(iter, dio, 1,
+			REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
 	fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
 				  GFP_KERNEL);
 	bio->bi_iter.bi_sector = iomap_sector(&iter->iomap, pos);
 	bio->bi_private = dio;
 	bio->bi_end_io = iomap_dio_bio_end_io;
 
-	__bio_add_page(bio, zero_page, len, 0);
 	iomap_dio_submit_bio(iter, dio, bio, pos);
 	return 0;
 }
+
+static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
+		loff_t pos, unsigned len)
+{
+	int i = DIV_ROUND_UP(len, IOMAP_ZERO_PAGE_SIZE);
+	unsigned remaining = len;
+	int ret;
+
+	for (i = 0; i < DIV_ROUND_UP(len, IOMAP_ZERO_PAGE_SIZE); i++) {
+		ret = iomap_dio_zero_page(iter, dio, pos,
+			min(remaining, IOMAP_ZERO_PAGE_SIZE));
+		if (ret)
+			return ret;
+		pos += IOMAP_ZERO_PAGE_SIZE;
+		remaining -= IOMAP_ZERO_PAGE_SIZE;
+	}
+
+	return 0;
+}
+
 
 /*
  * Figure out the bio's operation flags from the dio request, the
