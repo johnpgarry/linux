@@ -78,6 +78,10 @@ struct vm_fault;
 #define IOMAP_F_SIZE_CHANGED	(1U << 8)
 #define IOMAP_F_STALE		(1U << 9)
 
+/* Zero the mapping */
+#define IOMAP_F_ZERO		(1U << 10)
+#define IOMAP_F_SKIP		(1U << 11)
+
 /*
  * Flags from 0x1000 up are for file system specific usage:
  */
@@ -359,6 +363,7 @@ int iomap_writepages(struct address_space *mapping,
  */
 #define IOMAP_DIO_UNWRITTEN	(1 << 0)	/* covers unwritten extent(s) */
 #define IOMAP_DIO_COW		(1 << 1)	/* covers COW extent(s) */
+#define IOMAP_DIO_ZERO		(1 << 2)	/* zero the mappings */
 
 struct iomap_dio_ops {
 	int (*end_io)(struct kiocb *iocb, ssize_t size, int error,

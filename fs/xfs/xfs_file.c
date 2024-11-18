@@ -475,6 +475,9 @@ xfs_dio_write_end_io(
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
+	pr_err("%s iocb=%pS size=%zd error=%d flags=%d IOMAP_DIO_UNWRITTEN set=%d\n",
+		__func__, iocb, size, error, flags,
+		!!(flags & IOMAP_DIO_UNWRITTEN));
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
@@ -588,6 +591,84 @@ out_unlock:
 		xfs_iunlock(ip, iolock);
 	return ret;
 }
+static noinline ssize_t
+xfs_file_dio_write_atomic(
+	struct xfs_inode	*ip,
+	struct kiocb		*iocb,
+	struct iov_iter		*from)
+{
+	size_t			isize = i_size_read(VFS_I(ip));
+	size_t			count = iov_iter_count(from);
+	unsigned int		iolock = XFS_IOLOCK_SHARED;
+	unsigned int		flags = 0;
+	ssize_t			ret;
+
+	pr_err("%s ki_pos=%lld count=%zd\n", __func__, iocb->ki_pos, count);
+
+	/*
+	 * Extending writes need exclusivity because of the sub-block zeroing
+	 * that the DIO code always does for partial tail blocks beyond EOF, so
+	 * don't even bother trying the fast path in this case.
+	 */
+	if (iocb->ki_pos > isize || iocb->ki_pos + count >= isize) {
+		if (iocb->ki_flags & IOCB_NOWAIT)
+			return -EAGAIN;
+retry:
+		pr_err("%s1 retry: ki_pos=%lld count=%zd\n", __func__, iocb->ki_pos, count);
+		flags = IOMAP_DIO_FORCE_WAIT;
+	}
+
+	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
+	if (ret)
+		return ret;
+
+	/*
+	 * We can't properly handle unaligned direct I/O to reflink files yet,
+	 * as we can't unshare a partial block.
+	 */
+	if (xfs_is_cow_inode(ip)) {
+		trace_xfs_reflink_bounce_dio_write(iocb, from);
+		ret = -ENOTBLK;
+		goto out_unlock;
+	}
+
+	ret = xfs_file_write_checks(iocb, from, &iolock);
+	if (ret)
+		goto out_unlock;
+
+	/*
+	 * If we are doing exclusive unaligned I/O, this must be the only I/O
+	 * in-flight.  Otherwise we risk data corruption due to unwritten extent
+	 * conversions from the AIO end_io handler.  Wait for all other I/O to
+	 * drain first.
+	 */
+	if (flags & IOMAP_DIO_FORCE_WAIT)
+		inode_dio_wait(VFS_I(ip));
+
+	trace_xfs_file_direct_write(iocb, from);
+	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
+			   &xfs_dio_write_ops, flags, NULL, 0);
+	pr_err("%s2 ret=%zd after iomap_dio_rw\n", __func__, ret);
+
+	/*
+	 * Retry unaligned I/O with exclusive blocking semantics if the DIO
+	 * layer rejected it for mapping or locking reasons. If we are doing
+	 * nonblocking user I/O, propagate the error.
+	 */
+	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT)) {
+		ASSERT(flags & IOMAP_DIO_OVERWRITE_ONLY);
+		xfs_iunlock(ip, iolock);
+		pr_err("%s3 ret=%zd goto retry\n", __func__, ret);
+		goto retry;
+	}
+
+out_unlock:
+	if (iolock)
+		xfs_iunlock(ip, iolock);
+	pr_err("%s10 ret=%zd\n", __func__, ret);
+	return ret;
+}
+
 
 /*
  * Handle block unaligned direct I/O writes
@@ -687,12 +768,15 @@ xfs_file_dio_write(
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+	bool atomic = iocb->ki_flags & IOCB_ATOMIC;
 
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
 	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
+	if (atomic)
+		return xfs_file_dio_write_atomic(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
 

@@ -122,6 +122,11 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 
 	inode_dio_end(file_inode(iocb->ki_filp));
 
+	if (dio->flags & IOMAP_DIO_ZERO) {
+		pr_err("%s3 IOMAP_DIO_ZERO set, returning EAGAIN iocb->ki_pos=%lld ret=%zd\n", __func__, iocb->ki_pos, ret);
+		return -EAGAIN;
+	}
+
 	if (ret > 0) {
 		iocb->ki_pos += ret;
 
@@ -245,6 +250,7 @@ static int iomap_dio_zero_page(const struct iomap_iter *iter,
 	struct inode *inode = file_inode(dio->iocb->ki_filp);
 	struct bio *bio;
 
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
 	if (!len)
 		return 0;
 
@@ -255,7 +261,9 @@ static int iomap_dio_zero_page(const struct iomap_iter *iter,
 	bio->bi_iter.bi_sector = iomap_sector(&iter->iomap, pos);
 	bio->bi_private = dio;
 	bio->bi_end_io = iomap_dio_bio_end_io;
-
+	__bio_add_page(bio, zero_page, len, 0);
+	pr_err("%s2 pos=%lld len=%d bi_sector=%lld, bi_size=%d\n",
+		__func__, pos, len, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	iomap_dio_submit_bio(iter, dio, bio, pos);
 	return 0;
 }
@@ -267,6 +275,7 @@ static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 	unsigned remaining = len;
 	int ret;
 
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
 	for (i = 0; i < DIV_ROUND_UP(len, IOMAP_ZERO_PAGE_SIZE); i++) {
 		ret = iomap_dio_zero_page(iter, dio, pos,
 			min(remaining, IOMAP_ZERO_PAGE_SIZE));
@@ -321,8 +330,17 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
-	if (atomic && length != fs_block_size)
-		return -EINVAL;
+	pr_err("%s pos=%lld length=%lld iomap->type=%d (HOLE=%d, DELALLOC=%d, MAPPED=%d, UNWRITTEN=%d), flags=0x%x (NEW=%d, DIRTY=%d, ZERO=%d, SKIP=%d)\n",
+		__func__, pos, length, iomap->type,
+		IOMAP_HOLE, IOMAP_DELALLOC, IOMAP_MAPPED, IOMAP_UNWRITTEN,
+		 iomap->flags,
+		 !!(iomap->flags & IOMAP_F_NEW),
+		 !!(iomap->flags & IOMAP_F_DIRTY),
+		 !!(iomap->flags & IOMAP_F_ZERO),
+		 !!(iomap->flags & IOMAP_F_SKIP));
+
+	pr_err("%s0 iomap->addr=%lld, offset=%lld, length=%lld\n",
+		__func__, iomap->addr, iomap->offset, iomap->length);
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -333,8 +351,28 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		need_zeroout = true;
 	}
 
+
 	if (iomap->flags & IOMAP_F_SHARED)
 		dio->flags |= IOMAP_DIO_COW;
+
+	if (iomap->flags & IOMAP_F_SKIP) {
+		WARN_ON_ONCE(iomap->type != IOMAP_MAPPED);
+		WARN_ON_ONCE(iomap->flags & IOMAP_F_ZERO);
+		dio->size += length;
+		pr_err("%s1 IOMAP_F_SKIP pos=%lld length=%lld\n", __func__, pos, length);
+		return length;
+	}
+
+	if (iomap->flags & IOMAP_F_ZERO) {
+		WARN_ON_ONCE(iomap->type != IOMAP_UNWRITTEN);
+		iomap_dio_zero(iter, dio, pos, length);
+
+		dio->flags |= IOMAP_DIO_ZERO;
+		dio->size += length;
+		pr_err("%s2 IOMAP_F_ZERO pos=%lld length=%lld\n", __func__, pos, length);
+
+		return length;
+	}
 
 	if (iomap->flags & IOMAP_F_NEW) {
 		need_zeroout = true;
@@ -628,6 +666,8 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (iocb->ki_flags & IOCB_ATOMIC)
 		iomi.flags |= IOMAP_ATOMIC;
 
+	pr_err("%s pos=%lld len=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));
+
 	if (iov_iter_rw(iter) == READ) {
 		/* reads can always complete inline */
 		dio->flags |= IOMAP_DIO_INLINE_COMP;
@@ -803,12 +843,17 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		unsigned int dio_flags, void *private, size_t done_before)
 {
 	struct iomap_dio *dio;
+	ssize_t ret;
 
+	pr_err("%s ki_pos=%lld iov_iter_count(iter)=%zd\n", __func__, iocb->ki_pos, iov_iter_count(iter));
 	dio = __iomap_dio_rw(iocb, iter, ops, dops, dio_flags, private,
 			     done_before);
+	pr_err("%s1 dio=%pS from __iomap_dio_rw iov_iter_count(iter)=%zd\n", __func__, dio, iov_iter_count(iter));
 	if (IS_ERR_OR_NULL(dio))
 		return PTR_ERR_OR_ZERO(dio);
-	return iomap_dio_complete(dio);
+	ret = iomap_dio_complete(dio);
+	pr_err("%s2 dio=%pS ret=%zd from iomap_dio_complete iov_iter_count(iter)=%zd\n", __func__, dio, ret, iov_iter_count(iter));
+	return ret;
 }
 EXPORT_SYMBOL_GPL(iomap_dio_rw);
 
