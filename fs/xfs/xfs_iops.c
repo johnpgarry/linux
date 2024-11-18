@@ -581,7 +581,8 @@ xfs_get_atomic_write_attr(
 		return;
 	}
 
-	*unit_min = *unit_max = ip->i_mount->m_sb.sb_blocksize;
+	*unit_min = ip->i_mount->m_sb.sb_blocksize;
+	*unit_max = xfs_inode_alloc_unitsize(ip);
 }
 
 STATIC int
