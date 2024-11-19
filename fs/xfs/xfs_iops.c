@@ -570,6 +570,26 @@ xfs_stat_blksize(
 	return max_t(uint32_t, PAGE_SIZE, mp->m_sb.sb_blocksize);
 }
 
+static unsigned int
+xfs_inode_atomic_write_max(struct xfs_inode *ip)
+{
+	unsigned int alloc_unitsize = xfs_inode_alloc_unitsize(ip);
+	unsigned int atomic_write_max;
+
+	if (is_power_of_2(alloc_unitsize))
+		return alloc_unitsize;
+
+	/* Find highest power-of-2 evenly divisible into 
+	alloc_unitsize */
+	atomic_write_max = ip->i_mount->m_sb.sb_blocksize;
+	while (1) {
+		if (alloc_unitsize % (atomic_write_max * 2))
+			break;
+		atomic_write_max *= 2;
+	}
+	return atomic_write_max;
+}
+
 void
 xfs_get_atomic_write_attr(
 	struct xfs_inode	*ip,
@@ -582,7 +602,7 @@ xfs_get_atomic_write_attr(
 	}
 
 	*unit_min = ip->i_mount->m_sb.sb_blocksize;
-	*unit_max = xfs_inode_alloc_unitsize(ip);
+	*unit_max = xfs_inode_atomic_write_max(ip);
 }
 
 STATIC int

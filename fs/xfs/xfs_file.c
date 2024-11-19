@@ -907,10 +907,20 @@ xfs_file_write_iter(
 		return xfs_file_dax_write(iocb, from);
 
 	if (iocb->ki_flags & IOCB_ATOMIC) {
-		unsigned int unit_min, unit_max;
+		__maybe_unused unsigned int unit_min, unit_max;
+		unsigned int alloc_unitsize = xfs_inode_alloc_unitsize(ip);
 
-		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
-		if (ocount < unit_min || ocount > unit_max)
+		pr_err_once("%s 24 per 12=%d\n", __func__, 24 % 12);
+		pr_err_once("%s 12 per 24=%d\n", __func__, 12 % 24);
+		if (ocount < ip->i_mount->m_sb.sb_blocksize)
+			return -EINVAL;
+
+		/*
+		 * generic_atomic_write_valid() checks if the length is a 
+		 * power-of-2, so just check to ensure that we are divisible
+		 * into alloc_unitsize.
+		 */
+		if (alloc_unitsize % ocount)
 			return -EINVAL;
 
 		ret = generic_atomic_write_valid(iocb, from);
