@@ -913,9 +913,9 @@ relock:
 			__func__, atomic, imap_spans_range(&imap, offset_fsb, end_fsb),
 			imap.br_state, XFS_EXT_UNWRITTEN);
 		if (imap.br_state == XFS_EXT_UNWRITTEN) {
-			iomap_flags |= IOMAP_F_ZERO;
+	//		iomap_flags |= IOMAP_F_ZERO;
 		} else {
-			iomap_flags |= IOMAP_F_SKIP;
+	//		iomap_flags |= IOMAP_F_SKIP;
 		}
 	}
 

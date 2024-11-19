@@ -321,6 +321,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	unsigned int fs_block_size = i_blocksize(inode), pad;
 	const loff_t length = iomap_length(iter);
 	bool atomic = iter->flags & IOMAP_ATOMIC;
+	const size_t orig_len = iter->len;
 	loff_t pos = iter->pos;
 	blk_opf_t bio_opf;
 	struct bio *bio;
@@ -330,17 +331,21 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
-	pr_err("%s pos=%lld length=%lld iomap->type=%d (HOLE=%d, DELALLOC=%d, MAPPED=%d, UNWRITTEN=%d), flags=0x%x (NEW=%d, DIRTY=%d, ZERO=%d, SKIP=%d)\n",
+	pr_err("%s pos=%lld length=%lld iomap->type=%d (HOLE=%d, DELALLOC=%d, MAPPED=%d, UNWRITTEN=%d), flags=0x%x (NEW=%d, DIRTY=%d)\n",
 		__func__, pos, length, iomap->type,
 		IOMAP_HOLE, IOMAP_DELALLOC, IOMAP_MAPPED, IOMAP_UNWRITTEN,
 		 iomap->flags,
 		 !!(iomap->flags & IOMAP_F_NEW),
-		 !!(iomap->flags & IOMAP_F_DIRTY),
-		 !!(iomap->flags & IOMAP_F_ZERO),
-		 !!(iomap->flags & IOMAP_F_SKIP));
+		 !!(iomap->flags & IOMAP_F_DIRTY));
 
 	pr_err("%s0 iomap->addr=%lld, offset=%lld, length=%lld\n",
 		__func__, iomap->addr, iomap->offset, iomap->length);
+	pr_err("%s0.1 dio->flags=%d (DIO_WRITE=%d, DIRTY=%d) orig_len=%zd\n",
+		__func__,
+		dio->flags,
+		!!(dio->flags & IOMAP_DIO_WRITE),
+		!!(dio->flags & IOMAP_DIO_DIRTY),
+		orig_len);
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -351,26 +356,26 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		need_zeroout = true;
 	}
 
-
 	if (iomap->flags & IOMAP_F_SHARED)
 		dio->flags |= IOMAP_DIO_COW;
 
-	if (iomap->flags & IOMAP_F_SKIP) {
-		WARN_ON_ONCE(iomap->type != IOMAP_MAPPED);
-		WARN_ON_ONCE(iomap->flags & IOMAP_F_ZERO);
-		dio->size += length;
-		pr_err("%s1 IOMAP_F_SKIP pos=%lld length=%lld\n", __func__, pos, length);
-		return length;
+	if (atomic && length != orig_len) {
+		pr_err("%s1 setting IOMAP_DIO_ZERO\n", __func__);
+		dio->flags |= IOMAP_DIO_ZERO;
 	}
 
-	if (iomap->flags & IOMAP_F_ZERO) {
-		WARN_ON_ONCE(iomap->type != IOMAP_UNWRITTEN);
-		iomap_dio_zero(iter, dio, pos, length);
-
-		dio->flags |= IOMAP_DIO_ZERO;
+	if (dio->flags & IOMAP_DIO_ZERO) {
 		dio->size += length;
-		pr_err("%s2 IOMAP_F_ZERO pos=%lld length=%lld\n", __func__, pos, length);
+		
+		pr_err("%s2 IOMAP_DIO_ZERO set pos=%lld length=%lld\n", __func__, pos, length);
+		if (iomap->type == IOMAP_UNWRITTEN) {
+			pr_err("%s2.1 IOMAP_UNWRITTEN calling iomap_dio_zero pos=%lld length=%lld\n", __func__, pos, length);
+			iomap_dio_zero(iter, dio, pos, length);
+			return length;
+		}
 
+		WARN_ON_ONCE(iomap->type != IOMAP_MAPPED);
+		pr_err("%s2.3 IOMAP_MAPPED pos=%lld length=%lld\n", __func__, pos, length);
 		return length;
 	}
 
@@ -527,9 +532,12 @@ out:
 static loff_t iomap_dio_hole_iter(const struct iomap_iter *iter,
 		struct iomap_dio *dio)
 {
-	loff_t length = iov_iter_zero(iomap_length(iter), dio->submit.iter);
+	loff_t length;
 
+	pr_err("%s calling iov_iter_zero iomap_length=%lld\n", __func__, iomap_length(iter));
+	length = iov_iter_zero(iomap_length(iter), dio->submit.iter);
 	dio->size += length;
+	pr_err("%s2 length=%lld dio->size=%lld\n", __func__, length, dio->size);
 	if (!length)
 		return -EFAULT;
 	return length;

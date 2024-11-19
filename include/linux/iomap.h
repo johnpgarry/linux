@@ -78,9 +78,6 @@ struct vm_fault;
 #define IOMAP_F_SIZE_CHANGED	(1U << 8)
 #define IOMAP_F_STALE		(1U << 9)
 
-/* Zero the mapping */
-#define IOMAP_F_ZERO		(1U << 10)
-#define IOMAP_F_SKIP		(1U << 11)
 
 /*
  * Flags from 0x1000 up are for file system specific usage:
