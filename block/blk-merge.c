@@ -873,8 +873,10 @@ static struct request *attempt_merge(struct request_queue *q,
 			return NULL;
 	}
 
-	if (req->ioprio != next->ioprio)
+	if (req->ioprio != next->ioprio) {
+		pr_err("%s req->ioprio=%d next->ioprio=%d\n", __func__, req->ioprio, next->ioprio);
 		return NULL;
+	}
 
 	if (!blk_atomic_write_mergeable_rqs(req, next))
 		return NULL;
@@ -1009,8 +1011,10 @@ bool blk_rq_merge_ok(struct request *rq, struct bio *bio)
 			return false;
 	}
 
-	if (rq->ioprio != bio_prio(bio))
+	if (rq->ioprio != bio_prio(bio)) {
+		pr_err("%s rq->ioprio=%d bio_prio=%d\n", __func__, rq->ioprio, bio_prio(bio));
 		return false;
+	}
 
 	if (blk_atomic_write_mergeable_rq_bio(rq, bio) == false)
 		return false;
