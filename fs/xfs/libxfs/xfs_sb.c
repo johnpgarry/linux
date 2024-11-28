@@ -1155,6 +1155,8 @@ xfs_sb_mount_rextsize(
 		rgs->blklog = 0;
 		rgs->blkmask = (uint64_t)-1;
 	}
+
+	xfs_rt_awu_update(mp);
 }
 
 /* Update incore sb rt extent size, then recompute the cached rt geometry. */
