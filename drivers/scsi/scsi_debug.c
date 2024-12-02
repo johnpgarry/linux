@@ -6470,6 +6470,7 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 		sdev_printk(KERN_INFO, sdp, "%s: non-zero result=0x%x\n",
 			    __func__, cmnd->result);
 
+	pr_err_ratelimited("%s delta_jiff=%d ndelay=%d ns_from_boot=%lld\n", __func__, delta_jiff, ndelay, ns_from_boot);
 	if (delta_jiff > 0 || ndelay > 0) {
 		ktime_t kt;
 
@@ -6515,6 +6516,7 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 			ASSIGN_QUEUED_CMD(cmnd, sqcp);
 			WRITE_ONCE(sd_dp->defer_t, SDEB_DEFER_HRT);
 			hrtimer_start(&sd_dp->hrt, kt, HRTIMER_MODE_REL_PINNED);
+			pr_err_ratelimited("%s1 SDEB_DEFER_HRT\n", __func__);
 			/*
 			 * The completion handler will try to grab sqcp->lock,
 			 * so there is no chance that the completion handler
