@@ -614,6 +614,8 @@ static struct pgpath *__map_bio(struct multipath *m, struct bio *bio)
 	struct pgpath *pgpath;
 	unsigned long flags;
 
+
+	pr_err("%s bio=%pS\n", __func__, bio);
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))

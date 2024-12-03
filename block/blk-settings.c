@@ -160,6 +160,7 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 
 	unit_limit = rounddown_pow_of_two(unit_limit);
 
+	pr_err("%s lim=%pS\n", __func__, lim);
 	lim->atomic_write_max_sectors =
 		min(lim->atomic_write_hw_max >> SECTOR_SHIFT,
 			lim->max_hw_sectors);
@@ -225,6 +226,7 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 			goto unsupported;
 	}
 
+	pr_err("%s9 calling blk_atomic_writes_update_limits lim=%pS\n", __func__, lim);
 	blk_atomic_writes_update_limits(lim);
 	return;
 
@@ -382,6 +384,7 @@ int blk_validate_limits(struct queue_limits *lim)
 	if (!(lim->features & BLK_FEAT_WRITE_CACHE))
 		lim->features &= ~BLK_FEAT_FUA;
 
+	pr_err("%s9 calling blk_validate_atomic_write_limits lim=%pS\n", __func__, lim);
 	blk_validate_atomic_write_limits(lim);
 
 	err = blk_validate_integrity_limits(lim);
@@ -506,16 +509,22 @@ static bool blk_stack_atomic_writes_tail(struct queue_limits *t,
 				struct queue_limits *b)
 {
 	/* We're not going to support different boundary sizes.. yet */
-	if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary)
+	if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary) {
+		pr_err("%s atomic_write_hw_boundary ERROR\n", __func__);
 		return false;
+	}
 
 	/* Can't support this */
-	if (t->atomic_write_hw_unit_min > b->atomic_write_hw_unit_max)
+	if (t->atomic_write_hw_unit_min > b->atomic_write_hw_unit_max) {
+		pr_err("%s atomic_write_hw_unit_min ERROR\n", __func__);
 		return false;
+	}
 
 	/* Or this */
-	if (t->atomic_write_hw_unit_max < b->atomic_write_hw_unit_min)
+	if (t->atomic_write_hw_unit_max < b->atomic_write_hw_unit_min) {
+		pr_err("%s atomic_write_hw_unit_max > atomic_write_hw_unit_min ERROR\n", __func__);
 		return false;
+	}
 
 	t->atomic_write_hw_max = min(t->atomic_write_hw_max,
 				b->atomic_write_hw_max);
@@ -535,11 +544,16 @@ static bool blk_stack_atomic_writes_boundary_head(struct queue_limits *t,
 	 * devices store chunk sectors in t->io_min.
 	 */
 	if (b->atomic_write_hw_boundary > t->io_min &&
-	    b->atomic_write_hw_boundary % t->io_min)
+	    b->atomic_write_hw_boundary % t->io_min) {
+		
+		pr_err("%s b->atomic_write_hw_boundary ERROR\n", __func__);
 		return false;
+	}
 	if (t->io_min > b->atomic_write_hw_boundary &&
-	    t->io_min % b->atomic_write_hw_boundary)
+	    t->io_min % b->atomic_write_hw_boundary) {
+		pr_err("%s  t->io_min ERROR\n", __func__);
 		return false;
+	}
 
 	t->atomic_write_hw_boundary = b->atomic_write_hw_boundary;
 	return true;
@@ -551,8 +565,10 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 				struct queue_limits *b)
 {
 	if (b->atomic_write_hw_boundary &&
-	    !blk_stack_atomic_writes_boundary_head(t, b))
+	    !blk_stack_atomic_writes_boundary_head(t, b)) {
+		pr_err("%s blk_stack_atomic_writes_boundary_head ERROR\n", __func__);
 		return false;
+	}
 
 	if (t->io_min <= SECTOR_SIZE) {
 		/* No chunk sectors, so use bottom device values directly */
@@ -586,27 +602,46 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 				struct queue_limits *b)
 {
-	if (!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED))
+	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d)\n",
+		__func__,
+		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
+		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max);
+
+	if (!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED)) {
+		pr_err("%s t=%pS !BLK_FEAT_ATOMIC_WRITES_STACKED b=%pS ERROR\n", __func__,
+			t, b);
 		goto unsupported;
+	}
 
 	if (!b->atomic_write_hw_unit_min) {
+		pr_err("%s b=%pS !b->atomic_write_unit_min atomic_write_hw_unit_min=%d ERROR\n", __func__, b, b->atomic_write_hw_unit_min);
 		goto unsupported;
+	}
 
 	/*
 	 * If atomic_write_hw_max is set, we have already stacked 1x bottom
 	 * device, so check for compliance.
 	 */
 	if (t->atomic_write_hw_max) {
-		if (!blk_stack_atomic_writes_tail(t, b))
+		if (!blk_stack_atomic_writes_tail(t, b)) {
+			pr_err("%s t=%pS !blk_stack_atomic_writes_tail b=%pS ERROR\n", __func__, t, b);
 			goto unsupported;
+		}
 		return;
 	}
 
-	if (!blk_stack_atomic_writes_head(t, b))
+	if (!blk_stack_atomic_writes_head(t, b)) {
+		pr_err("%s t=%pS !blk_stack_atomic_writes_head b=%pS ERROR\n", __func__, t, b);
 		goto unsupported;
+	}
 	return;
 
 unsupported:
+	pr_err("%s10 unsupported: t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_max=%d/%d)\n",
+		__func__,
+		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
+		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max);
+
 	t->atomic_write_hw_max = 0;
 	t->atomic_write_hw_unit_max = 0;
 	t->atomic_write_hw_unit_min = 0;
@@ -639,6 +674,11 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		     sector_t start)
 {
 	unsigned int top, bottom, alignment, ret = 0;
+
+	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d)\n",
+		__func__,
+		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
+		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max);
 
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
 

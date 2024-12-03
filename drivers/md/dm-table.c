@@ -425,12 +425,15 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 	struct block_device *bdev = dev->bdev;
 	struct request_queue *q = bdev_get_queue(bdev);
 
+
 	if (unlikely(!q)) {
 		DMWARN("%s: Cannot set limits for nonexistent device %pg",
 		       dm_device_name(ti->table->md), bdev);
 		return 0;
 	}
 
+	pr_err("%s start=%lld len=%lld limits=%pS bdev=%pS q=%pS (limits=%pS) calling blk_stack_limits \n",
+		__func__, start, len, limits, bdev, q, &q->limits);
 	if (blk_stack_limits(limits, &q->limits,
 			get_start_sect(bdev) + start) < 0)
 		DMWARN("%s: adding target device %pg caused an alignment inconsistency: "
@@ -441,6 +444,9 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		       q->limits.logical_block_size,
 		       q->limits.alignment_offset,
 		       (unsigned long long) start << SECTOR_SHIFT);
+
+	pr_err("%s2 start=%lld len=%lld limits=%pS bdev=%pS q=%pS (limits=%pS) called blk_stack_limits \n",
+		__func__, start, len, limits, bdev, q, &q->limits);
 
 	/*
 	 * Only stack the integrity profile if the target doesn't have native
@@ -598,7 +604,7 @@ int dm_split_args(int *argc, char ***argvp, char *input)
 static void dm_set_stacking_limits(struct queue_limits *limits)
 {
 	blk_set_stacking_limits(limits);
-	limits->features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
+	limits->features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL | BLK_FEAT_ATOMIC_WRITES_STACKED;
 }
 
 /*
@@ -1594,6 +1600,8 @@ int dm_calculate_queue_limits(struct dm_table *t,
 	unsigned int zone_sectors = 0;
 	bool zoned = false;
 
+	pr_err("%s t=%pS limits=%pS calling dm_set_stacking_limits ti_limits=%pS\n", __func__, t, limits, &ti_limits);
+
 	dm_set_stacking_limits(limits);
 
 	t->integrity_supported = true;
@@ -1607,6 +1615,7 @@ int dm_calculate_queue_limits(struct dm_table *t,
 	for (unsigned int i = 0; i < t->num_targets; i++) {
 		struct dm_target *ti = dm_table_get_target(t, i);
 
+		pr_err("%s2 t=%pS limits=%pS calling dm_set_stacking_limits ti_limits=%pS i=%d t->num_targets=%d\n", __func__, t, limits, &ti_limits, i, t->num_targets);
 		dm_set_stacking_limits(&ti_limits);
 
 		if (!ti->type->iterate_devices) {
@@ -1619,6 +1628,7 @@ int dm_calculate_queue_limits(struct dm_table *t,
 		/*
 		 * Combine queue limits of all the devices this target uses.
 		 */
+		pr_err("%s2.1 t=%pS limits=%pS calling dm_set_stacking_limits ti_limits=%pS iterate_devices for dm_set_device_limits\n", __func__, t, limits, &ti_limits);
 		ti->type->iterate_devices(ti, dm_set_device_limits,
 					  &ti_limits);
 
@@ -1648,12 +1658,20 @@ combine_limits:
 		 * Merge this target's queue limits into the overall limits
 		 * for the table.
 		 */
+		pr_err("%s2.3 combine_limits: calling blk_stack_limits t=limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d)\n",
+			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & BLK_FEAT_ATOMIC_WRITES_STACKED));
+		pr_err("%s2.3.1 combine_limits: calling blk_stack_limits b=ti_limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d)\n",
+			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES_STACKED));
 		if (blk_stack_limits(limits, &ti_limits, 0) < 0)
 			DMWARN("%s: adding target device (start sect %llu len %llu) "
 			       "caused an alignment inconsistency",
 			       dm_device_name(t->md),
 			       (unsigned long long) ti->begin,
 			       (unsigned long long) ti->len);
+		pr_err("%s2.4 combine_limits: called blk_stack_limits t=limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d)\n",
+			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & BLK_FEAT_ATOMIC_WRITES_STACKED));
+		pr_err("%s2.4.1 combine_limits: called blk_stack_limits b=ti_limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d)\n",
+			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES_STACKED));
 
 		if (t->integrity_supported ||
 		    dm_target_has_integrity(ti->type)) {

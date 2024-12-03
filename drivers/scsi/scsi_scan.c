@@ -345,6 +345,8 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	kref_get(&sdev->host->tagset_refcnt);
 	sdev->request_queue = q;
 
+	pr_err("%s q=%pS limits=%pS\n", __func__, q, &q->limits);
+
 	depth = sdev->host->cmd_per_lun ?: 1;
 
 	/*

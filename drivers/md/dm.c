@@ -1937,8 +1937,15 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 	struct dm_io *io;
 	blk_status_t error = BLK_STS_OK;
 	bool is_abnormal, need_split;
+	static int jjcount;
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
+
+	jjcount++;
+
 
 	is_abnormal = is_abnormal_io(bio);
+	if (jjcount < 100 || atomic)
+		pr_err("%s bio=%pS md=%pS is_abnormal=%d\n", __func__, bio, md, is_abnormal);
 	if (static_branch_unlikely(&zoned_enabled)) {
 		/* Special case REQ_OP_ZONE_RESET_ALL as it cannot be split. */
 		need_split = (bio_op(bio) != REQ_OP_ZONE_RESET_ALL) &&
@@ -1948,6 +1955,7 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 	}
 
 	if (unlikely(need_split)) {
+		BUG_ON(atomic);
 		/*
 		 * Use bio_split_to_limits() for abnormal IO (e.g. discard, etc)
 		 * otherwise associated queue_limits won't be imposed.
@@ -2028,6 +2036,15 @@ static void dm_submit_bio(struct bio *bio)
 	struct mapped_device *md = bio->bi_bdev->bd_disk->private_data;
 	int srcu_idx;
 	struct dm_table *map;
+	static int jjcount;
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
+
+	jjcount++;
+
+	if (jjcount < 100 || atomic)
+		pr_err("%s bio=%pS md=%pS bi_bdev=%pS bi_sector=%lld bi_size=%d\n",
+			__func__, bio, md, bio->bi_bdev, bio->bi_iter.bi_sector,
+			bio->bi_iter.bi_size);
 
 	map = dm_get_live_table(md, &srcu_idx);
 	if (unlikely(!map)) {
@@ -2537,10 +2554,13 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 	struct table_device *td;
 	int r;
 
+	pr_err("%s md=%pS &limits=%pS type=%d DM_TYPE_REQUEST_BASED=%d md->disk->fops=%pS\n",
+		__func__, md, &limits, type, DM_TYPE_REQUEST_BASED, md->disk->fops);
 	WARN_ON_ONCE(type == DM_TYPE_NONE);
 
 	if (type == DM_TYPE_REQUEST_BASED) {
 		md->disk->fops = &dm_rq_blk_dops;
+		pr_err("%s2 calling dm_mq_init_request_queue md=%pS &limits=%pS type=%d DM_TYPE_REQUEST_BASED=%d\n", __func__, md, &limits, type, DM_TYPE_REQUEST_BASED);
 		r = dm_mq_init_request_queue(md, t);
 		if (r) {
 			DMERR("Cannot initialize queue for request-based dm mapped device");
@@ -2548,6 +2568,8 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 		}
 	}
 
+	pr_err("%s3 calling dm_calculate_queue_limits md=%pS &limits=%pS type=%d DM_TYPE_REQUEST_BASED=%d md->disk->fops=%pS\n",
+		__func__, md, &limits, type, DM_TYPE_REQUEST_BASED, md->disk->fops);
 	r = dm_calculate_queue_limits(t, &limits);
 	if (r) {
 		DMERR("Cannot calculate initial queue limits");
