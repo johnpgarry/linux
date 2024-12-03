@@ -767,8 +767,13 @@ void submit_bio_noacct(struct bio *bio)
 	struct block_device *bdev = bio->bi_bdev;
 	struct request_queue *q = bdev_get_queue(bdev);
 	blk_status_t status = BLK_STS_IOERR;
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
 
 	might_sleep();
+
+	if (atomic)
+		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d atomic=%d bdev=%pS\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, atomic, bdev);
 
 	/*
 	 * For a REQ_NOWAIT based request, return -EOPNOTSUPP

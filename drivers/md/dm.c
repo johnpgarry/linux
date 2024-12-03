@@ -1731,10 +1731,19 @@ static blk_status_t __split_and_process_bio(struct clone_info *ci)
 	struct bio *clone;
 	struct dm_target *ti;
 	unsigned int len;
+	bool atomic = ci->bio->bi_opf & REQ_ATOMIC;
+
+	if (atomic)
+		pr_err("%s ci=%pS sector=%lld sector_count=%d bio=%pS (bi_sector=%lld, bi_size=%d)\n",
+			__func__, ci, ci->sector, ci->sector_count,
+			ci->bio, ci->bio->bi_iter.bi_sector, ci->bio->bi_iter.bi_size);
 
 	ti = dm_table_find_target(ci->map, ci->sector);
 	if (unlikely(!ti))
 		return BLK_STS_IOERR;
+	if (atomic)
+		pr_err("%s2 ci=%pS sector=%lld sector_count=%d bio=%pS ti=%pS (begin=%lld, len=%lld)\n",
+			__func__, ci, ci->sector, ci->sector_count, ci->bio, ti, ti->begin, ti->len);
 
 	if (unlikely(ci->is_abnormal_io))
 		return __process_abnormal_io(ci, ti);
@@ -1769,6 +1778,8 @@ static blk_status_t __split_and_process_bio(struct clone_info *ci)
 static void init_clone_info(struct clone_info *ci, struct dm_io *io,
 			    struct dm_table *map, struct bio *bio, bool is_abnormal)
 {
+	bool atomic = bio->bi_opf & REQ_ATOMIC;
+
 	ci->map = map;
 	ci->io = io;
 	ci->bio = bio;
@@ -1776,6 +1787,11 @@ static void init_clone_info(struct clone_info *ci, struct dm_io *io,
 	ci->submit_as_polled = false;
 	ci->sector = bio->bi_iter.bi_sector;
 	ci->sector_count = bio_sectors(bio);
+
+	if (atomic)
+		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d ci=%pS sector=%lld sector_count=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			ci, ci->sector, ci->sector_count);
 
 	/* Shouldn't happen but sector_count was being set to 0 so... */
 	if (static_branch_unlikely(&zoned_enabled) &&
@@ -1945,7 +1961,9 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 
 	is_abnormal = is_abnormal_io(bio);
 	if (jjcount < 100 || atomic)
-		pr_err("%s bio=%pS md=%pS is_abnormal=%d\n", __func__, bio, md, is_abnormal);
+		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic);
 	if (static_branch_unlikely(&zoned_enabled)) {
 		/* Special case REQ_OP_ZONE_RESET_ALL as it cannot be split. */
 		need_split = (bio_op(bio) != REQ_OP_ZONE_RESET_ALL) &&
@@ -1954,6 +1972,10 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		need_split = is_abnormal;
 	}
 
+	if (jjcount < 100 || atomic)
+		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic, need_split);
 	if (unlikely(need_split)) {
 		BUG_ON(atomic);
 		/*
@@ -1964,6 +1986,15 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		 * boundaries.
 		 */
 		bio = bio_split_to_limits(bio);
+		if (jjcount < 100 || atomic) {
+			if (bio)
+				pr_err("%s2 after bio_split_to_limits bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d\n",
+					__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+					md, is_abnormal, atomic);
+			else
+				pr_err("%s2 after bio_split_to_limits bio=%pS md=%pS is_abnormal=%d atomic=%d\n",
+					__func__, bio, md, is_abnormal, atomic);
+		}
 		if (!bio)
 			return;
 	}
@@ -1986,6 +2017,11 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 	} else {
 		io = alloc_io(md, bio, GFP_NOIO);
 	}
+
+	if (jjcount < 100 || atomic)
+		pr_err("%s3 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic, need_split, io);
 	init_clone_info(&ci, io, map, bio, is_abnormal);
 
 	if (bio->bi_opf & REQ_PREFLUSH) {
@@ -2042,9 +2078,9 @@ static void dm_submit_bio(struct bio *bio)
 	jjcount++;
 
 	if (jjcount < 100 || atomic)
-		pr_err("%s bio=%pS md=%pS bi_bdev=%pS bi_sector=%lld bi_size=%d\n",
+		pr_err("%s bio=%pS md=%pS bi_bdev=%pS bi_sector=%lld bi_size=%d atomic=%d\n",
 			__func__, bio, md, bio->bi_bdev, bio->bi_iter.bi_sector,
-			bio->bi_iter.bi_size);
+			bio->bi_iter.bi_size, atomic);
 
 	map = dm_get_live_table(md, &srcu_idx);
 	if (unlikely(!map)) {
