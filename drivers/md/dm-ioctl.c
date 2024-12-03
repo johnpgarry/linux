@@ -1487,6 +1487,8 @@ static int populate_table(struct dm_table *table,
 		/* Add 1 for NUL terminator */
 		min_size = (size_t)(nul_terminator - (const char *)spec) + 1;
 
+		pr_err("%s i=%d calling dm_table_add_target spec->sector_start=%lld, length=%lld\n",
+			__func__, i, spec->sector_start, spec->length);
 		r = dm_table_add_target(table, spec->target_type,
 					(sector_t) spec->sector_start,
 					(sector_t) spec->length,
@@ -1523,12 +1525,14 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 	if (!md)
 		return -ENXIO;
 
+	pr_err("%s calling dm_table_create\n", __func__);
 	r = dm_table_create(&t, get_mode(param), param->target_count, md);
 	if (r)
 		goto err;
 
 	/* Protect md->type and md->queue against concurrent table loads. */
 	dm_lock_md_type(md);
+	pr_err("%s1 calling populate_table\n", __func__);
 	r = populate_table(t, param, param_size);
 	if (r)
 		goto err_unlock_md_type;
@@ -2293,12 +2297,14 @@ int __init dm_early_create(struct dm_ioctl *dmi,
 		goto err_destroy_dm;
 
 	/* alloc table */
+	pr_err("%s calling dm_table_create\n", __func__);
 	r = dm_table_create(&t, get_mode(dmi), dmi->target_count, md);
 	if (r)
 		goto err_hash_remove;
 
 	/* add targets */
 	for (i = 0; i < dmi->target_count; i++) {
+		pr_err("%s2 i=%d calling dm_table_add_target\n", __func__, i);
 		r = dm_table_add_target(t, spec_array[i]->target_type,
 					(sector_t) spec_array[i]->sector_start,
 					(sector_t) spec_array[i]->length,

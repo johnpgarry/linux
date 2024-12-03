@@ -7846,6 +7846,7 @@ static int __init scsi_debug_init(void)
 	if (sdebug_dev_size_mb < 1)
 		sdebug_dev_size_mb = 1;  /* force minimum 1 MB ramdisk */
 	sz = (unsigned long)sdebug_dev_size_mb * 1048576;
+	sz += 1024 * 256;
 	sdebug_store_sectors = sz / sdebug_sector_size;
 	sdebug_capacity = get_sdebug_capacity();
 
@@ -8027,6 +8028,8 @@ static int sdebug_add_store(void)
 	unsigned long sz = (unsigned long)sdebug_dev_size_mb * 1048576;
 	struct sdeb_store_info *sip = NULL;
 	struct xa_limit xal = { .max = 1 << 16, .min = 0 };
+
+	sz += 256 * 1024;
 
 	sip = kzalloc(sizeof(*sip), GFP_KERNEL);
 	if (!sip)

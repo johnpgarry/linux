@@ -1301,9 +1301,10 @@ static blk_status_t sd_setup_atomic_cmnd(struct scsi_cmnd *cmd,
 					sector_t lba, unsigned int nr_blocks,
 					bool boundary, unsigned char flags)
 {
-	WARN_ON_ONCE(1);
-	pr_err("%s lba=%lld nr_blocks=%d device=%pS\n",
-	__func__, lba, nr_blocks, cmd->device);
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	//WARN_ON_ONCE(1);
+	pr_err("%s lba=%lld nr_blocks=%d device=%pS rq->bio=%pS\n",
+	__func__, lba, nr_blocks, cmd->device, rq->bio);
 	cmd->cmd_len  = 16;
 	cmd->cmnd[0]  = WRITE_ATOMIC_16;
 	cmd->cmnd[1]  = flags;

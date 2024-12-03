@@ -810,6 +810,9 @@ static void accounted_complete(struct cache *cache, struct bio *bio)
 static void accounted_request(struct cache *cache, struct bio *bio)
 {
 	accounted_begin(cache, bio);
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d)\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	dm_submit_bio_remap(bio, NULL);
 }
 
@@ -1728,6 +1731,10 @@ static bool process_bio(struct cache *cache, struct bio *bio)
 {
 	bool commit_needed;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d)\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
+	
 	if (map_bio(cache, bio, get_bio_block(cache, bio), &commit_needed) == DM_MAPIO_REMAPPED)
 		dm_submit_bio_remap(bio, NULL);
 

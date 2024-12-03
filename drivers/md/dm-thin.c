@@ -754,6 +754,9 @@ static void issue(struct thin_c *tc, struct bio *bio)
 	struct pool *pool = tc->pool;
 
 	if (!bio_triggers_commit(tc, bio)) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d) calling dm_submit_bio_remap\n",
+				__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 		dm_submit_bio_remap(bio, NULL);
 		return;
 	}

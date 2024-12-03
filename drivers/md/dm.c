@@ -1374,8 +1374,17 @@ void dm_submit_bio_remap(struct bio *clone, struct bio *tgt_clone)
 	struct dm_io *io = tio->io;
 
 	/* establish bio that will get submitted */
-	if (!tgt_clone)
+	if (!tgt_clone) {
+		if (clone->bi_opf & REQ_ATOMIC)
+			pr_err("%s after clone_to_tio clone=%pS (bi_sector=%lld, bi_size=%d) tgt_clone=NULL\n",
+				__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size);
 		tgt_clone = clone;
+	} else {
+		if (clone->bi_opf & REQ_ATOMIC)
+			pr_err("%s1 after clone_to_tio clone=%pS (bi_sector=%lld, bi_size=%d) tgt_clone=%pS (bi_sector=%lld, bi_size=%d)\n",
+				__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size,
+				tgt_clone, tgt_clone->bi_iter.bi_sector, tgt_clone->bi_iter.bi_size);
+	}
 
 	/*
 	 * Account io->origin_bio to DM dev on behalf of target
@@ -1385,6 +1394,10 @@ void dm_submit_bio_remap(struct bio *clone, struct bio *tgt_clone)
 
 	trace_block_bio_remap(tgt_clone, disk_devt(io->md->disk),
 			      tio->old_sector);
+	if (clone->bi_opf & REQ_ATOMIC)
+		pr_err("%s2 calling  submit_bio_noacct clone=%pS (bi_sector=%lld, bi_size=%d) tgt_clone=%pS (bi_sector=%lld, bi_size=%d)\n",
+			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size,
+			tgt_clone, tgt_clone->bi_iter.bi_sector, tgt_clone->bi_iter.bi_size);
 	submit_bio_noacct(tgt_clone);
 }
 EXPORT_SYMBOL_GPL(dm_submit_bio_remap);
@@ -1415,6 +1428,9 @@ static void __map_bio(struct bio *clone)
 
 	clone->bi_end_io = clone_endio;
 
+	if (clone->bi_opf & REQ_ATOMIC)
+		pr_err("%s clone=%pS (bi_sector=%lld, bi_size=%d)\n",
+			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size);
 	/*
 	 * Map the clone.
 	 */
@@ -1429,12 +1445,19 @@ static void __map_bio(struct bio *clone)
 		down(&md->swap_bios_semaphore);
 	}
 
+	if (clone->bi_opf & REQ_ATOMIC)
+		pr_err("%s2 clone=%pS (bi_sector=%lld, bi_size=%d) ti->type->map=%pS\n",
+			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size, ti->type->map);
 	if (likely(ti->type->map == linear_map))
 		r = linear_map(ti, clone);
 	else if (ti->type->map == stripe_map)
 		r = stripe_map(ti, clone);
 	else
 		r = ti->type->map(ti, clone);
+
+	if (clone->bi_opf & REQ_ATOMIC)
+		pr_err("%s3 clone=%pS (bi_sector=%lld, bi_size=%d) ti->type->map=%pS r=%d\n",
+			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size, ti->type->map, r);
 
 	switch (r) {
 	case DM_MAPIO_SUBMITTED:
@@ -1443,6 +1466,9 @@ static void __map_bio(struct bio *clone)
 			dm_start_io_acct(io, clone);
 		break;
 	case DM_MAPIO_REMAPPED:
+		if (clone->bi_opf & REQ_ATOMIC)
+			pr_err("%s4 clone=%pS (bi_sector=%lld, bi_size=%d) DM_MAPIO_REMAPPED calling dm_submit_bio_remap\n",
+				__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size);
 		dm_submit_bio_remap(clone, NULL);
 		break;
 	case DM_MAPIO_KILL:
@@ -1767,7 +1793,13 @@ static blk_status_t __split_and_process_bio(struct clone_info *ci)
 	} else {
 		clone = alloc_tio(ci, ti, 0, &len, GFP_NOIO);
 	}
+	if (atomic)
+		pr_err("%s5 clone=%pS (bi_sector=%lld, bi_size=%d) calling __map_bio\n",
+			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size);
 	__map_bio(clone);
+	if (atomic)
+		pr_err("%s6 clone=%pS (bi_sector=%lld, bi_size=%d) called __map_bio\n",
+			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size);
 
 	ci->sector += len;
 	ci->sector_count -= len;
@@ -1953,14 +1985,10 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 	struct dm_io *io;
 	blk_status_t error = BLK_STS_OK;
 	bool is_abnormal, need_split;
-	static int jjcount;
 	bool atomic = bio->bi_opf & REQ_ATOMIC;
 
-	jjcount++;
-
-
 	is_abnormal = is_abnormal_io(bio);
-	if (jjcount < 100 || atomic)
+	if (atomic)
 		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d\n",
 			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
 			md, is_abnormal, atomic);
@@ -1972,8 +2000,8 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		need_split = is_abnormal;
 	}
 
-	if (jjcount < 100 || atomic)
-		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d\n",
+	if (atomic)
+		pr_err("%s2 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d\n",
 			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
 			md, is_abnormal, atomic, need_split);
 	if (unlikely(need_split)) {
@@ -1986,13 +2014,13 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		 * boundaries.
 		 */
 		bio = bio_split_to_limits(bio);
-		if (jjcount < 100 || atomic) {
+		if (atomic) {
 			if (bio)
-				pr_err("%s2 after bio_split_to_limits bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d\n",
+				pr_err("%s3 after bio_split_to_limits bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d\n",
 					__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
 					md, is_abnormal, atomic);
 			else
-				pr_err("%s2 after bio_split_to_limits bio=%pS md=%pS is_abnormal=%d atomic=%d\n",
+				pr_err("%s3.1 after bio_split_to_limits bio=%pS md=%pS is_abnormal=%d atomic=%d\n",
 					__func__, bio, md, is_abnormal, atomic);
 		}
 		if (!bio)
@@ -2018,11 +2046,15 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		io = alloc_io(md, bio, GFP_NOIO);
 	}
 
-	if (jjcount < 100 || atomic)
-		pr_err("%s3 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS\n",
+	if (atomic)
+		pr_err("%s4 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS calling init_clone_info\n",
 			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
 			md, is_abnormal, atomic, need_split, io);
 	init_clone_info(&ci, io, map, bio, is_abnormal);
+	if (atomic)
+		pr_err("%s5 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS called init_clone_info\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic, need_split, io);
 
 	if (bio->bi_opf & REQ_PREFLUSH) {
 		__send_empty_flush(&ci);
@@ -2036,16 +2068,33 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		goto out;
 	}
 
+	if (atomic)
+		pr_err("%s6 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS calling __split_and_process_bio\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic, need_split, io);
 	error = __split_and_process_bio(&ci);
 	if (error || !ci.sector_count)
 		goto out;
+	if (atomic)
+		pr_err("%s7 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS called __split_and_process_bio, calling bio_trim\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic, need_split, io);
 	/*
 	 * Remainder must be passed to submit_bio_noacct() so it gets handled
 	 * *after* bios already submitted have been completely processed.
 	 */
 	bio_trim(bio, io->sectors, ci.sector_count);
+		goto out;
+	if (atomic)
+		pr_err("%s8 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS called bio_trim\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic, need_split, io);
 	trace_block_split(bio, bio->bi_iter.bi_sector);
 	bio_inc_remaining(bio);
+	if (atomic)
+		pr_err("%s9 bio=%pS bi_sector=%lld bi_size=%d md=%pS is_abnormal=%d atomic=%d need_split=%d io=%pS called submit_bio_noacct\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+			md, is_abnormal, atomic, need_split, io);
 	submit_bio_noacct(bio);
 out:
 	/*
@@ -2072,12 +2121,10 @@ static void dm_submit_bio(struct bio *bio)
 	struct mapped_device *md = bio->bi_bdev->bd_disk->private_data;
 	int srcu_idx;
 	struct dm_table *map;
-	static int jjcount;
 	bool atomic = bio->bi_opf & REQ_ATOMIC;
 
-	jjcount++;
 
-	if (jjcount < 100 || atomic)
+	if (atomic)
 		pr_err("%s bio=%pS md=%pS bi_bdev=%pS bi_sector=%lld bi_size=%d atomic=%d\n",
 			__func__, bio, md, bio->bi_bdev, bio->bi_iter.bi_sector,
 			bio->bi_iter.bi_size, atomic);
@@ -2846,7 +2893,7 @@ static void dm_wq_work(struct work_struct *work)
 
 		if (!bio)
 			break;
-
+		pr_err("%s calling  submit_bio_noacct bio=%pS\n", __func__, bio);
 		submit_bio_noacct(bio);
 		cond_resched();
 	}

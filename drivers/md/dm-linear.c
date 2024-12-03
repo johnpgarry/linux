@@ -90,9 +90,18 @@ int linear_map(struct dm_target *ti, struct bio *bio)
 {
 	struct linear_c *lc = ti->private;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d) lc->start=%lld ti->begin=%lld (sectors=%lld), len=%lld (sectors=%lld)\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, lc->start,
+			ti->begin, ti->begin >> SECTOR_SHIFT,
+			ti->len, ti->len >> SECTOR_SHIFT);
+
 	bio_set_dev(bio, lc->dev->bdev);
 	bio->bi_iter.bi_sector = linear_map_sector(ti, bio->bi_iter.bi_sector);
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s10 bio=%pS (bi_sector=%lld, bi_size=%d)\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	return DM_MAPIO_REMAPPED;
 }
 

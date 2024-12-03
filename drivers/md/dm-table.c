@@ -688,6 +688,9 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	char **argv;
 	struct dm_target *ti;
 
+	pr_err("%s t=%pS start=%lld (sectors=%lld) len=%lld (sectors=%lld)\n",
+		__func__, t, start, start >> SECTOR_SHIFT, len, len >> SECTOR_SHIFT);
+
 	if (t->singleton) {
 		DMERR("%s: target type %s must appear alone in table",
 		      dm_device_name(t->md), t->targets->type->name);
@@ -737,6 +740,8 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 		t->immutable_target_type = ti->type;
 	}
 
+	pr_err("%s5 ti=%pS t=%pS start=%lld (sectors=%lld) len=%lld (sectors=%lld)\n",
+		__func__, ti, t, start, start >> SECTOR_SHIFT, len, len >> SECTOR_SHIFT);
 	ti->table = t;
 	ti->begin = start;
 	ti->len = len;
