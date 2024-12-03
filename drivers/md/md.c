@@ -5801,6 +5801,8 @@ void mddev_update_io_opt(struct mddev *mddev, unsigned int nr_stripes)
 {
 	struct queue_limits lim;
 
+	pr_err("%s mddev=%pS nr_stripes=%d\n", __func__, mddev, nr_stripes);
+
 	if (mddev_is_dm(mddev))
 		return;
 

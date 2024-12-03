@@ -3813,6 +3813,7 @@ static void raid_io_hints(struct dm_target *ti, struct queue_limits *limits)
 
 	limits->io_min = chunk_size_bytes;
 	limits->io_opt = chunk_size_bytes * mddev_data_stripes(rs);
+	pr_err("%s ti=%pS chunk_size_bytes=%d\n", __func__, ti, chunk_size_bytes);
 }
 
 static void raid_presuspend(struct dm_target *ti)
