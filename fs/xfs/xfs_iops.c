@@ -572,18 +572,35 @@ xfs_stat_blksize(
 	return max_t(uint32_t, PAGE_SIZE, mp->m_sb.sb_blocksize);
 }
 
+/* Returns max atomic write unit for a file, in bytes. */
+static unsigned int
+xfs_inode_atomicwrite_max(
+	struct xfs_inode	*ip)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+
+	if (XFS_IS_REALTIME_INODE(ip))
+		return mp->m_rt_awu_max;
+
+	return mp->m_sb.sb_blocksize;
+}
+
 void
 xfs_get_atomic_write_attr(
 	struct xfs_inode	*ip,
 	unsigned int		*unit_min,
 	unsigned int		*unit_max)
 {
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	unsigned int		awu_max = xfs_inode_atomicwrite_max(ip);
+
 	if (!xfs_inode_can_atomicwrite(ip)) {
 		*unit_min = *unit_max = 0;
 		return;
 	}
 
-	*unit_min = *unit_max = ip->i_mount->m_sb.sb_blocksize;
+	*unit_min = ip->i_mount->m_sb.sb_blocksize;
+	*unit_max =  min(target->bt_bdev_awu_max, awu_max);
 }
 
 STATIC int
