@@ -25,6 +25,7 @@
 #include "xfs_da_format.h"
 #include "xfs_health.h"
 #include "xfs_ag.h"
+#include "xfs_rtalloc.h"
 #include "xfs_rtbitmap.h"
 #include "xfs_exchrange.h"
 #include "xfs_rtgroup.h"
@@ -1150,6 +1151,8 @@ xfs_sb_mount_rextsize(
 		rgs->blklog = 0;
 		rgs->blkmask = (uint64_t)-1;
 	}
+
+	xfs_rt_awu_update(mp);
 }
 
 /* Update incore sb rt extent size, then recompute the cached rt geometry. */
