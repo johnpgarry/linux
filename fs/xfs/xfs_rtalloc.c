@@ -735,6 +735,28 @@ xfs_rtginode_ensure(
 	return xfs_rtginode_create(rtg, type, true);
 }
 
+void
+xfs_rt_awu_update(
+	struct xfs_mount	*mp)
+{
+	xfs_agblock_t		rsize = mp->m_sb.sb_rextsize;
+	xfs_extlen_t		awu_max;
+
+	if (is_power_of_2(rsize)) {
+		mp->m_rt_awu_max = rsize;
+		return;
+	}
+
+	/* Find highest power-of-2 evenly divisible into sb_rextsize */
+	awu_max = 1;
+	while (1) {
+		if (rsize % (awu_max * 2))
+			break;
+		awu_max *= 2;
+	}
+	mp->m_rt_awu_max = awu_max;
+}
+
 static struct xfs_mount *
 xfs_growfs_rt_alloc_fake_mount(
 	const struct xfs_mount	*mp,
@@ -969,6 +991,7 @@ xfs_growfs_rt_bmblock(
 	 */
 	mp->m_rsumlevels = nmp->m_rsumlevels;
 	mp->m_rsumblocks = nmp->m_rsumblocks;
+	mp->m_rt_awu_max = nmp->m_rt_awu_max;
 
 	/*
 	 * Recompute the growfsrt reservation from the new rsumsize.
