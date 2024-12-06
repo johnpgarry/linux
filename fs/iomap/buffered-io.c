@@ -730,7 +730,8 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 		if (iomap_block_needs_zeroing(iter, block_start)) {
 			if (WARN_ON_ONCE(iter->flags & IOMAP_UNSHARE))
 				return -EIO;
-			pr_err("%s calling folio_zero_segments\n", __func__);
+			pr_err("%s2 calling folio_zero_segments folio=%pS folio_size=%zd poff=%zd from=%zd to=%zd poff + plen=%zd\n",
+				__func__, folio, folio_size(folio), poff, from, to, poff + plen);
 			folio_zero_segments(folio, poff, from, to, poff + plen);
 		} else {
 			int status;
@@ -790,8 +791,8 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 	struct folio *folio;
 	int status = 0;
 
-	pr_err("%s pos=%lld len=%zd mapping_large_folio_support=%d\n",
-		__func__, pos, len, mapping_large_folio_support(iter->inode->i_mapping));
+	pr_err("%s pos=%lld len=%zd mapping_large_folio_support=%d io_block_size=%lld\n",
+		__func__, pos, len, mapping_large_folio_support(iter->inode->i_mapping), io_block_size);
 	BUG_ON(pos + len > iter->iomap.offset + iter->iomap.length);
 	if (srcmap != &iter->iomap)
 		BUG_ON(pos + len > srcmap->offset + srcmap->length);
@@ -1888,6 +1889,7 @@ static bool iomap_writepage_handle_eof(struct folio *folio, struct inode *inode,
 {
 	u64 isize = i_size_read(inode);
 
+	pr_err("%s *end_pos=%lld isize=%lld\n", __func__, *end_pos, isize);
 	if (*end_pos > isize) {
 		size_t poff = offset_in_folio(folio, isize);
 		pgoff_t end_index = isize >> PAGE_SHIFT;
@@ -1928,7 +1930,8 @@ static bool iomap_writepage_handle_eof(struct folio *folio, struct inode *inode,
 		 * Also adjust the writeback range to skip all blocks entirely
 		 * beyond i_size.
 		 */
-		pr_err("%s2 calling folio_zero_segment\n", __func__);
+		pr_err("%s2 calling folio_zero_segment poff=%zd folio=%pS folio_size()=%zd *end_pos=%lld\n",
+			__func__, poff, folio, folio_size(folio), *end_pos);
 		folio_zero_segment(folio, poff, folio_size(folio));
 		*end_pos = round_up(isize, i_blocksize(inode));
 	}
