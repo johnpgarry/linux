@@ -123,6 +123,7 @@ static void __blkdev_issue_write_zeroes(struct block_device *bdev,
 		struct bio **biop, unsigned flags, sector_t limit)
 {
 
+	pr_err("%s sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 	while (nr_sects) {
 		unsigned int len = min(nr_sects, limit);
 		struct bio *bio;
@@ -153,6 +154,7 @@ static int blkdev_issue_write_zeroes(struct block_device *bdev, sector_t sector,
 	struct blk_plug plug;
 	int ret = 0;
 
+	pr_err("%s sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 	blk_start_plug(&plug);
 	__blkdev_issue_write_zeroes(bdev, sector, nr_sects, gfp, &bio,
 			flags, limit);
@@ -196,6 +198,7 @@ static void __blkdev_issue_zero_pages(struct block_device *bdev,
 		sector_t sector, sector_t nr_sects, gfp_t gfp_mask,
 		struct bio **biop, unsigned int flags)
 {
+	pr_err("%s sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 	while (nr_sects) {
 		unsigned int nr_vecs = __blkdev_sectors_to_bio_pages(nr_sects);
 		struct bio *bio;
@@ -231,6 +234,7 @@ static int blkdev_issue_zero_pages(struct block_device *bdev, sector_t sector,
 	struct blk_plug plug;
 	int ret = 0;
 
+	pr_err("%s sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 	if (flags & BLKDEV_ZERO_NOFALLBACK)
 		return -EOPNOTSUPP;
 
@@ -276,6 +280,7 @@ int __blkdev_issue_zeroout(struct block_device *bdev, sector_t sector,
 {
 	sector_t limit = bio_write_zeroes_limit(bdev);
 
+	pr_err("%s sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 	if (bdev_read_only(bdev))
 		return -EPERM;
 
@@ -310,6 +315,7 @@ int blkdev_issue_zeroout(struct block_device *bdev, sector_t sector,
 {
 	int ret;
 
+	pr_err("%s sector=%lld nr_sects=%lld\n", __func__, sector, nr_sects);
 	if ((sector | nr_sects) & ((bdev_logical_block_size(bdev) >> 9) - 1))
 		return -EINVAL;
 	if (bdev_read_only(bdev))

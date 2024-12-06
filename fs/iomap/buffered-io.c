@@ -388,6 +388,8 @@ static loff_t iomap_readpage_iter(const struct iomap_iter *iter,
 		goto done;
 
 	if (iomap_block_needs_zeroing(iter, pos)) {
+		pr_err("%s2 calling folio_zero_range\n", __func__);
+
 		folio_zero_range(folio, poff, plen);
 		iomap_set_range_uptodate(folio, poff, plen);
 		goto done;
@@ -693,6 +695,9 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	size_t from = offset_in_folio(folio, pos), to = from + len;
 	size_t poff, plen;
 
+	pr_err("%s block_size=%lld block_start=%lld block_end=%lld nr_blocks=%d folio=%pS folio_size=%zd\n",
+		__func__, block_size, block_start, block_end, nr_blocks, folio, folio_size(folio));
+
 	/*
 	 * If the write or zeroing completely overlaps the current folio, then
 	 * entire folio will be dirtied so there is no need for
@@ -725,6 +730,7 @@ static int __iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 		if (iomap_block_needs_zeroing(iter, block_start)) {
 			if (WARN_ON_ONCE(iter->flags & IOMAP_UNSHARE))
 				return -EIO;
+			pr_err("%s calling folio_zero_segments\n", __func__);
 			folio_zero_segments(folio, poff, from, to, poff + plen);
 		} else {
 			int status;
@@ -784,6 +790,8 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 	struct folio *folio;
 	int status = 0;
 
+	pr_err("%s pos=%lld len=%zd mapping_large_folio_support=%d\n",
+		__func__, pos, len, mapping_large_folio_support(iter->inode->i_mapping));
 	BUG_ON(pos + len > iter->iomap.offset + iter->iomap.length);
 	if (srcmap != &iter->iomap)
 		BUG_ON(pos + len > srcmap->offset + srcmap->length);
@@ -795,8 +803,10 @@ static int iomap_write_begin(struct iomap_iter *iter, loff_t pos,
 		len = min_t(size_t, len, PAGE_SIZE - offset_in_page(pos));
 
 	folio = __iomap_get_folio(iter, pos, len);
+	pr_err("%s2 pos=%lld len=%zd folio=%pS\n", __func__, pos, len, folio);
 	if (IS_ERR(folio))
 		return PTR_ERR(folio);
+	pr_err("%s3 pos=%lld len=%zd folio=%pS folio_size=%zd\n", __func__, pos, len, folio, folio_size(folio));
 
 	/*
 	 * Now we have a locked folio, before we do anything with it we need to
@@ -917,6 +927,8 @@ static loff_t iomap_write_iter(struct iomap_iter *iter, struct iov_iter *i)
 	size_t chunk = mapping_max_folio_size(mapping);
 	unsigned int bdp_flags = (iter->flags & IOMAP_NOWAIT) ? BDP_ASYNC : 0;
 
+	pr_err("%s pos=%lld length=%lld chunk=%zd\n", __func__, pos, length, chunk);
+
 	do {
 		struct folio *folio;
 		loff_t old_size;
@@ -927,6 +939,7 @@ static loff_t iomap_write_iter(struct iomap_iter *iter, struct iov_iter *i)
 
 		bytes = iov_iter_count(i);
 retry:
+		pr_err("%s1 retry: pos=%lld length=%lld chunk=%zd bytes=%zd\n", __func__, pos, length, chunk, bytes);
 		offset = pos & (chunk - 1);
 		bytes = min(chunk - offset, bytes);
 		status = balance_dirty_pages_ratelimited_flags(mapping,
@@ -952,6 +965,7 @@ retry:
 			break;
 		}
 
+		pr_err("%s2 calling iomap_write_begin pos=%lld length=%lld chunk=%zd bytes=%zd\n", __func__, pos, length, chunk, bytes);
 		status = iomap_write_begin(iter, pos, bytes, &folio);
 		if (unlikely(status)) {
 			iomap_write_failed(iter->inode, pos, bytes);
@@ -968,6 +982,7 @@ retry:
 			flush_dcache_folio(folio);
 
 		copied = copy_folio_from_iter_atomic(folio, offset, bytes, i);
+		pr_err("%s3 calling iomap_write_end pos=%lld length=%lld chunk=%zd bytes=%zd\n", __func__, pos, length, chunk, bytes);
 		written = iomap_write_end(iter, pos, bytes, copied, folio) ?
 			  copied : 0;
 
@@ -1032,6 +1047,7 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *i,
 	};
 	ssize_t ret;
 
+	pr_err("%s iocb->ki_pos=%lld len=%zd\n", __func__, iocb->ki_pos, iov_iter_count(i));
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iter.flags |= IOMAP_NOWAIT;
 
@@ -1346,6 +1362,8 @@ static inline int iomap_zero_iter_flush_and_stale(struct iomap_iter *i)
 	struct address_space *mapping = i->inode->i_mapping;
 	loff_t end = i->pos + i->len - 1;
 
+	pr_err("%s2 calling folio_zero_range\n", __func__);
+
 	i->iomap.flags |= IOMAP_F_STALE;
 	return filemap_write_and_wait_range(mapping, i->pos, end);
 }
@@ -1356,6 +1374,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 	loff_t length = iomap_length(iter);
 	loff_t written = 0;
 
+	pr_err("%s pos=%lld length=%lld\n", __func__, pos, length);
 	do {
 		struct folio *folio;
 		int status;
@@ -1375,6 +1394,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 		if (bytes > folio_size(folio) - offset)
 			bytes = folio_size(folio) - offset;
 
+		pr_err("%s2 calling folio_zero_range offset=%zd bytes=%zd\n", __func__, offset, bytes);
 		folio_zero_range(folio, offset, bytes);
 		folio_mark_accessed(folio);
 
@@ -1410,6 +1430,7 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	int ret;
 	bool range_dirty;
 
+	pr_err("%s pos=%lld len=%lld\n", __func__, pos, len);
 	/*
 	 * Zero range can skip mappings that are zero on disk so long as
 	 * pagecache is clean. If pagecache was dirty prior to zero range, the
@@ -1423,8 +1444,10 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	if (off &&
 	    filemap_range_needs_writeback(mapping, pos, pos + plen - 1)) {
 		iter.len = plen;
-		while ((ret = iomap_iter(&iter, ops)) > 0)
+		while ((ret = iomap_iter(&iter, ops)) > 0) {
+		pr_err("%s2 pos=%lld len=%lld calling iomap_zero_iter *did_zero=%d\n", __func__, pos, len, *did_zero);
 			iter.processed = iomap_zero_iter(&iter, did_zero);
+		}
 
 		iter.len = len - (iter.pos - pos);
 		if (ret || !iter.len)
@@ -1447,12 +1470,14 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 
 			if (range_dirty) {
 				range_dirty = false;
+				pr_err("%s3 pos=%lld len=%lld calling iomap_zero_iter_flush_and_stale\n", __func__, pos, len);
 				proc = iomap_zero_iter_flush_and_stale(&iter);
 			}
 			iter.processed = proc;
 			continue;
 		}
 
+		pr_err("%s3 pos=%lld len=%lld calling iomap_zero_iter *did_zero=%d\n", __func__, pos, len, *did_zero);
 		iter.processed = iomap_zero_iter(&iter, did_zero);
 	}
 	return ret;
@@ -1714,6 +1739,7 @@ static struct iomap_ioend *iomap_alloc_ioend(struct iomap_writepage_ctx *wpc,
 	struct iomap_ioend *ioend;
 	struct bio *bio;
 
+	pr_err("%s pos=%lld\n", __func__, pos);
 	bio = bio_alloc_bioset(wpc->iomap.bdev, BIO_MAX_VECS,
 			       REQ_OP_WRITE | wbc_to_write_flags(wbc),
 			       GFP_NOFS, &iomap_ioend_bioset);
@@ -1779,6 +1805,8 @@ static int iomap_add_to_ioend(struct iomap_writepage_ctx *wpc,
 	struct iomap_folio_state *ifs = folio->private;
 	size_t poff = offset_in_folio(folio, pos);
 	int error;
+
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
 
 	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, pos)) {
 new_ioend:
@@ -1900,6 +1928,7 @@ static bool iomap_writepage_handle_eof(struct folio *folio, struct inode *inode,
 		 * Also adjust the writeback range to skip all blocks entirely
 		 * beyond i_size.
 		 */
+		pr_err("%s2 calling folio_zero_segment\n", __func__);
 		folio_zero_segment(folio, poff, folio_size(folio));
 		*end_pos = round_up(isize, i_blocksize(inode));
 	}

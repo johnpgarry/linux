@@ -414,6 +414,7 @@ xfs_file_write_zero_eof(
 	trace_xfs_zero_eof(ip, isize, iocb->ki_pos - isize);
 
 	xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
+	pr_err("%s calling xfs_zero_range\n", __func__);
 	error = xfs_zero_range(ip, isize, iocb->ki_pos - isize, NULL);
 	xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
 
@@ -539,6 +540,7 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
+		pr_err("%s calling xfs_iomap_write_unwritten offset=%lld size=%zd\n", __func__, offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}

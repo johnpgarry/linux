@@ -301,6 +301,7 @@ xfs_fs_commit_blocks(
 					(end - 1) >> PAGE_SHIFT);
 		WARN_ON_ONCE(error);
 
+		pr_err("%s calling xfs_iomap_write_unwritten start=%lld length=%zd\n", __func__, start, length);
 		error = xfs_iomap_write_unwritten(ip, start, length, false);
 		if (error)
 			goto out_drop_iolock;

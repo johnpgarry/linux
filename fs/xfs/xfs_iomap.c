@@ -635,10 +635,14 @@ xfs_iomap_write_unwritten(
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
 	rounding = xfs_inode_alloc_fsbsize_local(ip);
+	pr_err("%s offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld\n",
+		__func__, offset, count, offset_fsb, count_fsb);
 	if (rounding > 1) {
 		offset_fsb = rounddown_64(offset_fsb, rounding);
 		count_fsb = roundup_64(count_fsb, rounding);
 	}
+	pr_err("%s2 after rounding offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld\n",
+		__func__, offset, count, offset_fsb, count_fsb);
 	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 
 	/*
@@ -682,6 +686,7 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
+		pr_err("%s3 calling xfs_bmapi_write XFS_BMAPI_CONVERT\n", __func__);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);
@@ -1036,13 +1041,16 @@ xfs_buffered_write_iomap_begin(
 	unsigned int		iomap_flags = 0;
 	u64			seq;
 
+	pr_err("%s offset=%lld count=%lld\n", __func__, offset, count);
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
 	/* we can't use delayed allocations when using extent size hints */
-	if (xfs_get_extsz_hint(ip))
+	if (xfs_get_extsz_hint(ip)) {
+		pr_err("%s2 offset=%lld count=%lld calling xfs_direct_write_iomap_begin and returning\n", __func__, offset, count);
 		return xfs_direct_write_iomap_begin(inode, offset, count,
 				flags, iomap, srcmap);
+	}
 
 	error = xfs_qm_dqattach(ip);
 	if (error)
@@ -1520,6 +1528,7 @@ xfs_zero_range(
 	if (IS_DAX(inode))
 		return dax_zero_range(inode, pos, len, did_zero,
 				      &xfs_dax_write_iomap_ops);
+	pr_err("%s calling iomap_zero_range *did_zero=%d\n", __func__, did_zero ? *did_zero : -1);
 	return iomap_zero_range(inode, pos, len, did_zero,
 				&xfs_buffered_write_iomap_ops);
 }

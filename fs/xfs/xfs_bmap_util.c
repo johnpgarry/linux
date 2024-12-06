@@ -55,6 +55,7 @@ xfs_zero_extent(
 	xfs_fsblock_t		start_fsb,
 	xfs_off_t		count_fsb)
 {
+	pr_err("%s start_fsb=%lld count_fsb=%lld\n", __func__, start_fsb, count_fsb);
 	return blkdev_issue_zeroout(xfs_inode_buftarg(ip)->bt_bdev,
 			xfs_fsb_to_db(ip, start_fsb),
 			XFS_FSB_TO_BB(ip->i_mount, count_fsb),
@@ -730,6 +731,7 @@ xfs_alloc_file_space(
 		 * startoffset_fsb so that one of the following allocations
 		 * will eventually reach the requested range.
 		 */
+		pr_err("%s calling xfs_bmapi_write XFS_BMAPI_PREALLOC\n", __func__);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
 				&nimaps);
@@ -877,6 +879,7 @@ xfs_free_file_space(
 		return 0;
 	if (offset + len > XFS_ISIZE(ip))
 		len = XFS_ISIZE(ip) - offset;
+	pr_err("%s calling xfs_zero_range\n", __func__);
 	error = xfs_zero_range(ip, offset, len, NULL);
 	if (error)
 		return error;

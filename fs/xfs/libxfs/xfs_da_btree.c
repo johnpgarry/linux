@@ -2312,6 +2312,7 @@ xfs_da_grow_inode_int(
 	 * Try mapping it in one filesystem block.
 	 */
 	nmap = 1;
+	pr_err("%s calling xfs_bmapi_write xfs_bmapi_aflag(w)|XFS_BMAPI_METADATA|XFS_BMAPI_CONTIG\n", __func__);
 	error = xfs_bmapi_write(tp, dp, *bno, count,
 			xfs_bmapi_aflag(w)|XFS_BMAPI_METADATA|XFS_BMAPI_CONTIG,
 			args->total, &map, &nmap);

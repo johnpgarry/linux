@@ -614,6 +614,8 @@ static inline size_t memcpy_from_file_folio(char *to, struct folio *folio,
 static inline void folio_zero_segments(struct folio *folio,
 		size_t start1, size_t xend1, size_t start2, size_t xend2)
 {
+	pr_err_once("%s start1=%zd xend1=%zd start2=%zd xend2=%zd\n",
+		__func__, start1, xend1, start2, xend2);
 	zero_user_segments(&folio->page, start1, xend1, start2, xend2);
 }
 
@@ -626,6 +628,8 @@ static inline void folio_zero_segments(struct folio *folio,
 static inline void folio_zero_segment(struct folio *folio,
 		size_t start, size_t xend)
 {
+	pr_err("%s folio=%pS start=%zd xend=%zd\n",
+		__func__, folio, start, xend);
 	zero_user_segments(&folio->page, start, xend, 0, 0);
 }
 

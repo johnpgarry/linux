@@ -62,6 +62,7 @@ struct iomap_dio {
 static struct bio *iomap_dio_alloc_bio(const struct iomap_iter *iter,
 		struct iomap_dio *dio, unsigned short nr_vecs, blk_opf_t opf)
 {
+	pr_err("%s nr_vecs=%d\n", __func__, nr_vecs);
 	if (dio->dops && dio->dops->bio_set)
 		return bio_alloc_bioset(iter->iomap.bdev, nr_vecs, opf,
 					GFP_KERNEL, dio->dops->bio_set);
@@ -245,6 +246,8 @@ static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 	struct inode *inode = file_inode(dio->iocb->ki_filp);
 	struct bio *bio;
 
+	pr_err("%s pos=%lld len=%d\n", __func__, pos, len);
+
 	if (!len)
 		return 0;
 	/*
@@ -310,6 +313,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		io_block_size = iomap->io_block_size;
 	else
 		io_block_size = i_blocksize(inode);
+
+	pr_err("%s io_block_size=%lld\n", __func__, io_block_size);
 
 	if (atomic && length != i_blocksize(inode))
 		return -EINVAL;
@@ -389,6 +394,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			pad = do_div(_pos, io_block_size);
 		}
 
+		pr_err("%s2 calling iomap_dio_zero pos=%lld len=%lld\n",
+			__func__, pos - pad, pad);
 		ret = iomap_dio_zero(iter, dio, pos - pad, pad);
 		if (ret)
 			goto out;
@@ -477,9 +484,12 @@ zero_tail:
 			pad = do_div(_pos, io_block_size);
 		}
 
-		if (pad)
+		if (pad) {
+			pr_err("%s3 calling iomap_dio_zero pos=%lld len=%lld\n",
+			__func__, pos, io_block_size - pad);
 			ret = iomap_dio_zero(iter, dio, pos,
 					     io_block_size - pad);
+		}
 	}
 out:
 	/* Undo iter limitation to current extent */

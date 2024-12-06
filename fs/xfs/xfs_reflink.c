@@ -419,6 +419,7 @@ xfs_reflink_fill_cow_hole(
 
 	/* Allocate the entire reservation as unwritten blocks. */
 	nimaps = 1;
+	pr_err("%s calling xfs_bmapi_write XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC\n", __func__);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC, 0, cmap,
 			&nimaps);
@@ -481,6 +482,7 @@ xfs_reflink_fill_delalloc(
 		 * Replace delalloc reservation with an unwritten extent.
 		 */
 		nimaps = 1;
+		pr_err("%s calling xfs_bmapi_write XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC\n", __func__);
 		error = xfs_bmapi_write(tp, ip, cmap->br_startoff,
 				cmap->br_blockcount,
 				XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC, 0,
@@ -1412,6 +1414,7 @@ xfs_reflink_zero_posteof(
 		return 0;
 
 	trace_xfs_zero_eof(ip, isize, pos - isize);
+	pr_err("%s calling xfs_zero_range\n", __func__);
 	return xfs_zero_range(ip, isize, pos - isize, NULL);
 }
 

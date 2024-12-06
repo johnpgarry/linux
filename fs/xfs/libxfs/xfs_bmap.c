@@ -3794,10 +3794,12 @@ xfs_bmap_btalloc(
 	xfs_fileoff_t		orig_offset;
 	xfs_extlen_t		orig_length;
 	int			error;
-
+	//WARN_ON_ONCE(1);
 	ASSERT(ap->length);
 	orig_offset = ap->offset;
 	orig_length = ap->length;
+
+	pr_err("%s orig_offset=%lld orig_length=%d\n", __func__, orig_offset, orig_length);
 
 	xfs_bmap_compute_alignments(ap, &args);
 
@@ -3822,6 +3824,8 @@ xfs_bmap_btalloc(
 		ap->blkno = NULLFSBLOCK;
 		ap->length = 0;
 	}
+	pr_err("%s10 ap->offset=%lld, length=%d, blkno=%lld, total=%d\n",
+		__func__, ap->offset, ap->length, ap->blkno, ap->total);
 	return 0;
 }
 
@@ -4226,8 +4230,10 @@ xfs_bmapi_allocate(
 	if ((bma->datatype & XFS_ALLOC_USERDATA) &&
 	    XFS_IS_REALTIME_INODE(bma->ip))
 		error = xfs_bmap_rtalloc(bma);
-	else
+	else {
+		pr_err("%s calling xfs_bmap_btalloc\n", __func__);
 		error = xfs_bmap_btalloc(bma);
+	}
 	if (error)
 		return error;
 	if (bma->blkno == NULLFSBLOCK)
@@ -4286,6 +4292,16 @@ xfs_bmapi_allocate(
 	       bma->got.br_state == XFS_EXT_UNWRITTEN);
 	return 0;
 }
+#if 0
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+
+#endif
 
 STATIC int
 xfs_bmapi_convert_unwritten(
@@ -4298,6 +4314,12 @@ xfs_bmapi_convert_unwritten(
 	struct xfs_ifork	*ifp = xfs_ifork_ptr(bma->ip, whichfork);
 	int			tmp_logflags = 0;
 	int			error;
+
+	if (mval)
+		pr_err("%s len=%lld mval=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
+			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
+	else
+		pr_err("%s len=%lld mval=NULL\n", __func__, len);
 
 	/* check if we need to do unwritten->real conversion */
 	if (mval->br_state == XFS_EXT_UNWRITTEN &&
@@ -4556,6 +4578,7 @@ xfs_bmapi_write(
 			}
 
 			ASSERT(bma.length > 0);
+			pr_err("%s calling xfs_bmapi_allocate\n", __func__);
 			error = xfs_bmapi_allocate(&bma);
 			if (error) {
 				/*
@@ -4582,6 +4605,7 @@ xfs_bmapi_write(
 							end, n, flags);
 
 		/* Execute unwritten extent conversion if necessary */
+		pr_err("%s calling xfs_bmapi_convert_unwritten\n", __func__);
 		error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
 		if (error == -EAGAIN)
 			continue;
@@ -4735,6 +4759,7 @@ xfs_bmapi_convert_one_delalloc(
 	if (!xfs_iext_peek_prev_extent(ifp, &bma.icur, &bma.prev))
 		bma.prev.br_startoff = NULLFILEOFF;
 
+	pr_err("%s2 calling xfs_bmapi_allocate\n", __func__);
 	error = xfs_bmapi_allocate(&bma);
 	if (error)
 		goto out_finish;

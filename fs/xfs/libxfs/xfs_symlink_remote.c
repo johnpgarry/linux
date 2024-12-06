@@ -341,6 +341,7 @@ xfs_symlink_write_target(
 	}
 
 	nmaps = XFS_SYMLINK_MAPS;
+	pr_err("%s calling xfs_bmapi_write XFS_BMAPI_METADATA\n", __func__);
 	error = xfs_bmapi_write(tp, ip, 0, fs_blocks, XFS_BMAPI_METADATA,
 			resblks, mval, &nmaps);
 	if (error)
