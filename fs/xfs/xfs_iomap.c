@@ -638,8 +638,8 @@ xfs_iomap_write_unwritten(
 	pr_err("%s offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld\n",
 		__func__, offset, count, offset_fsb, count_fsb);
 	if (rounding > 1) {
-		offset_fsb = rounddown_64(offset_fsb, rounding);
-		count_fsb = roundup_64(count_fsb, rounding);
+		offset_fsb = rounddown_64(offset_fsb, 1);
+		count_fsb = roundup_64(count_fsb, 1);
 	}
 	pr_err("%s2 after rounding offset=%lld count=%lld offset_fsb=%lld count_fsb=%lld\n",
 		__func__, offset, count, offset_fsb, count_fsb);
