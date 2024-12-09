@@ -805,6 +805,82 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 }
 EXPORT_SYMBOL_GPL(iomap_dio_rw);
 
+static loff_t
+iomap_dio_zero_unwritten_iter(struct iomap_iter *iter, struct iomap_dio *dio)
+{
+	const struct iomap *iomap = &iter->iomap;
+	loff_t length = iomap_length(iter);
+	loff_t pos = iter->pos;
+
+	if (iomap->type == IOMAP_UNWRITTEN) {
+		int ret;
+
+		dio->flags |= IOMAP_DIO_UNWRITTEN;
+		ret = iomap_dio_zero(iter, dio, pos, length);
+		if (ret)
+			return ret;
+	}
+
+	dio->size += length;
+
+	return length;
+}
+
+ssize_t
+iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
+		const struct iomap_ops *ops, const struct iomap_dio_ops *dops)
+{
+	struct inode *inode = file_inode(iocb->ki_filp);
+	struct iomap_dio *dio;
+	ssize_t ret;
+	struct iomap_iter iomi = {
+		.inode		= inode,
+		.pos		= iocb->ki_pos,
+		.len		= iov_iter_count(iter),
+		.flags		= IOMAP_WRITE,
+	};
+
+	dio = kzalloc(sizeof(*dio), GFP_KERNEL);
+	if (!dio)
+		return -ENOMEM;
+
+	dio->iocb = iocb;
+	atomic_set(&dio->ref, 1);
+	dio->i_size = i_size_read(inode);
+	dio->dops = dops;
+	dio->submit.waiter = current;
+	dio->wait_for_completion = true;
+
+	inode_dio_begin(inode);
+
+	while ((ret = iomap_iter(&iomi, ops)) > 0)
+		iomi.processed = iomap_dio_zero_unwritten_iter(&iomi, dio);
+
+	if (ret < 0)
+		iomap_dio_set_error(dio, ret);
+
+	if (!atomic_dec_and_test(&dio->ref)) {
+		for (;;) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			if (!READ_ONCE(dio->submit.waiter))
+				break;
+
+			blk_io_schedule();
+		}
+		__set_current_state(TASK_RUNNING);
+	}
+
+	if (dops && dops->end_io)
+		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
+
+	kfree(dio);
+
+	inode_dio_end(file_inode(iocb->ki_filp));
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iomap_dio_zero_unwritten);
+
 static int __init iomap_dio_init(void)
 {
 	zero_page = alloc_pages(GFP_KERNEL | __GFP_ZERO,
