@@ -578,8 +578,45 @@ out:
 	return error;
 }
 
+static int
+xfs_dio_write_end_zero_unwritten(
+	struct kiocb		*iocb,
+	ssize_t			size,
+	int			error,
+	unsigned		flags)
+{
+	struct inode		*inode = file_inode(iocb->ki_filp);
+	struct xfs_inode	*ip = XFS_I(inode);
+	loff_t			offset = iocb->ki_pos;
+	unsigned int		nofs_flag;
+
+	trace_xfs_end_io_direct_write(ip, offset, size);
+
+	if (xfs_is_shutdown(ip->i_mount))
+		return -EIO;
+
+	if (error)
+		return error;
+	if (WARN_ON_ONCE(!size))
+		return 0;
+	if (!(flags & IOMAP_DIO_UNWRITTEN))
+		return 0;
+
+	/* Same as xfs_dio_write_end_io() ... */
+	nofs_flag = memalloc_nofs_save();
+
+	error = xfs_iomap_write_unwritten(ip, offset, size, true);
+
+	memalloc_nofs_restore(nofs_flag);
+	return error;
+}
+
 static const struct iomap_dio_ops xfs_dio_write_ops = {
 	.end_io		= xfs_dio_write_end_io,
+};
+
+static const struct iomap_dio_ops xfs_dio_zero_ops = {
+	.end_io		= xfs_dio_write_end_zero_unwritten,
 };
 
 /*
@@ -613,6 +650,52 @@ xfs_file_dio_write_aligned(
 	trace_xfs_file_direct_write(iocb, from);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			   &xfs_dio_write_ops, 0, NULL, 0);
+out_unlock:
+	if (iolock)
+		xfs_iunlock(ip, iolock);
+	return ret;
+}
+
+static noinline ssize_t
+xfs_file_dio_write_atomic(
+	struct xfs_inode	*ip,
+	struct kiocb		*iocb,
+	struct iov_iter		*from)
+{
+	unsigned int		iolock = XFS_IOLOCK_SHARED;
+	bool			do_zero = false;
+	ssize_t			ret;
+
+retry:
+	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
+	if (ret)
+		return ret;
+
+	ret = xfs_file_write_checks(iocb, from, &iolock);
+	if (ret)
+		goto out_unlock;
+
+	if (do_zero) {
+		ret = iomap_dio_zero_unwritten(iocb, from,
+				&xfs_direct_write_iomap_ops,
+				&xfs_dio_zero_ops);
+		if (ret)
+			goto out_unlock;
+	}
+
+	trace_xfs_file_direct_write(iocb, from);
+	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
+			&xfs_dio_write_ops, IOMAP_DIO_OVERWRITE_ONLY, NULL, 0);
+
+	if (do_zero && ret < 0)
+		goto out_unlock;
+
+	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT)) {
+		xfs_iunlock(ip, iolock);
+		do_zero = true;
+		goto retry;
+	}
+
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);
@@ -723,6 +806,8 @@ xfs_file_dio_write(
 		return -EINVAL;
 	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
+	if (iocb->ki_flags & IOCB_ATOMIC)
+		return xfs_file_dio_write_atomic(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
 
