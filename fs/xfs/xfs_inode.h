@@ -59,6 +59,7 @@ typedef struct xfs_inode {
 	xfs_rfsblock_t		i_nblocks;	/* # of direct & btree blocks */
 	prid_t			i_projid;	/* owner's project id */
 	xfs_extlen_t		i_extsize;	/* basic/minimum extent size */
+	xfs_extlen_t		i_awu_max;	/* atomic write unit max */
 	/* cowextsize is only used for v3 inodes, flushiter for v1/2 */
 	union {
 		xfs_extlen_t	i_cowextsize;	/* basic cow extent size */
@@ -632,6 +633,8 @@ static inline void xfs_finish_inode_setup(struct xfs_inode *ip)
 
 static inline void xfs_setup_existing_inode(struct xfs_inode *ip)
 {
+	pr_err("%s ip=%pS i_ino=%lld i_awu_max=%d calling xfs_setup_inode forcealign=%d extsize=%d\n",
+		__func__, ip, ip->i_ino, ip->i_awu_max, xfs_inode_has_forcealign(ip), ip->i_extsize);
 	xfs_setup_inode(ip);
 	xfs_setup_iops(ip);
 	xfs_finish_inode_setup(ip);

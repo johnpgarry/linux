@@ -185,6 +185,8 @@ xfs_inode_from_disk(
 
 	ASSERT(ip->i_cowfp == NULL);
 
+	pr_err("%s ip=%pS i_ino=%lld i_mount=%pS xfs_inode_has_forcealign=%d i_extsize=%d\n",
+		__func__, ip, ip->i_ino, ip->i_mount, xfs_inode_has_forcealign(ip), ip->i_extsize);
 	fa = xfs_dinode_verify(ip->i_mount, ip->i_ino, from);
 	if (fa) {
 		xfs_inode_verifier_error(ip, -EFSCORRUPTED, "dinode", from,
@@ -240,6 +242,8 @@ xfs_inode_from_disk(
 	ip->i_disk_size = be64_to_cpu(from->di_size);
 	ip->i_nblocks = be64_to_cpu(from->di_nblocks);
 	ip->i_extsize = be32_to_cpu(from->di_extsize);
+	pr_err("%s2 ip=%pS i_ino=%lld i_awu_max=%d xfs_inode_has_forcealign=%d i_extsize=%d\n",
+		__func__, ip, ip->i_ino, ip->i_awu_max, xfs_inode_has_forcealign(ip), ip->i_extsize);
 	ip->i_forkoff = from->di_forkoff;
 	ip->i_diflags = be16_to_cpu(from->di_flags);
 	ip->i_next_unlinked = be32_to_cpu(from->di_next_unlinked);
@@ -265,6 +269,8 @@ xfs_inode_from_disk(
 	}
 	if (xfs_is_reflink_inode(ip))
 		xfs_ifork_init_cow(ip);
+	pr_err("%s2 ip=%pS i_ino=%lld ip->i_mount=%pS xfs_inode_has_forcealign=%d i_extsize=%d\n",
+		__func__, ip, ip->i_ino, ip->i_mount, xfs_inode_has_forcealign(ip), ip->i_extsize);
 	return 0;
 
 out_destroy_data_fork:

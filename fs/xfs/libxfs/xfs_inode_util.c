@@ -275,6 +275,26 @@ xfs_icreate_want_attrfork(
 	return false;
 }
 
+static void
+xfs_inode_awu_init(
+	struct xfs_inode	*ip)
+{
+	xfs_extlen_t 		awu_max = 1;
+
+	if (!xfs_inode_has_forcealign(ip) || ip->i_extsize <= 1) {
+		ip->i_awu_max = 1;
+		return;
+	}
+
+	while (1) {
+		if (ip->i_extsize % (2 * awu_max))
+			break;
+		awu_max *= 2;
+	}
+
+	ip->i_awu_max = awu_max;
+}
+
 /* Initialise an inode's attributes. */
 void
 xfs_inode_init(
@@ -289,6 +309,9 @@ xfs_inode_init(
 	unsigned int		flags;
 	int			times = XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG |
 					XFS_ICHGTIME_ACCESS;
+
+	pr_err("%s ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
 
 	if (args->flags & XFS_ICREATE_TMPFILE)
 		set_nlink(inode, 0);
@@ -327,6 +350,8 @@ xfs_inode_init(
 		ip->i_projid = xfs_get_initial_prid(pip);
 	}
 
+	pr_err("%s2 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
 	ip->i_disk_size = 0;
 	ip->i_df.if_nextents = 0;
 	ASSERT(ip->i_nblocks == 0);
@@ -367,6 +392,10 @@ xfs_inode_init(
 		ASSERT(0);
 	}
 
+
+	pr_err("%s3 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
+	xfs_inode_awu_init(ip);
 	if (xfs_icreate_want_attrfork(mp, args)) {
 		ip->i_forkoff = xfs_default_attroffset(ip) >> 3;
 		xfs_ifork_init_attr(ip, XFS_DINODE_FMT_EXTENTS, 0);
@@ -379,6 +408,8 @@ xfs_inode_init(
 		}
 	}
 
+	pr_err("%s4 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d i_awu_max=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize, ip->i_awu_max);
 	xfs_trans_log_inode(tp, ip, flags);
 }
 
