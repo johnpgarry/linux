@@ -286,9 +286,15 @@ xfs_inode_awu_init(
 		return;
 	}
 
+	pr_err("%s mp->m_sb.sb_agblocks=%d\n", __func__, ip->i_mount->m_sb.sb_agblocks);
 	while (1) {
 		if (ip->i_extsize % (2 * awu_max))
 			break;
+		if (ip->i_mount->m_sb.sb_agblocks % (2 * awu_max)) {
+			pr_err("%s2  mp->m_sb.sb_agblocks=%d awu_max=%d ip->i_extsize=%d breaking as not aligned\n",
+				__func__, ip->i_mount->m_sb.sb_agblocks, awu_max, ip->i_extsize);
+			break;
+		}
 		awu_max *= 2;
 	}
 
@@ -310,8 +316,9 @@ xfs_inode_init(
 	int			times = XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG |
 					XFS_ICHGTIME_ACCESS;
 
-	pr_err("%s ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d\n",
-		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
+	pr_err("%s ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d rt=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize,
+		XFS_IS_REALTIME_INODE(ip));
 
 	if (args->flags & XFS_ICREATE_TMPFILE)
 		set_nlink(inode, 0);
@@ -350,8 +357,9 @@ xfs_inode_init(
 		ip->i_projid = xfs_get_initial_prid(pip);
 	}
 
-	pr_err("%s2 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d\n",
-		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
+	pr_err("%s2 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d rt=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize,
+		XFS_IS_REALTIME_INODE(ip));
 	ip->i_disk_size = 0;
 	ip->i_df.if_nextents = 0;
 	ASSERT(ip->i_nblocks == 0);
@@ -393,8 +401,9 @@ xfs_inode_init(
 	}
 
 
-	pr_err("%s3 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d\n",
-		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
+	pr_err("%s3 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d rt=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize,
+		XFS_IS_REALTIME_INODE(ip));
 	xfs_inode_awu_init(ip);
 	if (xfs_icreate_want_attrfork(mp, args)) {
 		ip->i_forkoff = xfs_default_attroffset(ip) >> 3;
@@ -408,8 +417,9 @@ xfs_inode_init(
 		}
 	}
 
-	pr_err("%s4 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d i_awu_max=%d\n",
-		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize, ip->i_awu_max);
+	pr_err("%s4 ip=%pS ip->i_ino=%lld xfs_inode_has_forcealign=%d i_extsize=%d i_awu_max=%d rt=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize, ip->i_awu_max,
+		XFS_IS_REALTIME_INODE(ip));
 	xfs_trans_log_inode(tp, ip, flags);
 }
 

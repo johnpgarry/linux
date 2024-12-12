@@ -582,7 +582,7 @@ xfs_inode_atomicwrite_max(
 	if (XFS_IS_REALTIME_INODE(ip))
 		return mp->m_rt_awu_max;
 
-	return ip->i_awu_max;
+	return XFS_FSB_TO_B(mp, ip->i_awu_max);
 }
 
 void
@@ -1331,8 +1331,9 @@ xfs_setup_inode(
 	inode->i_ino = ip->i_ino;
 	inode->i_state |= I_NEW;
 
-	pr_err("%s ip=%pS i_ino=%lld forcealign=%d extsize=%d\n",
-		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
+	pr_err("%s ip=%pS i_ino=%lld forcealign=%d extsize=%d rt=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize,
+		XFS_IS_REALTIME_INODE(ip));
 
 	inode_sb_list_add(inode);
 	/* make the inode look hashed for the writeback code */

@@ -603,13 +603,14 @@ xfs_icreate(
 
 	ASSERT(ip != NULL);
 	xfs_trans_ijoin(tp, ip, 0);
-	pr_err("%s ip=%pS i_ino=%lld calling xfs_inode_init xfs_inode_has_forcealign=%d i_extsize=%d\n",
-		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
+	pr_err("%s ip=%pS i_ino=%lld calling xfs_inode_init xfs_inode_has_forcealign=%d i_extsize=%d rt=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize, XFS_IS_REALTIME_INODE(ip));
 	xfs_inode_init(tp, args, ip);
 
 	/* now that we have an i_mode we can setup the inode structure */
-	pr_err("%s2 ip=%pS i_ino=%lld calling xfs_setup_inode xfs_inode_has_forcealign=%d i_extsize=%d\n",
-		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize);
+	pr_err("%s2 ip=%pS i_ino=%lld calling xfs_setup_inode xfs_inode_has_forcealign=%d i_extsize=%d rt=%d\n",
+		__func__, ip, ip->i_ino, xfs_inode_has_forcealign(ip), ip->i_extsize,
+		XFS_IS_REALTIME_INODE(ip));
 	xfs_setup_inode(ip);
 
 	*ipp = ip;
