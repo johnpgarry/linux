@@ -273,6 +273,11 @@ xfs_inode_from_disk(
 		xfs_ifork_init_cow(ip);
 	pr_err("%s2 ip=%pS i_ino=%lld ip->i_mount=%pS xfs_inode_has_forcealign=%d i_extsize=%d rt=%d\n",
 		__func__, ip, ip->i_ino, ip->i_mount, xfs_inode_has_forcealign(ip), ip->i_extsize, XFS_IS_REALTIME_INODE(ip));
+	xfs_inode_awu_init(ip);
+	pr_err("%s2 ip=%pS i_ino=%lld ip->i_mount=%pS xfs_inode_has_forcealign=%d i_extsize=%d rt=%d\n",
+		__func__, ip, ip->i_ino, ip->i_mount, xfs_inode_has_forcealign(ip), ip->i_extsize, XFS_IS_REALTIME_INODE(ip));
+
+
 	return 0;
 
 out_destroy_data_fork:

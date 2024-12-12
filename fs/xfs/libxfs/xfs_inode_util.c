@@ -275,7 +275,7 @@ xfs_icreate_want_attrfork(
 	return false;
 }
 
-static void
+void
 xfs_inode_awu_init(
 	struct xfs_inode	*ip)
 {
