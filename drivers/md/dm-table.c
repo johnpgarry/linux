@@ -131,6 +131,8 @@ int dm_table_create(struct dm_table **result, blk_mode_t mode,
 {
 	struct dm_table *t;
 
+	pr_err("%s num_targets=%d md=%pS\n", __func__, num_targets, md);
+
 	if (num_targets > DM_MAX_TARGETS)
 		return -EOVERFLOW;
 
@@ -152,6 +154,7 @@ int dm_table_create(struct dm_table **result, blk_mode_t mode,
 		return -EOVERFLOW;
 	}
 
+	pr_err("%s2 num_targets=%d md=%pS calling alloc_targets\n", __func__, num_targets, md);
 	if (alloc_targets(t, num_targets)) {
 		kfree(t);
 		return -ENOMEM;
@@ -688,8 +691,9 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	char **argv;
 	struct dm_target *ti;
 
-	pr_err("%s t=%pS start=%lld (sectors=%lld) len=%lld (sectors=%lld)\n",
-		__func__, t, start, start >> SECTOR_SHIFT, len, len >> SECTOR_SHIFT);
+	pr_err("%s t=%pS start=%lld (bytes=%lld/0x%llx) len=%lld (bytes=%lld/0x%llx)\n",
+		__func__, t, start, start << SECTOR_SHIFT, start << SECTOR_SHIFT,
+		len, len << SECTOR_SHIFT, len << SECTOR_SHIFT);
 
 	if (t->singleton) {
 		DMERR("%s: target type %s must appear alone in table",
@@ -740,8 +744,11 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 		t->immutable_target_type = ti->type;
 	}
 
-	pr_err("%s5 ti=%pS t=%pS start=%lld (sectors=%lld) len=%lld (sectors=%lld)\n",
-		__func__, ti, t, start, start >> SECTOR_SHIFT, len, len >> SECTOR_SHIFT);
+	pr_err("%s5 ti=%pS t=%pS start=%lld (bytes=%lld/0x%llx) len=%lld (bytes=%lld0x%llx)\n",
+		__func__, ti, t, start,
+		start << SECTOR_SHIFT, start << SECTOR_SHIFT,
+		len,
+		len << SECTOR_SHIFT, len << SECTOR_SHIFT);
 	ti->table = t;
 	ti->begin = start;
 	ti->len = len;

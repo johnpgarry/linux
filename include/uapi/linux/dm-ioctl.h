@@ -290,6 +290,43 @@ enum {
 #define DM_VERSION_PATCHLEVEL	0
 #define DM_VERSION_EXTRA	"-ioctl (2023-03-01)"
 
+static inline char *dm_dev_cmd_to_name(unsigned int cmd)
+{
+	if (cmd == DM_VERSION_CMD)
+		return "DM_VERSION_CMD";
+	if (cmd == DM_REMOVE_ALL_CMD)
+		return "DM_REMOVE_ALL_CMD";
+	if (cmd == DM_LIST_DEVICES_CMD)
+		return "DM_LIST_DEVICES_CMD";
+	if (cmd == DM_DEV_CREATE_CMD)
+		return "DM_DEV_CREATE_CMD";
+	if (cmd == DM_DEV_REMOVE_CMD)
+		return "DM_DEV_REMOVE_CMD";
+	if (cmd == DM_DEV_RENAME_CMD)
+		return "DM_DEV_RENAME_CMD";
+	if (cmd == DM_DEV_SUSPEND_CMD)
+		return "DM_DEV_SUSPEND_CMD";
+	if (cmd == DM_DEV_STATUS_CMD)
+		return "DM_DEV_STATUS_CMD";
+	if (cmd == DM_TABLE_LOAD_CMD)
+		return "DM_TABLE_LOAD_CMD";
+	if (cmd == DM_TABLE_CLEAR_CMD)
+		return "DM_TABLE_CLEAR_CMD";
+	if (cmd == DM_TABLE_DEPS_CMD)
+		return "DM_TABLE_DEPS_CMD";
+	if (cmd == DM_TABLE_STATUS_CMD)
+		return "DM_TABLE_STATUS_CMD";
+	if (cmd == DM_LIST_VERSIONS_CMD)
+		return "DM_LIST_VERSIONS_CMD";
+	if (cmd == DM_DEV_SET_GEOMETRY_CMD)
+		return "DM_DEV_SET_GEOMETRY_CMD";
+	if (cmd == DM_DEV_ARM_POLL_CMD)
+		return "DM_DEV_ARM_POLL_CMD";
+	if (cmd == DM_GET_TARGET_VERSION_CMD)
+		return "DM_GET_TARGET_VERSION_CMD";
+	return "unknown in dm_dev_cmd_to_name";
+}
+
 /* Status bits */
 #define DM_READONLY_FLAG	(1 << 0) /* In/Out */
 #define DM_SUSPEND_FLAG		(1 << 1) /* In/Out */

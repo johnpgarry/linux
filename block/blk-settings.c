@@ -247,6 +247,7 @@ int blk_validate_limits(struct queue_limits *lim)
 	unsigned int logical_block_sectors;
 	int err;
 
+	pr_err("%s lim=%pS\n", __func__, lim);
 	/*
 	 * Unless otherwise specified, default to 512 byte logical blocks and a
 	 * physical block size equal to the logical block size.

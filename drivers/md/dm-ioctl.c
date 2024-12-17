@@ -881,6 +881,7 @@ static int dev_create(struct file *filp, struct dm_ioctl *param, size_t param_si
 	int r, m = DM_ANY_MINOR;
 	struct mapped_device *md;
 
+	pr_err("%s param->name=%s\n", __func__, param->name);
 	r = check_name(param->name);
 	if (r)
 		return r;
@@ -888,6 +889,7 @@ static int dev_create(struct file *filp, struct dm_ioctl *param, size_t param_si
 	if (param->flags & DM_PERSISTENT_DEV_FLAG)
 		m = MINOR(huge_decode_dev(param->dev));
 
+	pr_err("%s1 calling dm_create\n", __func__);
 	r = dm_create(m, &md);
 	if (r)
 		return r;
@@ -898,6 +900,8 @@ static int dev_create(struct file *filp, struct dm_ioctl *param, size_t param_si
 		dm_destroy(md);
 		return r;
 	}
+	pr_err("%s2 param->name=%s md=%pS (name=%s)\n",
+		__func__, param->name, md, md->name);
 
 	param->flags &= ~DM_INACTIVE_PRESENT_FLAG;
 
@@ -1458,14 +1462,37 @@ static int populate_table(struct dm_table *table,
 	char *target_params;
 	size_t min_size = sizeof(struct dm_ioctl);
 
+	pr_err("%s table=%pS param->target_count=%d\n", __func__, table, param->target_count);
+
 	if (!param->target_count) {
 		DMERR("%s: no targets specified", __func__);
 		return -EINVAL;
 	}
+#if 0
+dm_target_spec
+		__u64 sector_start;
+	__u64 length;
+	__s32 status;		/* used when reading from kernel only */
+
+	/*
+	 * Location of the next dm_target_spec.
+	 * - When specifying targets on a DM_TABLE_LOAD command, this value is
+	 *   the number of bytes from the start of the "current" dm_target_spec
+	 *   to the start of the "next" dm_target_spec.
+	 * - When retrieving targets on a DM_TABLE_STATUS command, this value
+	 *   is the number of bytes from the start of the first dm_target_spec
+	 *   (that follows the dm_ioctl struct) to the start of the "next"
+	 *   dm_target_spec.
+	 */
+	__u32 next;
+
+	char target_type[DM_MAX_TYPE_NAME];
+#endif
 
 	for (i = 0; i < param->target_count; i++) {
 		const char *nul_terminator;
 
+		pr_err("%s2 i=%d spec=%pS\n", __func__, i, spec);
 		if (next < min_size) {
 			DMERR("%s: next target spec (offset %u) overlaps %s",
 			      __func__, next, i ? "previous target" : "'struct dm_ioctl'");
@@ -1487,8 +1514,8 @@ static int populate_table(struct dm_table *table,
 		/* Add 1 for NUL terminator */
 		min_size = (size_t)(nul_terminator - (const char *)spec) + 1;
 
-		pr_err("%s i=%d calling dm_table_add_target spec->sector_start=%lld, length=%lld\n",
-			__func__, i, spec->sector_start, spec->length);
+		pr_err("%s i=%d calling dm_table_add_target spec->sector_start=%lld, length=%lld, target_type=%pS\n",
+			__func__, i, spec->sector_start, spec->length, spec->target_type);
 		r = dm_table_add_target(table, spec->target_type,
 					(sector_t) spec->sector_start,
 					(sector_t) spec->length,
@@ -1501,6 +1528,7 @@ static int populate_table(struct dm_table *table,
 		next = spec->next;
 	}
 
+	pr_err("%s3 table=%pS calling dm_table_complete\n", __func__, table);
 	return dm_table_complete(table);
 }
 
@@ -1525,7 +1553,7 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 	if (!md)
 		return -ENXIO;
 
-	pr_err("%s calling dm_table_create\n", __func__);
+	pr_err("%s calling dm_table_create md=%pS dm_get_md_type(md)=%d\n", __func__, md, dm_get_md_type(md));
 	r = dm_table_create(&t, get_mode(param), param->target_count, md);
 	if (r)
 		goto err;
@@ -1534,6 +1562,7 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 	dm_lock_md_type(md);
 	pr_err("%s1 calling populate_table\n", __func__);
 	r = populate_table(t, param, param_size);
+	pr_err("%s1.1 called populate_table r=%d\n", __func__, r);
 	if (r)
 		goto err_unlock_md_type;
 
@@ -2081,6 +2110,7 @@ static int ctl_ioctl(struct file *file, uint command, struct dm_ioctl __user *us
 	if (cmd == DM_VERSION_CMD)
 		return 0;
 
+	pr_err("%s cmd=%d calling lookup_ioctl %s\n", __func__, cmd, dm_dev_cmd_to_name(cmd));
 	fn = lookup_ioctl(cmd, &ioctl_flags);
 	if (!fn) {
 		DMERR("dm_ctl_ioctl: unknown command 0x%x", command);
@@ -2101,6 +2131,7 @@ static int ctl_ioctl(struct file *file, uint command, struct dm_ioctl __user *us
 		goto out;
 
 	param->data_size = offsetof(struct dm_ioctl, data);
+	pr_err("%s2 cmd=%d calling fn=%pS\n", __func__, cmd, fn);
 	r = fn(file, param, input_param_size);
 
 	if (unlikely(param->flags & DM_BUFFER_FULL_FLAG) &&

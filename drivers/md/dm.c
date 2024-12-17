@@ -2348,6 +2348,7 @@ static struct mapped_device *alloc_dev(int minor)
 	struct mapped_device *md;
 	void *old_md;
 
+	pr_err("%s minor=%d\n", __func__, minor);
 	md = kvzalloc_node(sizeof(*md), GFP_KERNEL, numa_node_id);
 	if (!md) {
 		DMERR("unable to allocate device, out of memory.");
@@ -2389,7 +2390,9 @@ static struct mapped_device *alloc_dev(int minor)
 	 * established. If request-based table is loaded: blk-mq will
 	 * override accordingly.
 	 */
+	pr_err("%s2 calling blk_alloc_disk\n", __func__);
 	md->disk = blk_alloc_disk(NULL, md->numa_node_id);
+	pr_err("%s3 called blk_alloc_disk md->disk=%pS\n", __func__, md->disk);
 	if (IS_ERR(md->disk)) {
 		md->disk = NULL;
 		goto bad;
@@ -2593,6 +2596,7 @@ int dm_create(int minor, struct mapped_device **result)
 {
 	struct mapped_device *md;
 
+	pr_err("%s minor=%d calling alloc_dev\n", __func__, minor);
 	md = alloc_dev(minor);
 	if (!md)
 		return -ENXIO;
