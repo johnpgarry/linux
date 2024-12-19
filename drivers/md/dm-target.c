@@ -22,9 +22,12 @@ static inline struct target_type *__find_target_type(const char *name)
 {
 	struct target_type *tt;
 
+	pr_err("%s name=%s\n", __func__, name);
 	list_for_each_entry(tt, &_targets, list)
-		if (!strcmp(name, tt->name))
+		if (!strcmp(name, tt->name)) {
+			pr_err("%s2 matched name=%s tt=%pS\n", __func__, name, tt);
 			return tt;
+		}
 
 	return NULL;
 }
@@ -35,6 +38,7 @@ static struct target_type *get_target_type(const char *name)
 
 	down_read(&_lock);
 
+	pr_err("%s calling __find_target_type name=%s\n", __func__, name);
 	tt = __find_target_type(name);
 	if (tt && !try_module_get(tt->module))
 		tt = NULL;
@@ -50,7 +54,11 @@ static void load_module(const char *name)
 
 struct target_type *dm_get_target_type(const char *name)
 {
-	struct target_type *tt = get_target_type(name);
+	struct target_type *tt;
+
+
+	pr_err("%s calling get_target_type name=%s\n", __func__, name);
+	tt = get_target_type(name);
 
 	if (!tt) {
 		load_module(name);

@@ -435,8 +435,8 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 	}
 
-	pr_err("%s start=%lld len=%lld limits=%pS bdev=%pS q=%pS (limits=%pS) calling blk_stack_limits \n",
-		__func__, start, len, limits, bdev, q, &q->limits);
+	pr_err("%s start=%lld len=%lld limits=%pS bdev=%pS q=%pS (limits=%pS) calling blk_stack_limits get_start_sect=%lld\n",
+		__func__, start, len, limits, bdev, q, &q->limits, get_start_sect(bdev));
 	if (blk_stack_limits(limits, &q->limits,
 			get_start_sect(bdev) + start) < 0)
 		DMWARN("%s: adding target device %pg caused an alignment inconsistency: "
@@ -606,8 +606,10 @@ int dm_split_args(int *argc, char ***argvp, char *input)
 
 static void dm_set_stacking_limits(struct queue_limits *limits)
 {
+	pr_err("%s calling blk_set_stacking_limits limits=%pS\n", __func__, limits);
 	blk_set_stacking_limits(limits);
-	limits->features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL | BLK_FEAT_ATOMIC_WRITES_STACKED;
+	pr_err("%s1 called blk_set_stacking_limits limits=%pS\n", __func__, limits);
+	limits->features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
 }
 
 /*
@@ -691,9 +693,9 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	char **argv;
 	struct dm_target *ti;
 
-	pr_err("%s t=%pS start=%lld (bytes=%lld/0x%llx) len=%lld (bytes=%lld/0x%llx)\n",
+	pr_err("%s t=%pS start=%lld (bytes=%lld/0x%llx) len=%lld (bytes=%lld/0x%llx) type=%s\n",
 		__func__, t, start, start << SECTOR_SHIFT, start << SECTOR_SHIFT,
-		len, len << SECTOR_SHIFT, len << SECTOR_SHIFT);
+		len, len << SECTOR_SHIFT, len << SECTOR_SHIFT, type);
 
 	if (t->singleton) {
 		DMERR("%s: target type %s must appear alone in table",
@@ -710,7 +712,8 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 		DMERR("%s: zero-length target", dm_device_name(t->md));
 		return -EINVAL;
 	}
-
+ 
+	pr_err("%s1 calling dm_get_target_type type=%s\n", __func__, type);
 	ti->type = dm_get_target_type(type);
 	if (!ti->type) {
 		DMERR("%s: %s: unknown target type", dm_device_name(t->md), type);
@@ -1813,6 +1816,31 @@ static bool dm_table_supports_discards(struct dm_table *t)
 	return true;
 }
 
+static int device_not_atomic_write_capable(struct dm_target *ti, struct dm_dev *dev,
+				      sector_t start, sector_t len, void *data)
+{
+	pr_err("%s dev->bdev=%pS bdev_can_atomic_write=%d start=%lld len=%lld\n",
+		__func__, dev->bdev, bdev_can_atomic_write(dev->bdev), start, len);
+	return !bdev_can_atomic_write(dev->bdev);
+}
+
+static bool dm_table_supports_atomic_writes(struct dm_table *t)
+{
+	pr_err("%s t=%pS (num_targets=%d)\n", __func__, t, t->num_targets);
+	for (unsigned int i = 0; i < t->num_targets; i++) {
+		struct dm_target *ti = dm_table_get_target(t, i);
+		pr_err("%s1 t=%pS i=%d ti=%pS\n", __func__, t, i, ti);
+
+		if (ti->type->iterate_devices(ti, device_not_atomic_write_capable, NULL)) {
+			pr_err("%s2 iterate_devices failed t=%pS i=%d ti=%pS\n", __func__, t, i, ti);
+			return false;
+		}
+	}
+
+	pr_err("%s10 t=%pS return true\n", __func__, t);
+	return true;
+}
+
 static int device_not_secure_erase_capable(struct dm_target *ti,
 					   struct dm_dev *dev, sector_t start,
 					   sector_t len, void *data)
@@ -1841,6 +1869,7 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 {
 	int r;
 
+	pr_err("%s t=%pS q=%pS limits=%pS\n", __func__, t, q, limits);
 	if (!dm_table_supports_nowait(t))
 		limits->features &= ~BLK_FEAT_NOWAIT;
 
@@ -1884,7 +1913,17 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 			return r;
 	}
 
+	if (dm_table_supports_atomic_writes(t)) {
+		pr_err("%s8 setting BLK_FEAT_ATOMIC_WRITES_STACKED q=%pS limits=%pS\n", __func__, q, limits);
+		limits->features |= BLK_FEAT_ATOMIC_WRITES_STACKED;
+	} else {
+		pr_err("%s8.1 unsetting BLK_FEAT_ATOMIC_WRITES_STACKED q=%pS limits=%pS\n", __func__, q, limits);
+		limits->features &= ~BLK_FEAT_ATOMIC_WRITES_STACKED;
+	}
+
+	pr_err("%s9 calling queue_limits_set q=%pS limits=%pS\n", __func__, q, limits);
 	r = queue_limits_set(q, limits);
+	pr_err("%s9.1 called queue_limits_set r=%d q=%pS limits=%pS\n", __func__, r, q, limits);
 	if (r)
 		return r;
 

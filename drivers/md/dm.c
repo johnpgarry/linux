@@ -1429,8 +1429,8 @@ static void __map_bio(struct bio *clone)
 	clone->bi_end_io = clone_endio;
 
 	if (clone->bi_opf & REQ_ATOMIC)
-		pr_err("%s clone=%pS (bi_sector=%lld, bi_size=%d)\n",
-			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size);
+		pr_err("%s clone=%pS (bi_sector=%lld, bi_size=%d, bi_bdev=%pS)\n",
+			__func__, clone, clone->bi_iter.bi_sector, clone->bi_iter.bi_size, clone->bi_bdev);
 	/*
 	 * Map the clone.
 	 */

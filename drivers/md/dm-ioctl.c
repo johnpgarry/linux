@@ -709,6 +709,7 @@ static int __list_versions(struct dm_ioctl *param, size_t param_size, const char
 	struct target_type *tt = NULL;
 
 	if (name) {
+		pr_err("%s1 calling dm_get_target_type name=%s\n", __func__, name);
 		tt = dm_get_target_type(name);
 		if (!tt)
 			return -EINVAL;
@@ -1514,7 +1515,7 @@ dm_target_spec
 		/* Add 1 for NUL terminator */
 		min_size = (size_t)(nul_terminator - (const char *)spec) + 1;
 
-		pr_err("%s i=%d calling dm_table_add_target spec->sector_start=%lld, length=%lld, target_type=%pS\n",
+		pr_err("%s2.1 i=%d calling dm_table_add_target spec->sector_start=%lld, length=%lld, target_type=%s\n",
 			__func__, i, spec->sector_start, spec->length, spec->target_type);
 		r = dm_table_add_target(table, spec->target_type,
 					(sector_t) spec->sector_start,
@@ -1578,8 +1579,10 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 		goto err_unlock_md_type;
 	}
 
+	pr_err("%s1.2 immutable_target_type=%pS (name=%s)\n", __func__, immutable_target_type, immutable_target_type ? immutable_target_type->name : "?");
 	if (dm_get_md_type(md) == DM_TYPE_NONE) {
 		/* setup md->queue to reflect md's type (may block) */
+		pr_err("%s1.3 calling dm_setup_md_queue\n", __func__);
 		r = dm_setup_md_queue(md, t);
 		if (r) {
 			DMERR("unable to set up device queue for new table.");
@@ -2335,7 +2338,7 @@ int __init dm_early_create(struct dm_ioctl *dmi,
 
 	/* add targets */
 	for (i = 0; i < dmi->target_count; i++) {
-		pr_err("%s2 i=%d calling dm_table_add_target\n", __func__, i);
+		pr_err("%s2 i=%d calling dm_table_add_target target_type=%s\n", __func__, i, spec_array[i]->target_type);
 		r = dm_table_add_target(t, spec_array[i]->target_type,
 					(sector_t) spec_array[i]->sector_start,
 					(sector_t) spec_array[i]->length,

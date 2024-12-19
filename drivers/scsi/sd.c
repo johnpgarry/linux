@@ -1302,7 +1302,7 @@ static blk_status_t sd_setup_atomic_cmnd(struct scsi_cmnd *cmd,
 					bool boundary, unsigned char flags)
 {
 	struct request *rq = scsi_cmd_to_rq(cmd);
-	//WARN_ON_ONCE(1);
+	WARN_ON_ONCE(1);
 	pr_err("%s lba=%lld nr_blocks=%d device=%pS rq->bio=%pS\n",
 	__func__, lba, nr_blocks, cmd->device, rq->bio);
 	cmd->cmd_len  = 16;

@@ -79,9 +79,13 @@ static void linear_dtr(struct dm_target *ti)
 	kfree(lc);
 }
 
-static sector_t linear_map_sector(struct dm_target *ti, sector_t bi_sector)
+static sector_t linear_map_sector(struct dm_target *ti, sector_t bi_sector, bool atomic)
 {
 	struct linear_c *lc = ti->private;
+
+	if (atomic)
+		pr_err("%s bi_sector=%lld lc->start=%lld ti->begin=%lld, len=%lld\n",
+			__func__, bi_sector, lc->start, ti->begin, ti->len);
 
 	return lc->start + dm_target_offset(ti, bi_sector);
 }
@@ -91,13 +95,13 @@ int linear_map(struct dm_target *ti, struct bio *bio)
 	struct linear_c *lc = ti->private;
 
 	if (bio->bi_opf & REQ_ATOMIC)
-		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d) lc->start=%lld ti->begin=%lld (sectors=%lld), len=%lld (sectors=%lld)\n",
+		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d) lc->start=%lld ti->begin=%lld (bytes=%lld), len=%lld (bytes=%lld)\n",
 			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, lc->start,
-			ti->begin, ti->begin >> SECTOR_SHIFT,
-			ti->len, ti->len >> SECTOR_SHIFT);
+			ti->begin, ti->begin << SECTOR_SHIFT,
+			ti->len, ti->len << SECTOR_SHIFT);
 
 	bio_set_dev(bio, lc->dev->bdev);
-	bio->bi_iter.bi_sector = linear_map_sector(ti, bio->bi_iter.bi_sector);
+	bio->bi_iter.bi_sector = linear_map_sector(ti, bio->bi_iter.bi_sector, bio->bi_opf & REQ_ATOMIC);
 
 	if (bio->bi_opf & REQ_ATOMIC)
 		pr_err("%s10 bio=%pS (bi_sector=%lld, bi_size=%d)\n",
@@ -210,7 +214,8 @@ static struct target_type linear_target = {
 	.name   = "linear",
 	.version = {1, 4, 0},
 	.features = DM_TARGET_PASSES_INTEGRITY | DM_TARGET_NOWAIT |
-		    DM_TARGET_ZONED_HM | DM_TARGET_PASSES_CRYPTO,
+		    DM_TARGET_ZONED_HM | DM_TARGET_PASSES_CRYPTO |
+		    DM_TARGET_ATOMIC_WRITES,
 	.report_zones = linear_report_zones,
 	.module = THIS_MODULE,
 	.ctr    = linear_ctr,

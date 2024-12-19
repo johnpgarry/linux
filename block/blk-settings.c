@@ -175,7 +175,9 @@ static void blk_atomic_writes_update_limits(struct queue_limits *lim)
 static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 {
 	unsigned int boundary_sectors;
-
+ 
+	pr_err("%s lim=%pS atomic_write_hw_max=%d BLK_FEAT_ATOMIC_WRITES_STACKED set=%d\n",
+		__func__, lim, lim->atomic_write_hw_max, !!(lim->features & BLK_FEAT_ATOMIC_WRITES_STACKED));
 	if (!lim->atomic_write_hw_max)
 		goto unsupported;
 
@@ -601,12 +603,14 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 }
 
 static void blk_stack_atomic_writes_limits(struct queue_limits *t,
-				struct queue_limits *b)
+				struct queue_limits *b,
+				sector_t start)
 {
-	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d)\n",
+	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
 		__func__,
 		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
-		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max);
+		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max,
+		start);
 
 	if (!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED)) {
 		pr_err("%s t=%pS !BLK_FEAT_ATOMIC_WRITES_STACKED b=%pS ERROR\n", __func__,
@@ -616,6 +620,15 @@ static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 
 	if (!b->atomic_write_hw_unit_min) {
 		pr_err("%s b=%pS !b->atomic_write_unit_min atomic_write_hw_unit_min=%d ERROR\n", __func__, b, b->atomic_write_hw_unit_min);
+		goto unsupported;
+	}
+
+	/* It would be better to check alignment against the real HW atomic write limit,
+	  which is in atomic_write_hw_unit_max. However that value is not reported via
+	  sysfs, so just check versus the atomic_write_unit_max, which is ok */
+	if (!IS_ALIGNED(start, b->atomic_write_unit_max >> SECTOR_SHIFT)) {
+		pr_err("%s b=%pS !IS_ALIGNED b->atomic_write_unit_max=%d start=%lld ERROR\n",
+			__func__, b, b->atomic_write_hw_unit_min, start);
 		goto unsupported;
 	}
 
@@ -635,6 +648,30 @@ static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 		pr_err("%s t=%pS !blk_stack_atomic_writes_head b=%pS ERROR\n", __func__, t, b);
 		goto unsupported;
 	}
+
+	pr_err("%s2 t=%pS (atomic_write_hw_unit_min/max=%d/%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
+		__func__,
+		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max,
+		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max,
+		start);
+	pr_err("%s2.1 t=%pS (atomic_write_unit_min/max=%d/%d) b=%pS (atomic_write_unit_min/max=%d/%d) start=%lld\n",
+		__func__,
+		t, t->atomic_write_unit_min, t->atomic_write_unit_max,
+		b, b->atomic_write_unit_min, b->atomic_write_unit_max,
+		start);
+
+	if (!IS_ALIGNED(start, t->atomic_write_hw_unit_max >> SECTOR_SHIFT)) {
+	//	pr_err("%s t=%pS !IS_ALIGNED start=%lld t->atomic_write_hw_unit_max=%d ERROR\n", __func__,
+	//		t, start, t->atomic_write_hw_unit_max);
+	//	goto unsupported;
+	}
+
+	if (!IS_ALIGNED(start, b->atomic_write_hw_unit_max >> SECTOR_SHIFT)) {
+	//	pr_err("%s t=%pS !IS_ALIGNED start=%lld b->atomic_write_hw_unit_max=%d ERROR\n", __func__,
+	//		t, start, b->atomic_write_hw_unit_max);
+	//	goto unsupported;
+	}
+
 	return;
 
 unsupported:
@@ -676,10 +713,10 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 {
 	unsigned int top, bottom, alignment, ret = 0;
 
-	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d)\n",
+	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
 		__func__,
 		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
-		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max);
+		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max, start);
 
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
 
@@ -815,7 +852,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 		t->zone_write_granularity = 0;
 		t->max_zone_append_sectors = 0;
 	}
-	blk_stack_atomic_writes_limits(t, b);
+	blk_stack_atomic_writes_limits(t, b, start);
 
 	return ret;
 }
@@ -839,6 +876,7 @@ EXPORT_SYMBOL(blk_stack_limits);
 void queue_limits_stack_bdev(struct queue_limits *t, struct block_device *bdev,
 		sector_t offset, const char *pfx)
 {
+	pr_err("%s t=%pS offset=%lld get_start_sect(bdev)=%lld\n", __func__, t, offset, get_start_sect(bdev));
 	if (blk_stack_limits(t, bdev_limits(bdev),
 			get_start_sect(bdev) + offset))
 		pr_notice("%s: Warning: Device %pg is misaligned\n",
