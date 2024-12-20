@@ -176,8 +176,8 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 {
 	unsigned int boundary_sectors;
  
-	pr_err("%s lim=%pS atomic_write_hw_max=%d BLK_FEAT_ATOMIC_WRITES_STACKED set=%d\n",
-		__func__, lim, lim->atomic_write_hw_max, !!(lim->features & BLK_FEAT_ATOMIC_WRITES_STACKED));
+	pr_err("%s lim=%pS atomic_write_hw_max=%d BLK_FEAT_ATOMIC_WRITES set=%d\n",
+		__func__, lim, lim->atomic_write_hw_max, !!(lim->features & BLK_FEAT_ATOMIC_WRITES));
 	if (!lim->atomic_write_hw_max)
 		goto unsupported;
 
@@ -387,7 +387,11 @@ int blk_validate_limits(struct queue_limits *lim)
 	if (!(lim->features & BLK_FEAT_WRITE_CACHE))
 		lim->features &= ~BLK_FEAT_FUA;
 
-	pr_err("%s9 calling blk_validate_atomic_write_limits lim=%pS\n", __func__, lim);
+	pr_err("%s checking atomic_write_hw_unit_min lim=%pS BLK_FEAT_ATOMIC_WRITES set=%d\n",
+		__func__, lim, lim->features & BLK_FEAT_ATOMIC_WRITES);
+
+	pr_err("%s9 calling blk_validate_atomic_write_limits lim=%pS BLK_FEAT_ATOMIC_WRITES set=%d\n",
+		__func__, lim, lim->features & BLK_FEAT_ATOMIC_WRITES);
 	blk_validate_atomic_write_limits(lim);
 
 	err = blk_validate_integrity_limits(lim);
@@ -410,6 +414,7 @@ int blk_set_default_limits(struct queue_limits *lim)
 	 * initialization to the max value here.
 	 */
 	lim->max_user_discard_sectors = UINT_MAX;
+	pr_err("%s calling blk_validate_limits lim=%pS\n", __func__, lim);
 	return blk_validate_limits(lim);
 }
 
@@ -606,14 +611,14 @@ static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 				struct queue_limits *b,
 				sector_t start)
 {
-	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
+	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
 		__func__,
-		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
+		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
 		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max,
 		start);
 
-	if (!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED)) {
-		pr_err("%s t=%pS !BLK_FEAT_ATOMIC_WRITES_STACKED b=%pS ERROR\n", __func__,
+	if (!(t->features & BLK_FEAT_ATOMIC_WRITES)) {
+		pr_err("%s t=%pS !BLK_FEAT_ATOMIC_WRITES b=%pS ERROR\n", __func__,
 			t, b);
 		goto unsupported;
 	}
@@ -675,16 +680,15 @@ static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 	return;
 
 unsupported:
-	pr_err("%s10 unsupported: t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_max=%d/%d)\n",
+	pr_err("%s10 unsupported: t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d) b=%pS (atomic_write_hw_unit_max=%d/%d)\n",
 		__func__,
-		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
+		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
 		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max);
 
 	t->atomic_write_hw_max = 0;
 	t->atomic_write_hw_unit_max = 0;
 	t->atomic_write_hw_unit_min = 0;
 	t->atomic_write_hw_boundary = 0;
-	t->features &= ~BLK_FEAT_ATOMIC_WRITES_STACKED;
 }
 
 /**
@@ -713,9 +717,9 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 {
 	unsigned int top, bottom, alignment, ret = 0;
 
-	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES_STACKED=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
+	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
 		__func__,
-		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED),
+		t, t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
 		b, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max, start);
 
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);

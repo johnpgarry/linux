@@ -5761,6 +5761,8 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 {
 	struct md_rdev *rdev;
 
+	pr_err("%s mddev=%pS limit=%pS\n", __func__, mddev, lim);
+
 	rdev_for_each(rdev, mddev) {
 		queue_limits_stack_bdev(lim, rdev->bdev, rdev->data_offset,
 					mddev->gendisk->disk_name);

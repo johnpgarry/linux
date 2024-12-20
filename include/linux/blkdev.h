@@ -334,7 +334,7 @@ typedef unsigned int __bitwise blk_features_t;
 	((__force blk_features_t)(1u << 15))
 
 /* stacked device can/does support atomic writes */
-#define BLK_FEAT_ATOMIC_WRITES_STACKED \
+#define BLK_FEAT_ATOMIC_WRITES \
 	((__force blk_features_t)(1u << 16))
 
 /*
