@@ -450,8 +450,10 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		       q->limits.alignment_offset,
 		       (unsigned long long) start << SECTOR_SHIFT);
 
-	pr_err("%s2 start=%lld len=%lld limits=%pS bdev=%pS q=%pS (limits=%pS) called blk_stack_limits \n",
-		__func__, start, len, limits, bdev, q, &q->limits);
+	pr_err("%s2 start=%lld len=%lld limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) bdev=%pS q=%pS (limits=%pS, BLK_FEAT_ATOMIC_WRITES set=%d) called blk_stack_limits get_start_sect=%lld\n",
+		__func__, start, len, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		bdev, q, &q->limits, !!(q->limits.features & BLK_FEAT_ATOMIC_WRITES),
+		get_start_sect(bdev));
 
 	/*
 	 * Only stack the integrity profile if the target doesn't have native
@@ -1643,16 +1645,14 @@ int dm_calculate_queue_limits(struct dm_table *t,
 	}
 
 	pr_err("%s1.2 atomic_writes=%d\n", __func__, atomic_writes);
-
+	if (atomic_writes)
+		limits->features |= BLK_FEAT_ATOMIC_WRITES;
 
 	for (unsigned int i = 0; i < t->num_targets; i++) {
 		struct dm_target *ti = dm_table_get_target(t, i);
 
 		pr_err("%s2 t=%pS limits=%pS calling dm_set_stacking_limits ti_limits=%pS i=%d t->num_targets=%d\n", __func__, t, limits, &ti_limits, i, t->num_targets);
 		dm_set_stacking_limits(&ti_limits);
-
-		//if (dm_target_supports_atomic_writes(ti->type))
-		//	ti_limits->features |= BLK_FEAT_ATOMIC_WRITES;
 
 		if (!ti->type->iterate_devices) {
 			/* Set I/O hints portion of queue limits */
@@ -1661,6 +1661,11 @@ int dm_calculate_queue_limits(struct dm_table *t,
 			goto combine_limits;
 		}
 
+		/* dm_set_device_limits() -> blk_stack_limits() considers ti_limits  the 'top', so
+		we have to set BLK_FEAT_ATOMIC_WRITES here also. That is even though it is 'bottom'
+		at combine_limits: -> blk_stack_limits() */
+		if (atomic_writes)
+			ti_limits.features |= BLK_FEAT_ATOMIC_WRITES;
 		/*
 		 * Combine queue limits of all the devices this target uses.
 		 */
