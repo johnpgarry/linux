@@ -435,8 +435,10 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 	}
 
-	pr_err("%s start=%lld len=%lld limits=%pS bdev=%pS q=%pS (limits=%pS) calling blk_stack_limits get_start_sect=%lld\n",
-		__func__, start, len, limits, bdev, q, &q->limits, get_start_sect(bdev));
+	pr_err("%s start=%lld len=%lld limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) bdev=%pS q=%pS (limits=%pS, BLK_FEAT_ATOMIC_WRITES set=%d) calling blk_stack_limits get_start_sect=%lld\n",
+		__func__, start, len, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		bdev, q, &q->limits, !!(q->limits.features & BLK_FEAT_ATOMIC_WRITES),
+		get_start_sect(bdev));
 	if (blk_stack_limits(limits, &q->limits,
 			get_start_sect(bdev) + start) < 0)
 		DMWARN("%s: adding target device %pg caused an alignment inconsistency: "
@@ -628,6 +630,7 @@ static int validate_hardware_logical_block_alignment(struct dm_table *t,
 	 */
 	unsigned short device_logical_block_size_sects =
 		limits->logical_block_size >> SECTOR_SHIFT;
+	pr_err("%s t=%pS limits=%pS\n", __func__, t, limits);
 
 	/*
 	 * Offset of the start of the next table entry, mod logical_block_size.
@@ -1614,10 +1617,18 @@ int dm_calculate_queue_limits(struct dm_table *t,
 	struct queue_limits ti_limits;
 	unsigned int zone_sectors = 0;
 	bool zoned = false;
+	bool atomic_writes = true;
 
-	pr_err("%s t=%pS limits=%pS calling dm_set_stacking_limits ti_limits=%pS\n", __func__, t, limits, &ti_limits);
+	pr_err("%s calling dm_set_stacking_limits t=%pS limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) calling dm_set_stacking_limits ti_limits=%pS\n",
+		__func__, t, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		&ti_limits);
 
 	dm_set_stacking_limits(limits);
+
+	pr_err("%s1 called dm_set_stacking_limits t=%pS limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) calling dm_set_stacking_limits ti_limits=%pS\n",
+		__func__, t, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		&ti_limits);
+
 
 	t->integrity_supported = true;
 	for (unsigned int i = 0; i < t->num_targets; i++) {
@@ -1625,13 +1636,23 @@ int dm_calculate_queue_limits(struct dm_table *t,
 
 		if (!dm_target_passes_integrity(ti->type))
 			t->integrity_supported = false;
+		if (!dm_target_supports_atomic_writes(ti->type)) {
+			pr_err("%s1.1 unsetting atomic writes for i=%d\n", __func__, i);
+			atomic_writes = false;
+		}
 	}
+
+	pr_err("%s1.2 atomic_writes=%d\n", __func__, atomic_writes);
+
 
 	for (unsigned int i = 0; i < t->num_targets; i++) {
 		struct dm_target *ti = dm_table_get_target(t, i);
 
 		pr_err("%s2 t=%pS limits=%pS calling dm_set_stacking_limits ti_limits=%pS i=%d t->num_targets=%d\n", __func__, t, limits, &ti_limits, i, t->num_targets);
 		dm_set_stacking_limits(&ti_limits);
+
+		//if (dm_target_supports_atomic_writes(ti->type))
+		//	ti_limits->features |= BLK_FEAT_ATOMIC_WRITES;
 
 		if (!ti->type->iterate_devices) {
 			/* Set I/O hints portion of queue limits */

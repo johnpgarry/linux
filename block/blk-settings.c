@@ -514,7 +514,7 @@ static unsigned int blk_round_down_sectors(unsigned int sectors, unsigned int lb
 
 /* Check if second and later bottom devices are compliant */
 static bool blk_stack_atomic_writes_tail(struct queue_limits *t,
-				struct queue_limits *b)
+				const struct queue_limits *b)
 {
 	/* We're not going to support different boundary sizes.. yet */
 	if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary) {
@@ -545,7 +545,7 @@ static bool blk_stack_atomic_writes_tail(struct queue_limits *t,
 
 /* Check for valid boundary of first bottom device */
 static bool blk_stack_atomic_writes_boundary_head(struct queue_limits *t,
-				struct queue_limits *b)
+				const struct queue_limits *b)
 {
 	/*
 	 * Ensure atomic write boundary is aligned with chunk sectors. Stacked
@@ -570,7 +570,7 @@ static bool blk_stack_atomic_writes_boundary_head(struct queue_limits *t,
 
 /* Check stacking of first bottom device */
 static bool blk_stack_atomic_writes_head(struct queue_limits *t,
-				struct queue_limits *b)
+				const struct queue_limits *b)
 {
 	if (b->atomic_write_hw_boundary &&
 	    !blk_stack_atomic_writes_boundary_head(t, b)) {
@@ -608,7 +608,7 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 }
 
 static void blk_stack_atomic_writes_limits(struct queue_limits *t,
-				struct queue_limits *b,
+				const struct queue_limits *b,
 				sector_t start)
 {
 	pr_err("%s t=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d) b=%pS (atomic_write_hw_unit_min/max=%d/%d) start=%lld\n",
@@ -712,7 +712,7 @@ unsupported:
  *    queue_limits will have the misaligned flag set to indicate that
  *    the alignment_offset is undefined.
  */
-int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
+int blk_stack_limits(struct queue_limits *t, const struct queue_limits *b,
 		     sector_t start)
 {
 	unsigned int top, bottom, alignment, ret = 0;

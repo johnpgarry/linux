@@ -2637,7 +2637,7 @@ struct target_type *dm_get_immutable_target_type(struct mapped_device *md)
 int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 {
 	enum dm_queue_mode type = dm_table_get_type(t);
-	struct queue_limits limits;
+	struct queue_limits limits = {};
 	struct table_device *td;
 	int r;
 
