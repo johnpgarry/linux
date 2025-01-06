@@ -11,6 +11,7 @@
 #include <linux/err.h>
 #include <linux/kthread.h>
 #include <linux/percpu.h>
+#include <linux/sched.h>
 
 #include "funnel-queue.h"
 #include "logger.h"

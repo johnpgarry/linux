@@ -6,12 +6,10 @@
 #ifndef VDO_WORK_QUEUE_H
 #define VDO_WORK_QUEUE_H
 
-#include <linux/sched.h> /* for TASK_COMM_LEN */
-
 #include "types.h"
 
 enum {
-	MAX_VDO_WORK_QUEUE_NAME_LEN = TASK_COMM_LEN,
+	MAX_VDO_WORK_QUEUE_NAME_LEN = MODULE_NAME_LEN + 11,
 };
 
 struct vdo_work_queue_type {
