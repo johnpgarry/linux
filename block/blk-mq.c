@@ -2075,6 +2075,38 @@ static void blk_mq_commit_rqs(struct blk_mq_hw_ctx *hctx, int queued,
 		hctx->queue->mq_ops->commit_rqs(hctx);
 	}
 }
+static bool nvme_valid_atomic_write(struct request *req)
+{
+	struct request_queue *q = req->q;
+	u32 boundary_bytes = queue_atomic_write_boundary_bytes(q);
+
+	if (blk_rq_bytes(req) > queue_atomic_write_max_bytes(q)) {
+		pr_err("%s1 blk_rq_bytes(req) = %d queue_atomic_write_max_bytes=%d\n",
+			__func__, blk_rq_bytes(req),  queue_atomic_write_max_bytes(q));
+		return false;
+	}
+
+	if (boundary_bytes) {
+		u64 mask = boundary_bytes - 1, imask = ~mask;
+		u64 start = blk_rq_pos(req) << SECTOR_SHIFT;
+		u64 end = start + blk_rq_bytes(req) - 1;
+
+		/* If greater then must be crossing a boundary */
+		if (blk_rq_bytes(req) > boundary_bytes) {
+			pr_err("%s2 mask=0x%llx boundary_bytes=%d blk_rq_bytes(req)=%d\n",
+				__func__, mask, boundary_bytes, blk_rq_bytes(req));
+			return false;
+		}
+
+		if ((start & imask) != (end & imask)) {
+			pr_err("%s2 mask=0x%llx boundary_bytes=%d blk_rq_bytes(req)=%d start=%lld end=%lld imask=0x%llx\n",
+				__func__, mask, boundary_bytes, blk_rq_bytes(req), start, end, imask);
+			return false;
+		}
+	}
+
+	return true;
+}
 
 static bool bio_straddles_boundary(struct bio *bio, unsigned int bytes,
 				   unsigned int boundary)
@@ -2084,6 +2116,9 @@ static bool bio_straddles_boundary(struct bio *bio, unsigned int bytes,
 	loff_t start_mod = start % boundary;
 	loff_t end_mod = end % boundary;
 
+	if (end - start > 4096)
+		pr_err_once("%s start=%lld end=%lld boundary=%d start_mod=%lld end_mod=%lld\n", __func__,
+			start, end, boundary, start_mod, end_mod);
 	if (end - start > boundary)
 		return true;
 	if ((start_mod > end_mod) && (start_mod && end_mod))
@@ -2104,7 +2139,8 @@ static void blk_mq_check_atomic_write(struct request *rq)
 	if (!(rq->cmd_flags & REQ_ATOMIC))
 		return;	
 
-
+	pr_err_once("%s sector=%lld sectors=%d atomic_write_boundary=%d\n",
+		__func__, rq->__sector, blk_rq_sectors(rq), atomic_write_boundary);
 	if (blk_rq_bytes(rq) > atomic_max_bytes) {
 		pr_err("%s atomic_max_bytes=%d blk_rq_bytes(rq)=%d\n", __func__, atomic_max_bytes, blk_rq_bytes(rq));
 		BUG();
@@ -2118,6 +2154,9 @@ static void blk_mq_check_atomic_write(struct request *rq)
 			BUG();
 	
 	}
+
+	if (!nvme_valid_atomic_write(rq))
+		BUG();
 }
 /*
  * Returns true if we did some work AND can potentially do more.
