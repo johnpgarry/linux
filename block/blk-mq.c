@@ -2076,6 +2076,49 @@ static void blk_mq_commit_rqs(struct blk_mq_hw_ctx *hctx, int queued,
 	}
 }
 
+static bool bio_straddles_boundary(struct bio *bio, unsigned int bytes,
+				   unsigned int boundary)
+{
+	loff_t start = bio->bi_iter.bi_sector << SECTOR_SHIFT;
+	loff_t end = start + bytes;
+	loff_t start_mod = start % boundary;
+	loff_t end_mod = end % boundary;
+
+	if (end - start > boundary)
+		return true;
+	if ((start_mod > end_mod) && (start_mod && end_mod))
+		return true;
+
+	return false;
+}
+
+static void blk_mq_check_atomic_write(struct request *rq)
+{
+	struct request_queue *q = rq->q;
+	unsigned int atomic_write_boundary = queue_atomic_write_boundary_bytes(q);
+	unsigned int atomic_max_bytes = queue_atomic_write_max_bytes(q);
+
+	if (req_op(rq) != REQ_OP_WRITE)
+		return;
+		
+	if (!(rq->cmd_flags & REQ_ATOMIC))
+		return;	
+
+
+	if (blk_rq_bytes(rq) > atomic_max_bytes) {
+		pr_err("%s atomic_max_bytes=%d blk_rq_bytes(rq)=%d\n", __func__, atomic_max_bytes, blk_rq_bytes(rq));
+		BUG();
+	}
+		
+	if (atomic_write_boundary) {
+		bool straddles = bio_straddles_boundary(rq->bio, blk_rq_bytes(rq), atomic_write_boundary);
+		
+		
+		if (straddles)
+			BUG();
+	
+	}
+}
 /*
  * Returns true if we did some work AND can potentially do more.
  */
@@ -2117,6 +2160,7 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 		 */
 		if (nr_budgets)
 			nr_budgets--;
+		blk_mq_check_atomic_write(rq);
 		ret = q->mq_ops->queue_rq(hctx, &bd);
 		switch (ret) {
 		case BLK_STS_OK:
