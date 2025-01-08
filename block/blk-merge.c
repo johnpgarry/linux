@@ -178,7 +178,7 @@ static inline unsigned int blk_boundary_sectors(const struct queue_limits *lim,
 	 * chunk_sectors must be a multiple of atomic_write_boundary_sectors if
 	 * both non-zero.
 	 */
-	if (is_atomic && lim->atomic_write_boundary_sectors)
+	if (is_atomic && 0 && lim->atomic_write_boundary_sectors)
 		return lim->atomic_write_boundary_sectors;
 
 	return lim->chunk_sectors;
