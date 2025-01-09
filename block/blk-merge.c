@@ -178,7 +178,7 @@ static inline unsigned int blk_boundary_sectors(const struct queue_limits *lim,
 	 * chunk_sectors must be a multiple of atomic_write_boundary_sectors if
 	 * both non-zero.
 	 */
-	if (is_atomic && 0 && lim->atomic_write_boundary_sectors)
+	if (is_atomic && lim->atomic_write_boundary_sectors)
 		return lim->atomic_write_boundary_sectors;
 
 	return lim->chunk_sectors;
@@ -345,8 +345,11 @@ int bio_split_rw_at(struct bio *bio, const struct queue_limits *lim,
 	*segs = nsegs;
 	return 0;
 split:
-	if (bio->bi_opf & REQ_ATOMIC)
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d) max_bytes=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, max_bytes);
 		return -EINVAL;
+	}
 
 	/*
 	 * We can't sanely support splitting for a REQ_NOWAIT bio. End it
