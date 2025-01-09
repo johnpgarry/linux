@@ -1578,8 +1578,11 @@ struct bio *bio_split(struct bio *bio, int sectors,
 		return ERR_PTR(-EINVAL);
 
 	/* atomic writes cannot be split */
-	if (bio->bi_opf & REQ_ATOMIC)
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d) sectors=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, sectors);
 		return ERR_PTR(-EINVAL);
+	}
 
 	split = bio_alloc_clone(bio->bi_bdev, bio, gfp, bs);
 	if (!split)

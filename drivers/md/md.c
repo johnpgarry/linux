@@ -1695,6 +1695,8 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 	rdev->preferred_minor = 0xffff;
 	rdev->data_offset = le64_to_cpu(sb->data_offset);
 	rdev->new_data_offset = rdev->data_offset;
+	pr_err("%s rdev->data_offset=%lld rdev->new_data_offset=%lld\n", __func__,
+		rdev->data_offset, rdev->new_data_offset);
 	if ((le32_to_cpu(sb->feature_map) & MD_FEATURE_RESHAPE_ACTIVE) &&
 	    (le32_to_cpu(sb->feature_map) & MD_FEATURE_NEW_OFFSET))
 		rdev->new_data_offset += (s32)le32_to_cpu(sb->new_offset);
@@ -2051,6 +2053,8 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 		sb->devflags &= ~WriteMostly1;
 	sb->data_offset = cpu_to_le64(rdev->data_offset);
 	sb->data_size = cpu_to_le64(rdev->sectors);
+	pr_err("%s sb->data_offset=%lld sb->data_size=%lld\n", __func__,
+		sb->data_offset, sb->data_size);
 
 	if (mddev->bitmap && mddev->bitmap_info.file == NULL) {
 		sb->bitmap_offset = cpu_to_le32((__u32)mddev->bitmap_info.offset);
@@ -3215,6 +3219,8 @@ offset_store(struct md_rdev *rdev, const char *buf, size_t len)
 		return -EBUSY;
 	rdev->data_offset = offset;
 	rdev->new_data_offset = offset;
+	pr_err("%s rdev->data_offset=%lld rdev->new_data_offset=%lld\n", __func__,
+		rdev->data_offset, rdev->new_data_offset);
 	return len;
 }
 
@@ -3272,6 +3278,8 @@ static ssize_t new_offset_store(struct md_rdev *rdev,
 		mddev->reshape_backwards = 1;
 	else if (new_offset < rdev->data_offset)
 		mddev->reshape_backwards = 0;
+	pr_err("%s rdev->data_offset=%lld rdev->new_data_offset=%lld\n", __func__,
+		rdev->data_offset, rdev->new_data_offset);
 
 	return len;
 }
@@ -5399,8 +5407,11 @@ reshape_position_store(struct mddev *mddev, const char *buf, size_t len)
 	mddev->new_level = mddev->level;
 	mddev->new_layout = mddev->layout;
 	mddev->new_chunk_sectors = mddev->chunk_sectors;
-	rdev_for_each(rdev, mddev)
+	rdev_for_each(rdev, mddev) {
 		rdev->new_data_offset = rdev->data_offset;
+		pr_err("%s rdev->data_offset=%lld rdev->new_data_offset=%lld\n", __func__,
+			rdev->data_offset, rdev->new_data_offset);
+	}
 	err = 0;
 unlock:
 	mddev_unlock(mddev);
@@ -9830,6 +9841,9 @@ void md_finish_reshape(struct mddev *mddev)
 		else
 			rdev->sectors -= rdev->new_data_offset - rdev->data_offset;
 		rdev->data_offset = rdev->new_data_offset;
+		
+		pr_err("%s rdev->data_offset=%lld rdev->new_data_offset=%lld\n", __func__,
+			rdev->data_offset, rdev->new_data_offset);
 	}
 }
 EXPORT_SYMBOL(md_finish_reshape);
