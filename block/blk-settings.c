@@ -52,6 +52,8 @@ void blk_set_stacking_limits(struct queue_limits *lim)
 	lim->max_write_zeroes_sectors = UINT_MAX;
 	lim->max_hw_zone_append_sectors = UINT_MAX;
 	lim->max_user_discard_sectors = UINT_MAX;
+
+	lim->flags = BLK_FLAG_ATOMIC_WRITES_DISABLED;
 }
 EXPORT_SYMBOL(blk_set_stacking_limits);
 
@@ -175,8 +177,20 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 {
 	unsigned int boundary_sectors;
 
-	if (!(lim->features & BLK_FEAT_ATOMIC_WRITES))
+	pr_err("%s lim=%pS BLK_FEAT_ATOMIC_WRITES set=%d BLK_FLAG_ATOMIC_WRITES_DISABLED=%d\n",
+		__func__, lim,
+		!!(lim->features & BLK_FEAT_ATOMIC_WRITES),
+		!!(lim->flags & BLK_FLAG_ATOMIC_WRITES_DISABLED));
+
+	if (!(lim->features & BLK_FEAT_ATOMIC_WRITES)) {
+		pr_err("%s1 lim=%pS BLK_FEAT_ATOMIC_WRITES unset\n", __func__, lim);
 		goto unsupported;
+	}
+
+	if (lim->flags & BLK_FLAG_ATOMIC_WRITES_DISABLED) {
+		pr_err("%s2 lim=%pS BLK_FLAG_ATOMIC_WRITES_DISABLED set\n", __func__, lim);
+		goto unsupported;
+	}
 
 	if (!lim->atomic_write_hw_max)
 		goto unsupported;
@@ -232,11 +246,11 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 	return;
 
 unsupported:
+	pr_err("%s3 lim=%pS unsupported:\n", __func__, lim);
 	lim->atomic_write_max_sectors = 0;
 	lim->atomic_write_boundary_sectors = 0;
 	lim->atomic_write_unit_min = 0;
 	lim->atomic_write_unit_max = 0;
-	lim->features &= ~BLK_FEAT_ATOMIC_WRITES;
 }
 
 /*
