@@ -196,6 +196,8 @@ static ssize_t queue_feature_store(struct gendisk *disk, const char *page,
 	unsigned long val;
 	ssize_t ret;
 
+	pr_err("%s feature=0x%x\n", __func__, feature);
+
 	ret = queue_var_store(&val, page, count);
 	if (ret < 0)
 		return ret;
@@ -712,6 +714,7 @@ queue_attr_store(struct kobject *kobj, struct attribute *attr,
 	mutex_lock(&q->sysfs_lock);
 	blk_mq_freeze_queue(q);
 	res = entry->store(disk, page, length);
+	pr_err("%s res=%ld\n", __func__, res);
 	blk_mq_unfreeze_queue(q);
 	mutex_unlock(&q->sysfs_lock);
 	return res;
