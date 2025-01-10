@@ -2297,8 +2297,10 @@ int __init dm_early_create(struct dm_ioctl *dmi,
 	if (r)
 		goto err_hash_remove;
 
+	pr_err("%s md=%pS\n", __func__, md);
 	/* add targets */
 	for (i = 0; i < dmi->target_count; i++) {
+		pr_err("%s1 md=%pS calling dm_table_add_target i=%d\n", __func__, md, i);
 		r = dm_table_add_target(t, spec_array[i]->target_type,
 					(sector_t) spec_array[i]->sector_start,
 					(sector_t) spec_array[i]->length,
@@ -2315,6 +2317,7 @@ int __init dm_early_create(struct dm_ioctl *dmi,
 		goto err_destroy_table;
 
 	/* setup md->queue to reflect md's type (may block) */
+	pr_err("%s1 md=%pS calling dm_setup_md_queue\n", __func__, md);
 	r = dm_setup_md_queue(md, t);
 	if (r) {
 		DMERR("unable to set up device queue for new table.");

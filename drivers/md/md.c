@@ -5772,12 +5772,20 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 {
 	struct md_rdev *rdev;
 
+	pr_err("%s mddev=%pS limit=%pS MDDEV_STACK_INTEGRITY set=%d\n",
+		__func__, mddev, lim, !!(flags & MDDEV_STACK_ATOMIC_WRITES));
+
 	rdev_for_each(rdev, mddev) {
 		queue_limits_stack_bdev(lim, rdev->bdev, rdev->data_offset,
 					mddev->gendisk->disk_name);
 		if ((flags & MDDEV_STACK_INTEGRITY) &&
 		    !queue_limits_stack_integrity_bdev(lim, rdev->bdev))
 			return -EINVAL;
+		if (!(flags & MDDEV_STACK_ATOMIC_WRITES)) {
+		pr_err("%s mddev=%pS limit=%pS MDDEV_STACK_ATOMIC_WRITES unset, so unsetting BLK_FEAT_ATOMIC_WRITES (was=%d)\n",
+			__func__, mddev, lim, !!(lim->features & BLK_FEAT_ATOMIC_WRITES));
+			lim->features &= ~BLK_FEAT_ATOMIC_WRITES;
+		}
 	}
 
 	return 0;
@@ -5791,7 +5799,7 @@ int mddev_stack_new_rdev(struct mddev *mddev, struct md_rdev *rdev)
 
 	if (mddev_is_dm(mddev))
 		return 0;
-
+	pr_err("%s mddev=%pS rdev=%pS\n", __func__, mddev, rdev);
 	lim = queue_limits_start_update(mddev->gendisk->queue);
 	queue_limits_stack_bdev(&lim, rdev->bdev, rdev->data_offset,
 				mddev->gendisk->disk_name);
@@ -5811,6 +5819,8 @@ EXPORT_SYMBOL_GPL(mddev_stack_new_rdev);
 void mddev_update_io_opt(struct mddev *mddev, unsigned int nr_stripes)
 {
 	struct queue_limits lim;
+
+	pr_err("%s mddev=%pS nr_stripes=%d\n", __func__, mddev, nr_stripes);
 
 	if (mddev_is_dm(mddev))
 		return;

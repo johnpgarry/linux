@@ -175,6 +175,9 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 {
 	unsigned int boundary_sectors;
 
+	if (!(lim->features & BLK_FEAT_ATOMIC_WRITES))
+		goto unsupported;
+
 	if (!lim->atomic_write_hw_max)
 		goto unsupported;
 
@@ -233,6 +236,7 @@ unsupported:
 	lim->atomic_write_boundary_sectors = 0;
 	lim->atomic_write_unit_min = 0;
 	lim->atomic_write_unit_max = 0;
+	lim->features &= ~BLK_FEAT_ATOMIC_WRITES;
 }
 
 /*
@@ -611,14 +615,20 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 				struct queue_limits *b, sector_t start)
 {
-	if (!(t->features & BLK_FEAT_ATOMIC_WRITES_STACKED))
+	if (!(t->features & BLK_FEAT_ATOMIC_WRITES)) {
+		pr_err("%s t=%pS b=%pS BLK_FEAT_ATOMIC_WRITES unset\n", __func__,
+			t, b);
 		goto unsupported;
+	}
 
 	if (!b->atomic_write_hw_unit_min)
 		goto unsupported;
 
-	if (!blk_atomic_write_start_sect_aligned(start, b))
+	if (!blk_atomic_write_start_sect_aligned(start, b)) {
+		pr_err("%s t=%pS b=%pS blk_atomic_write_start_sect_aligned failed start=%lld\n", __func__,
+			t, b, start);
 		goto unsupported;
+	}
 
 	/*
 	 * If atomic_write_hw_max is set, we have already stacked 1x bottom
@@ -639,7 +649,7 @@ unsupported:
 	t->atomic_write_hw_unit_max = 0;
 	t->atomic_write_hw_unit_min = 0;
 	t->atomic_write_hw_boundary = 0;
-	t->features &= ~BLK_FEAT_ATOMIC_WRITES_STACKED;
+	t->features &= ~BLK_FEAT_ATOMIC_WRITES;
 }
 
 /**
@@ -668,7 +678,14 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 {
 	unsigned int top, bottom, alignment, ret = 0;
 
+	// BLK_FEAT_INHERIT_MASK includes BLK_FEAT_ZONED
+	pr_err("%s before BLK_FEAT_INHERIT_MASK masking t=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d) b=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d)\n",
+		__func__, t, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
+		b, !!(b->features & BLK_FEAT_ATOMIC_WRITES));
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
+	pr_err("%s1 after BLK_FEAT_INHERIT_MASK masking t=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d) b=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d)\n",
+		__func__, t, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
+		b, !!(b->features & BLK_FEAT_ATOMIC_WRITES));
 
 	/*
 	 * Some feaures need to be supported both by the stacking driver and all

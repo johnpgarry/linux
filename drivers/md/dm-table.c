@@ -431,6 +431,14 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 	}
 
+	pr_err("%s calling blk_stack_limits start=%lld dm_target ti=%pS limits=%pS (BLK_FEAT_ZONED set=%d)\n",
+		__func__, start, ti,
+		limits, !!(limits->features & BLK_FEAT_ZONED));
+	pr_err("%s0 calling blk_stack_limits bdev=%pS get_start_sect(bdev)=%lld &q->limits=%pS (BLK_FEAT_ZONED set=%d)\n",
+		__func__, bdev, get_start_sect(bdev),
+		&q->limits, !!(q->limits.features & BLK_FEAT_ZONED));
+
+
 	if (blk_stack_limits(limits, &q->limits,
 			get_start_sect(bdev) + start) < 0)
 		DMWARN("%s: adding target device %pg caused an alignment inconsistency: "
@@ -441,6 +449,12 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		       q->limits.logical_block_size,
 		       q->limits.alignment_offset,
 		       (unsigned long long) start << SECTOR_SHIFT);
+	pr_err("%s1 called blk_stack_limits start=%lld dm_target ti=%pS limits=%pS (BLK_FEAT_ZONED set=%d)\n",
+		__func__, start, ti,
+		limits, !!(limits->features & BLK_FEAT_ZONED));
+	pr_err("%s.10 called blk_stack_limits bdev=%pS get_start_sect(bdev)=%lld &q->limits=%pS (BLK_FEAT_ZONED set=%d)\n",
+		__func__, bdev, get_start_sect(bdev),
+		&q->limits, !!(q->limits.features & BLK_FEAT_ZONED));
 
 	/*
 	 * Only stack the integrity profile if the target doesn't have native
@@ -681,6 +695,10 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	int r = -EINVAL, argc;
 	char **argv;
 	struct dm_target *ti;
+
+	pr_err("%s t=%pS start=%lld (bytes=%lld/0x%llx) len=%lld (bytes=%lld/0x%llx) type=%s\n",
+		__func__, t, start, start << SECTOR_SHIFT, start << SECTOR_SHIFT,
+		len, len << SECTOR_SHIFT, len << SECTOR_SHIFT, type);
 
 	if (t->singleton) {
 		DMERR("%s: target type %s must appear alone in table",
@@ -1594,7 +1612,16 @@ int dm_calculate_queue_limits(struct dm_table *t,
 	unsigned int zone_sectors = 0;
 	bool zoned = false;
 
+	pr_err("%s calling dm_set_stacking_limits t=%pS limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) calling dm_set_stacking_limits ti_limits=%pS\n",
+		__func__, t, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		&ti_limits);
+
 	dm_set_stacking_limits(limits);
+
+	pr_err("%s1 called dm_set_stacking_limits t=%pS limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) calling dm_set_stacking_limits ti_limits=%pS\n",
+		__func__, t, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		&ti_limits);
+
 
 	t->integrity_supported = true;
 	for (unsigned int i = 0; i < t->num_targets; i++) {
@@ -1602,11 +1629,17 @@ int dm_calculate_queue_limits(struct dm_table *t,
 
 		if (!dm_target_passes_integrity(ti->type))
 			t->integrity_supported = false;
+
 	}
 
+	pr_err("%s1.2 zoned=%d limits=%pS (BLK_FEAT_ZONED set=%d)\n",
+		__func__, zoned, limits, !!(limits->features & BLK_FEAT_ZONED));
+	//if (atomic_writes)
+	//	limits->features |= BLK_FEAT_ATOMIC_WRITES;
 	for (unsigned int i = 0; i < t->num_targets; i++) {
 		struct dm_target *ti = dm_table_get_target(t, i);
 
+		pr_err("%s2 t=%pS limits=%pS calling dm_set_stacking_limits ti_limits=%pS i=%d t->num_targets=%d\n", __func__, t, limits, &ti_limits, i, t->num_targets);
 		dm_set_stacking_limits(&ti_limits);
 
 		if (!ti->type->iterate_devices) {
@@ -1619,15 +1652,23 @@ int dm_calculate_queue_limits(struct dm_table *t,
 		/*
 		 * Combine queue limits of all the devices this target uses.
 		 */
+		pr_err("%s2.1 t=%pS limits=%pS (BLK_FEAT_ZONED set=%d) calling dm_set_stacking_limits ti_limits=%pS (BLK_FEAT_ZONED set=%d) iterate_devices for dm_set_device_limits\n",
+			__func__, t,
+			limits, !!(limits->features & BLK_FEAT_ZONED),
+			&ti_limits, !!(ti_limits.features & BLK_FEAT_ZONED));
 		ti->type->iterate_devices(ti, dm_set_device_limits,
 					  &ti_limits);
+		pr_err("%s2.2 t=%pS limits=%pS (BLK_FEAT_ZONED set=%d) called dm_set_stacking_limits ti_limits=%pS (BLK_FEAT_ZONED set=%d) iterate_devices for dm_set_device_limits\n",
+			__func__, t,
+			limits, !!(limits->features & BLK_FEAT_ZONED),
+			&ti_limits, !!(ti_limits.features & BLK_FEAT_ZONED));
 
 		if (!zoned && (ti_limits.features & BLK_FEAT_ZONED)) {
 			/*
 			 * After stacking all limits, validate all devices
 			 * in table support this zoned model and zone sectors.
 			 */
-			zoned = (ti_limits.features & BLK_FEAT_ZONED);
+			zoned = true;
 			zone_sectors = ti_limits.chunk_sectors;
 		}
 
@@ -1648,12 +1689,28 @@ combine_limits:
 		 * Merge this target's queue limits into the overall limits
 		 * for the table.
 		 */
+		pr_err("%s2.3 combine_limits: calling blk_stack_limits t=limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
+			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & BLK_FEAT_ATOMIC_WRITES));
+		pr_err("%s2.3.1 combine_limits: calling blk_stack_limits b=ti_limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
+			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES));
+		pr_err("%s2.3.2 combine_limits: calling blk_stack_limits t=limits=%pS (BLK_FEAT_ZONED=%d) b=ti_limits=%pS (BLK_FEAT_ZONED=%d)\n",
+			__func__,
+			limits, !!(limits->features & BLK_FEAT_ZONED),
+			&ti_limits, !!(ti_limits.features & BLK_FEAT_ZONED));
 		if (blk_stack_limits(limits, &ti_limits, 0) < 0)
 			DMWARN("%s: adding target device (start sect %llu len %llu) "
 			       "caused an alignment inconsistency",
 			       dm_device_name(t->md),
 			       (unsigned long long) ti->begin,
 			       (unsigned long long) ti->len);
+		pr_err("%s2.4 combine_limits: called blk_stack_limits t=limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
+			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & BLK_FEAT_ATOMIC_WRITES));
+		pr_err("%s2.4.1 combine_limits: called blk_stack_limits b=ti_limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
+			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES));
+		pr_err("%s2.4.2 combine_limits: called blk_stack_limits t=limits=%pS (BLK_FEAT_ZONED=%d) b=ti_limits=%pS (BLK_FEAT_ZONED=%d)\n",
+			__func__,
+			limits, !!(limits->features & BLK_FEAT_ZONED),
+			&ti_limits, !!(ti_limits.features & BLK_FEAT_ZONED));
 
 		if (t->integrity_supported ||
 		    dm_target_has_integrity(ti->type)) {
@@ -1675,12 +1732,15 @@ combine_limits:
 	 *   zoned model on host-managed zoned block devices.
 	 * BUT...
 	 */
+	pr_err("%s5 finally checking BLK_FEAT_ZONED for limits=%pS (BLK_FEAT_ZONED=%d)\n",
+			__func__,
+			limits, !!(limits->features & BLK_FEAT_ZONED));
 	if (limits->features & BLK_FEAT_ZONED) {
 		/*
 		 * ...IF the above limits stacking determined a zoned model
 		 * validate that all of the table's devices conform to it.
 		 */
-		zoned = limits->features & BLK_FEAT_ZONED;
+		zoned = true;
 		zone_sectors = limits->chunk_sectors;
 	}
 	if (validate_hardware_zoned(t, zoned, zone_sectors))
@@ -1811,6 +1871,7 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 {
 	int r;
 
+	pr_err("%s t=%pS q=%pS limits=%pS\n", __func__, t, q, limits);
 	if (!dm_table_supports_nowait(t))
 		limits->features &= ~BLK_FEAT_NOWAIT;
 
@@ -1854,7 +1915,10 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 			return r;
 	}
 
+
+	pr_err("%s9 calling queue_limits_set q=%pS limits=%pS\n", __func__, q, limits);
 	r = queue_limits_set(q, limits);
+	pr_err("%s9.1 called queue_limits_set r=%d q=%pS limits=%pS\n", __func__, r, q, limits);
 	if (r)
 		return r;
 
