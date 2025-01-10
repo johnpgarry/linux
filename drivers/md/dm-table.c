@@ -1613,13 +1613,13 @@ int dm_calculate_queue_limits(struct dm_table *t,
 	bool zoned = false;
 
 	pr_err("%s calling dm_set_stacking_limits t=%pS limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) calling dm_set_stacking_limits ti_limits=%pS\n",
-		__func__, t, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		__func__, t, limits, !!(limits->features & 0),
 		&ti_limits);
 
 	dm_set_stacking_limits(limits);
 
 	pr_err("%s1 called dm_set_stacking_limits t=%pS limits=%pS (BLK_FEAT_ATOMIC_WRITES set=%d) calling dm_set_stacking_limits ti_limits=%pS\n",
-		__func__, t, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES),
+		__func__, t, limits, !!(limits->features & 0),
 		&ti_limits);
 
 
@@ -1690,9 +1690,9 @@ combine_limits:
 		 * for the table.
 		 */
 		pr_err("%s2.3 combine_limits: calling blk_stack_limits t=limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
-			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & BLK_FEAT_ATOMIC_WRITES));
+			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & 0));
 		pr_err("%s2.3.1 combine_limits: calling blk_stack_limits b=ti_limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
-			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES));
+			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & 0));
 		pr_err("%s2.3.2 combine_limits: calling blk_stack_limits t=limits=%pS (BLK_FEAT_ZONED=%d) b=ti_limits=%pS (BLK_FEAT_ZONED=%d)\n",
 			__func__,
 			limits, !!(limits->features & BLK_FEAT_ZONED),
@@ -1704,9 +1704,9 @@ combine_limits:
 			       (unsigned long long) ti->begin,
 			       (unsigned long long) ti->len);
 		pr_err("%s2.4 combine_limits: called blk_stack_limits t=limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
-			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & BLK_FEAT_ATOMIC_WRITES));
+			__func__, limits, limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max, !!(limits->features & 0));
 		pr_err("%s2.4.1 combine_limits: called blk_stack_limits b=ti_limits=%pS (atomic_write_hw_unit_min/max=%d/%d, BLK_FEAT_ATOMIC_WRITES=%d)\n",
-			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES));
+			__func__, &ti_limits, ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max, !!(ti_limits.features & 0));
 		pr_err("%s2.4.2 combine_limits: called blk_stack_limits t=limits=%pS (BLK_FEAT_ZONED=%d) b=ti_limits=%pS (BLK_FEAT_ZONED=%d)\n",
 			__func__,
 			limits, !!(limits->features & BLK_FEAT_ZONED),

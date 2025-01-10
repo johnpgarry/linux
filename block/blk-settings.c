@@ -177,15 +177,10 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 {
 	unsigned int boundary_sectors;
 
-	pr_err("%s lim=%pS BLK_FEAT_ATOMIC_WRITES set=%d BLK_FLAG_ATOMIC_WRITES_DISABLED=%d\n",
+	pr_err("%s lim=%pS BLK_FLAG_ATOMIC_WRITES_DISABLED=%d atomic_write_hw_max=%d\n",
 		__func__, lim,
-		!!(lim->features & BLK_FEAT_ATOMIC_WRITES),
-		!!(lim->flags & BLK_FLAG_ATOMIC_WRITES_DISABLED));
-
-	if (!(lim->features & BLK_FEAT_ATOMIC_WRITES)) {
-		pr_err("%s1 lim=%pS BLK_FEAT_ATOMIC_WRITES unset\n", __func__, lim);
-		goto unsupported;
-	}
+		!!(lim->flags & BLK_FLAG_ATOMIC_WRITES_DISABLED),
+		lim->atomic_write_hw_max);
 
 	if (lim->flags & BLK_FLAG_ATOMIC_WRITES_DISABLED) {
 		pr_err("%s2 lim=%pS BLK_FLAG_ATOMIC_WRITES_DISABLED set\n", __func__, lim);
@@ -629,12 +624,6 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 				struct queue_limits *b, sector_t start)
 {
-	if (!(t->features & BLK_FEAT_ATOMIC_WRITES)) {
-		pr_err("%s t=%pS b=%pS BLK_FEAT_ATOMIC_WRITES unset\n", __func__,
-			t, b);
-		goto unsupported;
-	}
-
 	if (!b->atomic_write_hw_unit_min)
 		goto unsupported;
 
@@ -663,7 +652,6 @@ unsupported:
 	t->atomic_write_hw_unit_max = 0;
 	t->atomic_write_hw_unit_min = 0;
 	t->atomic_write_hw_boundary = 0;
-	t->features &= ~BLK_FEAT_ATOMIC_WRITES;
 }
 
 /**
@@ -693,13 +681,13 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	unsigned int top, bottom, alignment, ret = 0;
 
 	// BLK_FEAT_INHERIT_MASK includes BLK_FEAT_ZONED
-	pr_err("%s before BLK_FEAT_INHERIT_MASK masking t=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d) b=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d)\n",
-		__func__, t, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
-		b, !!(b->features & BLK_FEAT_ATOMIC_WRITES));
+//	pr_err("%s before BLK_FEAT_INHERIT_MASK masking t=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d) b=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d)\n",
+//		__func__, t, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
+//		b, !!(b->features & BLK_FEAT_ATOMIC_WRITES));
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
-	pr_err("%s1 after BLK_FEAT_INHERIT_MASK masking t=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d) b=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d)\n",
-		__func__, t, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
-		b, !!(b->features & BLK_FEAT_ATOMIC_WRITES));
+//	pr_err("%s1 after BLK_FEAT_INHERIT_MASK masking t=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d) b=%pS (FEAT_ATOMIC_WRITES_STACKED set=%d)\n",
+//		__func__, t, !!(t->features & BLK_FEAT_ATOMIC_WRITES),
+//		b, !!(b->features & BLK_FEAT_ATOMIC_WRITES));
 
 	/*
 	 * Some feaures need to be supported both by the stacking driver and all

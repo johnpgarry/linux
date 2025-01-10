@@ -331,18 +331,13 @@ typedef unsigned int __bitwise blk_features_t;
 #define BLK_FEAT_RAID_PARTIAL_STRIPES_EXPENSIVE \
 	((__force blk_features_t)(1u << 15))
 
-/* device can/does support atomic writes */
-#define BLK_FEAT_ATOMIC_WRITES \
-	((__force blk_features_t)(1u << 16))
-
 /*
  * Flags automatically inherited when stacking limits.
  */
 #define BLK_FEAT_INHERIT_MASK \
 	(BLK_FEAT_WRITE_CACHE | BLK_FEAT_FUA | BLK_FEAT_ROTATIONAL | \
 	 BLK_FEAT_STABLE_WRITES | BLK_FEAT_ZONED | BLK_FEAT_BOUNCE_HIGH | \
-	 BLK_FEAT_RAID_PARTIAL_STRIPES_EXPENSIVE | \
-	 BLK_FEAT_ATOMIC_WRITES)
+	 BLK_FEAT_RAID_PARTIAL_STRIPES_EXPENSIVE)
 
 /* internal flags in queue_limits.flags */
 typedef unsigned int __bitwise blk_flags_t;
