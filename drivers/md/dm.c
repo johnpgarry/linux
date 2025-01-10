@@ -2537,10 +2537,13 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 	struct table_device *td;
 	int r;
 
+	pr_err("%s md=%pS &limits=%pS type=%d DM_TYPE_REQUEST_BASED=%d md->disk->fops=%pS\n",
+		__func__, md, &limits, type, DM_TYPE_REQUEST_BASED, md->disk->fops);
 	WARN_ON_ONCE(type == DM_TYPE_NONE);
 
 	if (type == DM_TYPE_REQUEST_BASED) {
 		md->disk->fops = &dm_rq_blk_dops;
+		pr_err("%s2 calling dm_mq_init_request_queue md=%pS &limits=%pS type=%d DM_TYPE_REQUEST_BASED=%d\n", __func__, md, &limits, type, DM_TYPE_REQUEST_BASED);
 		r = dm_mq_init_request_queue(md, t);
 		if (r) {
 			DMERR("Cannot initialize queue for request-based dm mapped device");
@@ -2548,11 +2551,15 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 		}
 	}
 
+	pr_err("%s3 calling dm_calculate_queue_limits md=%pS &limits=%pS type=%d DM_TYPE_REQUEST_BASED=%d md->disk->fops=%pS\n",
+		__func__, md, &limits, type, DM_TYPE_REQUEST_BASED, md->disk->fops);
 	r = dm_calculate_queue_limits(t, &limits);
 	if (r) {
 		DMERR("Cannot calculate initial queue limits");
 		return r;
 	}
+	pr_err("%s4 calling dm_table_set_restrictions md=%pS &limits=%pS type=%d DM_TYPE_REQUEST_BASED=%d md->disk->fops=%pS\n",
+		__func__, md, &limits, type, DM_TYPE_REQUEST_BASED, md->disk->fops);
 	r = dm_table_set_restrictions(t, md->queue, &limits);
 	if (r)
 		return r;

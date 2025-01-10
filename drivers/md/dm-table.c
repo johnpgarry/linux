@@ -431,8 +431,8 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 	}
 
-	pr_err("%s calling blk_stack_limits start=%lld dm_target ti=%pS limits=%pS (BLK_FEAT_ZONED set=%d)\n",
-		__func__, start, ti,
+	pr_err("%s calling blk_stack_limits start=%lld dm_target ti=%pS !!dm_target_supports_atomic_writes=%d limits=%pS (BLK_FEAT_ZONED set=%d)\n",
+		__func__, start, ti, !!dm_target_supports_atomic_writes(ti->type),
 		limits, !!(limits->features & BLK_FEAT_ZONED));
 	pr_err("%s0 calling blk_stack_limits bdev=%pS get_start_sect(bdev)=%lld &q->limits=%pS (BLK_FEAT_ZONED set=%d)\n",
 		__func__, bdev, get_start_sect(bdev),
@@ -1866,6 +1866,24 @@ static bool dm_table_supports_secure_erase(struct dm_table *t)
 	return true;
 }
 
+static bool dm_table_supports_atomic_writes(struct dm_table *t)
+{
+	pr_err("%s t=%pS (num_targets=%d)\n", __func__, t, t->num_targets);
+
+	for (unsigned int i = 0; i < t->num_targets; i++) {
+		struct dm_target *ti = dm_table_get_target(t, i);
+
+		pr_err("%s1.1 calling dm_target_supports_atomic_writes i=%d features=0x%llx dm_target ti=%pS\n",
+			__func__, i, ti->type->features, ti);
+		if (!dm_target_supports_atomic_writes(ti->type)) {
+			pr_err("%s1.2 return false for i=%d\n", __func__, i);
+			return false;
+		}
+	}
+
+	return true;
+}
+
 int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 			      struct queue_limits *limits)
 {
@@ -1915,6 +1933,10 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 			return r;
 	}
 
+	if (dm_table_supports_atomic_writes(t))
+		limits->flags &= ~BLK_FLAG_ATOMIC_WRITES_DISABLED;
+	else
+		limits->flags |= BLK_FLAG_ATOMIC_WRITES_DISABLED;
 
 	pr_err("%s9 calling queue_limits_set q=%pS limits=%pS\n", __func__, q, limits);
 	r = queue_limits_set(q, limits);
