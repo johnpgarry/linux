@@ -5772,15 +5772,6 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 {
 	struct md_rdev *rdev;
 
-	pr_err("%s mddev=%pS limit=%pS MDDEV_STACK_INTEGRITY set=%d\n",
-		__func__, mddev, lim, !!(flags & MDDEV_STACK_ATOMIC_WRITES));
-
-	if (flags & MDDEV_STACK_ATOMIC_WRITES) {
-			pr_err("%s2 mddev=%pS limit=%pS MDDEV_STACK_ATOMIC_WRITES set, so unsetting BLK_FLAG_ATOMIC_WRITES_DISABLED (was=%d)\n",
-				__func__, mddev, lim, !!(lim->flags & BLK_FLAG_ATOMIC_WRITES_DISABLED));
-				lim->flags &= ~BLK_FLAG_ATOMIC_WRITES_DISABLED;
-	}
-
 	rdev_for_each(rdev, mddev) {
 		queue_limits_stack_bdev(lim, rdev->bdev, rdev->data_offset,
 					mddev->gendisk->disk_name);

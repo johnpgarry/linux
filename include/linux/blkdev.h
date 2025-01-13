@@ -331,6 +331,10 @@ typedef unsigned int __bitwise blk_features_t;
 #define BLK_FEAT_RAID_PARTIAL_STRIPES_EXPENSIVE \
 	((__force blk_features_t)(1u << 15))
 
+/* atomic writes are enabled */
+#define BLK_FEAT_ATOMIC_WRITES \
+	((__force blk_features_t)(1u << 16))
+
 /*
  * Flags automatically inherited when stacking limits.
  */
@@ -350,9 +354,6 @@ typedef unsigned int __bitwise blk_flags_t;
 
 /* passthrough command IO accounting */
 #define BLK_FLAG_IOSTATS_PASSTHROUGH	((__force blk_flags_t)(1u << 2))
-
-/* do not support atomic writes, even though hw can support */
-#define BLK_FLAG_ATOMIC_WRITES_DISABLED	((__force blk_flags_t)(1u << 3))
 
 struct queue_limits {
 	blk_features_t		features;

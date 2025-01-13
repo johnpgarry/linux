@@ -1934,9 +1934,7 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 	}
 
 	if (dm_table_supports_atomic_writes(t))
-		limits->flags &= ~BLK_FLAG_ATOMIC_WRITES_DISABLED;
-	else
-		limits->flags |= BLK_FLAG_ATOMIC_WRITES_DISABLED;
+		limits->features |= BLK_FEAT_ATOMIC_WRITES;
 
 	pr_err("%s9 calling queue_limits_set q=%pS limits=%pS\n", __func__, q, limits);
 	r = queue_limits_set(q, limits);
