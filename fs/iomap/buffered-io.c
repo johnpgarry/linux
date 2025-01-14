@@ -1356,7 +1356,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 	loff_t length = iomap_length(iter);
 	loff_t written = 0;
 
-	pr_err("%s length=%lld\n", __func__, length);
+	pr_err("%s pos=%lld length=%lld\n", __func__, pos, length);
 	do {
 		struct folio *folio;
 		int status;
@@ -1455,11 +1455,11 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	while ((ret = iomap_iter(&iter, ops)) > 0) {
 		const struct iomap *srcmap = iomap_iter_srcmap(&iter);
 
-		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) ->flags=0x%x (NEW set=%d, DIRTY set=%d) range_dirty=%d iter.pos=%lld, len=%lld\n",
+		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) ->flags=0x%x (NEW set=%d, DIRTY set=%d) range_dirty=%d iter.pos=%lld iomap_length()=%lld\n",
 			__func__, srcmap->type,
 			IOMAP_HOLE, IOMAP_MAPPED, IOMAP_UNWRITTEN,
 			srcmap->flags, !!(srcmap->flags & IOMAP_F_NEW), !!(srcmap->flags & IOMAP_F_DIRTY),
-			range_dirty, iter.pos, iter.len);
+			range_dirty, iter.pos, iomap_length(&iter));
 		if ((srcmap->type == IOMAP_HOLE && !holes) ||
 		    (srcmap->type == IOMAP_UNWRITTEN && !holes) ||
 		    (srcmap->type == IOMAP_MAPPED && holes)) {

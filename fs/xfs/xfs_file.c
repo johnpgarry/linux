@@ -893,6 +893,9 @@ xfs_file_buffered_write(
 	bool			cleared_space = false;
 	unsigned int		iolock;
 
+	pr_err("%s ki_pos=%lld len=%zd\n",
+		__func__, iocb->ki_pos, iov_iter_count(from));
+
 write_retry:
 	iolock = XFS_IOLOCK_EXCL;
 	ret = xfs_ilock_iocb(iocb, iolock);

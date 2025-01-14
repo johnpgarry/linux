@@ -650,8 +650,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		if (dio_flags & IOMAP_DIO_OVERWRITE_ONLY) {
 			ret = -EAGAIN;
 			if (iomi.pos >= dio->i_size ||
-			    iomi.pos + iomi.len > dio->i_size)
+			    iomi.pos + iomi.len > dio->i_size) {
+				pr_err("%s IOMAP_DIO_OVERWRITE_ONLY goto out_free_dio\n", __func__);
 				goto out_free_dio;
+			}
 			iomi.flags |= IOMAP_OVERWRITE_ONLY;
 		}
 

@@ -923,8 +923,8 @@ relock:
 	xfs_iunlock(ip, lockmode);
 	trace_xfs_iomap_found(ip, offset, length, XFS_DATA_FORK, &imap);
 
-	pr_err("%s5 calling xfs_bmbt_to_iomap error=%d imap.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d XFS_EXT_NORM=%d\n",
-		__func__, error, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, XFS_EXT_NORM);
+	pr_err("%s5 calling xfs_bmbt_to_iomap imap.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d XFS_EXT_NORM=%d\n",
+		__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, XFS_EXT_NORM);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 allocate_blocks:
