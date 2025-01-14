@@ -1386,7 +1386,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 
 		ret = iomap_write_end(iter, pos, bytes, bytes, folio);
 		__iomap_put_folio(iter, pos, bytes, folio);
-		pr_err("%s2 called iomap_write_end ret=%d\n", __func__, ret);
+		pr_err("%s3 called iomap_write_end ret=%d\n", __func__, ret);
 		if (WARN_ON_ONCE(!ret))
 			return -EIO;
 
@@ -1458,12 +1458,13 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	while ((ret = iomap_iter(&iter, ops)) > 0) {
 		const struct iomap *srcmap = iomap_iter_srcmap(&iter);
 
-		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) range_dirty=%d\n",
+		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) ->flags=0x%x (NEW set=%d, DIRTY set=%d) range_dirty=%d\n",
 			__func__, srcmap->type,
 			IOMAP_HOLE, IOMAP_MAPPED, IOMAP_UNWRITTEN,
+			srcmap->flags, !!(srcmap->flags & IOMAP_F_NEW), !!(srcmap->flags & IOMAP_F_DIRTY),
 			range_dirty);
-		if (srcmap->type == IOMAP_HOLE ||
-		    srcmap->type == IOMAP_UNWRITTEN) {
+		if ((srcmap->type == IOMAP_HOLE && !holes) ||
+		    (srcmap->type == IOMAP_UNWRITTEN && !holes)) {
 			loff_t proc = iomap_length(&iter);
 
 			if (range_dirty) {

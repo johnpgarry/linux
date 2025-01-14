@@ -820,7 +820,7 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 }
 EXPORT_SYMBOL_GPL(iomap_dio_rw);
 
-static loff_t
+static __maybe_unused loff_t
 iomap_dio_zero_allocunit_iter(struct iomap_iter *iter, struct iomap_dio *dio)
 {
 	const struct iomap *iomap = &iter->iomap;
@@ -853,6 +853,8 @@ iomap_dio_zero_allocunit(struct kiocb *iocb,
 	ssize_t ret;
 	loff_t pos = rounddown(iocb->ki_pos, len);
 	struct inode *inode = file_inode(iocb->ki_filp);
+	int ret2;
+	bool did_zero = false;
 
 	struct iomap_iter iomi = {
 		.inode		= inode,
@@ -865,7 +867,7 @@ iomap_dio_zero_allocunit(struct kiocb *iocb,
 	if (!dio)
 		return -ENOMEM;
 
-	pr_err("%s iocb=%pS pos=%lld len=%lld\n", __func__, iocb, pos, len);
+	pr_err("%s iocb=%pS pos=%lld len=%lld ops=%pS dops=%pS\n", __func__, iocb, pos, len, ops, dops);
 	dio->iocb = iocb;
 	atomic_set(&dio->ref, 1);
 	dio->i_size = i_size_read(inode);
@@ -876,10 +878,16 @@ iomap_dio_zero_allocunit(struct kiocb *iocb,
 	inode_dio_begin(inode);
 
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
-		iomi.processed = iomap_dio_zero_allocunit_iter(&iomi, dio);
-		pr_err("%s2 iomi.processed=%lld\n", __func__, iomi.processed);
+	//	iomi.processed = iomap_dio_zero_allocunit_iter(&iomi, dio);
+	//	pr_err("%s2 iomi.processed=%lld\n", __func__, iomi.processed);
 	}
+//iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
+//		const struct iomap_ops *ops, bool holes)
+	pr_err("%s3 calling iomap_zero_range ret2=%d dio=%pS\n", __func__, ret2, dio);
+	ret2 = iomap_zero_range(inode, pos, len, &did_zero, ops, true);
+	pr_err("%s3.1 called iomap_zero_range ret2=%d\n", __func__, ret2);
 
+	#if 0
 	if (ret < 0)
 		iomap_dio_set_error(dio, ret);
 
@@ -893,14 +901,19 @@ iomap_dio_zero_allocunit(struct kiocb *iocb,
 		}
 		__set_current_state(TASK_RUNNING);
 	}
+	#endif
 
-	if (dops && dops->end_io)
-		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
+	if (dops && dops->end_io) {
+		pr_err("%s4 calling dops->end_io=%pS\n", __func__, dops->end_io);
+	//	ret = dops->end_io(iocb, dio->size, ret, dio->flags);
+	}
+	ret = ret2;
 
 	kfree(dio);
 
 	inode_dio_end(inode);
 
+	pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iomap_dio_zero_allocunit);

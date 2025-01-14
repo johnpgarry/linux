@@ -594,7 +594,8 @@ xfs_dio_write_end_zero_allocunit(
 	loff_t			offset = iocb->ki_pos;
 	unsigned int		nofs_flag;
 
-	pr_err("%s size=%zd error=%d\n", __func__, size, error);
+	pr_err("%s size=%zd error=%d IOMAP_DIO_UNWRITTEN set=%d\n",
+		__func__, size, error, !!(flags & IOMAP_DIO_UNWRITTEN));
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
