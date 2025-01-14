@@ -669,6 +669,8 @@ xfs_file_dio_write_atomic(
 	unsigned int unitsize = xfs_inode_alloc_unitsize(ip);
 	size_t			count = iov_iter_count(from);
 	bool aligned = ((iocb->ki_pos | count) & (unitsize - 1));
+	__maybe_unused struct inode *inode = file_inode(iocb->ki_filp);
+
 	/*
 	 * Zero unwritten only for writing multiple blocks. Leverage
 	 * IOMAP_DIO_OVERWRITE_ONLY detecting when zeroing is required, as
@@ -692,14 +694,13 @@ retry:
 		goto out_unlock;
 
 	if (do_zero) {
-		loff_t pos = rounddown(iocb->ki_pos, unitsize);
-		pr_err("%s2 calling iomap_dio_zero_unwritten unitsize=%d ki_pos=%lld pos=%lld\n",
-			__func__, unitsize, iocb->ki_pos, pos);
+		pr_err("%s2 calling xfs_zero_unwritten_range unitsize=%d ki_pos=%lld\n",
+			__func__, unitsize, iocb->ki_pos);
 		bool did_zero = false;
-		ret = iomap_dio_zero_unwritten(iocb, from,
-				&xfs_direct_write_iomap_ops,
-				&xfs_dio_zero_ops);
-		pr_err("%s2.1 called iomap_dio_zero_allocunit ret=%zd did_zero=%d\n", __func__, ret, did_zero);
+		xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
+		ret = xfs_zero_unwritten_range(ip, iocb->ki_pos, count);
+		xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
+		pr_err("%s2.1 called xfs_zero_unwritten_range ret=%zd did_zero=%d\n", __func__, ret, did_zero);
 		if (ret)
 			goto out_unlock;
 	}

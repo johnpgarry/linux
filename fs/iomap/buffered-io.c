@@ -1490,6 +1490,47 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 }
 EXPORT_SYMBOL_GPL(iomap_zero_range);
 
+
+static loff_t
+iomap_zero_unwritten_range_iter(struct iomap_iter *iter)
+{
+	const struct iomap *iomap = &iter->iomap;
+	loff_t length = iomap_length(iter);
+	loff_t pos = iter->pos;
+
+	pr_err("%s iomap->type=%d IOMAP_UNWRITTEN=%d pos=%lld length=%lld\n",
+		__func__, iomap->type, IOMAP_UNWRITTEN, pos, length);
+	if (iomap->type == IOMAP_UNWRITTEN) {
+		loff_t ret;
+
+		pr_err("%s1 calling iomap_zero_iter\n", __func__);
+		ret = iomap_zero_iter(iter, NULL);
+		pr_err("%s1.1 called iomap_zero_iter ret=%lld\n", __func__, ret);
+	}
+
+	pr_err("%s10 length=%lld\n", __func__, length);
+	return length;
+}
+
+int iomap_zero_unwritten_range(struct inode *inode, loff_t pos, loff_t len, const struct iomap_ops *ops)
+{
+	struct iomap_iter iomi = {
+		.inode		= inode,
+		.pos		= pos,
+		.len		= len,
+		.flags		= IOMAP_WRITE | IOMAP_ZERO,
+	};
+	int ret;
+
+	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+		iomi.processed = iomap_zero_unwritten_range_iter(&iomi);
+		pr_err("%s2 iomi.processed=%lld\n", __func__, iomi.processed);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(iomap_zero_unwritten_range);
+
 int
 iomap_truncate_page(struct inode *inode, loff_t pos, bool *did_zero,
 		const struct iomap_ops *ops)
