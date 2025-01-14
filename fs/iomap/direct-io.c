@@ -838,20 +838,18 @@ iomap_dio_zero_unwritten_iter(struct iomap_iter *iter, struct iomap_dio *dio)
 
 ssize_t
 iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
-		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
-		unsigned int len)
+		const struct iomap_ops *ops, const struct iomap_dio_ops *dops)
 {
 	struct inode *inode = file_inode(iocb->ki_filp);
 	struct iomap_dio *dio;
 	ssize_t ret;
-	loff_t pos = rounddown(iocb->ki_pos, len);
 	int ret2;
 	bool did_zero = false;
 
 	struct iomap_iter iomi = {
 		.inode		= inode,
-		.pos		= pos,
-		.len		= len,
+		.pos		= iocb->ki_pos,
+		.len		= iov_iter_count(iter),
 		.flags		= IOMAP_WRITE,
 	};
 
@@ -859,7 +857,7 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 	if (!dio)
 		return -ENOMEM;
 
-	pr_err("%s iocb=%pS pos=%lld len=%d ops=%pS dops=%pS\n", __func__, iocb, pos, len, ops, dops);
+	pr_err("%s iocb=%pS pos=%lld len=%zd ops=%pS dops=%pS\n", __func__, iocb, iocb->ki_pos, iov_iter_count(iter), ops, dops);
 	dio->iocb = iocb;
 	atomic_set(&dio->ref, 1);
 	dio->i_size = i_size_read(inode);
@@ -876,7 +874,7 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 //iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 //		const struct iomap_ops *ops, bool holes)
 	pr_err("%s3 calling iomap_zero_range ret2=%d dio=%pS\n", __func__, ret2, dio);
-	ret2 = iomap_zero_range(inode, pos, len, &did_zero, ops, true);
+	ret2 = iomap_zero_range(inode, iocb->ki_pos, iov_iter_count(iter), &did_zero, ops, true);
 	pr_err("%s3.1 called iomap_zero_range ret2=%d\n", __func__, ret2);
 
 	if (ret < 0)

@@ -698,7 +698,7 @@ retry:
 		bool did_zero = false;
 		ret = iomap_dio_zero_unwritten(iocb, from,
 				&xfs_direct_write_iomap_ops,
-				&xfs_dio_zero_ops, unitsize);
+				&xfs_dio_zero_ops);
 		pr_err("%s2.1 called iomap_dio_zero_allocunit ret=%zd did_zero=%d\n", __func__, ret, did_zero);
 		if (ret)
 			goto out_unlock;
