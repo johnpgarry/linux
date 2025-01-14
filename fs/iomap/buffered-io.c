@@ -1356,6 +1356,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 	loff_t length = iomap_length(iter);
 	loff_t written = 0;
 
+	pr_err("%s length=%lld\n", __func__, length);
 	do {
 		struct folio *folio;
 		int status;
@@ -1363,11 +1364,16 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 		size_t bytes = min_t(u64, SIZE_MAX, length);
 		bool ret;
 
+		pr_err("%s1 bytes=%zd\n", __func__, bytes);
 		status = iomap_write_begin(iter, pos, bytes, &folio);
-		if (status)
+		if (status) {
+			pr_err("%s1 status=%d\n", __func__, status);
 			return status;
-		if (iter->iomap.flags & IOMAP_F_STALE)
+		}
+		if (iter->iomap.flags & IOMAP_F_STALE) {
+			pr_err("%s2 IOMAP_F_STALE\n", __func__);
 			break;
+		}
 
 		/* warn about zeroing folios beyond eof that won't write back */
 		WARN_ON_ONCE(folio_pos(folio) > iter->inode->i_size);
@@ -1380,6 +1386,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 
 		ret = iomap_write_end(iter, pos, bytes, bytes, folio);
 		__iomap_put_folio(iter, pos, bytes, folio);
+		pr_err("%s3 called iomap_write_end ret=%d\n", __func__, ret);
 		if (WARN_ON_ONCE(!ret))
 			return -EIO;
 
@@ -1390,12 +1397,13 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 
 	if (did_zero)
 		*did_zero = true;
+	pr_err("%s10 written=%lld\n", __func__, written);
 	return written;
 }
 
 int
 iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
-		const struct iomap_ops *ops)
+		const struct iomap_ops *ops, bool holes)
 {
 	struct iomap_iter iter = {
 		.inode		= inode,
@@ -1410,6 +1418,7 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	int ret;
 	bool range_dirty;
 
+	pr_err("%s pos=%lld len=%lld off=%d plen=%lld holes=%d\n", __func__, pos, len, off, plen, holes);
 	/*
 	 * Zero range can skip mappings that are zero on disk so long as
 	 * pagecache is clean. If pagecache was dirty prior to zero range, the
@@ -1423,12 +1432,17 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	if (off &&
 	    filemap_range_needs_writeback(mapping, pos, pos + plen - 1)) {
 		iter.len = plen;
-		while ((ret = iomap_iter(&iter, ops)) > 0)
+		while ((ret = iomap_iter(&iter, ops)) > 0) {
+			pr_err("%s1 calling iomap_zero_iter\n", __func__);
 			iter.processed = iomap_zero_iter(&iter, did_zero);
+			pr_err("%s1.1 called iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
+		}
 
 		iter.len = len - (iter.pos - pos);
-		if (ret || !iter.len)
+		if (ret || !iter.len) {
+			pr_err("%s3 ret=%d iter.len=%lld\n", __func__, ret, iter.len);
 			return ret;
+		}
 	}
 
 	/*
@@ -1441,8 +1455,13 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	while ((ret = iomap_iter(&iter, ops)) > 0) {
 		const struct iomap *srcmap = iomap_iter_srcmap(&iter);
 
-		if (srcmap->type == IOMAP_HOLE ||
-		    srcmap->type == IOMAP_UNWRITTEN) {
+		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) ->flags=0x%x (NEW set=%d, DIRTY set=%d) range_dirty=%d\n",
+			__func__, srcmap->type,
+			IOMAP_HOLE, IOMAP_MAPPED, IOMAP_UNWRITTEN,
+			srcmap->flags, !!(srcmap->flags & IOMAP_F_NEW), !!(srcmap->flags & IOMAP_F_DIRTY),
+			range_dirty);
+		if ((srcmap->type == IOMAP_HOLE && !holes) ||
+		    (srcmap->type == IOMAP_UNWRITTEN && !holes)) {
 			loff_t proc = iomap_length(&iter);
 
 			if (range_dirty) {
@@ -1450,11 +1469,15 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 				proc = iomap_zero_iter_flush_and_stale(&iter);
 			}
 			iter.processed = proc;
+			pr_err("%s5 iter.processed=%lld\n", __func__, iter.processed);
 			continue;
 		}
 
+		pr_err("%s6 calling iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
 		iter.processed = iomap_zero_iter(&iter, did_zero);
+		pr_err("%s6.1 called iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
 	}
+	pr_err("%s10 ret=%d\n", __func__, ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iomap_zero_range);
@@ -1469,7 +1492,7 @@ iomap_truncate_page(struct inode *inode, loff_t pos, bool *did_zero,
 	/* Block boundary? Nothing to do */
 	if (!off)
 		return 0;
-	return iomap_zero_range(inode, pos, blocksize - off, did_zero, ops);
+	return iomap_zero_range(inode, pos, blocksize - off, did_zero, ops, false);
 }
 EXPORT_SYMBOL_GPL(iomap_truncate_page);
 
@@ -1685,6 +1708,7 @@ static void iomap_writepage_end_bio(struct bio *bio)
  */
 static int iomap_submit_ioend(struct iomap_writepage_ctx *wpc, int error)
 {
+	pr_err("%s wpc->ioend=%pS\n", __func__, wpc->ioend);
 	if (!wpc->ioend)
 		return error;
 
@@ -1694,6 +1718,7 @@ static int iomap_submit_ioend(struct iomap_writepage_ctx *wpc, int error)
 	 * failure happened so that the file system end I/O handler gets called
 	 * to clean up.
 	 */
+	pr_err("%s1 wpc->ops->prepare_ioend=%pS\n", __func__, wpc->ops->prepare_ioend);
 	if (wpc->ops->prepare_ioend)
 		error = wpc->ops->prepare_ioend(wpc->ioend, error);
 
@@ -1780,8 +1805,10 @@ static int iomap_add_to_ioend(struct iomap_writepage_ctx *wpc,
 	size_t poff = offset_in_folio(folio, pos);
 	int error;
 
+	pr_err("%s\n", __func__);
 	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, pos)) {
 new_ioend:
+		pr_err("%s1 calling iomap_submit_ioend\n", __func__);
 		error = iomap_submit_ioend(wpc, 0);
 		if (error)
 			return error;
@@ -1817,6 +1844,7 @@ static int iomap_writepage_map_blocks(struct iomap_writepage_ctx *wpc,
 			wpc->iomap.offset + wpc->iomap.length - pos);
 		WARN_ON_ONCE(!folio->private && map_len < dirty_len);
 
+		pr_err("%s wpc->iomap.type=%d\n", __func__, wpc->iomap.type);
 		switch (wpc->iomap.type) {
 		case IOMAP_INLINE:
 			WARN_ON_ONCE(1);
@@ -1825,6 +1853,7 @@ static int iomap_writepage_map_blocks(struct iomap_writepage_ctx *wpc,
 		case IOMAP_HOLE:
 			break;
 		default:
+			pr_err("%s1 calling iomap_add_to_ioend\n", __func__);
 			error = iomap_add_to_ioend(wpc, wbc, folio, inode, pos,
 					map_len);
 			if (!error)
@@ -2011,6 +2040,7 @@ iomap_writepages(struct address_space *mapping, struct writeback_control *wbc,
 	wpc->ops = ops;
 	while ((folio = writeback_iter(mapping, wbc, folio, &error)))
 		error = iomap_writepage_map(wpc, wbc, folio);
+	pr_err("%s calling iomap_submit_ioend\n", __func__);
 	return iomap_submit_ioend(wpc, error);
 }
 EXPORT_SYMBOL_GPL(iomap_writepages);

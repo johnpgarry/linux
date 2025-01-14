@@ -812,6 +812,8 @@ iomap_dio_zero_unwritten_iter(struct iomap_iter *iter, struct iomap_dio *dio)
 	loff_t length = iomap_length(iter);
 	loff_t pos = iter->pos;
 
+	pr_err("%s iomap->type=%d IOMAP_UNWRITTEN=%d pos=%lld length=%lld\n",
+		__func__, IOMAP_UNWRITTEN, IOMAP_UNWRITTEN, pos, length);
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		int ret;
 
@@ -823,6 +825,7 @@ iomap_dio_zero_unwritten_iter(struct iomap_iter *iter, struct iomap_dio *dio)
 
 	dio->size += length;
 
+	pr_err("%s10 length=%lld\n", __func__, length);
 	return length;
 }
 
@@ -844,6 +847,7 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 	if (!dio)
 		return -ENOMEM;
 
+	pr_err("%s iocb=%pS iocb->ki_pos=%lld len=%zd ops=%pS dops=%pS\n", __func__, iocb, iocb->ki_pos, iov_iter_count(iter), ops, dops);
 	dio->iocb = iocb;
 	atomic_set(&dio->ref, 1);
 	dio->i_size = i_size_read(inode);
@@ -853,8 +857,11 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 
 	inode_dio_begin(inode);
 
-	while ((ret = iomap_iter(&iomi, ops)) > 0)
+	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+		pr_err("%s2 calling iomap_dio_zero_unwritten_iter\n", __func__);
 		iomi.processed = iomap_dio_zero_unwritten_iter(&iomi, dio);
+		pr_err("%s2.1 called iomap_dio_zero_unwritten_iter iomi.processed=%lld\n", __func__, iomi.processed);
+	}
 
 	if (ret < 0)
 		iomap_dio_set_error(dio, ret);
@@ -870,13 +877,16 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 		__set_current_state(TASK_RUNNING);
 	}
 
-	if (dops && dops->end_io)
+	if (dops && dops->end_io) {
+		pr_err("%s3 calling dops->end_io=%pS\n", __func__, dops->end_io);
 		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
+	}
 
 	kfree(dio);
 
 	inode_dio_end(file_inode(iocb->ki_filp));
 
+	pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iomap_dio_zero_unwritten);
@@ -892,3 +902,4 @@ static int __init iomap_dio_init(void)
 	return 0;
 }
 fs_initcall(iomap_dio_init);
+

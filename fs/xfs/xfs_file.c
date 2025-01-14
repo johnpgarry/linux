@@ -666,7 +666,9 @@ xfs_file_dio_write_atomic(
 	bool			do_zero = false;
 	unsigned int		dio_flags;
 	ssize_t			ret;
-
+	unsigned int unitsize = xfs_inode_alloc_unitsize(ip);
+	size_t			count = iov_iter_count(from);
+	bool aligned = ((iocb->ki_pos | count) & (unitsize - 1));
 	/*
 	 * Zero unwritten only for writing multiple blocks. Leverage
 	 * IOMAP_DIO_OVERWRITE_ONLY detecting when zeroing is required, as
@@ -678,38 +680,50 @@ xfs_file_dio_write_atomic(
 		dio_flags = 0;
 
 retry:
+	pr_err("%s retry: do_zero=%d aligned=%d dio_flags=%d\n", __func__, do_zero, aligned, dio_flags);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
 
+	pr_err("%s0 calling xfs_file_write_checks\n", __func__);
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
 
 	if (do_zero) {
+		loff_t pos = rounddown(iocb->ki_pos, unitsize);
+		pr_err("%s2 calling iomap_dio_zero_allocunit unitsize=%d ki_pos=%lld pos=%lld\n",
+			__func__, unitsize, iocb->ki_pos, pos);
+		bool did_zero = false;
 		ret = iomap_dio_zero_unwritten(iocb, from,
 				&xfs_direct_write_iomap_ops,
 				&xfs_dio_zero_ops);
+		pr_err("%s2.1 called iomap_dio_zero_allocunit ret=%zd did_zero=%d\n", __func__, ret, did_zero);
 		if (ret)
 			goto out_unlock;
 	}
 
 	trace_xfs_file_direct_write(iocb, from);
+	pr_err("%s3 calling iomap_dio_rw ret=%zd\n", __func__, ret);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
-			&xfs_dio_write_ops, dio_flags, NULL, 0);
+			&xfs_dio_write_ops, IOMAP_DIO_OVERWRITE_ONLY, NULL, 0);
 
+	pr_err("%s3.1 called iomap_dio_rw ret=%zd do_zero=%d\n", __func__, ret, do_zero);
 	if (do_zero && ret < 0)
 		goto out_unlock;
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT)) {
 		xfs_iunlock(ip, iolock);
 		do_zero = true;
+		iolock = XFS_IOLOCK_EXCL;
 		goto retry;
 	}
 
 out_unlock:
+	pr_err("%s9 out_unlock: ret=%zd\n", __func__, ret);
 	if (iolock)
 		xfs_iunlock(ip, iolock);
+	pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 
