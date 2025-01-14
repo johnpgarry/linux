@@ -678,6 +678,7 @@ xfs_file_dio_write_atomic(
 		dio_flags = 0;
 
 retry:
+	pr_err("%s retry: do_zero=%d\n", __func__, do_zero);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -687,17 +688,21 @@ retry:
 		goto out_unlock;
 
 	if (do_zero) {
+		pr_err("%s2 calling iomap_dio_zero_unwritten\n", __func__);
 		ret = iomap_dio_zero_unwritten(iocb, from,
 				&xfs_direct_write_iomap_ops,
 				&xfs_dio_zero_ops);
+		pr_err("%s2.1 called iomap_dio_zero_unwritten ret=%zd\n", __func__, ret);
 		if (ret)
 			goto out_unlock;
 	}
 
 	trace_xfs_file_direct_write(iocb, from);
+	pr_err("%s3 calling iomap_dio_rw ret=%zd\n", __func__, ret);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			&xfs_dio_write_ops, dio_flags, NULL, 0);
 
+	pr_err("%s3.1 called iomap_dio_rw ret=%zd do_zero=%d\n", __func__, ret, do_zero);
 	if (do_zero && ret < 0)
 		goto out_unlock;
 
@@ -710,6 +715,7 @@ retry:
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);
+	pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 
@@ -811,13 +817,19 @@ xfs_file_dio_write(
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+	bool unaligned = (iocb->ki_pos | count) & ip->i_mount->m_blockmask;
+	bool atomic_write = iocb->ki_flags & IOCB_ATOMIC;
+	bool atomic_inode = xfs_inode_has_atomicwrites(ip);
+
+	pr_err("%s pos=%lld count=%zd atomic_write=%d atomic_inode=%d\n",
+		__func__, iocb->ki_pos, count, atomic_write, atomic_inode);
 
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
-	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
+	if (unaligned)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
-	if (iocb->ki_flags & IOCB_ATOMIC)
+	if (atomic_write)
 		return xfs_file_dio_write_atomic(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }

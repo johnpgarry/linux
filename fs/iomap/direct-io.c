@@ -796,12 +796,19 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		unsigned int dio_flags, void *private, size_t done_before)
 {
 	struct iomap_dio *dio;
+	int ret;
 
+	pr_err("%s calling __iomap_dio_rw\n", __func__);
 	dio = __iomap_dio_rw(iocb, iter, ops, dops, dio_flags, private,
 			     done_before);
+	pr_err("%s1 called __iomap_dio_rw dio=%pS\n", __func__, dio);
 	if (IS_ERR_OR_NULL(dio))
 		return PTR_ERR_OR_ZERO(dio);
-	return iomap_dio_complete(dio);
+	pr_err("%s1 calling iomap_dio_complete dio=%pS\n", __func__, dio);
+	ret = iomap_dio_complete(dio);
+	pr_err("%s1.1 called iomap_dio_complete dio=%pS ret=%d\n", __func__, dio, ret);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(iomap_dio_rw);
 
