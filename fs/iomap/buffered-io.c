@@ -1403,7 +1403,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 
 int
 iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
-		const struct iomap_ops *ops, bool holes)
+		const struct iomap_ops *ops, bool zero_unwritten)
 {
 	struct iomap_iter iter = {
 		.inode		= inode,
@@ -1418,7 +1418,7 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	int ret;
 	bool range_dirty;
 
-	pr_err("%s pos=%lld len=%lld off=%d plen=%lld holes=%d\n", __func__, pos, len, off, plen, holes);
+	pr_err("%s pos=%lld len=%lld off=%d plen=%lld zero_unwritten=%d\n", __func__, pos, len, off, plen, zero_unwritten);
 	/*
 	 * Zero range can skip mappings that are zero on disk so long as
 	 * pagecache is clean. If pagecache was dirty prior to zero range, the
@@ -1460,9 +1460,16 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 			IOMAP_HOLE, IOMAP_MAPPED, IOMAP_UNWRITTEN,
 			srcmap->flags, !!(srcmap->flags & IOMAP_F_NEW), !!(srcmap->flags & IOMAP_F_DIRTY),
 			range_dirty, iter.pos, iomap_length(&iter));
-		if ((srcmap->type == IOMAP_HOLE && !holes) ||
-		    (srcmap->type == IOMAP_UNWRITTEN && !holes) ||
-		    (srcmap->type == IOMAP_MAPPED && holes)) {
+
+		if (srcmap->type == IOMAP_UNWRITTEN && zero_unwritten) {
+			pr_err("%s5.0 calling iomap_zero_iter for zero_unwritten=1\n", __func__);
+			iter.processed = iomap_zero_iter(&iter, did_zero);
+			pr_err("%s5.0.1 called iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
+			continue;
+		}
+
+		if ((srcmap->type == IOMAP_HOLE) ||
+		    (srcmap->type == IOMAP_UNWRITTEN)) {
 			loff_t proc = iomap_length(&iter);
 
 			if (range_dirty) {
