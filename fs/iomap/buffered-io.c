@@ -1356,6 +1356,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 	loff_t length = iomap_length(iter);
 	loff_t written = 0;
 
+	pr_err("%s length=%lld\n", __func__, length);
 	do {
 		struct folio *folio;
 		int status;
@@ -1363,11 +1364,16 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 		size_t bytes = min_t(u64, SIZE_MAX, length);
 		bool ret;
 
+		pr_err("%s1 bytes=%zd\n", __func__, bytes);
 		status = iomap_write_begin(iter, pos, bytes, &folio);
-		if (status)
+		if (status) {
+			pr_err("%s1 status=%d\n", __func__, status);
 			return status;
-		if (iter->iomap.flags & IOMAP_F_STALE)
+		}
+		if (iter->iomap.flags & IOMAP_F_STALE) {
+			pr_err("%s2 IOMAP_F_STALE\n", __func__);
 			break;
+		}
 
 		/* warn about zeroing folios beyond eof that won't write back */
 		WARN_ON_ONCE(folio_pos(folio) > iter->inode->i_size);
@@ -1380,6 +1386,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 
 		ret = iomap_write_end(iter, pos, bytes, bytes, folio);
 		__iomap_put_folio(iter, pos, bytes, folio);
+		pr_err("%s2 called iomap_write_end ret=%d\n", __func__, ret);
 		if (WARN_ON_ONCE(!ret))
 			return -EIO;
 
@@ -1390,6 +1397,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 
 	if (did_zero)
 		*did_zero = true;
+	pr_err("%s10 written=%lld\n", __func__, written);
 	return written;
 }
 
@@ -1410,6 +1418,7 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	int ret;
 	bool range_dirty;
 
+	pr_err("%s pos=%lld len=%lld off=%d plen=%lld\n", __func__, pos, len, off, plen);
 	/*
 	 * Zero range can skip mappings that are zero on disk so long as
 	 * pagecache is clean. If pagecache was dirty prior to zero range, the
@@ -1423,12 +1432,17 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	if (off &&
 	    filemap_range_needs_writeback(mapping, pos, pos + plen - 1)) {
 		iter.len = plen;
-		while ((ret = iomap_iter(&iter, ops)) > 0)
+		while ((ret = iomap_iter(&iter, ops)) > 0) {
+			pr_err("%s1 calling iomap_zero_iter\n", __func__);
 			iter.processed = iomap_zero_iter(&iter, did_zero);
+			pr_err("%s1.1 called iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
+		}
 
 		iter.len = len - (iter.pos - pos);
-		if (ret || !iter.len)
+		if (ret || !iter.len) {
+			pr_err("%s3 ret=%d iter.len=%lld\n", __func__, ret, iter.len);
 			return ret;
+		}
 	}
 
 	/*
@@ -1441,6 +1455,10 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	while ((ret = iomap_iter(&iter, ops)) > 0) {
 		const struct iomap *srcmap = iomap_iter_srcmap(&iter);
 
+		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) range_dirty=%d\n",
+			__func__, srcmap->type,
+			IOMAP_HOLE, IOMAP_MAPPED, IOMAP_UNWRITTEN,
+			range_dirty);
 		if (srcmap->type == IOMAP_HOLE ||
 		    srcmap->type == IOMAP_UNWRITTEN) {
 			loff_t proc = iomap_length(&iter);
@@ -1450,11 +1468,15 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 				proc = iomap_zero_iter_flush_and_stale(&iter);
 			}
 			iter.processed = proc;
+			pr_err("%s5 iter.processed=%lld\n", __func__, iter.processed);
 			continue;
 		}
 
+		pr_err("%s6 calling iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
 		iter.processed = iomap_zero_iter(&iter, did_zero);
+		pr_err("%s6.1 called iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
 	}
+	pr_err("%s10 ret=%d\n", __func__, ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iomap_zero_range);

@@ -314,12 +314,16 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
-	if (atomic && length != iter->len)
+	if (atomic && length != iter->len) {
+		pr_err("%s -EINVAL atomic length=%lld iter->len=%lld\n",
+			__func__, length, iter->len);
 		return -EINVAL;
+	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
-	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
+	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter)) {
 		return -EINVAL;
+	}
 
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
@@ -431,6 +435,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			 * the tail (complete FS block), similar to when
 			 * bio_iov_iter_get_pages() returns an error, above.
 			 */
+			pr_err("%s2 -EINVAL atomic n=%zd length=%lld\n",
+				__func__, n, length);
 			ret = -EINVAL;
 			bio_put(bio);
 			goto zero_tail;
@@ -650,8 +656,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		if (dio_flags & IOMAP_DIO_OVERWRITE_ONLY) {
 			ret = -EAGAIN;
 			if (iomi.pos >= dio->i_size ||
-			    iomi.pos + iomi.len > dio->i_size)
+			    iomi.pos + iomi.len > dio->i_size) {
+				pr_err("%s IOMAP_DIO_OVERWRITE_ONLY EAGAIN\n", __func__);
 				goto out_free_dio;
+			}
 			iomi.flags |= IOMAP_OVERWRITE_ONLY;
 		}
 

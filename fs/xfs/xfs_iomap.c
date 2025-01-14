@@ -109,12 +109,14 @@ xfs_bmbt_to_iomap(
 	}
 
 	if (imap->br_startblock == HOLESTARTBLOCK) {
+		pr_err("%s HOLESTARTBLOCK\n", __func__);
 		iomap->addr = IOMAP_NULL_ADDR;
 		iomap->type = IOMAP_HOLE;
 	} else if (imap->br_startblock == DELAYSTARTBLOCK ||
 		   isnullstartblock(imap->br_startblock)) {
 		iomap->addr = IOMAP_NULL_ADDR;
 		iomap->type = IOMAP_DELALLOC;
+		pr_err("%s DELAYSTARTBLOCK\n", __func__);
 	} else {
 		xfs_daddr_t	daddr = xfs_fsb_to_db(ip, imap->br_startblock);
 
@@ -611,6 +613,8 @@ xfs_iomap_write_unwritten(
 	uint		resblks;
 	int		error;
 
+	pr_err("%s offset=%lld count=%lld\n",
+			__func__, offset, count);
 	trace_xfs_unwritten_convert(ip, offset, count);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -717,9 +721,13 @@ imap_needs_alloc(
 	struct xfs_bmbt_irec	*imap,
 	int			nimaps)
 {
+	pr_err("%s IOMAP_ZERO set=%d nimaps=%d\n", __func__, !!(flags & IOMAP_ZERO), nimaps);
 	/* don't allocate blocks when just zeroing */
-	if (flags & IOMAP_ZERO)
-		return false;
+	if (flags & IOMAP_ZERO) {
+		pr_err("%s IOMAP_ZERO means don't allocate blocks when just zeroing IOMAP_ATOMIC set=%d\n",
+			__func__, !!(flags & IOMAP_ATOMIC));
+		return true;
+	}
 	if (!nimaps ||
 	    imap->br_startblock == HOLESTARTBLOCK ||
 	    imap->br_startblock == DELAYSTARTBLOCK)
@@ -795,6 +803,16 @@ imap_spans_range(
 	return true;
 }
 
+#ifdef fdfddfd
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+#endif
+
 static int
 xfs_direct_write_iomap_begin(
 	struct inode		*inode,
@@ -815,6 +833,7 @@ xfs_direct_write_iomap_begin(
 	unsigned int		lockmode;
 	u64			seq;
 
+	pr_err("%s\n", __func__);
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
 	if (xfs_is_shutdown(mp))
@@ -825,8 +844,10 @@ xfs_direct_write_iomap_begin(
 	 * so consider them to be dirty for the purposes of O_DSYNC even if
 	 * there is no other metadata changes pending or have been made here.
 	 */
-	if (offset + length > i_size_read(inode))
+	if (offset + length > i_size_read(inode)) {
+		pr_err("%s1 set IOMAP_F_DIRTY\n", __func__);
 		iomap_flags |= IOMAP_F_DIRTY;
+	}
 
 	/*
 	 * COW writes may allocate delalloc space or convert unwritten COW
@@ -854,8 +875,11 @@ relock:
 
 	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
 			       &nimaps, 0);
+	pr_err("%s2 called xfs_bmapi_read error=%d\n", __func__, error);
 	if (error)
 		goto out_unlock;
+	pr_err("%s2.1 called xfs_bmapi_read error=%d imap.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d XFS_EXT_NORM=%d\n",
+		__func__, error, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, XFS_EXT_NORM);
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;
@@ -874,8 +898,11 @@ relock:
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 	}
 
-	if (imap_needs_alloc(inode, flags, &imap, nimaps))
+
+	if (imap_needs_alloc(inode, flags, &imap, nimaps)) {
+		pr_err("%s2.1 imap_needs_alloc, so goto allocate_blocks\n", __func__);
 		goto allocate_blocks;
+	}
 
 	/*
 	 * NOWAIT and OVERWRITE I/O needs to span the entire requested I/O with
@@ -885,8 +912,10 @@ relock:
 	 */
 	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
 		error = -EAGAIN;
-		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
+			pr_err("%s EAGAIN IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY !imap_spans_range\n", __func__);
 			goto out_unlock;
+		}
 	}
 
 	/*
@@ -898,19 +927,27 @@ relock:
 	if (flags & IOMAP_OVERWRITE_ONLY) {
 		error = -EAGAIN;
 		if (imap.br_state != XFS_EXT_NORM &&
-	            ((offset | length) & mp->m_blockmask))
+	            ((offset | length) & mp->m_blockmask)) {
+			pr_err("%s1 EAGAIN IOMAP_OVERWRITE_ONLY (offset | length) & mp->m_blockmask !XFS_EXT_NORM\n", __func__);
 			goto out_unlock;
+		}
 	}
 
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
 	trace_xfs_iomap_found(ip, offset, length, XFS_DATA_FORK, &imap);
+
+	pr_err("%s3.1 calling xfs_bmbt_to_iomap error=%d imap.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d XFS_EXT_NORM=%d\n",
+		__func__, error, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, XFS_EXT_NORM);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 allocate_blocks:
 	error = -EAGAIN;
-	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY))
+	pr_err("%s2 allocate_blocks: length=%lld\n", __func__, length);
+	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
+		pr_err("%s2.1 allocate_blocks: EAGAIN allocate_blocks: EAGAIN IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY\n", __func__);
 		goto out_unlock;
+	}
 
 	/*
 	 * We cap the maximum length we map to a sane size  to keep the chunks
@@ -930,6 +967,10 @@ allocate_blocks:
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
 	xfs_iunlock(ip, lockmode);
 
+	pr_err("%s2.2  allocate_blocks: calling xfs_iomap_write_direct length=%lld end_fsb=%lld offset_fsb=%lld\n",
+		__func__, length, end_fsb, offset_fsb);
+	pr_err("%s2.2.1 imap.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d XFS_EXT_NORM=%d\n",
+		__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, XFS_EXT_NORM);
 	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
 			flags, &imap, &seq);
 	if (error)
@@ -955,6 +996,7 @@ out_found_cow:
 out_unlock:
 	if (lockmode)
 		xfs_iunlock(ip, lockmode);
+	pr_err("%s10 error=%d\n", __func__, error);
 	return error;
 }
 
@@ -1012,13 +1054,16 @@ xfs_buffered_write_iomap_begin(
 	unsigned int		iomap_flags = 0;
 	u64			seq;
 
+	pr_err("%s\n", __func__);
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
 	/* we can't use delayed allocations when using extent size hints */
-	if (xfs_get_extsz_hint(ip))
+	if (xfs_get_extsz_hint(ip)) {
+		pr_err("%s1 xfs_get_extsz_hint set, so calling xfs_direct_write_iomap_begin\n", __func__);
 		return xfs_direct_write_iomap_begin(inode, offset, count,
 				flags, iomap, srcmap);
+	}
 
 	error = xfs_qm_dqattach(ip);
 	if (error)
@@ -1054,6 +1099,7 @@ xfs_buffered_write_iomap_begin(
 	/* We never need to allocate blocks for zeroing or unsharing a hole. */
 	if ((flags & (IOMAP_UNSHARE | IOMAP_ZERO)) &&
 	    imap.br_startoff > offset_fsb) {
+		pr_err("%s2 calling xfs_hole_to_iomap\n", __func__);
 		xfs_hole_to_iomap(ip, iomap, offset_fsb, imap.br_startoff);
 		goto out_unlock;
 	}
@@ -1066,6 +1112,8 @@ xfs_buffered_write_iomap_begin(
 	if ((flags & IOMAP_ZERO) && imap.br_startoff <= offset_fsb &&
 	    isnullstartblock(imap.br_startblock)) {
 		xfs_fileoff_t eof_fsb = XFS_B_TO_FSB(mp, XFS_ISIZE(ip));
+
+		pr_err("%s2.1 flags & IOMAP_ZERO\n", __func__);
 
 		if (offset_fsb >= eof_fsb)
 			goto convert_delay;
@@ -1098,6 +1146,7 @@ xfs_buffered_write_iomap_begin(
 	}
 
 	if (imap.br_startoff <= offset_fsb) {
+		pr_err("%s4 imap.br_startoff <= offset_fsb\n", __func__);
 		/*
 		 * For reflink files we may need a delalloc reservation when
 		 * overwriting shared extents.   This includes zeroing of
@@ -1131,6 +1180,7 @@ xfs_buffered_write_iomap_begin(
 		allocfork = XFS_COW_FORK;
 		end_fsb = imap.br_startoff + imap.br_blockcount;
 	} else {
+		pr_err("%s4.1 !(imap.br_startoff <= offset_fsb)\n", __func__);
 		/*
 		 * We cap the maximum length we map here to MAX_WRITEBACK_PAGES
 		 * pages to keep the chunks of work done where somewhat
@@ -1148,6 +1198,7 @@ xfs_buffered_write_iomap_begin(
 	}
 
 	if (eof && offset + count > XFS_ISIZE(ip)) {
+		pr_err("%s5 eof && offset + count > XFS_ISIZE(ip)\n", __func__);
 		/*
 		 * Determine the initial size of the preallocation.
 		 * We clean up any extra preallocation when the file is closed.
@@ -1185,6 +1236,7 @@ xfs_buffered_write_iomap_begin(
 	 * them out if the write happens to fail.
 	 */
 	iomap_flags |= IOMAP_F_NEW;
+	pr_err("%s5 setting IOMAP_F_NEW\n", __func__);
 	if (allocfork == XFS_COW_FORK) {
 		error = xfs_bmapi_reserve_delalloc(ip, allocfork, offset_fsb,
 				end_fsb - offset_fsb, prealloc_blocks, &cmap,
@@ -1196,6 +1248,7 @@ xfs_buffered_write_iomap_begin(
 		goto found_cow;
 	}
 
+	pr_err("%s6 calling xfs_bmapi_reserve_delalloc\n", __func__);
 	error = xfs_bmapi_reserve_delalloc(ip, allocfork, offset_fsb,
 			end_fsb - offset_fsb, prealloc_blocks, &imap, &icur,
 			eof);
@@ -1206,11 +1259,13 @@ xfs_buffered_write_iomap_begin(
 found_imap:
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
+	pr_err("%s7 found_imap: calling xfs_bmbt_to_iomap\n", __func__);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 convert_delay:
 	xfs_iunlock(ip, lockmode);
 	truncate_pagecache(inode, offset);
+	pr_err("%s8 convert_delay: calling xfs_bmapi_convert_delalloc\n", __func__);
 	error = xfs_bmapi_convert_delalloc(ip, XFS_DATA_FORK, offset,
 					   iomap, NULL);
 	if (error)
@@ -1237,6 +1292,7 @@ found_cow:
 
 out_unlock:
 	xfs_iunlock(ip, lockmode);
+	pr_err("%s10 error=%d\n", __func__, error);
 	return error;
 }
 
@@ -1264,10 +1320,12 @@ xfs_buffered_write_iomap_end(
 {
 	loff_t			start_byte, end_byte;
 
+	pr_err("%s offset=%lld length=%lld written=%zd\n", __func__, offset, length, written);
 	/* If we didn't reserve the blocks, we're not allowed to punch them. */
 	if (iomap->type != IOMAP_DELALLOC || !(iomap->flags & IOMAP_F_NEW))
 		return 0;
 
+	pr_err("%s2 offset=%lld length=%lld written=%zd\n", __func__, offset, length, written);
 	/*
 	 * iomap_page_mkwrite() will never fail in a way that requires delalloc
 	 * extents that it allocated to be revoked.  Hence never try to release
@@ -1275,12 +1333,15 @@ xfs_buffered_write_iomap_end(
 	 */
 	if (flags & IOMAP_FAULT)
 		return 0;
+	pr_err("%s3 offset=%lld length=%lld written=%zd\n", __func__, offset, length, written);
 
 	/* Nothing to do if we've written the entire delalloc extent */
 	start_byte = iomap_last_written_block(inode, offset, written);
 	end_byte = round_up(offset + length, i_blocksize(inode));
 	if (start_byte >= end_byte)
 		return 0;
+	pr_err("%s4 offset=%lld length=%lld written=%zd IOMAP_ZERO set=%d\n",
+		__func__, offset, length, written, !!(flags & IOMAP_ZERO));
 
 	/* For zeroing operations the callers already hold invalidate_lock. */
 	if (flags & (IOMAP_UNSHARE | IOMAP_ZERO)) {
@@ -1490,14 +1551,19 @@ xfs_zero_range(
 	bool			*did_zero)
 {
 	struct inode		*inode = VFS_I(ip);
+	int ret;
 
 	xfs_assert_ilocked(ip, XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL);
 
 	if (IS_DAX(inode))
 		return dax_zero_range(inode, pos, len, did_zero,
 				      &xfs_dax_write_iomap_ops);
-	return iomap_zero_range(inode, pos, len, did_zero,
+	pr_err("%s pos=%lld len=%lld calling iomap_zero_range with xfs_buffered_write_iomap_ops\n", __func__, pos, len);
+	ret = iomap_zero_range(inode, pos, len, did_zero,
 				&xfs_buffered_write_iomap_ops);
+	pr_err("%s10 pos=%lld len=%lld called iomap_zero_range ret=%d *did_zero=%d\n",
+		__func__, pos, len, ret, did_zero ? *did_zero : -1);
+	return ret;
 }
 
 int

@@ -127,8 +127,11 @@ xfs_end_ioend(
 	 */
 	if (ioend->io_flags & IOMAP_F_SHARED)
 		error = xfs_reflink_end_cow(ip, offset, size);
-	else if (ioend->io_type == IOMAP_UNWRITTEN)
+	else if (ioend->io_type == IOMAP_UNWRITTEN) {
+		pr_err("%s offset=%lld size=%zd calling xfs_iomap_write_unwritten\n",
+				__func__, offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, false);
+	}
 
 	if (!error && xfs_ioend_is_append(ioend))
 		error = xfs_setfilesize(ip, ioend->io_offset, ioend->io_size);
@@ -170,6 +173,7 @@ xfs_end_io(
 			io_list))) {
 		list_del_init(&ioend->io_list);
 		iomap_ioend_try_merge(ioend, &tmp);
+		pr_err("%s calling xfs_end_ioend\n", __func__);
 		xfs_end_ioend(ioend);
 		cond_resched();
 	}
@@ -182,6 +186,8 @@ xfs_end_bio(
 	struct iomap_ioend	*ioend = iomap_ioend_from_bio(bio);
 	struct xfs_inode	*ip = XFS_I(ioend->io_inode);
 	unsigned long		flags;
+	pr_err("%s calling queue_work on i_ioend_work, which calls xfs_end_ioend\n",
+		__func__);
 
 	spin_lock_irqsave(&ip->i_ioend_lock, flags);
 	if (list_empty(&ip->i_ioend_list))
@@ -413,6 +419,8 @@ xfs_prepare_ioend(
 		status = xfs_reflink_convert_cow(XFS_I(ioend->io_inode),
 				ioend->io_offset, ioend->io_size);
 	}
+
+	pr_err("%s\n", __func__);
 
 	memalloc_nofs_restore(nofs_flag);
 

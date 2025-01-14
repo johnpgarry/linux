@@ -414,6 +414,7 @@ xfs_file_write_zero_eof(
 	trace_xfs_zero_eof(ip, isize, iocb->ki_pos - isize);
 
 	xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
+	pr_err("%s calling xfs_zero_range\n", __func__);
 	error = xfs_zero_range(ip, isize, iocb->ki_pos - isize, NULL);
 	xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
 
@@ -480,6 +481,7 @@ restart:
 	 * the slow path when we are at or beyond the current EOF.
 	 */
 	if (iocb->ki_pos > i_size_read(inode)) {
+		pr_err("%s calling xfs_file_write_zero_eof\n", __func__);
 		error = xfs_file_write_zero_eof(iocb, from, iolock, count,
 				&drained_dio);
 		if (error == 1)
@@ -539,6 +541,8 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
+		pr_err("%s offset=%lld size=%zd calling xfs_iomap_write_unwritten\n",
+			__func__, offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}
@@ -590,6 +594,8 @@ xfs_dio_write_end_zero_unwritten(
 	loff_t			offset = iocb->ki_pos;
 	unsigned int		nofs_flag;
 
+	pr_err("%s size=%zd error=%d\n", __func__, size, error);
+
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
 	if (xfs_is_shutdown(ip->i_mount))
@@ -605,6 +611,8 @@ xfs_dio_write_end_zero_unwritten(
 	/* Same as xfs_dio_write_end_io() ... */
 	nofs_flag = memalloc_nofs_save();
 
+	pr_err("%s2 offset=%lld size=%zd error=%d calling xfs_iomap_write_unwritten\n",
+		__func__, offset, size, error);
 	error = xfs_iomap_write_unwritten(ip, offset, size, true);
 
 	memalloc_nofs_restore(nofs_flag);
@@ -634,6 +642,7 @@ xfs_file_dio_write_aligned(
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
+	pr_err("%s calling xfs_file_write_checks\n", __func__);
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
@@ -653,6 +662,7 @@ xfs_file_dio_write_aligned(
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);
+	pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 
@@ -664,18 +674,8 @@ xfs_file_dio_write_atomic(
 {
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	bool			do_zero = false;
-	unsigned int		dio_flags;
 	ssize_t			ret;
-
-	/*
-	 * Zero unwritten only for writing multiple blocks. Leverage
-	 * IOMAP_DIO_OVERWRITE_ONLY detecting when zeroing is required, as
-	 * it ensures that a single written mapping is provided.
-	 */
-	if (iov_iter_count(from) > ip->i_mount->m_sb.sb_blocksize)
-		dio_flags = IOMAP_DIO_OVERWRITE_ONLY;
-	else
-		dio_flags = 0;
+	unsigned int unitsize = xfs_inode_alloc_unitsize(ip);
 
 retry:
 	pr_err("%s retry: do_zero=%d\n", __func__, do_zero);
@@ -683,16 +683,20 @@ retry:
 	if (ret)
 		return ret;
 
+	pr_err("%s0 calling xfs_file_write_checks\n", __func__);
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
 
 	if (do_zero) {
-		pr_err("%s2 calling iomap_dio_zero_unwritten\n", __func__);
-		ret = iomap_dio_zero_unwritten(iocb, from,
-				&xfs_direct_write_iomap_ops,
-				&xfs_dio_zero_ops);
-		pr_err("%s2.1 called iomap_dio_zero_unwritten ret=%zd\n", __func__, ret);
+		unsigned long long pos = rounddown(iocb->ki_pos, unitsize);
+		pr_err("%s2 calling xfs_zero_range unitsize=%d ki_pos=%lld pos=%lld\n",
+			__func__, unitsize, iocb->ki_pos, pos);
+		bool did_zero = false;
+		xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
+		ret = xfs_zero_range(ip, pos, unitsize, &did_zero);
+		xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
+		pr_err("%s2.1 called xfs_zero_range ret=%zd did_zero=%d\n", __func__, ret, did_zero);
 		if (ret)
 			goto out_unlock;
 	}
@@ -700,7 +704,7 @@ retry:
 	trace_xfs_file_direct_write(iocb, from);
 	pr_err("%s3 calling iomap_dio_rw ret=%zd\n", __func__, ret);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
-			&xfs_dio_write_ops, dio_flags, NULL, 0);
+			&xfs_dio_write_ops, IOMAP_DIO_OVERWRITE_ONLY, NULL, 0);
 
 	pr_err("%s3.1 called iomap_dio_rw ret=%zd do_zero=%d\n", __func__, ret, do_zero);
 	if (do_zero && ret < 0)
@@ -709,10 +713,12 @@ retry:
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT)) {
 		xfs_iunlock(ip, iolock);
 		do_zero = true;
+		iolock = XFS_IOLOCK_EXCL;
 		goto retry;
 	}
 
 out_unlock:
+	pr_err("%s9 out_unlock: ret=%zd\n", __func__, ret);
 	if (iolock)
 		xfs_iunlock(ip, iolock);
 	pr_err("%s10 ret=%zd\n", __func__, ret);
@@ -775,6 +781,7 @@ retry_exclusive:
 		goto out_unlock;
 	}
 
+	pr_err("%s calling xfs_file_write_checks\n", __func__);
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
@@ -827,10 +834,10 @@ xfs_file_dio_write(
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
+	if (atomic_inode)
+		return xfs_file_dio_write_atomic(ip, iocb, from);
 	if (unaligned)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
-	if (atomic_write)
-		return xfs_file_dio_write_atomic(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
 
@@ -892,11 +899,13 @@ write_retry:
 	if (ret)
 		return ret;
 
+	pr_err("%s calling xfs_file_write_checks\n", __func__);
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out;
 
 	trace_xfs_file_buffered_write(iocb, from);
+	pr_err("%s1 calling iomap_file_buffered_write with xfs_buffered_write_iomap_ops\n", __func__);
 	ret = iomap_file_buffered_write(iocb, from,
 			&xfs_buffered_write_iomap_ops, NULL);
 
@@ -936,6 +945,7 @@ out:
 		/* Handle various SYNC-type writes */
 		ret = generic_write_sync(iocb, ret);
 	}
+	pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 
