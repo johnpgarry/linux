@@ -1710,6 +1710,7 @@ static void iomap_writepage_end_bio(struct bio *bio)
  */
 static int iomap_submit_ioend(struct iomap_writepage_ctx *wpc, int error)
 {
+	pr_err("%s wpc->ioend=%pS\n", __func__, wpc->ioend);
 	if (!wpc->ioend)
 		return error;
 
@@ -1719,6 +1720,7 @@ static int iomap_submit_ioend(struct iomap_writepage_ctx *wpc, int error)
 	 * failure happened so that the file system end I/O handler gets called
 	 * to clean up.
 	 */
+	pr_err("%s1 wpc->ops->prepare_ioend=%pS\n", __func__, wpc->ops->prepare_ioend);
 	if (wpc->ops->prepare_ioend)
 		error = wpc->ops->prepare_ioend(wpc->ioend, error);
 
@@ -1805,8 +1807,10 @@ static int iomap_add_to_ioend(struct iomap_writepage_ctx *wpc,
 	size_t poff = offset_in_folio(folio, pos);
 	int error;
 
+	pr_err("%s\n", __func__);
 	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, pos)) {
 new_ioend:
+		pr_err("%s1 calling iomap_submit_ioend\n", __func__);
 		error = iomap_submit_ioend(wpc, 0);
 		if (error)
 			return error;
@@ -1842,6 +1846,7 @@ static int iomap_writepage_map_blocks(struct iomap_writepage_ctx *wpc,
 			wpc->iomap.offset + wpc->iomap.length - pos);
 		WARN_ON_ONCE(!folio->private && map_len < dirty_len);
 
+		pr_err("%s wpc->iomap.type=%d\n", __func__, wpc->iomap.type);
 		switch (wpc->iomap.type) {
 		case IOMAP_INLINE:
 			WARN_ON_ONCE(1);
@@ -1850,6 +1855,7 @@ static int iomap_writepage_map_blocks(struct iomap_writepage_ctx *wpc,
 		case IOMAP_HOLE:
 			break;
 		default:
+			pr_err("%s1 calling iomap_add_to_ioend\n", __func__);
 			error = iomap_add_to_ioend(wpc, wbc, folio, inode, pos,
 					map_len);
 			if (!error)
@@ -2036,6 +2042,7 @@ iomap_writepages(struct address_space *mapping, struct writeback_control *wbc,
 	wpc->ops = ops;
 	while ((folio = writeback_iter(mapping, wbc, folio, &error)))
 		error = iomap_writepage_map(wpc, wbc, folio);
+	pr_err("%s calling iomap_submit_ioend\n", __func__);
 	return iomap_submit_ioend(wpc, error);
 }
 EXPORT_SYMBOL_GPL(iomap_writepages);

@@ -583,7 +583,7 @@ out:
 }
 
 static int
-xfs_dio_write_end_zero_unwritten(
+xfs_dio_write_end_zero_allocunit(
 	struct kiocb		*iocb,
 	ssize_t			size,
 	int			error,
@@ -624,7 +624,7 @@ static const struct iomap_dio_ops xfs_dio_write_ops = {
 };
 
 static const struct iomap_dio_ops xfs_dio_zero_ops = {
-	.end_io		= xfs_dio_write_end_zero_unwritten,
+	.end_io		= xfs_dio_write_end_zero_allocunit,
 };
 
 /*
@@ -689,14 +689,13 @@ retry:
 		goto out_unlock;
 
 	if (do_zero) {
-		unsigned long long pos = rounddown(iocb->ki_pos, unitsize);
-		pr_err("%s2 calling xfs_zero_range unitsize=%d ki_pos=%lld pos=%lld\n",
+		loff_t pos = rounddown(iocb->ki_pos, unitsize);
+		pr_err("%s2 calling iomap_dio_zero_allocunit unitsize=%d ki_pos=%lld pos=%lld\n",
 			__func__, unitsize, iocb->ki_pos, pos);
 		bool did_zero = false;
-		xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
-		ret = xfs_zero_range(ip, pos, unitsize, &did_zero, true);
-		xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
-		pr_err("%s2.1 called xfs_zero_range ret=%zd did_zero=%d\n", __func__, ret, did_zero);
+		ret = iomap_dio_zero_allocunit(iocb, &xfs_direct_write_iomap_ops,
+				&xfs_dio_zero_ops, unitsize);
+		pr_err("%s2.1 called iomap_dio_zero_allocunit ret=%zd did_zero=%d\n", __func__, ret, did_zero);
 		if (ret)
 			goto out_unlock;
 	}

@@ -821,12 +821,14 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 EXPORT_SYMBOL_GPL(iomap_dio_rw);
 
 static loff_t
-iomap_dio_zero_unwritten_iter(struct iomap_iter *iter, struct iomap_dio *dio)
+iomap_dio_zero_allocunit_iter(struct iomap_iter *iter, struct iomap_dio *dio)
 {
 	const struct iomap *iomap = &iter->iomap;
 	loff_t length = iomap_length(iter);
 	loff_t pos = iter->pos;
 
+	pr_err("%s iomap->type=%d IOMAP_UNWRITTEN=%d pos=%lld length=%lld\n",
+		__func__, IOMAP_UNWRITTEN, IOMAP_UNWRITTEN, pos, length);
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		int ret;
 
@@ -838,20 +840,24 @@ iomap_dio_zero_unwritten_iter(struct iomap_iter *iter, struct iomap_dio *dio)
 
 	dio->size += length;
 
+	pr_err("%s10 length=%lld\n", __func__, length);
 	return length;
 }
 
 ssize_t
-iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
-		const struct iomap_ops *ops, const struct iomap_dio_ops *dops)
+iomap_dio_zero_allocunit(struct kiocb *iocb,
+		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
+		loff_t len)
 {
-	struct inode *inode = file_inode(iocb->ki_filp);
 	struct iomap_dio *dio;
 	ssize_t ret;
+	loff_t pos = rounddown(iocb->ki_pos, len);
+	struct inode *inode = file_inode(iocb->ki_filp);
+
 	struct iomap_iter iomi = {
 		.inode		= inode,
-		.pos		= iocb->ki_pos,
-		.len		= iov_iter_count(iter),
+		.pos		= pos,
+		.len		= len,
 		.flags		= IOMAP_WRITE,
 	};
 
@@ -859,6 +865,7 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 	if (!dio)
 		return -ENOMEM;
 
+	pr_err("%s iocb=%pS pos=%lld len=%lld\n", __func__, iocb, pos, len);
 	dio->iocb = iocb;
 	atomic_set(&dio->ref, 1);
 	dio->i_size = i_size_read(inode);
@@ -868,8 +875,10 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 
 	inode_dio_begin(inode);
 
-	while ((ret = iomap_iter(&iomi, ops)) > 0)
-		iomi.processed = iomap_dio_zero_unwritten_iter(&iomi, dio);
+	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+		iomi.processed = iomap_dio_zero_allocunit_iter(&iomi, dio);
+		pr_err("%s2 iomi.processed=%lld\n", __func__, iomi.processed);
+	}
 
 	if (ret < 0)
 		iomap_dio_set_error(dio, ret);
@@ -890,11 +899,11 @@ iomap_dio_zero_unwritten(struct kiocb *iocb, struct iov_iter *iter,
 
 	kfree(dio);
 
-	inode_dio_end(file_inode(iocb->ki_filp));
+	inode_dio_end(inode);
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(iomap_dio_zero_unwritten);
+EXPORT_SYMBOL_GPL(iomap_dio_zero_allocunit);
 
 static int __init iomap_dio_init(void)
 {
