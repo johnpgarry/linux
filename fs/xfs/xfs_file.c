@@ -692,12 +692,12 @@ retry:
 
 	if (do_zero) {
 		loff_t pos = rounddown(iocb->ki_pos, unitsize);
-		pr_err("%s2 calling iomap_dio_zero_allocunit unitsize=%d ki_pos=%lld pos=%lld\n",
+		pr_err("%s2 calling iomap_dio_zero_unwritten unitsize=%d ki_pos=%lld pos=%lld\n",
 			__func__, unitsize, iocb->ki_pos, pos);
 		bool did_zero = false;
 		ret = iomap_dio_zero_unwritten(iocb, from,
 				&xfs_direct_write_iomap_ops,
-				&xfs_dio_zero_ops);
+				&xfs_dio_zero_ops, unitsize);
 		pr_err("%s2.1 called iomap_dio_zero_allocunit ret=%zd did_zero=%d\n", __func__, ret, did_zero);
 		if (ret)
 			goto out_unlock;

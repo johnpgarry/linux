@@ -1455,13 +1455,14 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	while ((ret = iomap_iter(&iter, ops)) > 0) {
 		const struct iomap *srcmap = iomap_iter_srcmap(&iter);
 
-		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) ->flags=0x%x (NEW set=%d, DIRTY set=%d) range_dirty=%d\n",
+		pr_err("%s5 srcmap->type=%d (HOLE=%d, MAPPED=%d, UNWRITTEN=%d) ->flags=0x%x (NEW set=%d, DIRTY set=%d) range_dirty=%d iter.pos=%lld, len=%lld\n",
 			__func__, srcmap->type,
 			IOMAP_HOLE, IOMAP_MAPPED, IOMAP_UNWRITTEN,
 			srcmap->flags, !!(srcmap->flags & IOMAP_F_NEW), !!(srcmap->flags & IOMAP_F_DIRTY),
-			range_dirty);
+			range_dirty, iter.pos, iter.len);
 		if ((srcmap->type == IOMAP_HOLE && !holes) ||
-		    (srcmap->type == IOMAP_UNWRITTEN && !holes)) {
+		    (srcmap->type == IOMAP_UNWRITTEN && !holes) ||
+		    (srcmap->type == IOMAP_MAPPED && holes)) {
 			loff_t proc = iomap_length(&iter);
 
 			if (range_dirty) {
@@ -1469,11 +1470,11 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 				proc = iomap_zero_iter_flush_and_stale(&iter);
 			}
 			iter.processed = proc;
-			pr_err("%s5 iter.processed=%lld\n", __func__, iter.processed);
+			pr_err("%s5.1 iter.processed=%lld skipping\n", __func__, iter.processed);
 			continue;
 		}
 
-		pr_err("%s6 calling iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
+		pr_err("%s6 calling iomap_zero_iter\n", __func__);
 		iter.processed = iomap_zero_iter(&iter, did_zero);
 		pr_err("%s6.1 called iomap_zero_iter iter.processed=%lld\n", __func__, iter.processed);
 	}
