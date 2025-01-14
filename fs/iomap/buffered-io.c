@@ -1418,9 +1418,6 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	int ret;
 	bool range_dirty;
 
-	if (holes)
-		iter.flags |= IOMAP_HOLES_ZERO;
-
 	pr_err("%s pos=%lld len=%lld off=%d plen=%lld holes=%d\n", __func__, pos, len, off, plen, holes);
 	/*
 	 * Zero range can skip mappings that are zero on disk so long as

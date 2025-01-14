@@ -721,13 +721,9 @@ imap_needs_alloc(
 	struct xfs_bmbt_irec	*imap,
 	int			nimaps)
 {
-	pr_err("%s IOMAP_ZERO set=%d IOMAP_HOLES_ZERO set=%d nimaps=%d\n",
-		__func__, !!(flags & IOMAP_ZERO), !!(flags & IOMAP_HOLES_ZERO), nimaps);
-	if (flags & IOMAP_HOLES_ZERO) {
-		pr_err("%s1 IOMAP_HOLES_ZERO means allocate blocks when just zeroing IOMAP_ATOMIC set=%d\n",
-			__func__, !!(flags & IOMAP_ATOMIC));
-		return true;
-	}
+	pr_err("%s IOMAP_ZERO set=%d nimaps=%d\n",
+		__func__, !!(flags & IOMAP_ZERO), nimaps);
+
 	/* don't allocate blocks when just zeroing */
 	if (flags & IOMAP_ZERO) {
 		pr_err("%s2 IOMAP_ZERO means don't allocate blocks when just zeroing IOMAP_ATOMIC set=%d\n",

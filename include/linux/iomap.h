@@ -183,7 +183,6 @@ struct iomap_folio_ops {
 #define IOMAP_DAX		0
 #endif /* CONFIG_FS_DAX */
 #define IOMAP_ATOMIC		(1 << 9)
-#define IOMAP_HOLES_ZERO (1 << 10)
 
 struct iomap_ops {
 	/*
