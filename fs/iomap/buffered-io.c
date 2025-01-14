@@ -1403,7 +1403,7 @@ static loff_t iomap_zero_iter(struct iomap_iter *iter, bool *did_zero)
 
 int
 iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
-		const struct iomap_ops *ops)
+		const struct iomap_ops *ops, bool holes)
 {
 	struct iomap_iter iter = {
 		.inode		= inode,
@@ -1418,7 +1418,10 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 	int ret;
 	bool range_dirty;
 
-	pr_err("%s pos=%lld len=%lld off=%d plen=%lld\n", __func__, pos, len, off, plen);
+	if (holes)
+		iter.flags |= IOMAP_HOLES_ZERO;
+
+	pr_err("%s pos=%lld len=%lld off=%d plen=%lld holes=%d\n", __func__, pos, len, off, plen, holes);
 	/*
 	 * Zero range can skip mappings that are zero on disk so long as
 	 * pagecache is clean. If pagecache was dirty prior to zero range, the
@@ -1491,7 +1494,7 @@ iomap_truncate_page(struct inode *inode, loff_t pos, bool *did_zero,
 	/* Block boundary? Nothing to do */
 	if (!off)
 		return 0;
-	return iomap_zero_range(inode, pos, blocksize - off, did_zero, ops);
+	return iomap_zero_range(inode, pos, blocksize - off, did_zero, ops, false);
 }
 EXPORT_SYMBOL_GPL(iomap_truncate_page);
 

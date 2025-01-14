@@ -905,7 +905,7 @@ xfs_setattr_size(
 	if (newsize > oldsize) {
 		trace_xfs_zero_eof(ip, oldsize, newsize - oldsize);
 		error = xfs_zero_range(ip, oldsize, newsize - oldsize,
-				&did_zeroing);
+				&did_zeroing, false);
 	} else {
 		error = xfs_truncate_page(ip, newsize, &did_zeroing);
 	}

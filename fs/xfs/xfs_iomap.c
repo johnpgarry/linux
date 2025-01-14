@@ -721,12 +721,13 @@ imap_needs_alloc(
 	struct xfs_bmbt_irec	*imap,
 	int			nimaps)
 {
-	pr_err("%s IOMAP_ZERO set=%d nimaps=%d\n", __func__, !!(flags & IOMAP_ZERO), nimaps);
+	pr_err("%s IOMAP_ZERO set=%d IOMAP_HOLES_ZERO set=%d nimaps=%d\n",
+		__func__, !!(flags & IOMAP_ZERO), !!(flags & IOMAP_HOLES_ZERO), nimaps);
 	/* don't allocate blocks when just zeroing */
 	if (flags & IOMAP_ZERO) {
 		pr_err("%s IOMAP_ZERO means don't allocate blocks when just zeroing IOMAP_ATOMIC set=%d\n",
 			__func__, !!(flags & IOMAP_ATOMIC));
-		return true;
+		return false;
 	}
 	if (!nimaps ||
 	    imap->br_startblock == HOLESTARTBLOCK ||
@@ -1548,7 +1549,8 @@ xfs_zero_range(
 	struct xfs_inode	*ip,
 	loff_t			pos,
 	loff_t			len,
-	bool			*did_zero)
+	bool			*did_zero,
+	bool 			holes)
 {
 	struct inode		*inode = VFS_I(ip);
 	int ret;
@@ -1558,9 +1560,11 @@ xfs_zero_range(
 	if (IS_DAX(inode))
 		return dax_zero_range(inode, pos, len, did_zero,
 				      &xfs_dax_write_iomap_ops);
-	pr_err("%s pos=%lld len=%lld calling iomap_zero_range with xfs_buffered_write_iomap_ops\n", __func__, pos, len);
+	pr_err("%s pos=%lld len=%lld calling iomap_zero_range with xfs_buffered_write_iomap_ops holes=%d\n",
+		__func__, pos, len, holes);
 	ret = iomap_zero_range(inode, pos, len, did_zero,
-				&xfs_buffered_write_iomap_ops);
+				&xfs_buffered_write_iomap_ops,
+				holes);
 	pr_err("%s10 pos=%lld len=%lld called iomap_zero_range ret=%d *did_zero=%d\n",
 		__func__, pos, len, ret, did_zero ? *did_zero : -1);
 	return ret;

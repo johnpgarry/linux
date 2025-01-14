@@ -880,7 +880,7 @@ xfs_free_file_space(
 		return 0;
 	if (offset + len > XFS_ISIZE(ip))
 		len = XFS_ISIZE(ip) - offset;
-	error = xfs_zero_range(ip, offset, len, NULL);
+	error = xfs_zero_range(ip, offset, len, NULL, false);
 	if (error)
 		return error;
 

@@ -415,7 +415,7 @@ xfs_file_write_zero_eof(
 
 	xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
 	pr_err("%s calling xfs_zero_range\n", __func__);
-	error = xfs_zero_range(ip, isize, iocb->ki_pos - isize, NULL);
+	error = xfs_zero_range(ip, isize, iocb->ki_pos - isize, NULL, false);
 	xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
 
 	return error;
@@ -694,7 +694,7 @@ retry:
 			__func__, unitsize, iocb->ki_pos, pos);
 		bool did_zero = false;
 		xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
-		ret = xfs_zero_range(ip, pos, unitsize, &did_zero);
+		ret = xfs_zero_range(ip, pos, unitsize, &did_zero, true);
 		xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
 		pr_err("%s2.1 called xfs_zero_range ret=%zd did_zero=%d\n", __func__, ret, did_zero);
 		if (ret)
