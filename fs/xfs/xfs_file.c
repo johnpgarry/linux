@@ -675,12 +675,13 @@ xfs_file_dio_write_atomic(
 	 * it ensures that a single written mapping is provided.
 	 */
 	if (iov_iter_count(from) > ip->i_mount->m_sb.sb_blocksize)
-		dio_flags = IOMAP_DIO_OVERWRITE_ONLY;
+		dio_flags = 0;//IOMAP_DIO_OVERWRITE_ONLY;
 	else
 		dio_flags = 0;
 
 retry:
-	pr_err("%s retry: do_zero=%d aligned=%d dio_flags=%d\n", __func__, do_zero, aligned, dio_flags);
+	pr_err("%s retry: do_zero=%d aligned=%d dio_flags=%d ki_pos=%lld len=%zd\n",
+		__func__, do_zero, aligned, dio_flags, iocb->ki_pos, iov_iter_count(from));
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
