@@ -707,7 +707,7 @@ retry:
 	trace_xfs_file_direct_write(iocb, from);
 	pr_err("%s3 calling iomap_dio_rw ret=%zd\n", __func__, ret);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
-			&xfs_dio_write_ops, IOMAP_DIO_OVERWRITE_ONLY, NULL, 0);
+			&xfs_dio_write_ops, 0, NULL, 0);
 
 	pr_err("%s3.1 called iomap_dio_rw ret=%zd do_zero=%d\n", __func__, ret, do_zero);
 	if (do_zero && ret < 0)
@@ -826,6 +826,10 @@ xfs_file_dio_write(
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
+
+	pr_err("%s ki_pos=%lld len=%zd IOCB_ATOMIC set=%d\n",
+		__func__, iocb->ki_pos, iov_iter_count(from),
+		!!(iocb->ki_flags & IOCB_ATOMIC));
 
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)

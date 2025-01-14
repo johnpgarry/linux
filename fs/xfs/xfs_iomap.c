@@ -896,10 +896,10 @@ relock:
 	 * when it is subsequently mapped and aborting the I/O.
 	 */
 	pr_err("%s3.1 imap_spans_range=%d\n", __func__, imap_spans_range(&imap, offset_fsb, end_fsb));
-	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
+	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY | IOMAP_ATOMIC)) {
 		error = -EAGAIN;
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
-			pr_err("%s3.1 EAGAIN IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY !imap_spans_range\n", __func__);
+			pr_err("%s3.1 EAGAIN IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY | IOMAP_ATOMIC !imap_spans_range\n", __func__);
 			goto out_unlock;
 		}
 	}
