@@ -1459,6 +1459,35 @@ iomap_zero_range(struct inode *inode, loff_t pos, loff_t len, bool *did_zero,
 }
 EXPORT_SYMBOL_GPL(iomap_zero_range);
 
+static loff_t
+iomap_zero_unwritten_range_iter(struct iomap_iter *iter)
+{
+	const struct iomap *iomap = &iter->iomap;
+
+	if (iomap->type == IOMAP_UNWRITTEN)
+		return iomap_zero_iter(iter, NULL);
+
+	return iomap_length(iter);
+}
+
+int iomap_zero_unwritten_range(struct inode *inode, loff_t pos, loff_t len,
+			const struct iomap_ops *ops)
+{
+	struct iomap_iter iomi = {
+		.inode		= inode,
+		.pos		= pos,
+		.len		= len,
+		.flags		= IOMAP_WRITE | IOMAP_ZERO,
+	};
+	int ret;
+
+	while ((ret = iomap_iter(&iomi, ops)) > 0)
+		iomi.processed = iomap_zero_unwritten_range_iter(&iomi);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(iomap_zero_unwritten_range);
+
 int
 iomap_truncate_page(struct inode *inode, loff_t pos, bool *did_zero,
 		const struct iomap_ops *ops)
