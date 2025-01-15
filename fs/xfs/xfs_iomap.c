@@ -1501,6 +1501,20 @@ xfs_zero_range(
 }
 
 int
+xfs_zero_unwritten_range(
+	struct xfs_inode	*ip,
+	loff_t			pos,
+	loff_t			len)
+{
+	struct inode		*inode = VFS_I(ip);
+
+	xfs_assert_ilocked(ip, XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL);
+
+	return iomap_zero_unwritten_range(inode, pos, len,
+				&xfs_buffered_write_iomap_ops);
+}
+
+int
 xfs_truncate_page(
 	struct xfs_inode	*ip,
 	loff_t			pos,
