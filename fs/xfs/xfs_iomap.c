@@ -136,6 +136,8 @@ xfs_bmbt_to_iomap(
 		    xfs_rtbno_is_group_start(mp, imap->br_startblock))
 			iomap->flags |= IOMAP_F_BOUNDARY;
 	}
+	pr_err("%s imap->br_startoff=%lld, br_blockcount=%lld, br_startblock=%lld\n",
+		__func__, imap->br_startoff, imap->br_blockcount, imap->br_startblock);
 	iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 	iomap->length = XFS_FSB_TO_B(mp, imap->br_blockcount);
 	if (mapping_flags & IOMAP_DAX)
@@ -856,7 +858,15 @@ relock:
 			       &nimaps, 0);
 	if (error)
 		goto out_unlock;
-
+#if 0
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+#endif
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;
 		if (flags & IOMAP_NOWAIT)
@@ -873,6 +883,14 @@ relock:
 		end_fsb = imap.br_startoff + imap.br_blockcount;
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 	}
+	if (flags & IOMAP_ATOMIC) {
+		pr_err("%s1 check if need alloc offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d nimaps=%d needs_alloc=%d\n",
+			__func__,
+			offset_fsb, end_fsb,
+			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
+			nimaps,
+			imap_needs_alloc(inode, flags, &imap, nimaps));
+	}
 
 	if (imap_needs_alloc(inode, flags, &imap, nimaps))
 		goto allocate_blocks;
@@ -887,6 +905,31 @@ relock:
 		error = -EAGAIN;
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
 			goto out_unlock;
+	}
+	if (flags & IOMAP_ATOMIC) {
+		pr_err("%s2 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+			__func__,
+			offset_fsb, end_fsb,
+			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
+			error = -EFAULT;
+			pr_err("%s2.1 ATOMIC !spans offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+				__func__,
+				offset_fsb, end_fsb,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+			//BUG();
+			goto out_unlock;
+		}
+
+		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
+			error = -EFAULT;
+			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+				__func__,
+				offset_fsb, end_fsb,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+			//BUG();
+			goto out_unlock;
+		}
 	}
 
 	/*
@@ -929,7 +972,12 @@ allocate_blocks:
 	else if (nimaps && imap.br_startblock == HOLESTARTBLOCK)
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
 	xfs_iunlock(ip, lockmode);
-
+	if (flags & IOMAP_ATOMIC) {
+		pr_err("%s4 ATOMIC allocate blocks offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+			__func__,
+			offset_fsb, end_fsb,
+			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+	}
 	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
 			flags, &imap, &seq);
 	if (error)
