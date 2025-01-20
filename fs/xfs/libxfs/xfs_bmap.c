@@ -4442,6 +4442,15 @@ xfs_bmapi_write(
 	int			n;		/* current extent index */
 	xfs_fileoff_t		obno;		/* old block number (offset) */
 
+
+	pr_err("%s bno=%lld len=%lld total=%d flags=0x%x (COWFORK set=%d, CONVERT set=%d, PREALLOC set=%d, ZERO set=%d\n",
+		__func__, bno, len, total,
+		flags,
+		!!(flags & XFS_BMAPI_COWFORK),
+		!!(flags & XFS_BMAPI_CONVERT),
+		!!(flags & XFS_BMAPI_PREALLOC),
+		!!(flags & XFS_BMAPI_ZERO));
+
 #ifdef DEBUG
 	xfs_fileoff_t		orig_bno;	/* original block number value */
 	int			orig_flags;	/* original flags arg value */

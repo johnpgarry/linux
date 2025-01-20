@@ -539,6 +539,7 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
+		pr_err("%s calling xfs_iomap_write_unwritten offset=%lld size=%zd\n", __func__, offset, size);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}

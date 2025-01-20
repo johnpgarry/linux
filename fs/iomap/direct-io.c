@@ -94,8 +94,11 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 	loff_t offset = iocb->ki_pos;
 	ssize_t ret = dio->error;
 
-	if (dops && dops->end_io)
+	if (dops && dops->end_io) {
+		pr_err("%s calling dops->end_io=%pS dio->size=%lld\n", __func__,
+			dops->end_io, dio->size);
 		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
+	}
 
 	if (likely(!ret)) {
 		ret = dio->size;
@@ -169,6 +172,9 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	bool should_dirty = (dio->flags & IOMAP_DIO_DIRTY);
 	struct kiocb *iocb = dio->iocb;
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d)\n", __func__,
+			bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	if (bio->bi_status)
 		iomap_dio_set_error(dio, blk_status_to_errno(bio->bi_status));
 	if (!atomic_dec_and_test(&dio->ref))
@@ -305,7 +311,15 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	int nr_pages, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
-
+#ifdef fdfdf
+	u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
+	#endif
+	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld\n",
+		__func__, pos, length, iomap->addr, iomap->offset, iomap->length);
 	if (atomic && length != iter->len)
 		return -EINVAL;
 
