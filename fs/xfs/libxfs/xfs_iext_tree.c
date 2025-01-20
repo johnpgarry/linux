@@ -945,6 +945,7 @@ xfs_iext_lookup_extent(
 	cur->leaf = xfs_iext_find_level(ifp, offset, 1);
 	if (!cur->leaf) {
 		cur->pos = 0;
+		pr_err("%s !cur->leaf, return false", __func__);
 		return false;
 	}
 
@@ -958,12 +959,16 @@ xfs_iext_lookup_extent(
 	}
 
 	/* Try looking in the next node for an entry > offset */
-	if (ifp->if_height == 1 || !cur->leaf->next)
+	if (ifp->if_height == 1 || !cur->leaf->next) {
+		pr_err("%s ifp->if_height == 1 || !cur->leaf->next, return false", __func__);
 		return false;
+	}
 	cur->leaf = cur->leaf->next;
 	cur->pos = 0;
-	if (!xfs_iext_valid(ifp, cur))
+	if (!xfs_iext_valid(ifp, cur)) {
+		pr_err("%s !xfs_iext_valid, return false", __func__);
 		return false;
+	}
 found:
 	xfs_iext_get(gotp, cur_rec(cur));
 	return true;

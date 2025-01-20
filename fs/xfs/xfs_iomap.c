@@ -136,8 +136,8 @@ xfs_bmbt_to_iomap(
 		    xfs_rtbno_is_group_start(mp, imap->br_startblock))
 			iomap->flags |= IOMAP_F_BOUNDARY;
 	}
-	pr_err("%s imap->br_startoff=%lld, br_blockcount=%lld, br_startblock=%lld\n",
-		__func__, imap->br_startoff, imap->br_blockcount, imap->br_startblock);
+	//pr_err("%s imap->br_startoff=%lld, br_blockcount=%lld, br_startblock=%lld\n",
+	//	__func__, imap->br_startoff, imap->br_blockcount, imap->br_startblock);
 	iomap->offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 	iomap->length = XFS_FSB_TO_B(mp, imap->br_blockcount);
 	if (mapping_flags & IOMAP_DAX)
@@ -834,7 +834,7 @@ xfs_direct_write_iomap_begin(
 	 * COW writes may allocate delalloc space or convert unwritten COW
 	 * extents, so we need to make sure to take the lock exclusively here.
 	 */
-	if (xfs_is_cow_inode(ip))
+	if (xfs_is_cow_inode(ip) || flags & IOMAP_ATOMIC)
 		lockmode = XFS_ILOCK_EXCL;
 	else
 		lockmode = XFS_ILOCK_SHARED;
@@ -875,7 +875,7 @@ typedef struct xfs_bmbt_irec
 		/* may drop and re-acquire the ilock */
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
-				(flags & IOMAP_DIRECT) || IS_DAX(inode));
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), false);
 		if (error)
 			goto out_unlock;
 		if (shared)
@@ -918,7 +918,7 @@ typedef struct xfs_bmbt_irec
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 			//BUG();
-			goto out_unlock;
+			goto try_cow;
 		}
 
 		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
@@ -928,10 +928,35 @@ typedef struct xfs_bmbt_irec
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 			//BUG();
-			goto out_unlock;
+			goto try_cow;
 		}
+		goto cont;
+
+try_cow:
+		pr_err("%s3.3 ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+				__func__,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
+				&lockmode,
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), true);
+		pr_err("%s3.4 ATOMIC called xfs_reflink_allocate_cow error=%d imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d shared=%d\n",
+				__func__, error,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, shared);
+		pr_err("%s3.4.1 ATOMIC called xfs_reflink_allocate_cow cmap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+				__func__,
+				cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
+		if (error)
+			goto out_unlock;
+		if (shared)
+			goto out_found_cow;
+		end_fsb = imap.br_startoff + imap.br_blockcount;
+		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
+		pr_err("%s3.4.2 ATOMIC called end_fsb=%lld length=%lld\n",
+				__func__, end_fsb, length);
+		goto allocate_blocks;
 	}
 
+cont:
 	/*
 	 * For overwrite only I/O, we cannot convert unwritten extents without
 	 * requiring sub-block zeroing.  This can only be done under an

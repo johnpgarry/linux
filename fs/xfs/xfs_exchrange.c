@@ -721,6 +721,10 @@ xfs_exchrange_contents(
 		return -EOPNOTSUPP;
 	}
 
+	pr_err("%s ip1=%pS (reflink_inode=%d, always_cow_inode=%d) ip2=%pS (reflink_inode=%d, always_cow_inode=%d)\n",
+		__func__, ip1, xfs_is_reflink_inode(ip1), xfs_is_always_cow_inode(ip1),
+		ip2, xfs_is_reflink_inode(ip2), xfs_is_always_cow_inode(ip2));
+
 	if (fxr->flags & ~(XFS_EXCHANGE_RANGE_ALL_FLAGS |
 			   XFS_EXCHANGE_RANGE_PRIV_FLAGS)) {
 		pr_err("%s ERROR XFS_EXCHANGE_RANGE_ALL_FLAGS\n", __func__);
@@ -766,6 +770,10 @@ out_unlock:
 out_err:
 	if (error)
 		trace_xfs_exchrange_error(ip2, error, _RET_IP_);
+
+	pr_err("%s10 ip1=%pS (reflink_inode=%d, always_cow_inode=%d) ip2=%pS (reflink_inode=%d, always_cow_inode=%d)\n",
+		__func__, ip1, xfs_is_reflink_inode(ip1), xfs_is_always_cow_inode(ip1),
+		ip2, xfs_is_reflink_inode(ip2), xfs_is_always_cow_inode(ip2));
 	return error;
 }
 

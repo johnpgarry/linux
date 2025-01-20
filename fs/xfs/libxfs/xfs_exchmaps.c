@@ -1216,6 +1216,8 @@ xfs_exchange_mappings(
 {
 	struct xfs_exchmaps_intent	*xmi;
 
+
+	pr_err("%s req->ip1=%pS, ip2=%pS\n", __func__, req->ip1, req->ip2);
 	BUILD_BUG_ON(XFS_EXCHMAPS_INTERNAL_FLAGS & XFS_EXCHMAPS_LOGGED_FLAGS);
 
 	xfs_assert_ilocked(req->ip1, XFS_ILOCK_EXCL);
@@ -1229,6 +1231,7 @@ xfs_exchange_mappings(
 		return;
 
 	xmi = xfs_exchmaps_init_intent(req);
+	pr_err("%s2 req->ip1=%pS, ip2=%pS xmi->xmi_ip1=%pS, ip2=%pS\n", __func__, req->ip1, req->ip2, xmi->xmi_ip1, xmi->xmi_ip1);
 	xfs_exchmaps_defer_add(tp, xmi);
 	xfs_exchmaps_ensure_reflink(tp, xmi);
 	xfs_exchmaps_upgrade_extent_counts(tp, xmi);
