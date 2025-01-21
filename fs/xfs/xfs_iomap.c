@@ -150,8 +150,10 @@ xfs_bmbt_to_iomap(
 	iomap->flags = iomap_flags;
 
 	if (xfs_ipincount(ip) &&
-	    (ip->i_itemp->ili_fsync_fields & ~XFS_ILOG_TIMESTAMP))
+	    (ip->i_itemp->ili_fsync_fields & ~XFS_ILOG_TIMESTAMP)) {
+		pr_err("%s2 set IOMAP_F_DIRTY\n", __func__);
 		iomap->flags |= IOMAP_F_DIRTY;
+	}
 
 	iomap->validity_cookie = sequence_cookie;
 	iomap->folio_ops = &xfs_iomap_folio_ops;
@@ -1083,7 +1085,7 @@ allocate_blocks:
 		return error;
 
 	trace_xfs_iomap_alloc(ip, offset, length, XFS_DATA_FORK, &imap);
-	pr_err("%s4.2 allocate_blocks: calling and return with imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n", __func__,
+	pr_err("%s4.2 allocate_blocks: calling and return with imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d and IOMAP_F_NEW\n", __func__,
 		imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags,
 				 iomap_flags | IOMAP_F_NEW, seq);

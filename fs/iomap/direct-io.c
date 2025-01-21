@@ -322,8 +322,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	u16			type;	/* type of mapping */
 	u16			flags;	/* flags for mapping */
 	#endif
-	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld\n",
-		__func__, pos, length, iomap->addr, iomap->offset, iomap->length);
+	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld, flags=0x%x (SHARED set=%d, NEW set=%d, DIRTY set=%d)\n",
+		__func__, pos, length, iomap->addr, iomap->offset, iomap->length,
+		iomap->flags,
+		!!(iomap->flags & IOMAP_F_SHARED),
+		!!(iomap->flags & IOMAP_F_NEW),
+		!!(iomap->flags & IOMAP_F_DIRTY));
 	if (atomic && length != iter->len)
 		return -EINVAL;
 
