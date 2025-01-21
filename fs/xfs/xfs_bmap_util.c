@@ -731,6 +731,7 @@ xfs_alloc_file_space(
 		 * startoffset_fsb so that one of the following allocations
 		 * will eventually reach the requested range.
 		 */
+		pr_err("%s calling xfs_bmapi_write\n", __func__);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
 				&nimaps);

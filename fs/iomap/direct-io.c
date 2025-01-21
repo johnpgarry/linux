@@ -132,8 +132,12 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 		 * If this is a DSYNC write, make sure we push it to stable
 		 * storage now that we've written data.
 		 */
-		if (dio->flags & IOMAP_DIO_NEED_SYNC)
+		pr_err("%s2 IOMAP_DIO_NEED_SYNC set=%d\n", __func__, !!(dio->flags & IOMAP_DIO_NEED_SYNC));
+		if (dio->flags & IOMAP_DIO_NEED_SYNC) {
+			pr_err("%s3 calling generic_write_sync\n", __func__);
 			ret = generic_write_sync(iocb, ret);
+			pr_err("%s3.1 called generic_write_sync ret=%zd\n", __func__, ret);
+		}
 		if (ret > 0)
 			ret += dio->done_before;
 	}

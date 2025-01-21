@@ -586,7 +586,7 @@ xfs_get_atomic_write_attr(
 	}
 
 	*unit_min = ip->i_mount->m_sb.sb_blocksize;
-	*unit_max =  target->bt_bdev_awu_max;
+	*unit_max =  min(16 * 1024, target->bt_bdev_awu_max);
 }
 
 STATIC int

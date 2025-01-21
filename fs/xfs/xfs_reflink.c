@@ -232,6 +232,9 @@ xfs_bmap_trim_cow(
 	bool			*shared)
 {
 	/* We can't update any real extents in always COW mode. */
+	pr_err("%s xfs_is_always_cow_inode(ip)=%d isnullstartblock(imap->br_startblock=%lld)=%d\n",
+		__func__, xfs_is_always_cow_inode(ip), imap->br_startblock, isnullstartblock(imap->br_startblock));
+
 	if (xfs_is_always_cow_inode(ip) &&
 	    !isnullstartblock(imap->br_startblock)) {
 		*shared = true;
@@ -344,12 +347,14 @@ xfs_find_trim_cow_extent(
 				cmap->br_startoff - imap->br_startoff);
 		pr_err("%s5 calling xfs_bmap_trim_cow\n", __func__);
 		ret = xfs_bmap_trim_cow(ip, imap, shared);
-		pr_err("%s5.1 called xfs_bmap_trim_cow ret=%d *found=%d *shared=%d returning\n",
-			__func__, ret, *found, *shared);
+		pr_err("%s5.1 called xfs_bmap_trim_cow ret=%d *found=%d *shared=%d returning imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, ret, *found, *shared, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 		return ret;
 	}
 
 	*shared = true;
+	pr_err("%s3 set *shared=true cmap->br_startblock=%lld isnullstartblock(br_startblock)=%d\n",
+		__func__, cmap->br_startblock, isnullstartblock(cmap->br_startblock));
 	if (isnullstartblock(cmap->br_startblock)) {
 		pr_err("%s6 calling xfs_trim_extent\n", __func__);
 		xfs_trim_extent(imap, cmap->br_startoff, cmap->br_blockcount);
@@ -407,7 +412,8 @@ xfs_reflink_fill_cow_hole(
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
 	uint			*lockmode,
-	bool			convert_now)
+	bool			convert_now,
+	bool 			always_cow)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_trans	*tp;
@@ -416,6 +422,13 @@ xfs_reflink_fill_cow_hole(
 	int			nimaps;
 	int			error;
 	bool			found;
+
+	pr_err("%s0 ip=%pS (i_cowfp=%pS) always_cow=%d\n",
+			__func__, ip, ip->i_cowfp, always_cow);
+	pr_err("%s0.1 imap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
+	pr_err("%s0.2 cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
+		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
 
 	resaligned = xfs_aligned_fsb_count(imap->br_startoff,
 		imap->br_blockcount, xfs_get_cowextsz_hint(ip));
@@ -431,9 +444,15 @@ xfs_reflink_fill_cow_hole(
 
 	*lockmode = XFS_ILOCK_EXCL;
 
+	pr_err("%s1 ip=%pS (i_cowfp=%pS) calling xfs_find_trim_cow_extent\n",
+			__func__, ip, ip->i_cowfp);
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
-	if (error || !*shared)
+	pr_err("%s1.1 ip=%pS (i_cowfp=%pS) called xfs_find_trim_cow_extent error=%d *shared=%d found=%d always_cow=%d\n",
+			__func__, ip, ip->i_cowfp, error, *shared, found, always_cow);
+	if ((error || !*shared) && !always_cow) {
+		pr_err("%s1.2 return error=%d || !*shared=%d\n", __func__, error, *shared);
 		goto out_trans_cancel;
+	}
 
 	if (found) {
 		xfs_trans_cancel(tp);
@@ -442,14 +461,14 @@ xfs_reflink_fill_cow_hole(
 
 	/* Allocate the entire reservation as unwritten blocks. */
 	nimaps = 1;
-	pr_err("%s1 calling xfs_bmapi_write imap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
+	pr_err("%s2 calling xfs_bmapi_write imap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
 		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
-	pr_err("%s1.1 calling xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
+	pr_err("%s2.1 calling xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
 		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC, 0, cmap,
 			&nimaps);
-	pr_err("%s1.1 called xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld error=%d\n",
+	pr_err("%s2.2 called xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld error=%d\n",
 		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error);
 	if (error)
 		goto out_trans_cancel;
@@ -495,8 +514,10 @@ xfs_reflink_fill_delalloc(
 
 		error = xfs_find_trim_cow_extent(ip, imap, cmap, shared,
 				&found);
-		if (error || !*shared)
+		if (error || !*shared) {
+			pr_err("%s return error=%d || !*shared=%d\n", __func__, error, *shared);
 			goto out_trans_cancel;
+		}
 
 		if (found) {
 			xfs_trans_cancel(tp);
@@ -555,8 +576,28 @@ xfs_reflink_allocate_cow(
 		pr_err("%s0 ip=%pS (i_cowfp=%pS) calling xfs_ifork_init_cow\n",
 			__func__, ip, ip->i_cowfp);
 		xfs_ifork_init_cow(ip);
-		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) called xfs_ifork_init_cow and returning\n",
+		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent\n",
 			__func__, ip, ip->i_cowfp);
+		error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
+		pr_err("%s0.2 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
+			__func__, ip,
+			imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, error, found, *shared);
+		pr_err("%s0.3 called xfs_find_trim_cow_extent ip=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, ip,
+			cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
+		if (error)
+			return error;
+		pr_err("%s0.4 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
+			__func__, ip, cmap->br_startoff, imap->br_startoff);
+		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
+				lockmode, convert_now, true);
+		pr_err("%s0.5 called xfs_reflink_fill_cow_hole ip=%pS error=%d\n",
+			__func__, ip, error);
+		pr_err("%s0.6 called xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+		__func__, ip, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
+		pr_err("%s0.6.1 called xfs_reflink_fill_cow_hole ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+		__func__, ip, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
+		pr_err("%s0.9 returning\n", __func__);
 		return 0;
 	}
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
@@ -566,8 +607,10 @@ xfs_reflink_allocate_cow(
 	pr_err("%s1.1 called xfs_find_trim_cow_extent ip=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
 		__func__, ip,
 		cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
-	if (error || !*shared)
+	if (error || !*shared) {
+		pr_err("%s1.2 return error=%d || !*shared=%d\n", __func__, error, *shared);
 		return error;
+	}
 
 
 
@@ -593,7 +636,7 @@ xfs_reflink_allocate_cow(
 		pr_err("%s3 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
 			__func__, ip, cmap->br_startoff, imap->br_startoff);
 		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
-				lockmode, convert_now);
+				lockmode, convert_now, false);
 
 		pr_err("%s3.1 called xfs_reflink_fill_cow_hole ip=%pS error=%d\n",
 			__func__, ip, error);

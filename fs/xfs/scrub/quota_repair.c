@@ -71,6 +71,7 @@ xrep_quota_item_fill_bmap_hole(
 	if (error)
 		return error;
 
+	pr_err("%s calling xfs_bmapi_write\n", __func__);
 	error = xfs_bmapi_write(sc->tp, sc->ip, dq->q_fileoffset,
 			XFS_DQUOT_CLUSTER_SIZE_FSB, XFS_BMAPI_METADATA, 0,
 			irec, &nmaps);
@@ -436,6 +437,7 @@ xrep_quota_data_fork(
 				joined = true;
 			}
 
+			pr_err("%s2 calling xfs_bmapi_write\n", __func__);
 			error = xfs_bmapi_write(sc->tp, sc->ip,
 					irec.br_startoff, irec.br_blockcount,
 					XFS_BMAPI_CONVERT, 0, &nrec, &nmap);

@@ -274,6 +274,8 @@ xfs_iomap_write_direct(
 
 	ASSERT(count_fsb > 0);
 
+	pr_err("%s offset_fsb=%lld count_fsb=%lld flags=0x%x (IOMAP_ATOMIC set=%d)\n",
+		__func__, offset_fsb, count_fsb, flags, !!(flags & IOMAP_ATOMIC));
 	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
 					   xfs_get_extsz_hint(ip));
 	if (unlikely(XFS_IS_REALTIME_INODE(ip))) {
@@ -318,12 +320,23 @@ xfs_iomap_write_direct(
 	error = xfs_iext_count_extend(tp, ip, XFS_DATA_FORK, nr_exts);
 	if (error)
 		goto out_trans_cancel;
+#ifdef fdfdf
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
 
+#endif
 	/*
 	 * From this point onwards we overwrite the imap pointer that the
 	 * caller gave to us.
 	 */
 	nimaps = 1;
+	pr_err("%s1 offset_fsb=%lld count_fsb=%lld calling xfs_bmapi_write imap->startoff=%lld, startblock=%lld, blockcount=%lld\n",
+		__func__, offset_fsb, count_fsb, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb, bmapi_flags, 0,
 				imap, &nimaps);
 	if (error)
@@ -663,6 +676,7 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
+		pr_err("%s2 calling xfs_bmapi_write\n", __func__);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);
@@ -832,6 +846,11 @@ xfs_direct_write_iomap_begin(
 	bool needs_cow;
 	bool need_alloc;
 	bool atomic = flags & IOMAP_ATOMIC;
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	struct block_device *target_bdev = target->bt_bdev;
+	unsigned int awu_max = bdev_atomic_write_unit_max_bytes(target_bdev);
+	unsigned int awu_max_fsb = XFS_B_TO_FSB(mp, awu_max);
+	unsigned int extsz = xfs_get_extsz_hint(ip);
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
@@ -884,7 +903,8 @@ typedef struct xfs_bmbt_irec
 } xfs_bmbt_irec_t;
 #endif
 	needs_cow = imap_needs_cow(ip, flags, &imap, nimaps);
-	pr_err("%s imap_needs_cow=%d IOMAP_UNSHARE set=%d\n", __func__, needs_cow, !!(flags & IOMAP_UNSHARE));
+	pr_err("%s imap_needs_cow=%d IOMAP_UNSHARE set=%d target_bdev=%pS awu_max=%d awu_max_fsb=%d extsz=%d\n",
+		__func__, needs_cow, !!(flags & IOMAP_UNSHARE), target_bdev, awu_max, awu_max_fsb, extsz);
 	if (needs_cow) {
 		error = -EAGAIN;
 		if (flags & IOMAP_NOWAIT)
@@ -906,13 +926,14 @@ typedef struct xfs_bmbt_irec
 		end_fsb = imap.br_startoff + imap.br_blockcount;
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 	}
-	pr_err("%s1 atomic=%d check if need alloc offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d nimaps=%d needs_alloc=%d\n",
+	pr_err("%s1 atomic=%d check if need alloc offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d nimaps=%d needs_alloc=%d IS_ALIGNED=%d\n",
 			__func__,
 			atomic,
 			offset_fsb, end_fsb,
 			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
 			nimaps,
-			imap_needs_alloc(inode, flags, &imap, nimaps));
+			imap_needs_alloc(inode, flags, &imap, nimaps),
+			IS_ALIGNED(imap.br_startblock, imap.br_blockcount));
 
 	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
 
@@ -942,17 +963,18 @@ typedef struct xfs_bmbt_irec
 				__func__,
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-			//BUG();
+			BUG();
 			goto try_cow;
 		}
 
 		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
 			error = -EFAULT;
-			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d\n",
 				__func__,
 				offset_fsb, end_fsb,
-				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-			//BUG();
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
+				awu_max_fsb);
+			BUG();
 			goto try_cow;
 		}
 		goto cont;
