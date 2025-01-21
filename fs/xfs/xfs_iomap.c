@@ -963,7 +963,9 @@ typedef struct xfs_bmbt_irec
 				__func__,
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-			BUG();
+			WARN_ON_ONCE(1);
+			error = -EIO;
+			goto out_unlock;
 			goto try_cow;
 		}
 
@@ -974,7 +976,9 @@ typedef struct xfs_bmbt_irec
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
 				awu_max_fsb);
-			BUG();
+			WARN_ON_ONCE(1);
+			error = -EIO;
+			goto out_unlock;
 			goto try_cow;
 		}
 		goto cont;
