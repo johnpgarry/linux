@@ -728,8 +728,10 @@ xfs_file_dio_write(
 	size_t			count = iov_iter_count(from);
 
 	/* direct I/O must be aligned to device logical sector size */
-	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
+	if ((iocb->ki_pos | count) & target->bt_logical_sectormask) {
+		pr_err("%s EINVAL\n", __func__);
 		return -EINVAL;
+	}
 	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
@@ -865,8 +867,10 @@ xfs_file_write_iter(
 		unsigned int unit_min, unit_max;
 
 		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
-		if (ocount < unit_min || ocount > unit_max)
+		if (ocount < unit_min || ocount > unit_max) {
+			pr_err("%s EINVAL\n", __func__);
 			return -EINVAL;
+		}
 
 		ret = generic_atomic_write_valid(iocb, from);
 		if (ret)
@@ -945,15 +949,19 @@ xfs_falloc_collapse_range(
 	loff_t			new_size = i_size_read(inode) - len;
 	int			error;
 
-	if (!xfs_is_falloc_aligned(XFS_I(inode), offset, len))
+	if (!xfs_is_falloc_aligned(XFS_I(inode), offset, len)) {
+		pr_err("%s EINVAL\n", __func__);
 		return -EINVAL;
+	}
 
 	/*
 	 * There is no need to overlap collapse range with EOF, in which case it
 	 * is effectively a truncate operation
 	 */
-	if (offset + len >= i_size_read(inode))
+	if (offset + len >= i_size_read(inode)) {
+		pr_err("%s1 EINVAL\n", __func__);
 		return -EINVAL;
+	}
 
 	error = xfs_collapse_file_space(XFS_I(inode), offset, len);
 	if (error)
@@ -971,8 +979,10 @@ xfs_falloc_insert_range(
 	loff_t			isize = i_size_read(inode);
 	int			error;
 
-	if (!xfs_is_falloc_aligned(XFS_I(inode), offset, len))
+	if (!xfs_is_falloc_aligned(XFS_I(inode), offset, len)) {
+		pr_err("%s EINVAL\n", __func__);
 		return -EINVAL;
+	}
 
 	/*
 	 * New inode size must not exceed ->s_maxbytes, accounting for
@@ -982,8 +992,10 @@ xfs_falloc_insert_range(
 		return -EFBIG;
 
 	/* Offset should be less than i_size */
-	if (offset >= isize)
+	if (offset >= isize) {
+		pr_err("%s1 EINVAL\n", __func__);
 		return -EINVAL;
+	}
 
 	error = xfs_falloc_setsize(file, isize + len);
 	if (error)
@@ -1106,8 +1118,10 @@ xfs_file_fallocate(
 	long			error;
 	uint			iolock = XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL;
 
-	if (!S_ISREG(inode->i_mode))
+	if (!S_ISREG(inode->i_mode)) {
+		pr_err("%s EINVAL\n", __func__);
 		return -EINVAL;
+	}
 	if (mode & ~XFS_FALLOC_FL_SUPPORTED)
 		return -EOPNOTSUPP;
 

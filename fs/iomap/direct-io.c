@@ -260,8 +260,10 @@ static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
 	/*
 	 * Max block size supported is 64k
 	 */
-	if (WARN_ON_ONCE(len > IOMAP_ZERO_PAGE_SIZE))
+	if (WARN_ON_ONCE(len > IOMAP_ZERO_PAGE_SIZE)) {
+		pr_err("%s EINVAL\n", __func__);
 		return -EINVAL;
+	}
 
 	bio = iomap_dio_alloc_bio(iter, dio, 1, REQ_OP_WRITE | REQ_SYNC | REQ_IDLE);
 	fscrypt_set_bio_crypt_ctx(bio, inode, pos >> inode->i_blkbits,
@@ -340,8 +342,10 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
-	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
+	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter)) {
+		pr_err("%s EINVAL\n", __func__);
 		return -EINVAL;
+	}
 
 	if (iomap->type == IOMAP_UNWRITTEN) {
 		dio->flags |= IOMAP_DIO_UNWRITTEN;
@@ -456,6 +460,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			 * bio_iov_iter_get_pages() returns an error, above.
 			 */
 			ret = -EINVAL;
+			pr_err("%s3 EINVAL\n", __func__);
 			bio_put(bio);
 			goto zero_tail;
 		}
@@ -524,8 +529,10 @@ static loff_t iomap_dio_inline_iter(const struct iomap_iter *iomi,
 	loff_t pos = iomi->pos;
 	size_t copied;
 
-	if (WARN_ON_ONCE(!iomap_inline_data_valid(iomap)))
+	if (WARN_ON_ONCE(!iomap_inline_data_valid(iomap))) {
+		pr_err("%s EIO\n", __func__);
 		return -EIO;
+	}
 
 	if (dio->flags & IOMAP_DIO_WRITE) {
 		loff_t size = iomi->inode->i_size;
@@ -552,8 +559,10 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 {
 	switch (iter->iomap.type) {
 	case IOMAP_HOLE:
-		if (WARN_ON_ONCE(dio->flags & IOMAP_DIO_WRITE))
+		if (WARN_ON_ONCE(dio->flags & IOMAP_DIO_WRITE)) {
+			pr_err("%s EIO\n", __func__);
 			return -EIO;
+		}
 		return iomap_dio_hole_iter(iter, dio);
 	case IOMAP_UNWRITTEN:
 		if (!(dio->flags & IOMAP_DIO_WRITE))
@@ -572,9 +581,11 @@ static loff_t iomap_dio_iter(const struct iomap_iter *iter,
 		 */
 		pr_warn_ratelimited("Direct I/O collision with buffered writes! File: %pD4 Comm: %.20s\n",
 				    dio->iocb->ki_filp, current->comm);
+		pr_err("%s1 EIO\n", __func__);
 		return -EIO;
 	default:
 		WARN_ON_ONCE(1);
+		pr_err("%s2 EIO\n", __func__);
 		return -EIO;
 	}
 }
