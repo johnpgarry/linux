@@ -502,9 +502,15 @@ xfs_dio_write_end_io(
 	struct xfs_inode	*ip = XFS_I(inode);
 	loff_t			offset = iocb->ki_pos;
 	unsigned int		nofs_flag;
+	bool atomic = iocb->ki_flags & IOCB_ATOMIC;
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
+	pr_err("%s IOMAP_DIO_UNWRITTEN set=%d IOMAP_DIO_COW set=%d offset=%lld size=%zd atomic=%d\n",
+		__func__,
+		!!(flags & IOMAP_DIO_UNWRITTEN),
+		!!(flags & IOMAP_DIO_COW),
+		offset, size, atomic);
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
@@ -527,6 +533,8 @@ xfs_dio_write_end_io(
 	nofs_flag = memalloc_nofs_save();
 
 	if (flags & IOMAP_DIO_COW) {
+		pr_err("%s1 calling xfs_reflink_end_cow offset=%lld size=%zd atomic=%d\n",
+			__func__, offset, size, atomic);
 		error = xfs_reflink_end_cow(ip, offset, size);
 		if (error)
 			goto out;
@@ -539,7 +547,7 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
-		pr_err("%s calling xfs_iomap_write_unwritten offset=%lld size=%zd\n", __func__, offset, size);
+		pr_err("%s2 calling xfs_iomap_write_unwritten offset=%lld size=%zd atomic=%d\n", __func__, offset, size, atomic);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}

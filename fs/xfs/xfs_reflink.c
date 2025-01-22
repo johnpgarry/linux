@@ -570,13 +570,14 @@ xfs_reflink_allocate_cow(
 		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, always_cow, *shared);
 
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
-	if (!ip->i_cowfp) {
-		ASSERT(always_cow);
-		ASSERT(!xfs_is_reflink_inode(ip));
-		pr_err("%s0 ip=%pS (i_cowfp=%pS) calling xfs_ifork_init_cow\n",
-			__func__, ip, ip->i_cowfp);
-		xfs_ifork_init_cow(ip);
-		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent\n",
+	if (always_cow) {
+		if (!ip->i_cowfp) {
+			pr_err("%s0 ip=%pS (i_cowfp=%pS) calling xfs_ifork_init_cow\n",
+				__func__, ip, ip->i_cowfp);
+			xfs_ifork_init_cow(ip);
+		}
+		
+		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) maybe called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent\n",
 			__func__, ip, ip->i_cowfp);
 		error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
 		pr_err("%s0.2 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
@@ -829,7 +830,7 @@ xfs_reflink_end_cow_extent(
 	unsigned int		resblks;
 	int			nmaps;
 	int			error;
-
+	pr_err("%s *offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb ? *offset_fsb : -1, end_fsb);
 	resblks = XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_write, resblks, 0,
 			XFS_TRANS_RESERVE, &tp);
@@ -852,6 +853,7 @@ xfs_reflink_end_cow_extent(
 	if (!xfs_iext_lookup_extent(ip, ifp, *offset_fsb, &icur, &got) ||
 	    got.br_startoff >= end_fsb) {
 		*offset_fsb = end_fsb;
+		pr_err("%s1 !xfs_iext_lookup_extent *offset_fsb=%lld end_fsb=%lld\n", __func__, *offset_fsb, end_fsb);
 		goto out_cancel;
 	}
 
@@ -862,7 +864,19 @@ xfs_reflink_end_cow_extent(
 	 * deletion; from now on @del represents the mapping that we're
 	 * actually remapping.
 	 */
+#ifdef fdfdf
+typedef struct xfs_bmbt_irec
+{
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
+} xfs_bmbt_irec_t;
+
+#endif
+
 	while (!xfs_bmap_is_written_extent(&got)) {
+		pr_err("%s2 calling xfs_iext_next_extent got->\n", __func__);
 		if (!xfs_iext_next_extent(ifp, &icur, &got) ||
 		    got.br_startoff >= end_fsb) {
 			*offset_fsb = end_fsb;
@@ -941,6 +955,7 @@ xfs_reflink_end_cow_extent(
 out_cancel:
 	xfs_trans_cancel(tp);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	pr_err("%s10 error=%d\n", __func__, error);
 	return error;
 }
 
@@ -961,6 +976,9 @@ xfs_reflink_end_cow(
 
 	offset_fsb = XFS_B_TO_FSBT(ip->i_mount, offset);
 	end_fsb = XFS_B_TO_FSB(ip->i_mount, offset + count);
+
+	pr_err("%s offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld ip->i_cowfp=%pS\n", __func__,
+		offset, count, offset_fsb, end_fsb, ip->i_cowfp);
 
 	/*
 	 * Walk forwards until we've remapped the I/O range.  The loop function
@@ -994,11 +1012,18 @@ xfs_reflink_end_cow(
 	 * have never supported this 100%.  If either disk write succeeds the
 	 * blocks will be remapped.
 	 */
-	while (end_fsb > offset_fsb && !error)
+	while (end_fsb > offset_fsb && !error) {
+		pr_err("%s1 offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld calling xfs_reflink_end_cow_extent\n", __func__,
+			offset, count, offset_fsb, end_fsb);
 		error = xfs_reflink_end_cow_extent(ip, &offset_fsb, end_fsb);
+		pr_err("%s1.1 offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld called xfs_reflink_end_cow_extent error=%d\n", __func__,
+			offset, count, offset_fsb, end_fsb, error);
+	}
 
 	if (error)
 		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
+	pr_err("%s10 ip->i_cowfp=%pS error=%d\n", __func__,
+			ip->i_cowfp, error);
 	return error;
 }
 

@@ -3480,7 +3480,7 @@ xfs_bmap_compute_alignments(
 		if (args->mod)
 			args->mod = args->prod - args->mod;
 	}
-
+	pr_err("%s align=%d args->mod=%d, prod=%d stripe_align=%d\n", __func__, align, args->mod, args->prod, stripe_align);
 	return stripe_align;
 }
 
@@ -3797,6 +3797,8 @@ xfs_bmap_btalloc(
 	orig_length = ap->length;
 
 	stripe_align = xfs_bmap_compute_alignments(ap, &args);
+	pr_err("%s after calling xfs_bmap_compute_alignments stripe_align=%d args.alignment=%d\n",
+		__func__, stripe_align, args.alignment);
 
 	/* Trim the allocation back to the maximum an AG can fit. */
 	args.maxlen = min(ap->length, mp->m_ag_max_usable);
