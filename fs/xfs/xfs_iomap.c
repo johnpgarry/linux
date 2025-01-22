@@ -314,6 +314,10 @@ xfs_iomap_write_direct(
 		}
 	}
 
+	if (flags & IOMAP_ATOMIC)
+		bmapi_flags |= XFS_BMAPI_ATOMIC;
+
+
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, dblocks,
 			rblocks, force, &tp);
 	if (error)
@@ -915,7 +919,7 @@ typedef struct xfs_bmbt_irec
 		/* may drop and re-acquire the ilock */
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
-				(flags & IOMAP_DIRECT) || IS_DAX(inode), false);
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), false, false);
 		pr_err("%s0 called xfs_reflink_allocate_cow error=%d shared=%d\n", __func__, error, shared);
 		if (error) {
 			pr_err("%s0.1 called xfs_reflink_allocate_cow goto out_unlock from error\n", __func__);
@@ -968,7 +972,7 @@ typedef struct xfs_bmbt_irec
 		//	WARN_ON_ONCE(1);
 		//	error = -EIO;
 		//	goto out_unlock;
-			goto try_cow;
+			goto atomic_try_cow;
 		}
 
 		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
@@ -981,18 +985,18 @@ typedef struct xfs_bmbt_irec
 		//	WARN_ON_ONCE(1);
 		//	error = -EIO;
 		//	goto out_unlock;
-			goto try_cow;
+			goto atomic_try_cow;
 		}
 		goto cont;
 
-try_cow:
+atomic_try_cow:
 		BUG_ON(!atomic);
 		pr_err("%s3.3 ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
 				__func__,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
-				(flags & IOMAP_DIRECT) || IS_DAX(inode), true);
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), true, true);
 		pr_err("%s3.4 ATOMIC called xfs_reflink_allocate_cow error=%d imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d shared=%d br_startblock == HOLESTARTBLOCK=%d\n",
 				__func__, error,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, shared, !!(imap.br_startblock == HOLESTARTBLOCK));

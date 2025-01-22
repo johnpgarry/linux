@@ -3446,29 +3446,30 @@ xfs_bmap_compute_alignments(
 	struct xfs_mount	*mp = args->mp;
 	xfs_extlen_t		align = 0; /* minimum allocation alignment */
 	int			stripe_align = 0;
+	bool atomic = ap->flags & XFS_BMAPI_ATOMIC;
+
 
 	/* stripe alignment for allocation is determined by mount parameters */
 	if (mp->m_swidth && xfs_has_swalloc(mp))
 		stripe_align = mp->m_swidth;
 	else if (mp->m_dalign)
 		stripe_align = mp->m_dalign;
+	else if (atomic)
+		stripe_align = ap->length;
 
 	if (ap->flags & XFS_BMAPI_COWFORK)
 		align = xfs_get_cowextsz_hint(ap->ip);
 	else if (ap->datatype & XFS_ALLOC_USERDATA)
 		align = xfs_get_extsz_hint(ap->ip);
 
-	/*
-	 * xfs_get_cowextsz_hint() returns extsz_hint for when forcealign is
-	 * set as forcealign and cowextsz_hint are mutually exclusive
-	 */
-	if (align) {
-		args->alignment = align;
-		if (stripe_align % align)
-			stripe_align = align;
-	} else {
+	pr_err("%s atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d XFS_BMAPI_COWFORK set=%d align=%d\n", __func__,
+		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length,
+			!!(ap->flags & XFS_BMAPI_COWFORK), align);
+
+	if (stripe_align)
+		args->alignment = stripe_align;
+	else
 		args->alignment = 1;
-	}
 
 	if (align) {
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
@@ -3493,7 +3494,8 @@ xfs_bmap_compute_alignments(
 		if (args->mod)
 			args->mod = args->prod - args->mod;
 	}
-	pr_err("%s align=%d args->mod=%d, prod=%d stripe_align=%d\n", __func__, align, args->mod, args->prod, stripe_align);
+	pr_err("%s2 atomic=%d align=%d args->mod=%d, prod=%d stripe_align=%d args->alignment=%d\n", 
+		__func__, atomic, align, args->mod, args->prod, stripe_align, args->alignment);
 	return stripe_align;
 }
 
@@ -4457,13 +4459,14 @@ xfs_bmapi_write(
 	xfs_fileoff_t		obno;		/* old block number (offset) */
 
 
-	pr_err("%s bno=%lld len=%lld total=%d flags=0x%x (COWFORK set=%d, CONVERT set=%d, PREALLOC set=%d, ZERO set=%d) mval=%pS (cmap when fill_cow_hole caller\n",
+	pr_err("%s bno=%lld len=%lld total=%d flags=0x%x (COWFORK set=%d, CONVERT set=%d, PREALLOC set=%d, ZERO set=%d, ATOMIC set=%d) mval=%pS (cmap when fill_cow_hole caller\n",
 		__func__, bno, len, total,
 		flags,
 		!!(flags & XFS_BMAPI_COWFORK),
 		!!(flags & XFS_BMAPI_CONVERT),
 		!!(flags & XFS_BMAPI_PREALLOC),
 		!!(flags & XFS_BMAPI_ZERO),
+		!!(flags & XFS_BMAPI_ATOMIC),
 		mval);
 
 #ifdef DEBUG

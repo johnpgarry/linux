@@ -413,7 +413,8 @@ xfs_reflink_fill_cow_hole(
 	bool			*shared,
 	uint			*lockmode,
 	bool			convert_now,
-	bool 			always_cow)
+	bool 			always_cow,
+	bool 			atomic)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_trans	*tp;
@@ -422,9 +423,13 @@ xfs_reflink_fill_cow_hole(
 	int			nimaps;
 	int			error;
 	bool			found;
+	uint32_t		bmapi_flags = XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC;
 
-	pr_err("%s0 ip=%pS (i_cowfp=%pS) always_cow=%d\n",
-			__func__, ip, ip->i_cowfp, always_cow);
+	if (atomic)
+		bmapi_flags |= XFS_BMAPI_ATOMIC;
+
+	pr_err("%s0 ip=%pS (i_cowfp=%pS) always_cow=%d atomic=%d\n",
+			__func__, ip, ip->i_cowfp, always_cow, atomic);
 	pr_err("%s0.1 imap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
 		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
 	pr_err("%s0.2 cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
@@ -466,7 +471,7 @@ xfs_reflink_fill_cow_hole(
 	pr_err("%s2.1 calling xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
 		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
-			XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC, 0, cmap,
+			bmapi_flags, 0, cmap,
 			&nimaps);
 	pr_err("%s2.2 called xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld error=%d\n",
 		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error);
@@ -560,14 +565,15 @@ xfs_reflink_allocate_cow(
 	bool			*shared,
 	uint			*lockmode,
 	bool			convert_now,
-	bool			always_cow)
+	bool			always_cow,
+	bool 			atomic)
 {
 	int			error;
 	bool			found;
 
-	pr_err("%s ip=%pS (i_cowfp=%pS) imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d always_cow=%d *shared=%d\n",
+	pr_err("%s ip=%pS (i_cowfp=%pS) imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d always_cow=%d *shared=%d atomic=%d\n",
 		__func__, ip, ip->i_cowfp,
-		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, always_cow, *shared);
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, always_cow, *shared, atomic);
 
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 	if (always_cow) {
@@ -591,7 +597,7 @@ xfs_reflink_allocate_cow(
 		pr_err("%s0.4 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
 			__func__, ip, cmap->br_startoff, imap->br_startoff);
 		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
-				lockmode, convert_now, true);
+				lockmode, convert_now, true, atomic);
 		pr_err("%s0.5 called xfs_reflink_fill_cow_hole ip=%pS error=%d\n",
 			__func__, ip, error);
 		pr_err("%s0.6 called xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
@@ -637,7 +643,7 @@ xfs_reflink_allocate_cow(
 		pr_err("%s3 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
 			__func__, ip, cmap->br_startoff, imap->br_startoff);
 		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
-				lockmode, convert_now, false);
+				lockmode, convert_now, false, atomic);
 
 		pr_err("%s3.1 called xfs_reflink_fill_cow_hole ip=%pS error=%d\n",
 			__func__, ip, error);
