@@ -328,8 +328,13 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		!!(iomap->flags & IOMAP_F_SHARED),
 		!!(iomap->flags & IOMAP_F_NEW),
 		!!(iomap->flags & IOMAP_F_DIRTY));
-	if (atomic && length != iter->len)
-		return -EINVAL;
+	if (atomic && length != iter->len) {
+		pr_err("%s EINVAL length=%lld iter->len=%lld pos=%lld IOMAP_F_SHARED set=%d\n",
+			__func__, length, iter->len, pos,
+			!!(iomap->flags & IOMAP_F_SHARED));
+		if (!(iomap->flags & IOMAP_F_SHARED))
+			return -EINVAL;
+	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
