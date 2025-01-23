@@ -305,6 +305,9 @@ xfs_iomap_write_direct(
 		}
 	}
 
+	if (flags & IOMAP_ATOMIC)
+		bmapi_flags |= XFS_BMAPI_NALIGN;
+
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, dblocks,
 			rblocks, force, &tp);
 	if (error)
