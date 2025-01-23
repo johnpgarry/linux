@@ -283,8 +283,13 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 		opflags |= REQ_FUA;
 	else
 		dio->flags &= ~IOMAP_DIO_WRITE_THROUGH;
-	if (atomic)
-		opflags |= REQ_ATOMIC;
+
+	if (atomic) {
+		if (dio->flags & IOMAP_DIO_COW)
+			opflags |= REQ_FUA;
+		else
+			opflags |= REQ_ATOMIC;
+	}
 
 	return opflags;
 }
@@ -306,9 +311,6 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
-	if (atomic && length != iter->len)
-		return -EINVAL;
-
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
 		return -EINVAL;
@@ -320,6 +322,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 	if (iomap->flags & IOMAP_F_SHARED)
 		dio->flags |= IOMAP_DIO_COW;
+	else if (atomic && length != iter->len)
+		return -EINVAL;
 
 	if (iomap->flags & IOMAP_F_NEW) {
 		need_zeroout = true;
@@ -416,7 +420,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		n = bio->bi_iter.bi_size;
-		if (WARN_ON_ONCE(atomic && n != length)) {
+		if (WARN_ON_ONCE(atomic && n != length &&
+				!(dio->flags & IOMAP_DIO_COW))) {
 			/*
 			 * This bio should have covered the complete length,
 			 * which it doesn't, so error. We may need to zero out

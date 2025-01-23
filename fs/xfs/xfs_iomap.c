@@ -809,6 +809,7 @@ xfs_direct_write_iomap_begin(
 	struct xfs_bmbt_irec	imap, cmap;
 	xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_fileoff_t		end_fsb = xfs_iomap_end_fsb(mp, offset, length);
+	bool			atomic = flags & IOMAP_ATOMIC;
 	int			nimaps = 1, error = 0;
 	bool			shared = false;
 	u16			iomap_flags = 0;
@@ -832,7 +833,7 @@ xfs_direct_write_iomap_begin(
 	 * COW writes may allocate delalloc space or convert unwritten COW
 	 * extents, so we need to make sure to take the lock exclusively here.
 	 */
-	if (xfs_is_cow_inode(ip))
+	if (xfs_is_cow_inode(ip) || atomic)
 		lockmode = XFS_ILOCK_EXCL;
 	else
 		lockmode = XFS_ILOCK_SHARED;
@@ -865,7 +866,7 @@ relock:
 		/* may drop and re-acquire the ilock */
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
-				(flags & IOMAP_DIRECT) || IS_DAX(inode));
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), false);
 		if (error)
 			goto out_unlock;
 		if (shared)
@@ -887,6 +888,28 @@ relock:
 		error = -EAGAIN;
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
 			goto out_unlock;
+	}
+
+	if (flags & IOMAP_ATOMIC) {
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb) ||
+		    !IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
+			/*
+			 * TODO: We don't properly handle when we don't span the
+			 * range, as we just CoW in imap (and not all the range
+			 * which we require).
+			 */
+			error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
+					&lockmode,
+					(flags & IOMAP_DIRECT) || IS_DAX(inode), true);
+			if (error)
+				goto out_unlock;
+			/* checking shared is really just a bodge */
+			if (!shared) {
+				error = -EINVAL;
+				goto out_unlock;
+			}
+			goto out_found_cow;
+		}
 	}
 
 	/*
@@ -1113,7 +1136,7 @@ xfs_buffered_write_iomap_begin(
 		xfs_trim_extent(&imap, offset_fsb, end_fsb - offset_fsb);
 
 		/* Trim the mapping to the nearest shared extent boundary. */
-		error = xfs_bmap_trim_cow(ip, &imap, &shared);
+		error = xfs_bmap_trim_cow(ip, &imap, &shared, false);
 		if (error)
 			goto out_unlock;
 

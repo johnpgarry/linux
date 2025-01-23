@@ -229,10 +229,11 @@ int
 xfs_bmap_trim_cow(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
-	bool			*shared)
+	bool			*shared,
+	bool			atomic_cow)
 {
 	/* We can't update any real extents in always COW mode. */
-	if (xfs_is_always_cow_inode(ip) &&
+	if ((xfs_is_always_cow_inode(ip) || atomic_cow) &&
 	    !isnullstartblock(imap->br_startblock)) {
 		*shared = true;
 		return 0;
@@ -312,7 +313,8 @@ xfs_find_trim_cow_extent(
 	struct xfs_bmbt_irec	*imap,
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
-	bool			*found)
+	bool			*found,
+	bool			atomic_cow)
 {
 	xfs_fileoff_t		offset_fsb = imap->br_startoff;
 	xfs_filblks_t		count_fsb = imap->br_blockcount;
@@ -329,7 +331,7 @@ xfs_find_trim_cow_extent(
 	if (cmap->br_startoff > offset_fsb) {
 		xfs_trim_extent(imap, imap->br_startoff,
 				cmap->br_startoff - imap->br_startoff);
-		return xfs_bmap_trim_cow(ip, imap, shared);
+		return xfs_bmap_trim_cow(ip, imap, shared, atomic_cow);
 	}
 
 	*shared = true;
@@ -384,7 +386,8 @@ xfs_reflink_fill_cow_hole(
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
 	uint			*lockmode,
-	bool			convert_now)
+	bool			convert_now,
+	bool 			atomic_cow)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_trans	*tp;
@@ -408,7 +411,7 @@ xfs_reflink_fill_cow_hole(
 
 	*lockmode = XFS_ILOCK_EXCL;
 
-	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
+	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found, atomic_cow);
 	if (error || !*shared)
 		goto out_trans_cancel;
 
@@ -465,7 +468,7 @@ xfs_reflink_fill_delalloc(
 		*lockmode = XFS_ILOCK_EXCL;
 
 		error = xfs_find_trim_cow_extent(ip, imap, cmap, shared,
-				&found);
+				&found, false);
 		if (error || !*shared)
 			goto out_trans_cancel;
 
@@ -509,7 +512,8 @@ xfs_reflink_allocate_cow(
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
 	uint			*lockmode,
-	bool			convert_now)
+	bool			convert_now,
+	bool			atomic_cow)
 {
 	int			error;
 	bool			found;
@@ -520,7 +524,7 @@ xfs_reflink_allocate_cow(
 		xfs_ifork_init_cow(ip);
 	}
 
-	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
+	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found, atomic_cow);
 	if (error || !*shared)
 		return error;
 
@@ -535,7 +539,7 @@ xfs_reflink_allocate_cow(
 	 */
 	if (cmap->br_startoff > imap->br_startoff)
 		return xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
-				lockmode, convert_now);
+				lockmode, convert_now, atomic_cow);
 
 	/*
 	 * CoW fork has a delalloc reservation. Replace it with a real extent.
