@@ -673,7 +673,7 @@ xfs_mp_compute_awu_max(
 	}
 	mp->awu_max = awu_max;
 
-	pr_err("%s agsize=%d awu_max=%d\n", __func__, agsize, awu_max);
+	pr_err("%s agsize=%d awu_max=%d sb_agblklog=%d\n", __func__, agsize, awu_max, mp->m_sb.sb_agblklog);
 }
 /*
  * This function does the following on an initial mount of a file system:

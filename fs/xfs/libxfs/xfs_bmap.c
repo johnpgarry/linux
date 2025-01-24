@@ -3840,8 +3840,37 @@ xfs_bmap_btalloc(
 		ap->blkno = NULLFSBLOCK;
 		ap->length = 0;
 	}
+	pr_err("%s10 ap->blkno=%lld, length=%d, offset=%lld, total=%d\n",
+		__func__, ap->blkno, ap->length, ap->offset, ap->total);
 	return 0;
 }
+#ifdef dsdsdd
+
+struct xfs_bmalloca {
+	struct xfs_trans	*tp;	/* transaction pointer */
+	struct xfs_inode	*ip;	/* incore inode pointer */
+	struct xfs_bmbt_irec	prev;	/* extent before the new one */
+	struct xfs_bmbt_irec	got;	/* extent after, or delayed */
+
+	xfs_fileoff_t		offset;	/* offset in file filling in */
+	xfs_extlen_t		length;	/* i/o length asked/allocated */
+	xfs_fsblock_t		blkno;	/* starting block of new extent */
+
+	struct xfs_btree_cur	*cur;	/* btree cursor */
+	struct xfs_iext_cursor	icur;	/* incore extent cursor */
+	int			nallocs;/* number of extents alloc'd */
+	int			logflags;/* flags for transaction logging */
+
+	xfs_extlen_t		total;	/* total blocks needed for xaction */
+	xfs_extlen_t		minlen;	/* minimum allocation size (blocks) */
+	xfs_extlen_t		minleft; /* amount must be left after alloc */
+	bool			eof;	/* set if allocating past last extent */
+	bool			wasdel;	/* replacing a delayed allocation */
+	bool			aeof;	/* allocated space at eof */
+	bool			conv;	/* overwriting unwritten extents */
+	int			datatype;/* data type being allocated */
+	uint32_t		flags;
+#endif
 
 /* Trim extent to fit a logical block range. */
 void
@@ -5503,6 +5532,8 @@ __xfs_bunmapi(
 
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
 
+	pr_err("%s start=%lld *rlen=%lld\n", __func__, start, *rlen);
+
 	whichfork = xfs_bmapi_whichfork(flags);
 	ASSERT(whichfork != XFS_COW_FORK);
 	ifp = xfs_ifork_ptr(ip, whichfork);
@@ -5783,6 +5814,7 @@ xfs_bunmapi(
 {
 	int			error;
 
+	pr_err("%s bno=%lld len=%lld calling __xfs_bunmapi\n", __func__, bno, len);
 	error = __xfs_bunmapi(tp, ip, bno, &len, flags, nexts);
 	*done = (len == 0);
 	return error;

@@ -1844,6 +1844,7 @@ xfs_refcount_free_cow_extent(
 {
 	struct xfs_mount		*mp = tp->t_mountp;
 
+	pr_err("%s fsb=%lld len=%d\n", __func__, fsb, len);
 	if (!xfs_has_reflink(mp))
 		return;
 

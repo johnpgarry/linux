@@ -631,7 +631,7 @@ void xfs_irele(struct xfs_inode *ip);
 extern struct kmem_cache	*xfs_inode_cache;
 
 /* The default CoW extent size hint. */
-#define XFS_DEFAULT_COWEXTSZ_HINT 32
+#define XFS_DEFAULT_COWEXTSZ_HINT 128
 
 bool xfs_inode_needs_inactive(struct xfs_inode *ip);
 

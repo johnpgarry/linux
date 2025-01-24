@@ -641,6 +641,8 @@ xfs_iomap_write_unwritten(
 	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
 	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 
+	pr_err("%s offset=%lld count=%lld\n", __func__, offset, count);
+
 	/*
 	 * Reserve enough blocks in this transaction for two complete extent
 	 * btree splits.  We may be converting the middle part of an unwritten
@@ -829,6 +831,10 @@ imap_spans_range(
 		return false;
 	return true;
 }
+static inline uint32_t xfs_mask32lo(int n)
+{
+	return ((uint32_t)1 << (n)) - 1;
+}
 
 static int
 xfs_direct_write_iomap_begin(
@@ -857,11 +863,13 @@ xfs_direct_write_iomap_begin(
 	unsigned int awu_max = bdev_atomic_write_unit_max_bytes(target_bdev);
 	unsigned int awu_max_fsb = XFS_B_TO_FSB(mp, awu_max);
 	unsigned int extsz = xfs_get_extsz_hint(ip);
+	unsigned int agno, agbno;
+	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
-	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld\n",
-		__func__, offset, length, offset_fsb, end_fsb);
+	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld &cmap=%pS agsize=%d\n",
+		__func__, offset, length, offset_fsb, end_fsb, &cmap, agsize);
 
 	if (xfs_is_shutdown(mp))
 		return -EIO;
@@ -902,6 +910,14 @@ relock:
 			       &nimaps, 0);
 	if (error)
 		goto out_unlock;
+	agno = XFS_FSB_TO_AGNO(mp, imap.br_startblock);
+	agbno = XFS_FSB_TO_AGBNO(mp, imap.br_startblock);
+	pr_err("%s0.1 after xfs_bmapi_read imap.startoff=%lld, startblock=%lld (ag=%d, agbno=%d, physical_offset=%d), blockcount=%lld, state=%d\n",
+		__func__,
+		imap.br_startoff,
+		imap.br_startblock,
+		agno, agbno, (agno * agsize) + agbno,
+		imap.br_blockcount, imap.br_state);
 #if 0
 typedef struct xfs_bmbt_irec
 {
@@ -910,9 +926,10 @@ typedef struct xfs_bmbt_irec
 	xfs_filblks_t	br_blockcount;	/* number of blocks */
 	xfs_exntst_t	br_state;	/* extent state */
 } xfs_bmbt_irec_t;
+		xfs_daddr_t	daddr = xfs_fsb_to_db(ip, imap->br_startblock);
 #endif
 	needs_cow = imap_needs_cow(ip, flags, &imap, nimaps);
-	pr_err("%s0 imap_needs_cow=%d IOMAP_UNSHARE set=%d target_bdev=%pS awu_max=%d awu_max_fsb=%d extsz=%d offset=%lld length=%lld\n",
+	pr_err("%s0.0 imap_needs_cow=%d IOMAP_UNSHARE set=%d target_bdev=%pS awu_max=%d awu_max_fsb=%d extsz=%d offset=%lld length=%lld\n",
 		__func__, needs_cow, !!(flags & IOMAP_UNSHARE), target_bdev, awu_max, awu_max_fsb, extsz, offset, length);
 	if (needs_cow) {
 		error = -EAGAIN;
@@ -923,7 +940,7 @@ typedef struct xfs_bmbt_irec
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
 				(flags & IOMAP_DIRECT) || IS_DAX(inode), false, false);
-		pr_err("%s1 called xfs_reflink_allocate_cow error=%d shared=%d\n", __func__, error, shared);
+		pr_err("%s1 called xfs_reflink_allocate_cow error=%d shared=%d &cmap=%pS\n", __func__, error, shared, &cmap);
 		if (error) {
 			pr_err("%s1.1 called xfs_reflink_allocate_cow goto out_unlock from error\n", __func__);
 			goto out_unlock;
@@ -968,7 +985,7 @@ typedef struct xfs_bmbt_irec
 			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
 			error = -EFAULT;
-			pr_err("%s3.1 ATOMIC !spans offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+			pr_err("%s3.1 ATOMIC !spans offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d goto atomic_try_cow;\n",
 				__func__,
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
@@ -980,7 +997,7 @@ typedef struct xfs_bmbt_irec
 
 		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
 			error = -EFAULT;
-			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d\n",
+			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
 				__func__,
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
@@ -994,9 +1011,9 @@ typedef struct xfs_bmbt_irec
 
 atomic_try_cow:
 		BUG_ON(!atomic);
-		pr_err("%s4 ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+		pr_err("%s4 atomic_try_cow: ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d &cmap=%pS\n",
 				__func__,
-				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, &cmap);
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
 				(flags & IOMAP_DIRECT) || IS_DAX(inode), true, true);
