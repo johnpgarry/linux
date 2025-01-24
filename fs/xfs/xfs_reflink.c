@@ -575,13 +575,14 @@ xfs_reflink_allocate_cow(
 		__func__, ip, ip->i_cowfp,
 		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, always_cow, *shared, atomic);
 
+	if (!ip->i_cowfp) {
+		pr_err("%s0 ip=%pS (i_cowfp=%pS) calling xfs_ifork_init_cow\n",
+			__func__, ip, ip->i_cowfp);
+		xfs_ifork_init_cow(ip);
+	}
+
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 	if (always_cow) {
-		if (!ip->i_cowfp) {
-			pr_err("%s0 ip=%pS (i_cowfp=%pS) calling xfs_ifork_init_cow\n",
-				__func__, ip, ip->i_cowfp);
-			xfs_ifork_init_cow(ip);
-		}
 		
 		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) maybe called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent\n",
 			__func__, ip, ip->i_cowfp);
