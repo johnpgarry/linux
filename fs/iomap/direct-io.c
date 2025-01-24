@@ -334,7 +334,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		!!(iomap->flags & IOMAP_F_NEW),
 		!!(iomap->flags & IOMAP_F_DIRTY));
 	if (atomic && length != iter->len) {
-		pr_err("%s EINVAL length=%lld iter->len=%lld pos=%lld IOMAP_F_SHARED set=%d\n",
+		pr_err("%s2 EINVAL length=%lld iter->len=%lld pos=%lld IOMAP_F_SHARED set=%d\n",
 			__func__, length, iter->len, pos,
 			!!(iomap->flags & IOMAP_F_SHARED));
 		if (!(iomap->flags & IOMAP_F_SHARED))
@@ -343,7 +343,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter)) {
-		pr_err("%s EINVAL\n", __func__);
+		pr_err("%s3 EINVAL\n", __func__);
 		return -EINVAL;
 	}
 
@@ -460,7 +460,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			 * bio_iov_iter_get_pages() returns an error, above.
 			 */
 			ret = -EINVAL;
-			pr_err("%s3 EINVAL\n", __func__);
+			pr_err("%s4 EINVAL\n", __func__);
 			bio_put(bio);
 			goto zero_tail;
 		}

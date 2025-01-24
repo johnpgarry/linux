@@ -181,6 +181,8 @@ xfs_reflink_trim_around_shared(
 
 	/* Holes, unwritten, and delalloc extents cannot be shared */
 	if (!xfs_is_cow_inode(ip) || !xfs_bmap_is_written_extent(irec)) {
+		pr_err("%s *shared=false xfs_is_cow_inode=%d xfs_bmap_is_written_extent=%d\n",
+			__func__, xfs_is_cow_inode(ip), xfs_bmap_is_written_extent(irec));
 		*shared = false;
 		return 0;
 	}
@@ -198,6 +200,8 @@ xfs_reflink_trim_around_shared(
 		return error;
 
 	*shared = false;
+	pr_err("%s *shared=false fbno=%d NULLAGBLOCK=%d\n",
+			__func__, fbno, NULLAGBLOCK);
 	if (fbno == NULLAGBLOCK) {
 		/* No shared blocks at all. */
 		return 0;
@@ -471,8 +475,7 @@ xfs_reflink_fill_cow_hole(
 	pr_err("%s2.1 calling xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
 		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
-			bmapi_flags, 0, cmap,
-			&nimaps);
+			bmapi_flags, 0, cmap, &nimaps);
 	pr_err("%s2.2 called xfs_bmapi_write cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld error=%d\n",
 		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error);
 	if (error)

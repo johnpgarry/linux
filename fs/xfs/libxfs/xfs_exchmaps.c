@@ -111,6 +111,7 @@ xmi_advance(
 	struct xfs_exchmaps_intent	*xmi,
 	const struct xfs_bmbt_irec	*irec)
 {
+	pr_err("%s irec->br_blockcount=%lld\n", __func__, irec->br_blockcount);
 	xmi->xmi_startoff1 += irec->br_blockcount;
 	xmi->xmi_startoff2 += irec->br_blockcount;
 	xmi->xmi_blockcount -= irec->br_blockcount;
@@ -289,6 +290,7 @@ xfs_exchmaps_find_mappings(
 
 	bmap_flags = xfs_bmapi_aflag(xfs_exchmaps_whichfork(xmi));
 
+	pr_err("%s irec1=%pS irec2=%pS\n", __func__, irec1, irec2);
 	for (; xmi_has_more_exchange_work(xmi); xmi_advance(xmi, irec1)) {
 		/* Read mapping from the first file */
 		nimaps = 1;
@@ -387,6 +389,17 @@ xfs_exchmaps_one_step(
 	int				whichfork = xfs_exchmaps_whichfork(xmi);
 
 	xfs_exchmaps_update_quota(tp, xmi, irec1, irec2);
+#ifdef fdfdf
+	#define XFS_STAGING_FORK	(-1)	/* fake fork for staging a btree */
+#define	XFS_DATA_FORK		(0)
+#define	XFS_ATTR_FORK		(1)
+#define	XFS_COW_FORK		(2)
+	#endif
+	pr_err("%s0 irec1.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld whichfork=%d (STAGING=%d, DATA=%d, ATTR=%d, COW=%d)\n",
+			__func__, irec1->br_startoff, irec1->br_startblock, irec1->br_blockcount, whichfork,
+			XFS_STAGING_FORK, XFS_DATA_FORK, XFS_ATTR_FORK, XFS_COW_FORK);
+	pr_err("%s0.1 irec2.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld calling xfs_bmap_unmap_extent\n",
+			__func__, irec2->br_startoff, irec2->br_startblock, irec2->br_blockcount);
 
 	/* Remove both mappings. */
 	xfs_bmap_unmap_extent(tp, xmi->xmi_ip1, whichfork, irec1);
@@ -399,6 +412,10 @@ xfs_exchmaps_one_step(
 	 * information exchanged.
 	 */
 	swap(irec1->br_startoff, irec2->br_startoff);
+	pr_err("%s10 irec1.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, irec1->br_startoff, irec1->br_startblock, irec1->br_blockcount);
+	pr_err("%s1.1 irec2.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld calling xfs_bmap_map_extent\n",
+			__func__, irec2->br_startoff, irec2->br_startblock, irec2->br_blockcount);
 	xfs_bmap_map_extent(tp, xmi->xmi_ip1, whichfork, irec2);
 	xfs_bmap_map_extent(tp, xmi->xmi_ip2, whichfork, irec1);
 
@@ -579,6 +596,7 @@ xfs_exchmaps_finish_one(
 	struct xfs_bmbt_irec		irec1, irec2;
 	int				error;
 
+	pr_err("%s tp=%pS xmi=%pS\n", __func__, tp, xmi);
 	if (xmi_has_more_exchange_work(xmi)) {
 		/*
 		 * If the operation state says that some range of the files
@@ -588,6 +606,10 @@ xfs_exchmaps_finish_one(
 		error = xfs_exchmaps_find_mappings(xmi, &irec1, &irec2, NULL);
 		if (error)
 			return error;
+		pr_err("%s2 after xfs_exchmaps_find_mappings irec1.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, irec1.br_startoff, irec1.br_startblock, irec1.br_blockcount);
+		pr_err("%s2.1 after xfs_exchmaps_find_mappings irec2.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+			__func__, irec2.br_startoff, irec2.br_startblock, irec2.br_blockcount);
 
 		if (xmi_has_more_exchange_work(xmi))
 			xfs_exchmaps_one_step(tp, xmi, &irec1, &irec2);

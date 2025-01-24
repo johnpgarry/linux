@@ -6328,6 +6328,8 @@ xfs_bmap_map_extent(
 	int			whichfork,
 	struct xfs_bmbt_irec	*PREV)
 {
+	pr_err("%s PREV=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) whichfork=%d\n", 
+		__func__, PREV, PREV->br_startoff, PREV->br_startoff, PREV->br_blockcount, whichfork);
 	__xfs_bmap_add(tp, XFS_BMAP_MAP, ip, whichfork, PREV);
 }
 
@@ -6339,6 +6341,8 @@ xfs_bmap_unmap_extent(
 	int			whichfork,
 	struct xfs_bmbt_irec	*PREV)
 {
+	pr_err("%s PREV=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) whichfork=%d\n",
+		__func__, PREV, PREV->br_startoff, PREV->br_startoff, PREV->br_blockcount, whichfork);
 	__xfs_bmap_add(tp, XFS_BMAP_UNMAP, ip, whichfork, PREV);
 }
 

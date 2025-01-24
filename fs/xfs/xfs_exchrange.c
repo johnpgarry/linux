@@ -204,6 +204,8 @@ xfs_exchrange_mappings(
 	bool				retried = false;
 	int				error;
 
+	pr_err("%s ip1=%pS ip2=%pS\n", __func__, ip1, ip2);
+
 	trace_xfs_exchrange_mappings(fxr, ip1, ip2);
 
 	if (fxr->flags & XFS_EXCHANGE_RANGE_TO_EOF)
