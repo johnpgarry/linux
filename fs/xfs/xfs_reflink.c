@@ -440,10 +440,10 @@ xfs_reflink_fill_cow_hole(
 
 	pr_err("%s0 ip=%pS (i_cowfp=%pS) always_cow=%d atomic=%d\n",
 			__func__, ip, ip->i_cowfp, always_cow, atomic);
-	pr_err("%s0.1 imap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
-		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
-	pr_err("%s0.2 cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
-		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
+	pr_err("%s0.1 imap->br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d XFS_EXT_UNWRITTEN=%d\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, cmap->br_state, XFS_EXT_UNWRITTEN);
+	pr_err("%s0.2 cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d\n",
+		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 
 	resaligned = xfs_aligned_fsb_count(imap->br_startoff,
 		imap->br_blockcount, xfs_get_cowextsz_hint(ip));
@@ -476,14 +476,14 @@ xfs_reflink_fill_cow_hole(
 
 	/* Allocate the entire reservation as unwritten blocks. */
 	nimaps = 1;
-	pr_err("%s2 calling xfs_bmapi_write imap->br_startoff=%lld, startblock=%lld, blockcount=%lld\n",
-		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
-	pr_err("%s2.1 calling xfs_bmapi_write  to Allocate the entire reservation as unwritten blocksd\n",
+	pr_err("%s2 calling xfs_bmapi_write imap->br_startoff=%lld, blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_blockcount);
+	pr_err("%s2.1 calling xfs_bmapi_write to Allocate the entire reservation as unwritten blocksd\n",
 		__func__);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			bmapi_flags, 0, cmap, &nimaps);
-	pr_err("%s2.2 called xfs_bmapi_write cmap=%pS cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld error=%d\n",
-		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error);
+	pr_err("%s2.2 called xfs_bmapi_write output in cmap=%pS cmap->br_startoff=%lld, blockcount=%lld error=%d\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_blockcount, error);
 	if (error)
 		goto out_trans_cancel;
 
