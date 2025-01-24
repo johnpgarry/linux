@@ -3448,6 +3448,9 @@ xfs_bmap_compute_alignments(
 	int			stripe_align = 0;
 	bool atomic = ap->flags & XFS_BMAPI_ATOMIC;
 
+	pr_err("%s atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d XFS_BMAPI_COWFORK set=%d\n", __func__,
+		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length,
+			!!(ap->flags & XFS_BMAPI_COWFORK));
 
 	/* stripe alignment for allocation is determined by mount parameters */
 	if (mp->m_swidth && xfs_has_swalloc(mp))
@@ -3457,14 +3460,16 @@ xfs_bmap_compute_alignments(
 	else if (atomic)
 		stripe_align = ap->length;
 
-	if (ap->flags & XFS_BMAPI_COWFORK)
+	if (ap->flags & XFS_BMAPI_COWFORK) {
 		align = xfs_get_cowextsz_hint(ap->ip);
-	else if (ap->datatype & XFS_ALLOC_USERDATA)
+		pr_err("%s1 align=%d from XFS_BMAPI_COWFORK\n", __func__, align);
+	} else if (ap->datatype & XFS_ALLOC_USERDATA) {
 		align = xfs_get_extsz_hint(ap->ip);
+		pr_err("%s1.1 align=%d from XFS_ALLOC_USERDATA\n", __func__, align);
+	}
 
-	pr_err("%s atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d XFS_BMAPI_COWFORK set=%d align=%d\n", __func__,
-		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length,
-			!!(ap->flags & XFS_BMAPI_COWFORK), align);
+	pr_err("%s2 atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d lign=%d\n", __func__,
+		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length, align);
 
 	if (stripe_align)
 		args->alignment = stripe_align;
@@ -3494,7 +3499,7 @@ xfs_bmap_compute_alignments(
 		if (args->mod)
 			args->mod = args->prod - args->mod;
 	}
-	pr_err("%s2 atomic=%d align=%d args->mod=%d, prod=%d stripe_align=%d args->alignment=%d\n", 
+	pr_err("%s10 atomic=%d align=%d args->mod=%d, prod=%d stripe_align=%d args->alignment=%d\n", 
 		__func__, atomic, align, args->mod, args->prod, stripe_align, args->alignment);
 	return stripe_align;
 }
