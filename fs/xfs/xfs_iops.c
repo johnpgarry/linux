@@ -579,6 +579,7 @@ xfs_get_atomic_write_attr(
 	unsigned int		*unit_max)
 {
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	struct xfs_mount	*mp = ip->i_mount;
 
 	if (!xfs_inode_can_atomicwrite(ip)) {
 		*unit_min = *unit_max = 0;
@@ -586,7 +587,8 @@ xfs_get_atomic_write_attr(
 	}
 
 	*unit_min = ip->i_mount->m_sb.sb_blocksize;
-	*unit_max =  min(64 * 1024, target->bt_bdev_awu_max);
+	*unit_max =  min_t(unsigned int, XFS_FSB_TO_B(mp, mp->awu_max),
+							target->bt_bdev_awu_max);
 }
 
 STATIC int

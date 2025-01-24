@@ -650,6 +650,31 @@ xfs_agbtree_compute_maxlevels(
 	mp->m_agbtree_maxlevels = max(levels, mp->m_refc_maxlevels);
 }
 
+static inline void
+xfs_mp_compute_awu_max(
+	struct xfs_mount	*mp)
+{
+	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
+	xfs_agblock_t		awu_max;
+
+	if (is_power_of_2(agsize)) {
+		mp->awu_max = agsize;
+		return;
+	}
+
+	/*
+	 * Find highest power-of-2 evenly divisible into agsize
+	 */
+	awu_max = 1;
+	while (1) {
+		if (agsize % (awu_max * 2))
+			break;
+		awu_max *= 2;
+	}
+	mp->awu_max = awu_max;
+
+	pr_err("%s agsize=%d awu_max=%d\n", __func__, agsize, awu_max);
+}
 /*
  * This function does the following on an initial mount of a file system:
  *	- reads the superblock from disk and init the mount struct
@@ -721,6 +746,8 @@ xfs_mountfs(
 	xfs_refcountbt_compute_maxlevels(mp);
 
 	xfs_agbtree_compute_maxlevels(mp);
+
+	xfs_mp_compute_awu_max(mp);
 
 	/*
 	 * Check if sb_agblocks is aligned at stripe boundary.  If sb_agblocks
