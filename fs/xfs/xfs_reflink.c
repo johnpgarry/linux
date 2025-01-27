@@ -351,13 +351,14 @@ xfs_find_trim_cow_extent(
 	pr_err("%s2 after xfs_iext_lookup_extent check cmap->br_startoff=%lld > offset_fsb=%lld cmap->br_startblock=%lld, br_blockcount=%lld, br_state=%d XFS_EXT_UNWRITTEN=%d\n",
 		__func__, cmap->br_startoff, offset_fsb, cmap->br_startblock, cmap->br_blockcount, cmap->br_state, XFS_EXT_UNWRITTEN);
 	if (cmap->br_startoff > offset_fsb) {
+		pr_err("%s5 calling xfs_trim_extent\n", __func__);
 		xfs_trim_extent(imap, imap->br_startoff,
 				cmap->br_startoff - imap->br_startoff);
-		pr_err("%s5 calling xfs_bmap_trim_cow\n", __func__);
+		pr_err("%s5.1 calling xfs_bmap_trim_cow\n", __func__);
 		ret = xfs_bmap_trim_cow(ip, imap, shared);
-		pr_err("%s5.1 called xfs_bmap_trim_cow ret=%d *found=%d *shared=%d returning imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		pr_err("%s5.2 called xfs_bmap_trim_cow ret=%d *found=%d *shared=%d returning imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
 			__func__, ret, *found, *shared, imap->br_startoff, imap->br_startblock, imap->br_blockcount);
-		pr_err("%s5.1.1 cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
+		pr_err("%s5.2.1 cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
 			__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
 		return ret;
 	}
