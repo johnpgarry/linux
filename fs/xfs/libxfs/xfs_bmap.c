@@ -4699,7 +4699,7 @@ xfs_bmapi_write(
 					bma.got.br_blockcount -
 					(bno - bma.got.br_startoff));
 			} else {
-				if (!eof)
+				if (!eof && 0)
 					bma.length = XFS_FILBLKS_MIN(bma.length,
 						bma.got.br_startoff - bno);
 				pr_err("%s2.1 len=%lld bma.length=%d bma.got.br_startoff=%lld bno=%lld\n",
