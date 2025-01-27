@@ -866,6 +866,7 @@ xfs_direct_write_iomap_begin(
 	unsigned int extsz = xfs_get_extsz_hint(ip);
 	unsigned int agno, agbno;
 	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
+	xfs_fileoff_t atomic_orig_length_fsb = end_fsb - offset_fsb;
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
@@ -941,7 +942,7 @@ typedef struct xfs_bmbt_irec
 		/* may drop and re-acquire the ilock */
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
-				(flags & IOMAP_DIRECT) || IS_DAX(inode), false, false);
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), false, false, 0);
 		pr_err("%s1 called xfs_reflink_allocate_cow error=%d shared=%d &cmap=%pS\n", __func__, error, shared, &cmap);
 		if (error) {
 			pr_err("%s1.1 called xfs_reflink_allocate_cow goto out_unlock from error\n", __func__);
@@ -1018,7 +1019,7 @@ atomic_try_cow:
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, &cmap);
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
-				(flags & IOMAP_DIRECT) || IS_DAX(inode), true, true);
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), true, true, atomic_orig_length_fsb);
 		pr_err("%s4.1 ATOMIC called xfs_reflink_allocate_cow error=%d imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d shared=%d br_startblock == HOLESTARTBLOCK=%d\n",
 				__func__, error,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, shared, !!(imap.br_startblock == HOLESTARTBLOCK));

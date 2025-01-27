@@ -374,7 +374,7 @@ xfs_find_trim_cow_extent(
 	}
 
 	/* real extent found - no need to allocate */
-	pr_err("%s7 calling xfs_trim_extent with cmap=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld - real extent found - no need to allocate\n",
+	pr_err("%s7 real extent found - no need to allocate calling xfs_trim_extent with cmap=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
 		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount);
 	xfs_trim_extent(cmap, offset_fsb, count_fsb);
 	pr_err("%s7.1 called xfs_trim_extent with cmap=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n",
@@ -447,6 +447,7 @@ xfs_reflink_fill_cow_hole(
 	int			error;
 	bool			found;
 	uint32_t		bmapi_flags = XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC;
+	xfs_filblks_t br_blockcount;
 
 	if (atomic) {
 		bmapi_flags |= XFS_BMAPI_ATOMIC;
@@ -491,11 +492,15 @@ xfs_reflink_fill_cow_hole(
 
 	/* Allocate the entire reservation as unwritten blocks. */
 	nimaps = 1;
+	if (atomic)
+		br_blockcount = XFS_DEFAULT_COWEXTSZ_HINT;
+	else
+		br_blockcount = imap->br_blockcount;
 	pr_err("%s2 calling xfs_bmapi_write imap->br_startoff=%lld, blockcount=%lld\n",
 		__func__, imap->br_startoff, imap->br_blockcount);
-	pr_err("%s2.1 calling xfs_bmapi_write to Allocate the entire reservation as unwritten blocks\n",
-		__func__);
-	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
+	pr_err("%s2.1 calling xfs_bmapi_write to Allocate the entire reservation as unwritten blocks br_blockcount=%lld\n",
+		__func__, br_blockcount);
+	error = xfs_bmapi_write(tp, ip, imap->br_startoff, br_blockcount,
 			bmapi_flags, 0, cmap, &nimaps);
 	pr_err("%s2.2 called xfs_bmapi_write output in cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld) error=%d nimaps=%d\n",
 		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error, nimaps);
@@ -590,7 +595,8 @@ xfs_reflink_allocate_cow(
 	uint			*lockmode,
 	bool			convert_now,
 	bool			always_cow,
-	bool 			atomic)
+	bool 			atomic,
+	xfs_fileoff_t atomic_orig_length_fsb)
 {
 	int			error;
 	bool			found;
@@ -608,8 +614,8 @@ xfs_reflink_allocate_cow(
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 	if (always_cow) {
 		
-		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) maybe called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent cmap=%pS\n",
-			__func__, ip, ip->i_cowfp, cmap);
+		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) maybe called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent cmap=%pS atomic_orig_length_fsb=%lld\n",
+			__func__, ip, ip->i_cowfp, cmap, atomic_orig_length_fsb);
 		error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
 		pr_err("%s0.2 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
 			__func__, ip,
@@ -619,6 +625,8 @@ xfs_reflink_allocate_cow(
 				found, *shared);
 		if (error)
 			return error;
+		if (found)
+			goto did_i_find;
 		pr_err("%s0.4 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
 			__func__, ip, cmap->br_startoff, imap->br_startoff);
 		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
@@ -645,9 +653,10 @@ xfs_reflink_allocate_cow(
 	}
 
 
-
 	/* CoW fork has a real extent */
+did_i_find:
 	if (found) {
+
 		pr_err("%s2 calling xfs_reflink_convert_unwritten ip=%pS\n",
 			__func__, ip);
 		error = xfs_reflink_convert_unwritten(ip, imap, cmap,

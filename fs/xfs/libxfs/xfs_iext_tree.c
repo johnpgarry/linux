@@ -974,7 +974,7 @@ xfs_iext_lookup_extent(
 		return false;
 	}
 found:
-	pr_err("%s9 found:, return true\n", __func__);
+	pr_err("%s9 found: return true\n", __func__);
 	xfs_iext_get(gotp, cur_rec(cur));
 	return true;
 }
