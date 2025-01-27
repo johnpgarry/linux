@@ -261,6 +261,8 @@ xfs_reflink_convert_cow_locked(
 	int			dummy_logflags;
 	int			error = 0;
 
+	pr_err("%s offset_fsb=%lld count_fsb=%lld\n", __func__, offset_fsb, count_fsb);
+
 	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &got))
 		return 0;
 
@@ -393,10 +395,21 @@ xfs_reflink_convert_unwritten(
 	xfs_filblks_t		count_fsb = imap->br_blockcount;
 	int			error;
 
+
+	pr_err("%s imap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) convert_now=%d\n",
+		__func__, imap, imap->br_startoff, imap->br_startblock, imap->br_blockcount,
+		imap->br_state, convert_now);
+	pr_err("%s0 cmap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount,
+		cmap->br_state);
+
 	/*
 	 * cmap might larger than imap due to cowextsize hint.
 	 */
 	xfs_trim_extent(cmap, offset_fsb, count_fsb);
+	pr_err("%s2 after xfs_trim_extent cmap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount,
+		cmap->br_state);
 
 	/*
 	 * COW fork extents are supposed to remain unwritten until we're ready
@@ -435,10 +448,12 @@ xfs_reflink_fill_cow_hole(
 	bool			found;
 	uint32_t		bmapi_flags = XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC;
 
-	if (atomic)
+	if (atomic) {
 		bmapi_flags |= XFS_BMAPI_ATOMIC;
+	//	bmapi_flags |= XFS_BMAPI_ENTIRE;
+	}
 
-	pr_err("%s0 ip=%pS (i_cowfp=%pS) always_cow=%d atomic=%d xfs_get_cowextsz_hint()=%d\n",
+	pr_err("%s ip=%pS (i_cowfp=%pS) always_cow=%d atomic=%d xfs_get_cowextsz_hint()=%d\n",
 			__func__, ip, ip->i_cowfp, always_cow, atomic, xfs_get_cowextsz_hint(ip));
 	pr_err("%s0.1 imap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) XFS_EXT_UNWRITTEN=%d\n",
 		__func__, imap, imap->br_startoff, imap->br_startblock, imap->br_blockcount, cmap->br_state, XFS_EXT_UNWRITTEN);
@@ -478,12 +493,12 @@ xfs_reflink_fill_cow_hole(
 	nimaps = 1;
 	pr_err("%s2 calling xfs_bmapi_write imap->br_startoff=%lld, blockcount=%lld\n",
 		__func__, imap->br_startoff, imap->br_blockcount);
-	pr_err("%s2.1 calling xfs_bmapi_write to Allocate the entire reservation as unwritten blocksd\n",
+	pr_err("%s2.1 calling xfs_bmapi_write to Allocate the entire reservation as unwritten blocks\n",
 		__func__);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			bmapi_flags, 0, cmap, &nimaps);
-	pr_err("%s2.2 called xfs_bmapi_write output in cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld) error=%d\n",
-		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error);
+	pr_err("%s2.2 called xfs_bmapi_write output in cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld) error=%d nimaps=%d\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error, nimaps);
 	if (error)
 		goto out_trans_cancel;
 

@@ -684,7 +684,8 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
-		pr_err("%s2 calling xfs_bmapi_write\n", __func__);
+		pr_err("%s2 calling xfs_bmapi_write offset_fsb=%lld count_fsb=%lld XFS_BMAPI_CONVERT\n",
+			__func__, offset_fsb, count_fsb);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);

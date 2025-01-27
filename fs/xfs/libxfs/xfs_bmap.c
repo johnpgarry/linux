@@ -4079,6 +4079,8 @@ xfs_bmapi_read(
 
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &icur, &got))
 		eof = true;
+	pr_err("%s2 called xfs_iext_lookup_extent got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld eof=%d\n",
+			__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len, eof);
 	end = bno + len;
 	obno = bno;
 
@@ -4088,6 +4090,8 @@ xfs_bmapi_read(
 			got.br_startoff = end;
 		if (got.br_startoff > bno) {
 			/* Reading in a hole.  */
+			pr_err("%s4 Reading in a hole got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+			__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len);
 			mval->br_startoff = bno;
 			mval->br_startblock = HOLESTARTBLOCK;
 			mval->br_blockcount =
@@ -4101,13 +4105,15 @@ xfs_bmapi_read(
 		}
 
 		/* set up the extent map to return. */
-		pr_err("%s calling xfs_bmapi_trim_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+		pr_err("%s5 calling xfs_bmapi_trim_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
 			__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
 		xfs_bmapi_trim_map(mval, &got, &bno, len, obno, end, n, flags);
-		pr_err("%s2 calling xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+		pr_err("%s5.1 called xfs_bmapi_trim_map got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+			__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len);
+		pr_err("%s6 calling xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
 			__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
 		xfs_bmapi_update_map(&mval, &bno, &len, obno, end, &n, flags);
-		pr_err("%s2.1 called xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+		pr_err("%s6.1 called xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
 			__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
 
 		/* If we're done, stop now. */
