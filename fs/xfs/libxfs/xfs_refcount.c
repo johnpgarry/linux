@@ -1402,6 +1402,7 @@ xfs_refcount_finish_one(
 		ri->ri_blockcount = 0;
 		break;
 	case XFS_REFCOUNT_FREE_COW:
+		pr_err("%s XFS_REFCOUNT_FREE_COW calling __xfs_refcount_cow_free\n", __func__);
 		error = __xfs_refcount_cow_free(rcur, bno, ri->ri_blockcount);
 		if (error)
 			return error;

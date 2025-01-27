@@ -445,6 +445,8 @@ xfs_alloc_fix_len(
 
 	ASSERT(args->mod < args->prod);
 	rlen = args->len;
+	pr_err("%s args->len=%d args->prod=%d, mod=%d, maxlen=%d, minlen=%d, maxlen=%d\n",
+		__func__, args->len, args->prod, args->mod, args->maxlen, args->minlen, args->maxlen);
 	ASSERT(rlen >= args->minlen);
 	ASSERT(rlen <= args->maxlen);
 	if (args->prod <= 1 || rlen < args->mod || rlen == args->maxlen ||
@@ -465,6 +467,8 @@ xfs_alloc_fix_len(
 	ASSERT(args->pag->pagf_freeblks + args->pag->pagf_flcount >=
 		rlen + args->minleft);
 	args->len = rlen;
+
+	pr_err("%s10 fixed args->len=%d\n", __func__, args->len);
 }
 
 /*

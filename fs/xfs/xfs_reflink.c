@@ -438,12 +438,12 @@ xfs_reflink_fill_cow_hole(
 	if (atomic)
 		bmapi_flags |= XFS_BMAPI_ATOMIC;
 
-	pr_err("%s0 ip=%pS (i_cowfp=%pS) always_cow=%d atomic=%d\n",
-			__func__, ip, ip->i_cowfp, always_cow, atomic);
-	pr_err("%s0.1 imap->br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d XFS_EXT_UNWRITTEN=%d\n",
-		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, cmap->br_state, XFS_EXT_UNWRITTEN);
-	pr_err("%s0.2 cmap->br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d\n",
-		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
+	pr_err("%s0 ip=%pS (i_cowfp=%pS) always_cow=%d atomic=%d xfs_get_cowextsz_hint()=%d\n",
+			__func__, ip, ip->i_cowfp, always_cow, atomic, xfs_get_cowextsz_hint(ip));
+	pr_err("%s0.1 imap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) XFS_EXT_UNWRITTEN=%d\n",
+		__func__, imap, imap->br_startoff, imap->br_startblock, imap->br_blockcount, cmap->br_state, XFS_EXT_UNWRITTEN);
+	pr_err("%s0.2 cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d)\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 
 	resaligned = xfs_aligned_fsb_count(imap->br_startoff,
 		imap->br_blockcount, xfs_get_cowextsz_hint(ip));
@@ -482,8 +482,8 @@ xfs_reflink_fill_cow_hole(
 		__func__);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			bmapi_flags, 0, cmap, &nimaps);
-	pr_err("%s2.2 called xfs_bmapi_write output in cmap=%pS cmap->br_startoff=%lld, blockcount=%lld error=%d\n",
-		__func__, cmap, cmap->br_startoff, cmap->br_blockcount, error);
+	pr_err("%s2.2 called xfs_bmapi_write output in cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld) error=%d\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, error);
 	if (error)
 		goto out_trans_cancel;
 
@@ -599,9 +599,9 @@ xfs_reflink_allocate_cow(
 		pr_err("%s0.2 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
 			__func__, ip,
 			imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, error, found, *shared);
-		pr_err("%s0.3 called xfs_find_trim_cow_extent ip=%pS cmap=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
-			__func__, ip, cmap,
-			cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
+		pr_err("%s0.2.1 cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d) found=%d *shared=%d\n",
+				__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state,
+				found, *shared);
 		if (error)
 			return error;
 		pr_err("%s0.4 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
@@ -610,8 +610,8 @@ xfs_reflink_allocate_cow(
 				lockmode, convert_now, true, atomic);
 		pr_err("%s0.5 called xfs_reflink_fill_cow_hole ip=%pS error=%d\n",
 			__func__, ip, error);
-		pr_err("%s0.6 called xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
-		__func__, ip, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
+		pr_err("%s0.6 called xfs_reflink_fill_cow_hole ip=%pS cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
+		__func__, ip, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 		pr_err("%s0.6.1 called xfs_reflink_fill_cow_hole ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
 		__func__, ip, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
 		pr_err("%s0.9 returning\n", __func__);
@@ -621,9 +621,9 @@ xfs_reflink_allocate_cow(
 	pr_err("%s1 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
 		__func__, ip,
 		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, error, found, *shared);
-	pr_err("%s1.1 called xfs_find_trim_cow_extent ip=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+	pr_err("%s1.1 called xfs_find_trim_cow_extent ip=%pS cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
 		__func__, ip,
-		cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
+		cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	if (error || !*shared) {
 		pr_err("%s1.2 return error=%d || !*shared=%d\n", __func__, error, *shared);
 		return error;

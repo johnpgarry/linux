@@ -912,12 +912,13 @@ relock:
 		goto out_unlock;
 	agno = XFS_FSB_TO_AGNO(mp, imap.br_startblock);
 	agbno = XFS_FSB_TO_AGBNO(mp, imap.br_startblock);
-	pr_err("%s0.1 after xfs_bmapi_read imap.startoff=%lld, startblock=%lld (ag=%d, agbno=%d, physical_offset=%d), blockcount=%lld, state=%d\n",
+	pr_err("%s0.1 after xfs_bmapi_read imap.startoff=%lld, startblock=%lld (ag=%d, agbno=%d, physical_offset=%d), blockcount=%lld, state=%d nimaps=%d\n",
 		__func__,
 		imap.br_startoff,
 		imap.br_startblock,
 		agno, agbno, (agno * agsize) + agbno,
-		imap.br_blockcount, imap.br_state);
+		imap.br_blockcount, imap.br_state,
+		nimaps);
 #if 0
 typedef struct xfs_bmbt_irec
 {
