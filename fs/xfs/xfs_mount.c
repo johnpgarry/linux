@@ -657,8 +657,11 @@ xfs_mp_compute_awu_max(
 	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
 	xfs_agblock_t		awu_max;
 
-	if (is_power_of_2(agsize)) {
+	agsize = 67108864;
+
+	if (is_power_of_2(agsize) && 0) {
 		mp->awu_max = agsize;
+		pr_err("%s0 agsize=%d mp->awu_max=%d sb_agblklog=%d\n", __func__, agsize, mp->awu_max, mp->m_sb.sb_agblklog);
 		return;
 	}
 
@@ -669,11 +672,13 @@ xfs_mp_compute_awu_max(
 	while (1) {
 		if (agsize % (awu_max * 2))
 			break;
+		if (XFS_FSB_TO_B(mp, awu_max * 2) > UINT_MAX)
+			break;
 		awu_max *= 2;
 	}
 	mp->awu_max = awu_max;
 
-	pr_err("%s agsize=%d awu_max=%d sb_agblklog=%d\n", __func__, agsize, awu_max, mp->m_sb.sb_agblklog);
+	pr_err("%s1 agsize=%d mp->awu_max=%d sb_agblklog=%d\n", __func__, agsize, mp->awu_max, mp->m_sb.sb_agblklog);
 }
 /*
  * This function does the following on an initial mount of a file system:

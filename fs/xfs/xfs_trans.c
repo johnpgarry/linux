@@ -255,6 +255,7 @@ xfs_trans_alloc(
 	bool			want_retry = true;
 	int			error;
 
+	pr_err("%s blocks=%d\n", __func__, blocks);
 	/*
 	 * Allocate the handle before we do our freeze accounting and setting up
 	 * GFP_NOFS allocation context so that we avoid lockdep false positives
@@ -307,6 +308,7 @@ retry:
 	trace_xfs_trans_alloc(tp, _RET_IP_);
 
 	*tpp = tp;
+	pr_err("%s10 return tp=%pS\n", __func__, tp);
 	return 0;
 }
 
@@ -943,6 +945,7 @@ xfs_trans_commit(
 	 * Finish deferred items on final commit. Only permanent transactions
 	 * should ever have deferred ops.
 	 */
+	pr_err("%s tp=%pS\n", __func__, tp);
 	WARN_ON_ONCE(!list_empty(&tp->t_dfops) &&
 		     !(tp->t_flags & XFS_TRANS_PERM_LOG_RES));
 	if (tp->t_flags & XFS_TRANS_PERM_LOG_RES) {
@@ -979,6 +982,8 @@ xfs_trans_cancel(
 	struct xfs_mount	*mp = tp->t_mountp;
 	struct xlog		*log = mp->m_log;
 	bool			dirty = (tp->t_flags & XFS_TRANS_DIRTY);
+
+	pr_err("%s tp=%pS\n", __func__, tp);
 
 	trace_xfs_trans_cancel(tp, _RET_IP_);
 

@@ -318,10 +318,14 @@ xfs_iomap_write_direct(
 		bmapi_flags |= XFS_BMAPI_ATOMIC;
 
 
+	pr_err("%s0 calling xfs_trans_alloc_inode offset_fsb=%lld count_fsb=%lld\n",
+		__func__, offset_fsb, count_fsb);
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, dblocks,
 			rblocks, force, &tp);
 	if (error)
 		return error;
+	pr_err("%s0.1 called xfs_trans_alloc_inode offset_fsb=%lld count_fsb=%lld tp=%pS\n",
+		__func__, offset_fsb, count_fsb, tp);
 
 	error = xfs_iext_count_extend(tp, ip, XFS_DATA_FORK, nr_exts);
 	if (error)
@@ -351,6 +355,8 @@ typedef struct xfs_bmbt_irec
 	/*
 	 * Complete the transaction
 	 */
+	pr_err("%s1.1 offset_fsb=%lld count_fsb=%lld calling xfs_trans_commit imap->startoff=%lld, startblock=%lld, blockcount=%lld tp=%pS\n",
+		__func__, offset_fsb, count_fsb, imap->br_startoff, imap->br_startblock, imap->br_blockcount, tp);
 	error = xfs_trans_commit(tp);
 	if (error)
 		goto out_unlock;
@@ -674,6 +680,8 @@ xfs_iomap_write_unwritten(
 				0, true, &tp);
 		if (error)
 			return error;
+		pr_err("%s1 offset=%lld count=%lld called xfs_trans_alloc_inode tp=%pS\n",
+			__func__, offset, count, tp);
 
 		error = xfs_iext_count_extend(tp, ip, XFS_DATA_FORK,
 				XFS_IEXT_WRITE_UNWRITTEN_CNT);
@@ -684,8 +692,8 @@ xfs_iomap_write_unwritten(
 		 * Modify the unwritten extent state of the buffer.
 		 */
 		nimaps = 1;
-		pr_err("%s2 calling xfs_bmapi_write offset_fsb=%lld count_fsb=%lld XFS_BMAPI_CONVERT\n",
-			__func__, offset_fsb, count_fsb);
+		pr_err("%s2 calling xfs_bmapi_write offset_fsb=%lld count_fsb=%lld XFS_BMAPI_CONVERT tp=%pS\n",
+			__func__, offset_fsb, count_fsb, tp);
 		error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 					XFS_BMAPI_CONVERT, resblks, &imap,
 					&nimaps);
@@ -708,6 +716,8 @@ xfs_iomap_write_unwritten(
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		}
 
+		pr_err("%s3 calling xfs_trans_commit offset_fsb=%lld count_fsb=%lld tp=%pS\n",
+			__func__, offset_fsb, count_fsb, tp);
 		error = xfs_trans_commit(tp);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		if (error)

@@ -469,6 +469,8 @@ xfs_reflink_fill_cow_hole(
 	xfs_iunlock(ip, *lockmode);
 	*lockmode = 0;
 
+	pr_err("%s0.3 cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) calling xfs_trans_alloc_inode\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, resblks, 0,
 			false, &tp);
 	if (error)
@@ -476,8 +478,8 @@ xfs_reflink_fill_cow_hole(
 
 	*lockmode = XFS_ILOCK_EXCL;
 
-	pr_err("%s1 ip=%pS (i_cowfp=%pS) calling xfs_find_trim_cow_extent\n",
-			__func__, ip, ip->i_cowfp);
+	pr_err("%s1 ip=%pS (i_cowfp=%pS) calling xfs_find_trim_cow_extent tp=%pS\n",
+			__func__, ip, ip->i_cowfp, tp);
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
 	pr_err("%s1.1 ip=%pS (i_cowfp=%pS) called xfs_find_trim_cow_extent error=%d *shared=%d found=%d always_cow=%d\n",
 			__func__, ip, ip->i_cowfp, error, *shared, found, always_cow);
@@ -509,14 +511,18 @@ xfs_reflink_fill_cow_hole(
 		goto out_trans_cancel;
 
 	xfs_inode_set_cowblocks_tag(ip);
+	pr_err("%s3 calling xfs_trans_commit tp=%pS\n",
+		__func__, tp);
 	error = xfs_trans_commit(tp);
 	if (error)
 		return error;
 
 convert:
+	pr_err("%s4 convert: calling xfs_reflink_convert_unwritten\n", __func__);
 	return xfs_reflink_convert_unwritten(ip, imap, cmap, convert_now);
 
 out_trans_cancel:
+	pr_err("%s5 out_trans_cancel: calling xfs_trans_cancel tp=%pS\n", __func__, tp);
 	xfs_trans_cancel(tp);
 	return error;
 }
@@ -540,6 +546,7 @@ xfs_reflink_fill_delalloc(
 		xfs_iunlock(ip, *lockmode);
 		*lockmode = 0;
 
+		pr_err("%s calling xfs_trans_alloc_inode\n", __func__);
 		error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, 0, 0,
 				false, &tp);
 		if (error)
@@ -820,8 +827,11 @@ xfs_reflink_cancel_cow_range(
 		end_fsb = XFS_B_TO_FSB(ip->i_mount, offset + count);
 
 	/* Start a rolling transaction to remove the mappings */
+
+	pr_err("%s calling xfs_trans_alloc\n", __func__);
 	error = xfs_trans_alloc(ip->i_mount, &M_RES(ip->i_mount)->tr_write,
 			0, 0, 0, &tp);
+	pr_err("%s0 called xfs_trans_alloc tp=%pS\n", __func__, tp);
 	if (error)
 		goto out;
 
@@ -834,12 +844,14 @@ xfs_reflink_cancel_cow_range(
 	if (error)
 		goto out_cancel;
 
+	pr_err("%s2 calling xfs_trans_commit tp=%pS\n", __func__, tp);
 	error = xfs_trans_commit(tp);
 
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
 
 out_cancel:
+	pr_err("%s3 out_cancel: calling xfs_trans_cancel tp=%pS\n", __func__, tp);
 	xfs_trans_cancel(tp);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 out:
@@ -875,6 +887,7 @@ xfs_reflink_end_cow_extent(
 	resblks = XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_write, resblks, 0,
 			XFS_TRANS_RESERVE, &tp);
+	pr_err("%s0 called xfs_trans_alloc tp=%pS\n", __func__, tp);
 	if (error)
 		return error;
 
@@ -986,6 +999,7 @@ typedef struct xfs_bmbt_irec
 	/* Remove the mapping from the CoW fork. */
 	xfs_bmap_del_extent_cow(ip, &icur, &got, &del);
 
+	pr_err("%s5 calling xfs_trans_commit tp=%pS\n", __func__, tp);
 	error = xfs_trans_commit(tp);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	if (error)
@@ -996,6 +1010,7 @@ typedef struct xfs_bmbt_irec
 	return 0;
 
 out_cancel:
+	pr_err("%s6 out_cancel: calling xfs_trans_cancel tp=%pS\n", __func__, tp);
 	xfs_trans_cancel(tp);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	pr_err("%s10 error=%d\n", __func__, error);
@@ -1014,14 +1029,20 @@ xfs_reflink_end_cow(
 	xfs_fileoff_t			offset_fsb;
 	xfs_fileoff_t			end_fsb;
 	int				error = 0;
+	static int countjj;
 
 	trace_xfs_reflink_end_cow(ip, offset, count);
 
 	offset_fsb = XFS_B_TO_FSBT(ip->i_mount, offset);
 	end_fsb = XFS_B_TO_FSB(ip->i_mount, offset + count);
 
-	pr_err("%s offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld ip->i_cowfp=%pS\n", __func__,
-		offset, count, offset_fsb, end_fsb, ip->i_cowfp);
+	pr_err("%s offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld ip->i_cowfp=%pS countjj=%d\n", __func__,
+		offset, count, offset_fsb, end_fsb, ip->i_cowfp, countjj);
+	countjj++;
+	if (countjj == 2) {
+		//pr_err("%s0 bailing\n", __func__);
+		//return 0;
+	}
 
 	/*
 	 * Walk forwards until we've remapped the I/O range.  The loop function
@@ -1347,8 +1368,10 @@ xfs_reflink_remap_extent(
 	 * we're remapping.
 	 */
 	resblks = XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK);
+	pr_err("%s calling xfs_trans_alloc_inode\n", __func__);
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write,
 			resblks + dmap->br_blockcount, 0, false, &tp);
+	pr_err("%s1 called xfs_trans_alloc_inode tp=%pS\n", __func__, tp);
 	if (error == -EDQUOT || error == -ENOSPC) {
 		quota_reserved = false;
 		error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write,
