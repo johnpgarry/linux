@@ -382,8 +382,11 @@ xfs_trans_mod_sb(
 		 */
 		if (delta < 0) {
 			tp->t_blk_res_used += (uint)-delta;
-			if (tp->t_blk_res_used > tp->t_blk_res)
+			if (tp->t_blk_res_used > tp->t_blk_res) {
+				pr_err("%s tp=%pS tp->t_blk_res_used=%d > tp->t_blk_res=%d\n",
+					__func__, tp, tp->t_blk_res_used, tp->t_blk_res);
 				xfs_force_shutdown(mp, SHUTDOWN_CORRUPT_INCORE);
+			}
 		} else if (delta > 0 && (tp->t_flags & XFS_TRANS_RES_FDBLKS)) {
 			int64_t	blkres_delta;
 

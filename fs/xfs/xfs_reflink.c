@@ -469,8 +469,8 @@ xfs_reflink_fill_cow_hole(
 	xfs_iunlock(ip, *lockmode);
 	*lockmode = 0;
 
-	pr_err("%s0.3 cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) calling xfs_trans_alloc_inode\n",
-		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
+	pr_err("%s0.3 cmap=%pS (br_startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) calling xfs_trans_alloc_inode resblks=%d resaligned=%lld\n",
+		__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state, resblks, resaligned);
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, resblks, 0,
 			false, &tp);
 	if (error)

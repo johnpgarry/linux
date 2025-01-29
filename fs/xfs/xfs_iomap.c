@@ -884,8 +884,10 @@ xfs_direct_write_iomap_begin(
 	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld &cmap=%pS agsize=%d\n",
 		__func__, offset, length, offset_fsb, end_fsb, &cmap, agsize);
 
-	if (xfs_is_shutdown(mp))
+	if (xfs_is_shutdown(mp)) {
+		pr_err("%s xfs_is_shutdown\n", __func__);
 		return -EIO;
+	}
 
 	/*
 	 * Writes that span EOF might trigger an IO size update on completion,
@@ -906,8 +908,10 @@ xfs_direct_write_iomap_begin(
 
 relock:
 	error = xfs_ilock_for_iomap(ip, flags, &lockmode);
-	if (error)
+	if (error) {
+		pr_err("%s0.1 xfs_ilock_for_iomap error=%d\n", __func__, error);
 		return error;
+	}
 
 	/*
 	 * The reflink iflag could have changed since the earlier unlocked
@@ -921,8 +925,10 @@ relock:
 
 	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
 			       &nimaps, 0);
-	if (error)
+	if (error) {
+		pr_err("%s0.1 xfs_bmapi_read error=%d\n", __func__, error);
 		goto out_unlock;
+	}
 	agno = XFS_FSB_TO_AGNO(mp, imap.br_startblock);
 	agbno = XFS_FSB_TO_AGBNO(mp, imap.br_startblock);
 	pr_err("%s0.1 after xfs_bmapi_read imap.startoff=%lld, startblock=%lld (ag=%d, agbno=%d, physical_offset=%d), blockcount=%lld, state=%d nimaps=%d\n",
@@ -1066,6 +1072,7 @@ atomic_try_cow:
 	}
 
 cont:
+	pr_err("%s4.7 cont:\n", __func__);
 	/*
 	 * For overwrite only I/O, we cannot convert unwritten extents without
 	 * requiring sub-block zeroing.  This can only be done under an
@@ -1123,8 +1130,11 @@ allocate_blocks:
 			offset_fsb, end_fsb,
 			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 
-	if (error)
+	if (error)  {
+		
+		pr_err("%s xfs_iomap_write_direct error=%d, return\n", __func__, error);
 		return error;
+	}
 
 	trace_xfs_iomap_alloc(ip, offset, length, XFS_DATA_FORK, &imap);
 	pr_err("%s5.2 allocate_blocks: calling xfs_bmbt_to_iomap and return with imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d and IOMAP_F_NEW\n", __func__,
