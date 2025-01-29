@@ -768,6 +768,7 @@ imap_needs_alloc(
 	return false;
 }
 
+/* returns true when it is a cow inode and other conditions from IOMAP_UNSHARE | IOMAP_ZERO */
 static inline bool
 imap_needs_cow(
 	struct xfs_inode	*ip,
@@ -950,6 +951,8 @@ typedef struct xfs_bmbt_irec
 			goto out_unlock;
 
 		/* may drop and re-acquire the ilock */
+		pr_err("%s1.0 calling xfs_reflink_allocate_cow imap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+			__func__, &imap, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
 				(flags & IOMAP_DIRECT) || IS_DAX(inode), false, false, 0);

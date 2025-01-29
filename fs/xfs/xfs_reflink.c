@@ -648,9 +648,12 @@ xfs_reflink_allocate_cow(
 		pr_err("%s0.9 returning\n", __func__);
 		return 0;
 	}
+	pr_err("%s1 calling xfs_find_trim_cow_extent ip=%pS imap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+		__func__, ip, imap,
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
-	pr_err("%s1 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
-		__func__, ip,
+	pr_err("%s1.0 called xfs_find_trim_cow_extent ip=%pS imap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) error=%d found=%d *shared=%d\n",
+		__func__, ip, imap,
 		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, error, found, *shared);
 	pr_err("%s1.1 called xfs_find_trim_cow_extent ip=%pS cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
 		__func__, ip,
@@ -684,6 +687,7 @@ did_i_find:
 	if (cmap->br_startoff > imap->br_startoff) {
 		pr_err("%s3 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
 			__func__, ip, cmap->br_startoff, imap->br_startoff);
+		pr_err("%s3.0 CoW fork does not have an extent and data extent is shared. Allocate a real extent in the CoW fork.\n", __func__);
 		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
 				lockmode, convert_now, false, atomic);
 
