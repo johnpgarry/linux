@@ -108,8 +108,8 @@ xfs_bmbt_to_iomap(
 		return xfs_alert_fsblock_zero(ip, imap);
 	}
 
-	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld\n", __func__,
-		imap->br_startoff, imap->br_startblock, imap->br_blockcount);
+	pr_err("%s imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld sequence_cookie=0x%llx\n", __func__,
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount, sequence_cookie);
 
 	if (imap->br_startblock == HOLESTARTBLOCK) {
 		iomap->addr = IOMAP_NULL_ADDR;
@@ -912,17 +912,18 @@ xfs_direct_write_iomap_begin(
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
-	pr_err("%s offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld &cmap=%pS agsize=%d\n",
+	pr_err("%s ***** offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld &cmap=%pS agsize=%d\n",
 		__func__, offset, length, offset_fsb, end_fsb, &cmap, agsize);
 	pr_err("%s0 srcmap=%pS (addr=%lld, offset=%lld, type=%d, flags=%d)\n",
 		__func__, srcmap, srcmap->addr, srcmap->offset, srcmap->type, srcmap->flags);
 	pr_err("%s0.1 iomap=%pS (addr=%lld, offset=%lld, type=%d, flags=%d)\n",
 		__func__, iomap, iomap->addr, iomap->offset, iomap->type, iomap->flags);
-	pr_err("%s0.2 flags=0x%x (UNSHARE=%d, ATOMIC=%d, ZERO=%d)\n",
+	pr_err("%s0.2 flags=0x%x (UNSHARE=%d, ATOMIC=%d, ZERO=%d, ATOMIC_COW=%d)\n",
 		__func__, flags,
 		!!(flags & IOMAP_UNSHARE),
 		!!(flags & IOMAP_ATOMIC),
-		!!(flags & IOMAP_ZERO));
+		!!(flags & IOMAP_ZERO),
+		!!(flags & IOMAP_ATOMIC_COW));
 
 	if (xfs_is_shutdown(mp)) {
 		pr_err("%s xfs_is_shutdown\n", __func__);
@@ -1057,21 +1058,23 @@ typedef struct xfs_bmbt_irec
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
 			goto out_unlock;
 	}
-	if (flags & IOMAP_ATOMIC) {
+	if (flags & IOMAP_ATOMIC_COW) {
+		pr_err("%s2.9 IOMAP_ATOMIC_COW set, going to atomic_try_cow\n", __func__);
+		goto atomic_try_cow;
+	} else if (flags & IOMAP_ATOMIC) {
 		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
 			__func__,
 			offset_fsb, end_fsb,
 			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
 			error = -EFAULT;
-			pr_err("%s3.1 ATOMIC !spans offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d goto atomic_try_cow;\n",
+			pr_err("%s3.1 ATOMIC !spans offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
 				__func__,
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		//	WARN_ON_ONCE(1);
-		//	error = -EIO;
-		//	goto out_unlock;
-			goto atomic_try_cow;
+			error = -EAGAIN;
+			goto out_unlock;
 		}
 
 		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
@@ -1084,7 +1087,8 @@ typedef struct xfs_bmbt_irec
 		//	WARN_ON_ONCE(1);
 		//	error = -EIO;
 		//	goto out_unlock;
-			goto atomic_try_cow;
+			error = -EAGAIN;
+			goto out_unlock;
 		}
 		goto cont;
 
@@ -1115,7 +1119,7 @@ atomic_try_cow:
 				__func__, length, imap.br_startblock, HOLESTARTBLOCK);
 			pr_err("%s4.3.2 imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
 				__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-			error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0 | IOMAP_F_ATOMIC_COW, seq);
+			error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0, seq);
 			if (error)
 				goto out_unlock;
 		}
@@ -1125,7 +1129,7 @@ atomic_try_cow:
 			__func__, length, imap.br_startblock, HOLESTARTBLOCK);
 		pr_err("%s4.5 imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
 			__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-		return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED | IOMAP_F_ATOMIC_COW, seq);
+		return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
 	}
 
 cont:

@@ -628,7 +628,7 @@ xfs_reflink_allocate_cow(
 		pr_err("%s0.2 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
 			__func__, ip,
 			imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, error, found, *shared);
-		pr_err("%s0.2.1 cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d) found=%d *shared=%d\n",
+		pr_err("%s0.2.1 ******** cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d) found=%d *shared=%d\n",
 				__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state,
 				found, *shared);
 		if (error)

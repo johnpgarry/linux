@@ -327,13 +327,12 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	u16			type;	/* type of mapping */
 	u16			flags;	/* flags for mapping */
 	#endif
-	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld, flags=0x%x (SHARED=%d, NEW=%d, DIRTY=%d, ATOMIC_COW=%d)\n",
+	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld, flags=0x%x (SHARED=%d, NEW=%d, DIRTY=%d)\n",
 		__func__, pos, length, iomap->addr, iomap->offset, iomap->length,
 		iomap->flags,
 		!!(iomap->flags & IOMAP_F_SHARED),
 		!!(iomap->flags & IOMAP_F_NEW),
-		!!(iomap->flags & IOMAP_F_DIRTY),
-		!!(iomap->flags & IOMAP_F_ATOMIC_COW));
+		!!(iomap->flags & IOMAP_F_DIRTY));
 	if (atomic && length != iter->len) {
 		pr_err("%s2 EINVAL length=%lld iter->len=%lld pos=%lld IOMAP_F_SHARED set=%d\n",
 			__func__, length, iter->len, pos,
@@ -682,6 +681,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		 */
 		if (iocb->ki_flags & IOCB_DIO_CALLER_COMP)
 			dio->flags |= IOMAP_DIO_CALLER_COMP;
+
+		if (dio_flags & IOMAP_DIO_ATOMIC_COW)
+			iomi.flags |= IOMAP_ATOMIC_COW;
 
 		if (dio_flags & IOMAP_DIO_OVERWRITE_ONLY) {
 			ret = -EAGAIN;

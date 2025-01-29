@@ -628,6 +628,52 @@ out_unlock:
 	return ret;
 }
 
+static noinline ssize_t
+xfs_file_dio_write_atomic(
+	struct xfs_inode	*ip,
+	struct kiocb		*iocb,
+	struct iov_iter		*from)
+{
+	unsigned int		iolock = XFS_IOLOCK_SHARED;
+	bool			use_cow = false;
+	unsigned int		dio_flags;
+	ssize_t			ret;
+
+	pr_err("%s\n", __func__);
+retry:
+	pr_err("%s1 retry: calling iomap_dio_rw use_cow=%d\n", __func__, use_cow);
+	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
+	if (ret)
+		return ret;
+
+	ret = xfs_file_write_checks(iocb, from, &iolock);
+	if (ret)
+		goto out_unlock;
+
+	trace_xfs_file_direct_write(iocb, from);
+	if (use_cow)
+		dio_flags = IOMAP_DIO_ATOMIC_COW;
+	else
+		dio_flags = 0;
+
+	pr_err("%s3 calling iomap_dio_rw\n", __func__);
+	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
+			&xfs_dio_write_ops, dio_flags, NULL, 0);
+	pr_err("%s3.1 called iomap_dio_rw ret=%zd\n", __func__, ret);
+
+	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) && !use_cow) {
+		xfs_iunlock(ip, iolock);
+		use_cow = true;
+		goto retry;
+	}
+
+out_unlock:
+	pr_err("%s9 out_unlock: ret=%zd\n", __func__, ret);
+	if (iolock)
+		xfs_iunlock(ip, iolock);
+	return ret;
+}
+
 /*
  * Handle block unaligned direct I/O writes
  *
@@ -734,6 +780,8 @@ xfs_file_dio_write(
 	}
 	if ((iocb->ki_pos | count) & ip->i_mount->m_blockmask)
 		return xfs_file_dio_write_unaligned(ip, iocb, from);
+	if (iocb->ki_flags & IOCB_ATOMIC)
+		return xfs_file_dio_write_atomic(ip, iocb, from);
 	return xfs_file_dio_write_aligned(ip, iocb, from);
 }
 

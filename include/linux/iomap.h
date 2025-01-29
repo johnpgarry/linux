@@ -68,7 +68,6 @@ struct vm_fault;
 #endif /* CONFIG_BUFFER_HEAD */
 #define IOMAP_F_XATTR		(1U << 5)
 #define IOMAP_F_BOUNDARY	(1U << 6)
-#define IOMAP_F_ATOMIC_COW	(1U << 7)
 
 /*
  * Flags set by the core iomap code during operations:
@@ -184,6 +183,7 @@ struct iomap_folio_ops {
 #define IOMAP_DAX		0
 #endif /* CONFIG_FS_DAX */
 #define IOMAP_ATOMIC		(1 << 9)
+#define IOMAP_ATOMIC_COW		(1 << 10)
 
 struct iomap_ops {
 	/*
@@ -434,6 +434,8 @@ struct iomap_dio_ops {
  * fault.
  */
 #define IOMAP_DIO_PARTIAL		(1 << 2)
+
+#define IOMAP_DIO_ATOMIC_COW		(1 << 3)
 
 ssize_t iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
