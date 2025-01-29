@@ -76,6 +76,8 @@ int iomap_iter(struct iomap_iter *iter, const struct iomap_ops *ops)
 {
 	int ret;
 
+	pr_err("%s iter->iomap.length=%lld ops->iomap_end=%pS\n",
+		__func__, iter->iomap.length, ops->iomap_end);
 	if (iter->iomap.length && ops->iomap_end) {
 		ret = ops->iomap_end(iter->inode, iter->pos, iomap_length(iter),
 				iter->processed > 0 ? iter->processed : 0,

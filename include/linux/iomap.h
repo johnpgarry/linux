@@ -68,6 +68,7 @@ struct vm_fault;
 #endif /* CONFIG_BUFFER_HEAD */
 #define IOMAP_F_XATTR		(1U << 5)
 #define IOMAP_F_BOUNDARY	(1U << 6)
+#define IOMAP_F_ATOMIC_COW	(1U << 7)
 
 /*
  * Flags set by the core iomap code during operations:
