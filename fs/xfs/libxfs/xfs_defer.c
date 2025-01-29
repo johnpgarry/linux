@@ -587,6 +587,8 @@ xfs_defer_finish_one(
 
 	trace_xfs_defer_pending_finish(tp->t_mountp, dfp);
 
+	pr_err("%s tp=%pS dfp=%pS\n", __func__, tp, dfp);
+
 	xfs_defer_create_done(tp, dfp);
 	list_for_each_safe(li, n, &dfp->dfp_work) {
 		list_del(li);
@@ -856,6 +858,7 @@ xfs_defer_add(
 	if (!dfp || !xfs_defer_can_append(dfp, ops))
 		dfp = xfs_defer_alloc(&tp->t_dfops, ops);
 
+	pr_err("%s calling xfs_defer_add_item tp=%pS dfp=%pS\n", __func__, tp, dfp);
 	xfs_defer_add_item(dfp, li);
 	trace_xfs_defer_add_item(tp->t_mountp, dfp, li);
 	return dfp;

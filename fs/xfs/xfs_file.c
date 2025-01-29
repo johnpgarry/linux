@@ -533,11 +533,19 @@ xfs_dio_write_end_io(
 	nofs_flag = memalloc_nofs_save();
 
 	if (flags & IOMAP_DIO_COW) {
-		pr_err("%s1 calling xfs_reflink_end_cow offset=%lld size=%zd atomic=%d\n",
-			__func__, offset, size, atomic);
-		error = xfs_reflink_end_cow(ip, offset, size);
-		if (error)
-			goto out;
+		if (atomic) {
+			pr_err("%s2 calling xfs_reflink_end_atomic_cow offset=%lld size=%zd atomic=%d\n",
+				__func__, offset, size, atomic);
+			error = xfs_reflink_end_atomic_cow(ip, offset, size);
+			if (error)
+				goto out;
+		} else {
+			pr_err("%s3 calling xfs_reflink_end_cow offset=%lld size=%zd atomic=%d\n",
+				__func__, offset, size, atomic);
+			error = xfs_reflink_end_cow(ip, offset, size);
+			if (error)
+				goto out;
+		}
 	}
 
 	/*

@@ -3642,6 +3642,7 @@ xfs_alloc_vextent_finish(
 				args->agbno, args->len));
 	}
 
+	pr_err("%s calling xfs_ag_resv_alloc_extent\n", __func__);
 	xfs_ag_resv_alloc_extent(args->pag, args->resv, args);
 
 	XFS_STATS_INC(mp, xs_allocx);

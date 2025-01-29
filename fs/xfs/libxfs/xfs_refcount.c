@@ -1429,6 +1429,9 @@ __xfs_refcount_add(
 {
 	struct xfs_refcount_intent	*ri;
 
+
+	pr_err("%s tp=%pS startblock=%lld blockcount=%d\n",
+		__func__, tp, startblock, blockcount);
 	ri = kmem_cache_alloc(xfs_refcount_intent_cache,
 			GFP_KERNEL | __GFP_NOFAIL);
 	INIT_LIST_HEAD(&ri->ri_list);
