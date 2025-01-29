@@ -3503,8 +3503,8 @@ xfs_bmap_compute_alignments(
 	pr_err("%s2 atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d align=%d\n", __func__,
 		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length, align);
 
-	if (stripe_align)
-		args->alignment = stripe_align;
+	if (atomic)
+		args->alignment = align;
 	else
 		args->alignment = 1;
 
