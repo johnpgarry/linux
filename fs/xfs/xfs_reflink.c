@@ -495,7 +495,7 @@ xfs_reflink_fill_cow_hole(
 
 	/* Allocate the entire reservation as unwritten blocks. */
 	nimaps = 1;
-	if (atomic)
+	if (0)
 		br_blockcount = XFS_DEFAULT_COWEXTSZ_HINT;
 	else
 		br_blockcount = imap->br_blockcount;
