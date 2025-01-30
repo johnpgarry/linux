@@ -967,6 +967,7 @@ relock:
 	if (xfs_is_cow_inode(ip) && lockmode == XFS_ILOCK_SHARED) {
 		xfs_iunlock(ip, lockmode);
 		lockmode = XFS_ILOCK_EXCL;
+		pr_err("%s goto relock\n", __func__);
 		goto relock;
 	}
 

@@ -658,15 +658,16 @@ retry:
 	if (ret)
 		return ret;
 
-	if (use_cow) {
-		_nest = atomic_inc_return(&nest);
-		BUG_ON(_nest > 1);
-	}
 
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
 
+	if (use_cow) {
+		_nest = atomic_inc_return(&nest);
+		BUG_ON(_nest > 1);
+	}
+	
 	trace_xfs_file_direct_write(iocb, from);
 	if (use_cow)
 		dio_flags = IOMAP_DIO_ATOMIC_COW;
