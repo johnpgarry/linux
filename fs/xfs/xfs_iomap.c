@@ -1044,7 +1044,7 @@ typedef struct xfs_bmbt_irec
 	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
 
 	pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
-	if (need_alloc && !(IOMAP_ATOMIC_COW))
+	if (need_alloc && !(flags & IOMAP_ATOMIC))
 		goto allocate_blocks;
 
 	/*
