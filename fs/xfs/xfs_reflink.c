@@ -872,18 +872,18 @@ xfs_reflink_end_cow_extent_locked(
 	struct xfs_inode	*ip,
 	xfs_fileoff_t		*offset_fsb,
 	xfs_fileoff_t		end_fsb,
-	struct xfs_trans	*  const tp)
+	struct xfs_trans	*  const tp,
+	bool				*commit)
 {
 	struct xfs_iext_cursor	icur;
 	struct xfs_bmbt_irec	got, del, data;
-	struct xfs_mount	*mp = ip->i_mount;
-	struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, XFS_COW_FORK);
-	unsigned int		resblks;
-	int			nmaps;
+	__maybe_unused struct xfs_mount	*mp = ip->i_mount;
+	__maybe_unused struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, XFS_COW_FORK);
+	__maybe_unused int			nmaps;
 	int			error;
-	resblks = XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK);
-	pr_err("%s *offset_fsb=%lld end_fsb=%lld calling xfs_trans_alloc resblks=%d tp=%pS\n",
-		__func__, offset_fsb ? *offset_fsb : -1, end_fsb, resblks, tp);
+
+	pr_err("%s *offset_fsb=%lld end_fsb=%lld calling xfs_trans_alloc tp=%pS\n",
+		__func__, offset_fsb ? *offset_fsb : -1, end_fsb, tp);
 
 	/*
 	 * In case of racing, overlapping AIO writes no COW extents might be
@@ -894,7 +894,7 @@ xfs_reflink_end_cow_extent_locked(
 	    got.br_startoff >= end_fsb) {
 		*offset_fsb = end_fsb;
 		pr_err("%s1 !xfs_iext_lookup_extent *offset_fsb=%lld end_fsb=%lld\n", __func__, *offset_fsb, end_fsb);
-		goto out_cancel;
+		return 0;
 	}
 
 	/*
@@ -920,7 +920,7 @@ typedef struct xfs_bmbt_irec
 		if (!xfs_iext_next_extent(ifp, &icur, &got) ||
 		    got.br_startoff >= end_fsb) {
 			*offset_fsb = end_fsb;
-			goto out_cancel;
+			return 0;
 		}
 	}
 	del = got;
@@ -931,7 +931,7 @@ typedef struct xfs_bmbt_irec
 	if (error) {
 		pr_err("%s2.1 called xfs_iext_count_extend error=%d\n", __func__,
 			error);
-		goto out_cancel;
+		return error;
 	}
 
 	/* Grab the corresponding mapping in the data fork. */
@@ -939,7 +939,7 @@ typedef struct xfs_bmbt_irec
 	error = xfs_bmapi_read(ip, del.br_startoff, del.br_blockcount, &data,
 			&nmaps, 0);
 	if (error)
-		goto out_cancel;
+		return error;
 
 	/* We can only remap the smaller of the two extent sizes. */
 	data.br_blockcount = min(data.br_blockcount, del.br_blockcount);
@@ -971,7 +971,7 @@ typedef struct xfs_bmbt_irec
 		error = xfs_bunmapi(NULL, ip, data.br_startoff,
 				data.br_blockcount, 0, 1, &done);
 		if (error)
-			goto out_cancel;
+			return error;
 		ASSERT(done);
 	}
 
@@ -990,11 +990,8 @@ typedef struct xfs_bmbt_irec
 
 	/* Update the caller about how much progress we made. */
 	*offset_fsb = del.br_startoff + del.br_blockcount;
+	*commit = true;
 	return 0;
-
-out_cancel:
-	pr_err("%s10 error=%d\n", __func__, error);
-	return error;
 }
 
 /*
@@ -1013,14 +1010,11 @@ xfs_reflink_end_cow_extent(
 	xfs_fileoff_t		*offset_fsb,
 	xfs_fileoff_t		end_fsb)
 {
-	struct xfs_iext_cursor	icur;
-	struct xfs_bmbt_irec	got, del, data;
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_trans	*tp;
-	struct xfs_ifork	*ifp = xfs_ifork_ptr(ip, XFS_COW_FORK);
 	unsigned int		resblks;
-	int			nmaps;
 	int			error;
+	bool		commit = false;
 
 	resblks = XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_write, resblks, 0,
@@ -1035,100 +1029,13 @@ xfs_reflink_end_cow_extent(
 	 */
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, 0);
-
-	/*
-	 * In case of racing, overlapping AIO writes no COW extents might be
-	 * left by the time I/O completes for the loser of the race.  In that
-	 * case we are done.
-	 */
-	if (!xfs_iext_lookup_extent(ip, ifp, *offset_fsb, &icur, &got) ||
-	    got.br_startoff >= end_fsb) {
-		*offset_fsb = end_fsb;
+	error = xfs_reflink_end_cow_extent_locked(ip, offset_fsb, end_fsb, tp, &commit);
+	if (error || !commit)
 		goto out_cancel;
-	}
-
-	/*
-	 * Only remap real extents that contain data.  With AIO, speculative
-	 * preallocations can leak into the range we are called upon, and we
-	 * need to skip them.  Preserve @got for the eventual CoW fork
-	 * deletion; from now on @del represents the mapping that we're
-	 * actually remapping.
-	 */
-	while (!xfs_bmap_is_written_extent(&got)) {
-		if (!xfs_iext_next_extent(ifp, &icur, &got) ||
-		    got.br_startoff >= end_fsb) {
-			*offset_fsb = end_fsb;
-			goto out_cancel;
-		}
-	}
-	del = got;
-	xfs_trim_extent(&del, *offset_fsb, end_fsb - *offset_fsb);
-
-	error = xfs_iext_count_extend(tp, ip, XFS_DATA_FORK,
-			XFS_IEXT_REFLINK_END_COW_CNT);
-	if (error)
-		goto out_cancel;
-
-	/* Grab the corresponding mapping in the data fork. */
-	nmaps = 1;
-	error = xfs_bmapi_read(ip, del.br_startoff, del.br_blockcount, &data,
-			&nmaps, 0);
-	if (error)
-		goto out_cancel;
-
-	/* We can only remap the smaller of the two extent sizes. */
-	data.br_blockcount = min(data.br_blockcount, del.br_blockcount);
-	del.br_blockcount = data.br_blockcount;
-
-	trace_xfs_reflink_cow_remap_from(ip, &del);
-	trace_xfs_reflink_cow_remap_to(ip, &data);
-
-	if (xfs_bmap_is_real_extent(&data)) {
-		/*
-		 * If the extent we're remapping is backed by storage (written
-		 * or not), unmap the extent and drop its refcount.
-		 */
-		xfs_bmap_unmap_extent(tp, ip, XFS_DATA_FORK, &data);
-		xfs_refcount_decrease_extent(tp, &data);
-		xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_BCOUNT,
-				-data.br_blockcount);
-	} else if (data.br_startblock == DELAYSTARTBLOCK) {
-		int		done;
-
-		/*
-		 * If the extent we're remapping is a delalloc reservation,
-		 * we can use the regular bunmapi function to release the
-		 * incore state.  Dropping the delalloc reservation takes care
-		 * of the quota reservation for us.
-		 */
-		error = xfs_bunmapi(NULL, ip, data.br_startoff,
-				data.br_blockcount, 0, 1, &done);
-		if (error)
-			goto out_cancel;
-		ASSERT(done);
-	}
-
-	/* Free the CoW orphan record. */
-	xfs_refcount_free_cow_extent(tp, del.br_startblock, del.br_blockcount);
-
-	/* Map the new blocks into the data fork. */
-	xfs_bmap_map_extent(tp, ip, XFS_DATA_FORK, &del);
-
-	/* Charge this new data fork mapping to the on-disk quota. */
-	xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_DELBCOUNT,
-			(long)del.br_blockcount);
-
-	/* Remove the mapping from the CoW fork. */
-	xfs_bmap_del_extent_cow(ip, &icur, &got, &del);
 
 	error = xfs_trans_commit(tp);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	if (error)
-		return error;
-
-	/* Update the caller about how much progress we made. */
-	*offset_fsb = del.br_startoff + del.br_blockcount;
-	return 0;
+	return error;
 
 out_cancel:
 	xfs_trans_cancel(tp);
@@ -1169,7 +1076,7 @@ xfs_reflink_end_cow_extent_(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, 0);
 
-	error = xfs_reflink_end_cow_extent_locked(ip, offset_fsb, end_fsb, tp);
+	error = xfs_reflink_end_cow_extent_locked(ip, offset_fsb, end_fsb, tp, NULL);
 	pr_err("%s1 called xfs_reflink_end_cow_extent_locked error=%d\n", __func__, error);
 	if (error)
 		goto out_cancel;
