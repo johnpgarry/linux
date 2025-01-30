@@ -688,10 +688,12 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 			iomi.flags |= IOMAP_ATOMIC_COW;
 
 		if (dio_flags & IOMAP_DIO_OVERWRITE_ONLY) {
+			pr_err("%s AAA IOMAP_DIO_OVERWRITE_ONLY set\n", __func__);
 			ret = -EAGAIN;
 			if (iomi.pos >= dio->i_size ||
 			    iomi.pos + iomi.len > dio->i_size)
 				goto out_free_dio;
+			pr_err("%s AAA1 setting IOMAP_OVERWRITE_ONLY\n", __func__);
 			iomi.flags |= IOMAP_OVERWRITE_ONLY;
 		}
 

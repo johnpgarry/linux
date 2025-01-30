@@ -884,7 +884,7 @@ xfs_direct_write_iomap_begin(
 	struct inode		*inode,
 	loff_t			offset,
 	loff_t			length,
-	unsigned		flags,
+	const unsigned		flags,
 	struct iomap		*iomap,
 	struct iomap		*srcmap)
 {
@@ -918,12 +918,13 @@ xfs_direct_write_iomap_begin(
 		__func__, srcmap, srcmap->addr, srcmap->offset, srcmap->type, srcmap->flags);
 	pr_err("%s0.1 iomap=%pS (addr=%lld, offset=%lld, type=%d, flags=%d)\n",
 		__func__, iomap, iomap->addr, iomap->offset, iomap->type, iomap->flags);
-	pr_err("%s0.2 flags=0x%x (UNSHARE=%d, ATOMIC=%d, ZERO=%d, ATOMIC_COW=%d)\n",
+	pr_err("%s0.2 flags=0x%x (UNSHARE=%d, ATOMIC=%d, ZERO=%d, ATOMIC_COW=%d, OVERWRITE_ONLY=%d)\n",
 		__func__, flags,
 		!!(flags & IOMAP_UNSHARE),
 		!!(flags & IOMAP_ATOMIC),
 		!!(flags & IOMAP_ZERO),
-		!!(flags & IOMAP_ATOMIC_COW));
+		!!(flags & IOMAP_ATOMIC_COW),
+		!!(flags & IOMAP_OVERWRITE_ONLY));
 
 	if (xfs_is_shutdown(mp)) {
 		pr_err("%s xfs_is_shutdown\n", __func__);
@@ -1073,7 +1074,37 @@ relock:
 		
 	}
 
+
 	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
+
+
+	if (flags & IOMAP_ATOMIC) {
+		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d need_alloc=%d\n",
+			__func__,
+			offset_fsb, end_fsb,
+			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, need_alloc);
+		error = -EAGAIN;
+
+		if (need_alloc) {
+			pr_err("%s3.1 ATOMIC needs_alloc\n", __func__);
+			goto out_unlock;
+		}
+
+		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
+			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
+				__func__,
+				offset_fsb, end_fsb,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
+				awu_max_fsb);
+			goto out_unlock;
+		}
+		
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
+			pr_err("%s3.3  ATOMIC !imap_spans_range\n", __func__);
+			goto out_unlock;
+		}
+
+	}
 
 	pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
 	if (need_alloc)
@@ -1091,26 +1122,6 @@ relock:
 			goto out_unlock;
 	}
 
-	if (flags & IOMAP_ATOMIC) {
-		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
-			__func__,
-			offset_fsb, end_fsb,
-			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-
-		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
-			error = -EFAULT;
-			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
-				__func__,
-				offset_fsb, end_fsb,
-				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
-				awu_max_fsb);
-		//	WARN_ON_ONCE(1);
-		//	error = -EIO;
-		//	goto out_unlock;
-			error = -EAGAIN;
-			goto out_unlock;
-		}
-	}
 
 	/*
 	 * For overwrite only I/O, we cannot convert unwritten extents without
@@ -1134,6 +1145,7 @@ relock:
 
 allocate_blocks:
 	error = -EAGAIN;
+	pr_err("%s5 allocate_blocks:\n", __func__);
 	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
 		pr_err("%s5.0 allocate_blocks: IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY set\n", __func__);
 		goto out_unlock;
@@ -1150,7 +1162,7 @@ allocate_blocks:
 	 */
 	length = min_t(loff_t, length, 1024 * PAGE_SIZE);
 	end_fsb = xfs_iomap_end_fsb(mp, offset, length);
-	pr_err("%s5 allocate_blocks: end_fsb=%lld length=%lld\n", __func__, end_fsb, length);
+	pr_err("%s5.0.0 allocate_blocks: end_fsb=%lld length=%lld\n", __func__, end_fsb, length);
 
 	if (offset + length > XFS_ISIZE(ip))
 		end_fsb = xfs_iomap_eof_align_last_fsb(ip, end_fsb);
