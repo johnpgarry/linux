@@ -46,8 +46,7 @@ int	xfs_getbmap(struct xfs_inode *ip, struct getbmapx *bmv,
 int	xfs_bmap_extsize_align(struct xfs_mount *mp, struct xfs_bmbt_irec *gotp,
 			       struct xfs_bmbt_irec *prevp, xfs_extlen_t extsz,
 			       int rt, int eof, int delay, int convert,
-			       xfs_fileoff_t *offp, xfs_extlen_t *lenp,
-			       bool atomic);
+			       xfs_fileoff_t *offp, xfs_extlen_t *lenp);
 bool	xfs_bmap_adjacent(struct xfs_bmalloca *ap);
 int	xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 			     int whichfork, struct xfs_bmbt_irec *rec,

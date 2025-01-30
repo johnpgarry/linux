@@ -2977,8 +2977,7 @@ xfs_bmap_extsize_align(
 	int		delay,		/* creating delalloc extent? */
 	int		convert,	/* overwriting unwritten extent? */
 	xfs_fileoff_t	*offp,		/* in/out: aligned offset */
-	xfs_extlen_t	*lenp,
-	bool atomic)		/* in/out: aligned length */
+	xfs_extlen_t	*lenp)		/* in/out: aligned length */
 {
 	xfs_fileoff_t	orig_off;	/* original offset */
 	xfs_extlen_t	orig_alen;	/* original length */
@@ -3021,13 +3020,8 @@ xfs_bmap_extsize_align(
 
 	/* Same adjustment for the end of the requested area. */
 	temp = (align_alen % extsz);
-	if (temp) {
+	if (temp)
 		align_alen += extsz - temp;
-	//	pr_err("%s2 align_off=%lld align_alen=%d atomic=%d\n",
-		//	__func__, align_off, align_alen, atomic);
- 		if (atomic)
- 			goto end;
-	}
 
 	/*
 	 * For large extent hint sizes, the aligned extent might be larger than
@@ -3140,7 +3134,7 @@ xfs_bmap_extsize_align(
 	if (prevp->br_startoff != NULLFILEOFF)
 		ASSERT(align_off >= prevp->br_startoff + prevp->br_blockcount);
 #endif
-end:
+
 	*lenp = align_alen;
 	*offp = align_off;
 	return 0;
@@ -3454,7 +3448,6 @@ xfs_bmap_compute_alignments(
 	int			stripe_align = 0;
 	bool atomic = ap->flags & XFS_BMAPI_NALIGN;
 
-//	pr_err("%s atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d XFS_BMAPI_COWFORK set=%d\n", __func__,
 	/* stripe alignment for allocation is determined by mount parameters */
 	if (mp->m_swidth && xfs_has_swalloc(mp))
 		stripe_align = mp->m_swidth;
@@ -3465,7 +3458,6 @@ xfs_bmap_compute_alignments(
 		align = xfs_get_cowextsz_hint(ap->ip);
 	else if (ap->datatype & XFS_ALLOC_USERDATA)
 		align = xfs_get_extsz_hint(ap->ip);
-	//	atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length, align);
 
 	if (atomic)
 		args->alignment = align;
@@ -3475,7 +3467,7 @@ xfs_bmap_compute_alignments(
 	if (align) {
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
-					&ap->length, atomic))
+					&ap->length))
 			ASSERT(0);
 		ASSERT(ap->length);
 	}
@@ -4119,7 +4111,7 @@ retry:
 			prev.br_startoff = NULLFILEOFF;
 
 		error = xfs_bmap_extsize_align(mp, got, &prev, extsz, 0, eof,
-					       1, 0, &aoff, &alen, false);
+					       1, 0, &aoff, &alen);
 		ASSERT(!error);
 	}
 
