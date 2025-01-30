@@ -586,8 +586,8 @@ xfs_get_atomic_write_attr(
 		return;
 	}
 
-	pr_err("%s mp->awu_max=%d\n", __func__, mp->awu_max);
-	pr_err("%s1 XFS_FSB_TO_B(mp, mp->awu_max)=%lld (unsigned int)(XFS_FSB_TO_B(mp, mp->awu_max))=%d\n",
+	pr_err_once("%s mp->awu_max=%d\n", __func__, mp->awu_max);
+	pr_err_once("%s1 XFS_FSB_TO_B(mp, mp->awu_max)=%lld (unsigned int)(XFS_FSB_TO_B(mp, mp->awu_max))=%d\n",
 		__func__, XFS_FSB_TO_B(mp, mp->awu_max), (unsigned int)(XFS_FSB_TO_B(mp, mp->awu_max)));
 
 	*unit_min = ip->i_mount->m_sb.sb_blocksize;
