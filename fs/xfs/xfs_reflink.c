@@ -603,8 +603,7 @@ xfs_reflink_allocate_cow(
 	uint			*lockmode,
 	bool			convert_now,
 	bool			always_cow,
-	bool 			atomic,
-	xfs_fileoff_t atomic_orig_length_fsb)
+	bool 			atomic)
 {
 	int			error;
 	bool			found;
@@ -622,8 +621,8 @@ xfs_reflink_allocate_cow(
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 	if (always_cow) {
 		
-		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) maybe called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent cmap=%pS atomic_orig_length_fsb=%lld\n",
-			__func__, ip, ip->i_cowfp, cmap, atomic_orig_length_fsb);
+		pr_err("%s0.1 ip=%pS (i_cowfp=%pS) maybe called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent cmap=%pS\n",
+			__func__, ip, ip->i_cowfp, cmap);
 		error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
 		pr_err("%s0.2 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d *shared=%d\n",
 			__func__, ip,
