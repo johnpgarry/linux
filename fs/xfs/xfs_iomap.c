@@ -979,20 +979,10 @@ relock:
 		agno, agbno, (agno * agsize) + agbno,
 		imap.br_blockcount, imap.br_state,
 		nimaps);
-#if 0
-typedef struct xfs_bmbt_irec
-{
-	xfs_fileoff_t	br_startoff;	/* starting file offset */
-	xfs_fsblock_t	br_startblock;	/* starting block number */
-	xfs_filblks_t	br_blockcount;	/* number of blocks */
-	xfs_exntst_t	br_state;	/* extent state */
-} xfs_bmbt_irec_t;
-		xfs_daddr_t	daddr = xfs_fsb_to_db(ip, imap->br_startblock);
-#endif
 	needs_cow = imap_needs_cow(ip, flags, &imap, nimaps);
 	pr_err("%s0.2 imap_needs_cow=%d IOMAP_UNSHARE set=%d target_bdev=%pS awu_max=%d awu_max_fsb=%d extsz=%d offset=%lld length=%lld\n",
 		__func__, needs_cow, !!(flags & IOMAP_UNSHARE), target_bdev, awu_max, awu_max_fsb, extsz, offset, length);
-	if (atomic && offset_fsb > 0) {
+	if (0 && atomic && offset_fsb > 0) {
 		int			jnimaps = 1;
 		__maybe_unused bool jfound = false;
 		__maybe_unused bool jshared = false;
@@ -1009,7 +999,9 @@ typedef struct xfs_bmbt_irec
 		BUG_ON(error);
 		
 	}
-	if (needs_cow && !atomic) {
+	if (atomic)
+		needs_cow = false;
+	if (needs_cow) {
 		error = -EAGAIN;
 		if (flags & IOMAP_NOWAIT)
 			goto out_unlock;
@@ -1040,49 +1032,7 @@ typedef struct xfs_bmbt_irec
 			nimaps,
 			imap_needs_alloc(inode, flags, &imap, nimaps),
 			IS_ALIGNED(imap.br_startblock, imap.br_blockcount));
-
-	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
-
-	pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
-	if (need_alloc && !(flags & IOMAP_ATOMIC))
-		goto allocate_blocks;
-
-	/*
-	 * NOWAIT and OVERWRITE I/O needs to span the entire requested I/O with
-	 * a single map so that we avoid partial IO failures due to the rest of
-	 * the I/O range not covered by this map triggering an EAGAIN condition
-	 * when it is subsequently mapped and aborting the I/O.
-	 */
-	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
-		error = -EAGAIN;
-		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
-			goto out_unlock;
-	}
 	if (flags & IOMAP_ATOMIC_COW) {
-		pr_err("%s2.9 IOMAP_ATOMIC_COW set, going to atomic_try_cow\n", __func__);
-		goto atomic_try_cow;
-	} else if (flags & IOMAP_ATOMIC) {
-		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
-			__func__,
-			offset_fsb, end_fsb,
-			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-
-		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
-			error = -EFAULT;
-			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
-				__func__,
-				offset_fsb, end_fsb,
-				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
-				awu_max_fsb);
-		//	WARN_ON_ONCE(1);
-		//	error = -EIO;
-		//	goto out_unlock;
-			error = -EAGAIN;
-			goto out_unlock;
-		}
-		goto cont;
-
-atomic_try_cow:
 		BUG_ON(!atomic);
 		pr_err("%s4 atomic_try_cow: ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d &cmap=%pS\n",
 				__func__,
@@ -1094,8 +1044,8 @@ atomic_try_cow:
 				__func__, error,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, shared, !!(imap.br_startblock == HOLESTARTBLOCK));
 		pr_err("%s4.2 ATOMIC called xfs_reflink_allocate_cow cmap.startoff=%lld, startblock=%lld blockcount=%lld (0x%llx) state=%d isnullstartblock()=%d\n",
-				__func__,
-				cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_blockcount, cmap.br_state, isnullstartblock(cmap.br_startblock));
+					__func__,
+					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_blockcount, cmap.br_state, isnullstartblock(cmap.br_startblock));
 		if (error)
 			goto out_unlock;
 		if (shared)
@@ -1120,10 +1070,48 @@ atomic_try_cow:
 		pr_err("%s4.5 imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
 			__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
+		
 	}
 
-cont:
-	pr_err("%s4.7 cont:\n", __func__);
+	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
+
+	pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
+	if (need_alloc)
+		goto allocate_blocks;
+
+	/*
+	 * NOWAIT and OVERWRITE I/O needs to span the entire requested I/O with
+	 * a single map so that we avoid partial IO failures due to the rest of
+	 * the I/O range not covered by this map triggering an EAGAIN condition
+	 * when it is subsequently mapped and aborting the I/O.
+	 */
+	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
+		error = -EAGAIN;
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
+			goto out_unlock;
+	}
+
+	if (flags & IOMAP_ATOMIC) {
+		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+			__func__,
+			offset_fsb, end_fsb,
+			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+
+		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
+			error = -EFAULT;
+			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
+				__func__,
+				offset_fsb, end_fsb,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
+				awu_max_fsb);
+		//	WARN_ON_ONCE(1);
+		//	error = -EIO;
+		//	goto out_unlock;
+			error = -EAGAIN;
+			goto out_unlock;
+		}
+	}
+
 	/*
 	 * For overwrite only I/O, we cannot convert unwritten extents without
 	 * requiring sub-block zeroing.  This can only be done under an
