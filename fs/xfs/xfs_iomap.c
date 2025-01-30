@@ -978,33 +978,9 @@ relock:
 	}
 	agno = XFS_FSB_TO_AGNO(mp, imap.br_startblock);
 	agbno = XFS_FSB_TO_AGBNO(mp, imap.br_startblock);
-	//pr_err("%s0.1 after xfs_bmapi_read imap.startoff=%lld, startblock=%lld (ag=%d, agbno=%d, physical_offset=%d), blockcount=%lld, state=%d nimaps=%d\n",
-	//	__func__,
-	//	imap.br_startoff,
-	//	imap.br_startblock,
-	//	agno, agbno, (agno * agsize) + agbno,
-	//	imap.br_blockcount, imap.br_state,
-//		nimaps);
-	needs_cow = imap_needs_cow(ip, flags, &imap, nimaps);
-	//pr_err("%s0.2 imap_needs_cow=%d IOMAP_UNSHARE set=%d target_bdev=%pS awu_max=%d awu_max_fsb=%d extsz=%d offset=%lld length=%lld\n",
-	//	__func__, needs_cow, !!(flags & IOMAP_UNSHARE), target_bdev, awu_max, awu_max_fsb, extsz, offset, length);
-	if (0 && atomic && offset_fsb > 0) {
-		int			jnimaps = 1;
-		__maybe_unused bool jfound = false;
-		__maybe_unused bool jshared = false;
-		__maybe_unused struct xfs_bmbt_irec	jmap = {-69, -69, -69, -69};
-		__maybe_unused struct xfs_bmbt_irec	jcmap = {-69, -69, -69, -69};
 
-		pr_err("%s0.3 calling xfs_bmapi_read for atomic previous range\n", __func__);
-		error = xfs_bmapi_read(ip, offset_fsb - 1, 1, &jmap,
-			       &jnimaps, 0);
-		pr_err("%s0.3.1 called xfs_bmapi_read for atomic previous range error=%d jnimaps=%d\n", __func__, error, jnimaps);
-		pr_err("%s0.3.2 jmap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d)\n",
-			__func__, &jmap,
-			jmap.br_startoff, jmap.br_startblock, jmap.br_blockcount, jmap.br_state);
-		BUG_ON(error);
-		
-	}
+	needs_cow = imap_needs_cow(ip, flags, &imap, nimaps);
+
 	if (atomic)
 		needs_cow = false;
 	if (needs_cow) {
@@ -1030,14 +1006,7 @@ relock:
 		end_fsb = imap.br_startoff + imap.br_blockcount;
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 	}
-//	pr_err("%s2 atomic=%d check if need alloc offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d nimaps=%d needs_alloc=%d IS_ALIGNED=%d\n",
-//			__func__,
-//			atomic,
-//			offset_fsb, end_fsb,
-//			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
-//			nimaps,
-//			imap_needs_alloc(inode, flags, &imap, nimaps),
-//			IS_ALIGNED(imap.br_startblock, imap.br_blockcount));
+
 	if (flags & IOMAP_ATOMIC_COW) {
 		BUG_ON(!atomic);
 	//	pr_err("%s4 atomic_try_cow: ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d &cmap=%pS\n",
@@ -1110,6 +1079,8 @@ relock:
 			goto out_unlock;
 		}
 
+		/* nodge to always do CoW based */
+		goto out_unlock;
 	}
 
 

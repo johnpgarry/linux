@@ -541,14 +541,7 @@ xfs_dio_write_end_io(
 		if ((_atomic_cowkk % 1000) == 0)
 			pr_err("%s _atomic_cowkk=%d\n", __func__, _atomic_cowkk);
 		if (0) {
-		//	pr_err("%s2 calling xfs_reflink_end_atomic_cow offset=%lld size=%zd atomic=%d\n",
-		//		__func__, offset, size, atomic);
-			error = xfs_reflink_end_atomic_cow(ip, offset, size);
-			if (error)
-				goto out;
 		} else {
-		//	pr_err("%s3 calling xfs_reflink_end_cow offset=%lld size=%zd atomic=%d\n",
-		//		__func__, offset, size, atomic);
 			error = xfs_reflink_end_cow(ip, offset, size);
 			if (error)
 				goto out;
@@ -598,6 +591,8 @@ xfs_dio_write_end_io(
 	}
 
 out:
+	if (error)
+		pr_err("%s error=%d\n", __func__, error);
 	memalloc_nofs_restore(nofs_flag);
 	return error;
 }
@@ -669,7 +664,7 @@ retry:
 	if (use_cow)
 		dio_flags = IOMAP_DIO_ATOMIC_COW;
 	else
-		dio_flags = IOMAP_OVERWRITE_ONLY;
+		dio_flags = 0;
 
 	pr_err_once("%s3 calling iomap_dio_rw\n", __func__);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
@@ -678,6 +673,7 @@ retry:
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) && !use_cow) {
 		xfs_iunlock(ip, iolock);
+		iolock = XFS_IOLOCK_EXCL;
 		use_cow = true;
 		goto retry;
 	}

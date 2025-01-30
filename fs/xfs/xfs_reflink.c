@@ -1206,11 +1206,6 @@ xfs_reflink_end_cow(
 	offset_fsb = XFS_B_TO_FSBT(ip->i_mount, offset);
 	end_fsb = XFS_B_TO_FSB(ip->i_mount, offset + count);
 
-	//pr_err("%s offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld ip->i_cowfp=%pS countjj=%d\n", __func__,
-	//	offset, count, offset_fsb, end_fsb, ip->i_cowfp, countjj);
-
-
-
 	/*
 	 * Walk forwards until we've remapped the I/O range.  The loop function
 	 * repeatedly cycles the ILOCK to allocate one transaction per remapped
@@ -1243,122 +1238,11 @@ xfs_reflink_end_cow(
 	 * have never supported this 100%.  If either disk write succeeds the
 	 * blocks will be remapped.
 	 */
-	while (end_fsb > offset_fsb && !error) {
-	//	pr_err("%s1 offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld calling xfs_reflink_end_cow_extent\n", __func__,
-	//		offset, count, offset_fsb, end_fsb);
+	while (end_fsb > offset_fsb && !error)
 		error = xfs_reflink_end_cow_extent(ip, &offset_fsb, end_fsb);
-	//	pr_err("%s1.1 offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld called xfs_reflink_end_cow_extent error=%d\n", __func__,
-	//		offset, count, offset_fsb, end_fsb, error);
-	}
-
-	if (error) {
-		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
-		pr_err("%s10 ip->i_cowfp=%pS error=%d\n", __func__,
-			ip->i_cowfp, error);
-	}
-	return error;
-}
-
-int
-xfs_reflink_end_atomic_cow(
-	struct xfs_inode		*ip,
-	xfs_off_t			offset,
-	xfs_off_t			count)
-{
-	xfs_fileoff_t			offset_fsb;
-	xfs_fileoff_t			end_fsb;
-	struct xfs_trans	*tp;
-	int			error;
-	struct xfs_mount	*mp = ip->i_mount;
-	int dblocks = 0;
-
-	trace_xfs_reflink_end_cow(ip, offset, count);
-
-	offset_fsb = XFS_B_TO_FSBT(ip->i_mount, offset);
-	end_fsb = XFS_B_TO_FSB(ip->i_mount, offset + count);
-
-	dblocks = XFS_NEXTENTADD_SPACE_RES(ip->i_mount,
-			(unsigned int)(end_fsb - offset_fsb),
-			XFS_DATA_FORK);
-
-	pr_err("%s &&&& offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld ip->i_cowfp=%pS dblocks=%d\n", __func__,
-		offset, count, offset_fsb, end_fsb, ip->i_cowfp, dblocks);
-	
-
-	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write,
-				dblocks, 0, false, &tp);
-	pr_err("%s0.0 called xfs_trans_alloc tp=%pS error=%d\n", __func__, tp, error);
-	if (error)
-		return error;
-
-
-	/*
-	 * Walk forwards until we've remapped the I/O range.  The loop function
-	 * repeatedly cycles the ILOCK to allocate one transaction per remapped
-	 * extent.
-	 *
-	 * If we're being called by writeback then the pages will still
-	 * have PageWriteback set, which prevents races with reflink remapping
-	 * and truncate.  Reflink remapping prevents races with writeback by
-	 * taking the iolock and mmaplock before flushing the pages and
-	 * remapping, which means there won't be any further writeback or page
-	 * cache dirtying until the reflink completes.
-	 *
-	 * We should never have two threads issuing writeback for the same file
-	 * region.  There are also have post-eof checks in the writeback
-	 * preparation code so that we don't bother writing out pages that are
-	 * about to be truncated.
-	 *
-	 * If we're being called as part of directio write completion, the dio
-	 * count is still elevated, which reflink and truncate will wait for.
-	 * Reflink remapping takes the iolock and mmaplock and waits for
-	 * pending dio to finish, which should prevent any directio until the
-	 * remap completes.  Multiple concurrent directio writes to the same
-	 * region are handled by end_cow processing only occurring for the
-	 * threads which succeed; the outcome of multiple overlapping direct
-	 * writes is not well defined anyway.
-	 *
-	 * It's possible that a buffered write and a direct write could collide
-	 * here (the buffered write stumbles in after the dio flushes and
-	 * invalidates the page cache and immediately queues writeback), but we
-	 * have never supported this 100%.  If either disk write succeeds the
-	 * blocks will be remapped.
-	 */
-	#ifdef fdfdf
-		unsigned int		t_blk_res;	/* # of blocks resvd */
-	unsigned int		t_blk_res_used;	/* # of resvd blocks used */
-	#endif
-	while (end_fsb > offset_fsb && !error) {
-		pr_err("%s1 offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld calling xfs_reflink_end_cow_extent tp=%pS (t_blk_res=%d, t_blk_res_used=%d)\n",
-			__func__,
-			offset, count, offset_fsb, end_fsb,
-			tp, tp->t_blk_res, tp->t_blk_res_used);
-		error = xfs_reflink_end_cow_extent_locked(ip, &offset_fsb, end_fsb, tp);
-		pr_err("%s1.1 offset=%lld count=%lld offset_fsb=%lld end_fsb=%lld called xfs_reflink_end_cow_extent error=%d tp=%pS (t_blk_res=%d, t_blk_res_used=%d)\n", __func__,
-			offset, count, offset_fsb, end_fsb, error,
-			tp, tp->t_blk_res, tp->t_blk_res_used);
-		if (error)
-			goto error_handle;
-	}
-	
-	pr_err("%s3 calling xfs_trans_commit tp=%pS\n", __func__, tp);
-	error = xfs_trans_commit(tp);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	pr_err("%s3.1 called xfs_trans_commit tp=%pS error=%d\n", __func__, tp, error);
-	if (error)
-		return error;
 
 	if (error)
 		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
-	pr_err("%s10 ip->i_cowfp=%pS error=%d\n", __func__,
-			ip->i_cowfp, error);
-	return error;
-
-error_handle:
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	
-	pr_err("%s11 error=%d\n", __func__, error);
-	BUG();
 	return error;
 }
 
