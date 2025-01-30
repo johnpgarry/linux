@@ -648,6 +648,8 @@ xfs_file_dio_write_atomic(
 	bool			use_cow = false;
 	unsigned int		dio_flags;
 	ssize_t			ret;
+	static atomic_t nest;
+	unsigned int _nest;
 
 	pr_err_once("%s\n", __func__);
 retry:
@@ -655,6 +657,11 @@ retry:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
+
+	if (use_cow) {
+		_nest = atomic_inc_return(&nest);
+		BUG_ON(_nest > 1);
+	}
 
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
@@ -670,6 +677,10 @@ retry:
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			&xfs_dio_write_ops, dio_flags, NULL, 0);
 	pr_err_once("%s3.1 called iomap_dio_rw ret=%zd use_cow=%d\n", __func__, ret, use_cow);
+
+	if (use_cow) {
+		atomic_dec(&nest);
+	}
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) && !use_cow) {
 		xfs_iunlock(ip, iolock);
