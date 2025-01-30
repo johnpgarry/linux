@@ -506,7 +506,7 @@ xfs_dio_write_end_io(
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
-	pr_err_once("%s IOMAP_DIO_UNWRITTEN set=%d IOMAP_DIO_COW set=%d offset=%lld size=%zd atomic=%d\n",
+	pr_err("%s IOMAP_DIO_UNWRITTEN set=%d IOMAP_DIO_COW set=%d offset=%lld size=%zd atomic=%d\n",
 		__func__,
 		!!(flags & IOMAP_DIO_UNWRITTEN),
 		!!(flags & IOMAP_DIO_COW),
@@ -541,14 +541,14 @@ xfs_dio_write_end_io(
 		if ((_atomic_cowkk % 10000) == 0)
 			pr_err("%s _atomic_cowkk=%d\n", __func__, _atomic_cowkk);
 		if (0) {
-		//	pr_err("%s2 calling xfs_reflink_end_atomic_cow offset=%lld size=%zd atomic=%d\n",
-		//		__func__, offset, size, atomic);
+			pr_err("%s2 calling xfs_reflink_end_atomic_cow offset=%lld size=%zd atomic=%d\n",
+				__func__, offset, size, atomic);
 			error = xfs_reflink_end_atomic_cow(ip, offset, size);
 			if (error)
 				goto out;
 		} else {
-		//	pr_err("%s3 calling xfs_reflink_end_cow offset=%lld size=%zd atomic=%d\n",
-		//		__func__, offset, size, atomic);
+			pr_err("%s3 calling xfs_reflink_end_cow offset=%lld size=%zd atomic=%d\n",
+				__func__, offset, size, atomic);
 			error = xfs_reflink_end_cow(ip, offset, size);
 			if (error)
 				goto out;
@@ -562,7 +562,7 @@ xfs_dio_write_end_io(
 	 * they are converted.
 	 */
 	if (flags & IOMAP_DIO_UNWRITTEN) {
-		pr_err_once("%s2 calling xfs_iomap_write_unwritten offset=%lld size=%zd atomic=%d\n", __func__, offset, size, atomic);
+		pr_err("%s2 calling xfs_iomap_write_unwritten offset=%lld size=%zd atomic=%d\n", __func__, offset, size, atomic);
 		error = xfs_iomap_write_unwritten(ip, offset, size, true);
 		goto out;
 	}
@@ -654,9 +654,9 @@ xfs_file_dio_write_atomic(
 	unsigned int		dio_flags;
 	ssize_t			ret;
 
-	pr_err_once("%s\n", __func__);
+	pr_err("%s\n", __func__);
 retry:
-	pr_err_once("%s1 retry: calling iomap_dio_rw use_cow=%d\n", __func__, use_cow);
+	pr_err("%s1 retry: calling iomap_dio_rw use_cow=%d\n", __func__, use_cow);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -671,10 +671,10 @@ retry:
 	else
 		dio_flags = IOMAP_OVERWRITE_ONLY;
 
-	pr_err_once("%s3 calling iomap_dio_rw\n", __func__);
+	pr_err("%s3 calling iomap_dio_rw\n", __func__);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			&xfs_dio_write_ops, dio_flags, NULL, 0);
-	pr_err_once("%s3.1 called iomap_dio_rw ret=%zd use_cow=%d\n", __func__, ret, use_cow);
+	pr_err("%s3.1 called iomap_dio_rw ret=%zd use_cow=%d\n", __func__, ret, use_cow);
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) && !use_cow) {
 		xfs_iunlock(ip, iolock);
@@ -683,11 +683,9 @@ retry:
 	}
 
 out_unlock:
-	pr_err_once("%s9 out_unlock: ret=%zd\n", __func__, ret);
+	pr_err("%s9 out_unlock: ret=%zd\n", __func__, ret);
 	if (iolock)
 		xfs_iunlock(ip, iolock);
-	if (ret < 0)
-		pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }
 

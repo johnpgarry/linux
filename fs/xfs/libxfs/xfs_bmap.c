@@ -2997,11 +2997,11 @@ xfs_bmap_extsize_align(
 	orig_alen = align_alen = *lenp;
 	orig_end = orig_off + orig_alen;
 
-	//pr_err("%s align_off=%lld align_alen=%d extsz=%d\n", __func__, align_off, align_alen, extsz);
-//	pr_err("%s0.0 gotp=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
-//		__func__, gotp, gotp->br_startoff, gotp->br_startblock, gotp->br_blockcount, gotp->br_state);
-	//pr_err("%s0.1 prevp=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
-	//	__func__, prevp, prevp->br_startoff, prevp->br_startblock, prevp->br_blockcount, prevp->br_state);
+	pr_err("%s align_off=%lld align_alen=%d extsz=%d\n", __func__, align_off, align_alen, extsz);
+	pr_err("%s0.0 gotp=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
+		__func__, gotp, gotp->br_startoff, gotp->br_startblock, gotp->br_blockcount, gotp->br_state);
+	pr_err("%s0.1 prevp=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d)\n",
+		__func__, prevp, prevp->br_startoff, prevp->br_startblock, prevp->br_blockcount, prevp->br_state);
 
 	/*
 	 * If this request overlaps an existing extent, then don't
@@ -3024,15 +3024,15 @@ xfs_bmap_extsize_align(
 	if (temp) {
 		align_alen += temp;
 		align_off -= temp;
-		//pr_err("%s1 align_off=%lld align_alen=%d\n", __func__, align_off, align_alen);
+		pr_err("%s1 align_off=%lld align_alen=%d\n", __func__, align_off, align_alen);
 	}
 
 	/* Same adjustment for the end of the requested area. */
 	temp = (align_alen % extsz);
 	if (temp) {
 		align_alen += extsz - temp;
-	//	pr_err("%s2 align_off=%lld align_alen=%d atomic=%d\n",
-		//	__func__, align_off, align_alen, atomic);
+		pr_err("%s2 align_off=%lld align_alen=%d atomic=%d\n",
+			__func__, align_off, align_alen, atomic);
  		if (atomic)
  			goto end;
 	}
@@ -3048,7 +3048,7 @@ xfs_bmap_extsize_align(
 	while (align_alen > XFS_MAX_BMBT_EXTLEN)
 		align_alen -= extsz;
 	ASSERT(align_alen <= XFS_MAX_BMBT_EXTLEN);
-	//pr_err("%s3 align_off=%lld align_alen=%d\n", __func__, align_off, align_alen);
+	pr_err("%s3 align_off=%lld align_alen=%d\n", __func__, align_off, align_alen);
 
 	/*
 	 * If the previous block overlaps with this proposed allocation
@@ -3095,10 +3095,10 @@ xfs_bmap_extsize_align(
 	    align_off + align_alen > nexto &&
 	    nexto != NULLFILEOFF) {
 		ASSERT(nexto > prevo);
-	//	pr_err("%s5 align_off=%lld align_alen=%d orig_end=%lld nexto=%lld\n",
-		//	__func__, align_off, align_alen, orig_end, nexto);
+		pr_err("%s5 align_off=%lld align_alen=%d orig_end=%lld nexto=%lld\n",
+			__func__, align_off, align_alen, orig_end, nexto);
 		align_alen = nexto - align_off;
-	//	pr_err("%s5.1 align_off=%lld align_alen=%d\n", __func__, align_off, align_alen);
+		pr_err("%s5.1 align_off=%lld align_alen=%d\n", __func__, align_off, align_alen);
 	}
 
 	/*
@@ -3155,7 +3155,7 @@ xfs_bmap_extsize_align(
 end:
 	*lenp = align_alen;
 	*offp = align_off;
-//	pr_err("%s10 *offp=%lld *lenp=%d\n", __func__, *offp, *lenp);
+	pr_err("%s10 *offp=%lld *lenp=%d\n", __func__, *offp, *lenp);
 	return 0;
 }
 
@@ -3353,9 +3353,9 @@ xfs_bmap_select_minlen(
 	 * Since we used XFS_ALLOC_FLAG_TRYLOCK in _longest_free_extent(), it is
 	 * possible that there is enough contiguous free space for this request.
 	 */
-//	pr_err("%s blen=%d ap->minlen=%d args->maxlen=%d\n", __func__, blen, ap->minlen, args->maxlen);
+	pr_err("%s blen=%d ap->minlen=%d args->maxlen=%d\n", __func__, blen, ap->minlen, args->maxlen);
 	if (blen < ap->minlen) {
-		//pr_err("%s1 return ap->minlen=%d\n", __func__, ap->minlen);
+		pr_err("%s1 return ap->minlen=%d\n", __func__, ap->minlen);
 		return ap->minlen;
 	}
 
@@ -3366,10 +3366,10 @@ xfs_bmap_select_minlen(
 	 */
 	if (blen < args->maxlen) {
 
-	//	pr_err("%s2 return blen=%d\n", __func__, blen);
+		pr_err("%s2 return blen=%d\n", __func__, blen);
 		return blen;
 	}
-//	pr_err("%s10 return args->maxlen=%d\n", __func__, args->maxlen);
+	pr_err("%s10 return args->maxlen=%d\n", __func__, args->maxlen);
 	return args->maxlen;
 }
 
@@ -3387,8 +3387,8 @@ xfs_bmap_btalloc_select_lengths(
 	if (ap->tp->t_flags & XFS_TRANS_LOWMODE) {
 		args->total = ap->minlen;
 		args->minlen = ap->minlen;
-		//pr_err("%s args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
-		//	__func__, args->minlen, args->maxlen, args->total, args->alignment);
+		pr_err("%s args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
+			__func__, args->minlen, args->maxlen, args->total, args->alignment);
 		return 0;
 	}
 
@@ -3410,8 +3410,8 @@ xfs_bmap_btalloc_select_lengths(
 		xfs_perag_rele(pag);
 
 	args->minlen = xfs_bmap_select_minlen(ap, args, *blen);
-	//pr_err("%s10 args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
-	//		__func__, args->minlen, args->maxlen, args->total, args->alignment);
+	pr_err("%s10 args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
+			__func__, args->minlen, args->maxlen, args->total, args->alignment);
 	return error;
 }
 
@@ -3478,9 +3478,9 @@ xfs_bmap_compute_alignments(
 	int			stripe_align = 0;
 	bool atomic = ap->flags & XFS_BMAPI_NALIGN;
 
-//	pr_err("%s atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d XFS_BMAPI_COWFORK set=%d\n", __func__,
-//		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length,
-//			!!(ap->flags & XFS_BMAPI_COWFORK));
+	pr_err("%s atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d XFS_BMAPI_COWFORK set=%d\n", __func__,
+		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length,
+			!!(ap->flags & XFS_BMAPI_COWFORK));
 
 	/* stripe alignment for allocation is determined by mount parameters */
 	if (mp->m_swidth && xfs_has_swalloc(mp))
@@ -3490,18 +3490,18 @@ xfs_bmap_compute_alignments(
 
 	if (atomic && 0) {
 		//align = ap->atomic_length;
-	//	pr_err("%s1.0 align=%d from XFS_BMAPI_NALIGN\n", __func__, align);
+		pr_err("%s1.0 align=%d from XFS_BMAPI_NALIGN\n", __func__, align);
 
 	} else if (ap->flags & XFS_BMAPI_COWFORK) {
 		align = xfs_get_cowextsz_hint(ap->ip);
-	//	pr_err("%s1.1 align=%d from XFS_BMAPI_COWFORK\n", __func__, align);
+		pr_err("%s1.1 align=%d from XFS_BMAPI_COWFORK\n", __func__, align);
 	} else if (ap->datatype & XFS_ALLOC_USERDATA) {
 		align = xfs_get_extsz_hint(ap->ip);
-	//	pr_err("%s1.1 align=%d from XFS_ALLOC_USERDATA\n", __func__, align);
+		pr_err("%s1.1 align=%d from XFS_ALLOC_USERDATA\n", __func__, align);
 	}
 
-	//pr_err("%s2 atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d align=%d\n", __func__,
-	//	atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length, align);
+	pr_err("%s2 atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d align=%d\n", __func__,
+		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length, align);
 
 	if (atomic)
 		args->alignment = align;
@@ -3509,18 +3509,18 @@ xfs_bmap_compute_alignments(
 		args->alignment = 1;
 
 	if (align) {
-	//	pr_err("%s3 calling xfs_bmap_extsize_align ap->offset=%lld ap->got.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d conv=%d eof=%d ap->length=%d\n", __func__,
-	//		ap->offset, ap->got.br_startoff, ap->got.br_startblock, ap->got.br_blockcount, ap->got.br_state, ap->conv, ap->eof, ap->length);
-	//	pr_err("%s3.1 ap->prev.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n", __func__,
-	//		ap->prev.br_startoff, ap->prev.br_startblock, ap->prev.br_blockcount, ap->prev.br_state);
+		pr_err("%s3 calling xfs_bmap_extsize_align ap->offset=%lld ap->got.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d conv=%d eof=%d ap->length=%d\n", __func__,
+			ap->offset, ap->got.br_startoff, ap->got.br_startblock, ap->got.br_blockcount, ap->got.br_state, ap->conv, ap->eof, ap->length);
+		pr_err("%s3.1 ap->prev.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n", __func__,
+			ap->prev.br_startoff, ap->prev.br_startblock, ap->prev.br_blockcount, ap->prev.br_state);
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
 					&ap->length, atomic))
 			ASSERT(0);
-	//	pr_err("%s4 called xfs_bmap_extsize_align ap->offset=%lld ap->got.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d ap->length=%d\n", __func__,
-	//		ap->offset, ap->got.br_startoff, ap->got.br_startblock, ap->got.br_blockcount, ap->got.br_state, ap->length);
-	//	pr_err("%s4.1 ap->prev.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n", __func__,
-	//		ap->prev.br_startoff, ap->prev.br_startblock, ap->prev.br_blockcount, ap->prev.br_state);
+		pr_err("%s4 called xfs_bmap_extsize_align ap->offset=%lld ap->got.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d ap->length=%d\n", __func__,
+			ap->offset, ap->got.br_startoff, ap->got.br_startblock, ap->got.br_blockcount, ap->got.br_state, ap->length);
+		pr_err("%s4.1 ap->prev.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n", __func__,
+			ap->prev.br_startoff, ap->prev.br_startblock, ap->prev.br_blockcount, ap->prev.br_state);
 		ASSERT(ap->length);
 	}
 
@@ -3539,8 +3539,8 @@ xfs_bmap_compute_alignments(
 		if (args->mod)
 			args->mod = args->prod - args->mod;
 	}
-	//pr_err("%s10 atomic=%d align=%d args->mod=%d, prod=%d stripe_align=%d args->alignment=%d\n", 
-	//	__func__, atomic, align, args->mod, args->prod, stripe_align, args->alignment);
+	pr_err("%s10 atomic=%d align=%d args->mod=%d, prod=%d stripe_align=%d args->alignment=%d\n", 
+		__func__, atomic, align, args->mod, args->prod, stripe_align, args->alignment);
 	return stripe_align;
 }
 
@@ -3553,7 +3553,7 @@ xfs_bmap_process_allocated_extent(
 {
 	ap->blkno = args->fsbno;
 	ap->length = args->len;
-	//pr_err("%s ap->blkno=%lld, length=%d\n", __func__, ap->blkno, ap->length);
+	pr_err("%s ap->blkno=%lld, length=%d\n", __func__, ap->blkno, ap->length);
 	/*
 	 * If the extent size hint is active, we tried to round the
 	 * caller's allocation request offset down to extsz and the
@@ -3586,7 +3586,7 @@ xfs_bmap_exact_minlen_extent_alloc(
 	args->alloc_minlen_only = 1;
 	args->minlen = args->maxlen = ap->minlen;
 	args->total = ap->total;
-	//pr_err("%s args->minlen=%d, maxlen=%d, total=%d\n", __func__, args->minlen, args->maxlen, args->total);
+	pr_err("%s args->minlen=%d, maxlen=%d, total=%d\n", __func__, args->minlen, args->maxlen, args->total);
 
 	/*
 	 * Unlike the longest extent available in an AG, we don't track
@@ -3671,8 +3671,8 @@ xfs_bmap_btalloc_at_eof(
 		args->alignment = stripe_align;
 		args->minlen = nextminlen;
 		args->minalignslop = 0;
-	//	pr_err("%s args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
-	//		__func__, args->minlen, args->maxlen, args->total, args->alignment);
+		pr_err("%s args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
+			__func__, args->minlen, args->maxlen, args->total, args->alignment);
 	} else {
 		/*
 		 * Adjust minlen to try and preserve alignment if we
@@ -3682,8 +3682,8 @@ xfs_bmap_btalloc_at_eof(
 		if (blen > args->alignment &&
 		    blen <= args->maxlen + args->alignment)
 			args->minlen = blen - args->alignment;
-	//	pr_err("%s2 args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
-	//		__func__, args->minlen, args->maxlen, args->total, args->alignment);
+		pr_err("%s2 args->minlen=%d, maxlen=%d, total=%d, alignment=%d\n",
+			__func__, args->minlen, args->maxlen, args->total, args->alignment);
 		args->minalignslop = 0;
 	}
 
@@ -3861,15 +3861,15 @@ xfs_bmap_btalloc(
 	orig_offset = ap->offset;
 	orig_length = ap->length;
 
-	//pr_err("%s orig_offset=%lld orig_length=%d ap->minleft=%d\n", __func__, orig_offset, orig_length, ap->minleft);
+	pr_err("%s orig_offset=%lld orig_length=%d ap->minleft=%d\n", __func__, orig_offset, orig_length, ap->minleft);
 	stripe_align = xfs_bmap_compute_alignments(ap, &args);
-	//pr_err("%s1 after calling xfs_bmap_compute_alignments stripe_align=%d args.alignment=%d\n",
-	//	__func__, stripe_align, args.alignment);
+	pr_err("%s1 after calling xfs_bmap_compute_alignments stripe_align=%d args.alignment=%d\n",
+		__func__, stripe_align, args.alignment);
 
 	/* Trim the allocation back to the maximum an AG can fit. */
 	args.maxlen = min(ap->length, mp->m_ag_max_usable);
-//	pr_err("%s2 args.maxlen=%d = min ap->length=%d mp->m_ag_max_usable=%d\n",
-//		__func__, args.maxlen, ap->length, mp->m_ag_max_usable);
+	pr_err("%s2 args.maxlen=%d = min ap->length=%d mp->m_ag_max_usable=%d\n",
+		__func__, args.maxlen, ap->length, mp->m_ag_max_usable);
 
 	if (unlikely(XFS_TEST_ERROR(false, mp,
 			XFS_ERRTAG_BMAP_ALLOC_MINLEN_EXTENT)))
@@ -3889,8 +3889,8 @@ xfs_bmap_btalloc(
 		ap->blkno = NULLFSBLOCK;
 		ap->length = 0;
 	}
-	//pr_err("%s10 ap->blkno=%lld, length=%d, offset=%lld, total=%d, length=%d\n",
-	//	__func__, ap->blkno, ap->length, ap->offset, ap->total, ap->length);
+	pr_err("%s10 ap->blkno=%lld, length=%d, offset=%lld, total=%d, length=%d\n",
+		__func__, ap->blkno, ap->length, ap->offset, ap->total, ap->length);
 	return 0;
 }
 #ifdef dsdsdd
@@ -3970,15 +3970,15 @@ xfs_bmapi_trim_map(
 	uint32_t		flags)
 {
 
-	///pr_err("%s mval=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) len=%lld obno=%lld end=%lld *bno=%lld\n", 
-	//	__func__, mval, mval->br_startoff, mval->br_startoff, mval->br_blockcount, len, obno, end, *bno);
-	//pr_err("%s0 got=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) flags=0x%x (CONVERT=%d, PREALLOC=%d, COWFORK=%d, ENTIRE=%d)\n", 
-	//	__func__, got, got->br_startoff, got->br_startoff, got->br_blockcount,
-	///	flags,
-	//	!!(flags & XFS_BMAPI_CONVERT),
-	//	!!(flags & XFS_BMAPI_PREALLOC),
-	//	!!(flags & XFS_BMAPI_COWFORK),
-	//	!!(flags & XFS_BMAPI_ENTIRE));
+	pr_err("%s mval=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) len=%lld obno=%lld end=%lld *bno=%lld\n", 
+		__func__, mval, mval->br_startoff, mval->br_startoff, mval->br_blockcount, len, obno, end, *bno);
+	pr_err("%s0 got=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) flags=0x%x (CONVERT=%d, PREALLOC=%d, COWFORK=%d, ENTIRE=%d)\n", 
+		__func__, got, got->br_startoff, got->br_startoff, got->br_blockcount,
+		flags,
+		!!(flags & XFS_BMAPI_CONVERT),
+		!!(flags & XFS_BMAPI_PREALLOC),
+		!!(flags & XFS_BMAPI_COWFORK),
+		!!(flags & XFS_BMAPI_ENTIRE));
 
 	if ((flags & XFS_BMAPI_ENTIRE) ||
 	    got->br_startoff + got->br_blockcount <= obno) {
@@ -4011,10 +4011,10 @@ xfs_bmapi_trim_map(
 			got->br_blockcount - (*bno - got->br_startoff));
 	mval->br_state = got->br_state;
 	ASSERT(mval->br_blockcount <= len);
-	//pr_err("%s10 mval=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) len=%lld obno=%lld end=%lld *bno=%lld\n", 
-	//	__func__, mval, mval->br_startoff, mval->br_startoff, mval->br_blockcount, len, obno, end, *bno);
-	//pr_err("%s10.0 got=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld)\n", 
-	//	__func__, got, got->br_startoff, got->br_startoff, got->br_blockcount);
+	pr_err("%s10 mval=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) len=%lld obno=%lld end=%lld *bno=%lld\n", 
+		__func__, mval, mval->br_startoff, mval->br_startoff, mval->br_blockcount, len, obno, end, *bno);
+	pr_err("%s10.0 got=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld)\n", 
+		__func__, got, got->br_startoff, got->br_startoff, got->br_blockcount);
 	return;
 }
 
@@ -4121,8 +4121,8 @@ xfs_bmapi_read(
 
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &icur, &got))
 		eof = true;
-	//pr_err("%s2 called xfs_iext_lookup_extent got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld eof=%d\n",
-	//		__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len, eof);
+	pr_err("%s2 called xfs_iext_lookup_extent got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld eof=%d\n",
+			__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len, eof);
 	end = bno + len;
 	obno = bno;
 
@@ -4132,8 +4132,8 @@ xfs_bmapi_read(
 			got.br_startoff = end;
 		if (got.br_startoff > bno) {
 			/* Reading in a hole.  */
-			//pr_err("%s4 Reading in a hole got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
-			//__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len);
+			pr_err("%s4 Reading in a hole got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+			__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len);
 			mval->br_startoff = bno;
 			mval->br_startblock = HOLESTARTBLOCK;
 			mval->br_blockcount =
@@ -4147,16 +4147,16 @@ xfs_bmapi_read(
 		}
 
 		/* set up the extent map to return. */
-	//	pr_err("%s5 calling xfs_bmapi_trim_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
-	//		__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
+		pr_err("%s5 calling xfs_bmapi_trim_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+			__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
 		xfs_bmapi_trim_map(mval, &got, &bno, len, obno, end, n, flags);
-	//	pr_err("%s5.1 called xfs_bmapi_trim_map got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
-	//		__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len);
-	//	pr_err("%s6 calling xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
-	//		__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
+		pr_err("%s5.1 called xfs_bmapi_trim_map got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+			__func__, &got, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state, bno, len);
+		pr_err("%s6 calling xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+			__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
 		xfs_bmapi_update_map(&mval, &bno, &len, obno, end, &n, flags);
-	//	pr_err("%s6.1 called xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
-	//		__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
+		pr_err("%s6.1 called xfs_bmapi_update_map mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d) bno=%lld len=%lld\n",
+			__func__, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, bno, len);
 
 		/* If we're done, stop now. */
 		if (bno >= end || n >= *nmap)
@@ -4346,9 +4346,9 @@ xfs_bmapi_allocate(
 	ASSERT(bma->length > 0);
 	ASSERT(bma->length <= XFS_MAX_BMBT_EXTLEN);
 
-	//pr_err("%s bma->offset=%lld, length=%d, blkno=%lld, minlen=%d, minleft=%d XFS_BMAPI_CONTIG set=%d\n",
-	//	__func__, bma->offset, bma->length, bma->blkno, bma->minlen, bma->minleft,
-	//	!!(bma->flags & XFS_BMAPI_CONTIG));
+	pr_err("%s bma->offset=%lld, length=%d, blkno=%lld, minlen=%d, minleft=%d XFS_BMAPI_CONTIG set=%d\n",
+		__func__, bma->offset, bma->length, bma->blkno, bma->minlen, bma->minleft,
+		!!(bma->flags & XFS_BMAPI_CONTIG));
 
 	if (bma->flags & XFS_BMAPI_CONTIG)
 		bma->minlen = bma->length;
@@ -4376,8 +4376,8 @@ xfs_bmapi_allocate(
 		}
 	}
 
-	//pr_err("%s1 bma->offset=%lld, length=%d, blkno=%lld, minlen=%d, minleft=%d calling xfs_bmap_btalloc\n",
-	//	__func__, bma->offset, bma->length, bma->blkno, bma->minlen, bma->minleft);
+	pr_err("%s1 bma->offset=%lld, length=%d, blkno=%lld, minlen=%d, minleft=%d calling xfs_bmap_btalloc\n",
+		__func__, bma->offset, bma->length, bma->blkno, bma->minlen, bma->minleft);
 
 	if ((bma->datatype & XFS_ALLOC_USERDATA) &&
 	    XFS_IS_REALTIME_INODE(bma->ip))
@@ -4455,8 +4455,8 @@ xfs_bmapi_convert_unwritten(
 	int			tmp_logflags = 0;
 	int			error;
 
-	//pr_err("%s len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-	//	__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
+	pr_err("%s len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+		__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
 
 	/* check if we need to do unwritten->real conversion */
 	if (mval->br_state == XFS_EXT_UNWRITTEN &&
@@ -4485,20 +4485,20 @@ xfs_bmapi_convert_unwritten(
 	 * if required.
 	 */
 	if (flags & XFS_BMAPI_ZERO) {
-	//	pr_err("%s3 XFS_BMAPI_ZERO len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-		//	__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
+		pr_err("%s3 XFS_BMAPI_ZERO len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
 		error = xfs_zero_extent(bma->ip, mval->br_startblock,
 					mval->br_blockcount);
 		if (error)
 			return error;
 	}
 
-//	pr_err("%s3 calling xfs_bmap_add_extent_unwritten_real len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-//			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
+	pr_err("%s3 calling xfs_bmap_add_extent_unwritten_real len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
 	error = xfs_bmap_add_extent_unwritten_real(bma->tp, bma->ip, whichfork,
 			&bma->icur, &bma->cur, mval, &tmp_logflags);
-//	pr_err("%s3.1 callled xfs_bmap_add_extent_unwritten_real len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-//			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
+	pr_err("%s3.1 callled xfs_bmap_add_extent_unwritten_real len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
 	/*
 	 * Log the inode core unconditionally in the unwritten extent conversion
 	 * path because the conversion might not have done so (e.g., if the
@@ -4520,15 +4520,15 @@ xfs_bmapi_convert_unwritten(
 	 * xfs_bmap_add_extent_unwritten_real might have merged it into one
 	 * of the neighbouring ones.
 	 */
-//	pr_err("%s4 calling xfs_iext_get_extent len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-//			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
-//	pr_err("%s4.1 &bma->got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-//			__func__, &bma->got, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount, bma->got.br_state);
+	pr_err("%s4 calling xfs_iext_get_extent len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
+	pr_err("%s4.1 &bma->got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+			__func__, &bma->got, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount, bma->got.br_state);
 	xfs_iext_get_extent(ifp, &bma->icur, &bma->got);
-//	pr_err("%s5.1 called xfs_iext_get_extent len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-//			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
-//	pr_err("%s5.1 &bma->got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
-//			__func__, &bma->got, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount, bma->got.br_state);
+	pr_err("%s5.1 called xfs_iext_get_extent len=%lld mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+			__func__, len, mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state);
+	pr_err("%s5.1 &bma->got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n", 
+			__func__, &bma->got, bma->got.br_startoff, bma->got.br_startblock, bma->got.br_blockcount, bma->got.br_state);
 
 	/*
 	 * We may have combined previously unwritten space with written space,
@@ -4621,7 +4621,7 @@ xfs_bmapi_write(
 	int			n;		/* current extent index */
 	xfs_fileoff_t		obno;		/* old block number (offset) */
 
-	#ifdef ddsdd
+
 	pr_err("%s bno=%lld len=%lld total=%d flags=0x%x (COWFORK=%d, CONVERT=%d, PREALLOC=%d, ZERO=%d, NALIGN=%d, ENTIRE=%d) mval=%pS (cmap when fill_cow_hole caller)\n",
 		__func__, bno, len, total,
 		flags,
@@ -4632,7 +4632,6 @@ xfs_bmapi_write(
 		!!(flags & XFS_BMAPI_NALIGN),
 		!!(flags & XFS_BMAPI_ENTIRE),
 		mval);
-	#endif
 
 #ifdef DEBUG
 	xfs_fileoff_t		orig_bno;	/* original block number value */
@@ -4685,8 +4684,8 @@ xfs_bmapi_write(
 
 	if (!xfs_iext_lookup_extent(ip, ifp, bno, &bma.icur, &bma.got))
 		eof = true;
-	//pr_err("%s1 after xfs_iext_lookup_extent bno=%lld eof=%d &bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
-	//	__func__, bno, eof, &bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_startblock, bma.got.br_state);
+	pr_err("%s1 after xfs_iext_lookup_extent bno=%lld eof=%d &bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+		__func__, bno, eof, &bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_startblock, bma.got.br_state);
 	if (!xfs_iext_peek_prev_extent(ifp, &bma.icur, &bma.prev))
 		bma.prev.br_startoff = NULLFILEOFF;
 	bma.minleft = xfs_bmapi_minleft(tp, ip, whichfork);
@@ -4698,8 +4697,8 @@ xfs_bmapi_write(
 		bool			need_alloc = false, wasdelay = false;
 
 		/* in hole or beyond EOF? */
-		//pr_err("%s1.1 in hole or beyond EOF? eof=%d OR bma.got.br_startoff(%lld) > bno (%lld)\n",
-		//	__func__, eof, bma.got.br_startoff, bno);
+		pr_err("%s1.1 in hole or beyond EOF? eof=%d OR bma.got.br_startoff(%lld) > bno (%lld)\n",
+			__func__, eof, bma.got.br_startoff, bno);
 		if (eof || bma.got.br_startoff > bno) {
 			/*
 			 * CoW fork conversions should /never/ hit EOF or
@@ -4734,7 +4733,7 @@ xfs_bmapi_write(
 			 * avoid overflows.
 			 */
 			bma.length = XFS_FILBLKS_MIN(len, XFS_MAX_BMBT_EXTLEN);
-			//pr_err("%s2 len=%lld bma.length=%d bno=%lld\n", __func__, len, bma.length, bno);
+			pr_err("%s2 len=%lld bma.length=%d bno=%lld\n", __func__, len, bma.length, bno);
 
 			if (wasdelay) {
 				bma.length = XFS_FILBLKS_MIN(bma.length,
@@ -4744,8 +4743,8 @@ xfs_bmapi_write(
 				if (!eof)
 					bma.length = XFS_FILBLKS_MIN(bma.length,
 						bma.got.br_startoff - bno);
-				//pr_err("%s2.1 len=%lld bma.length=%d bma.got.br_startoff=%lld bno=%lld\n",
-				//	__func__, len, bma.length, bma.got.br_startoff, bno);
+				pr_err("%s2.1 len=%lld bma.length=%d bma.got.br_startoff=%lld bno=%lld\n",
+					__func__, len, bma.length, bma.got.br_startoff, bno);
 			}
 
 			ASSERT(bma.length > 0);
@@ -4770,19 +4769,19 @@ xfs_bmapi_write(
 						bma.length);
 		}
 
-//		pr_err("%s3 calling xfs_bmapi_trim_map bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
-//			&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
-//			len, obno, end);
+		pr_err("%s3 calling xfs_bmapi_trim_map bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
+			&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
+			len, obno, end);
 		/* Deal with the allocated space we found.  */
 		xfs_bmapi_trim_map(mval, &bma.got, &bno, len, obno,
 							end, n, flags);
 
-	//	pr_err("%s4 calling xfs_bmapi_convert_unwritten bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
-	//		&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
-	//		len, obno, end);
-	///	pr_err("%s4.1 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
-	//		mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
-	//		len, obno, end);
+		pr_err("%s4 calling xfs_bmapi_convert_unwritten bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
+			&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
+			len, obno, end);
+		pr_err("%s4.1 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
+			mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
+			len, obno, end);
 		/* Execute unwritten extent conversion if necessary */
 		error = xfs_bmapi_convert_unwritten(&bma, mval, len, flags);
 		if (error == -EAGAIN)
@@ -4790,32 +4789,32 @@ xfs_bmapi_write(
 		if (error)
 			goto error0;
 
-		//pr_err("%s5 calling xfs_bmapi_update_map bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
-		//	&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
-		//	len, obno, end);
-	//	pr_err("%s5.1 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
-	//		mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
-	//		len, obno, end);
+		pr_err("%s5 calling xfs_bmapi_update_map bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
+			&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
+			len, obno, end);
+		pr_err("%s5.1 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
+			mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
+			len, obno, end);
 		/* update the extent map to return */
 		xfs_bmapi_update_map(&mval, &bno, &len, obno, end, &n, flags);
 
-	//	pr_err("%s6 called xfs_bmapi_update_map bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
-	//		&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
-	//		len, obno, end);
-	//	pr_err("%s6.1 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
-	//		mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
-	//		len, obno, end);
+		pr_err("%s6 called xfs_bmapi_update_map bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
+			&bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_blockcount, bma.got.br_state,
+			len, obno, end);
+		pr_err("%s6.1 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) len=%lld obno=%lld end=%lld\n", __func__,
+			mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state,
+			len, obno, end);
 		/*
 		 * If we're done, stop now.  Stop when we've allocated
 		 * XFS_BMAP_MAX_NMAP extents no matter what.  Otherwise
 		 * the transaction may get too big.
 		 */
 
-	//	pr_err("%s7 bno=%lld >= end=%lld n=%d >= *nmap=%d bma.nallocs=%d >= *nmap\n",
-	//		__func__, bno, end, n, *nmap, bma.nallocs);
+		pr_err("%s7 bno=%lld >= end=%lld n=%d >= *nmap=%d bma.nallocs=%d >= *nmap\n",
+			__func__, bno, end, n, *nmap, bma.nallocs);
 		if (bno >= end || n >= *nmap || bma.nallocs >= *nmap) {
-	//		pr_err("%s7.1 break bno=%lld end=%lld n=%d *nmap=%d bma.nallocs=%d\n",
-	//			__func__, bno, end, n, *nmap, bma.nallocs);
+			pr_err("%s7.1 break bno=%lld end=%lld n=%d *nmap=%d bma.nallocs=%d\n",
+				__func__, bno, end, n, *nmap, bma.nallocs);
 			break;
 		}
 
@@ -4824,8 +4823,8 @@ xfs_bmapi_write(
 		if (!xfs_iext_next_extent(ifp, &bma.icur, &bma.got))
 			eof = true;
 
-		//pr_err("%s8 bottom of loop bno=%lld eof=%d &bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
-		//	__func__, bno, eof, &bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_startblock, bma.got.br_state);
+		pr_err("%s8 bottom of loop bno=%lld eof=%d &bma.got=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+			__func__, bno, eof, &bma.got, bma.got.br_startoff, bma.got.br_startblock, bma.got.br_startblock, bma.got.br_state);
 	}
 
 	error = xfs_bmap_btree_to_extents(tp, ip, bma.cur, &bma.logflags,
@@ -4853,8 +4852,8 @@ xfs_bmapi_write(
 		return -ENOSR;
 	}
 	*nmap = n;
-	//pr_err("%s10 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) *nmap=%d\n", __func__,
-	//		mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, *nmap);
+	pr_err("%s10 mval=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, br_state=%d) *nmap=%d\n", __func__,
+			mval, mval->br_startoff, mval->br_startblock, mval->br_blockcount, mval->br_state, *nmap);
 	return 0;
 error0:
 	xfs_bmapi_finish(&bma, whichfork, error);
@@ -4890,10 +4889,10 @@ xfs_bmapi_convert_one_delalloc(
 	 * Space for the extent and indirect blocks was reserved when the
 	 * delalloc extent was created so there's no need to do so here.
 	 */
-	//pr_err("%s calling xfs_trans_alloc\n", __func__);
+	pr_err("%s calling xfs_trans_alloc\n", __func__);
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_write, 0, 0,
 				XFS_TRANS_RESERVE, &tp);
-	//pr_err("%s0 called xfs_trans_alloc tp=%pS\n", __func__, tp);
+	pr_err("%s0 called xfs_trans_alloc tp=%pS\n", __func__, tp);
 	if (error)
 		return error;
 
@@ -5706,7 +5705,7 @@ __xfs_bunmapi(
 
 	trace_xfs_bunmap(ip, start, len, flags, _RET_IP_);
 
-	//pr_err("%s start=%lld *rlen=%lld\n", __func__, start, *rlen);
+	pr_err("%s start=%lld *rlen=%lld\n", __func__, start, *rlen);
 
 	whichfork = xfs_bmapi_whichfork(flags);
 	ASSERT(whichfork != XFS_COW_FORK);
@@ -5988,7 +5987,7 @@ xfs_bunmapi(
 {
 	int			error;
 
-	//pr_err("%s bno=%lld len=%lld calling __xfs_bunmapi\n", __func__, bno, len);
+	pr_err("%s bno=%lld len=%lld calling __xfs_bunmapi\n", __func__, bno, len);
 	error = __xfs_bunmapi(tp, ip, bno, &len, flags, nexts);
 	*done = (len == 0);
 	return error;
@@ -6534,8 +6533,8 @@ xfs_bmap_map_extent(
 	int			whichfork,
 	struct xfs_bmbt_irec	*PREV)
 {
-	//pr_err("%s PREV=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) whichfork=%d\n", 
-	//	__func__, PREV, PREV->br_startoff, PREV->br_startoff, PREV->br_blockcount, whichfork);
+	pr_err("%s PREV=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) whichfork=%d\n", 
+		__func__, PREV, PREV->br_startoff, PREV->br_startoff, PREV->br_blockcount, whichfork);
 	__xfs_bmap_add(tp, XFS_BMAP_MAP, ip, whichfork, PREV);
 }
 
@@ -6547,8 +6546,8 @@ xfs_bmap_unmap_extent(
 	int			whichfork,
 	struct xfs_bmbt_irec	*PREV)
 {
-	//pr_err("%s PREV=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) whichfork=%d\n",
-	//	__func__, PREV, PREV->br_startoff, PREV->br_startoff, PREV->br_blockcount, whichfork);
+	pr_err("%s PREV=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld) whichfork=%d\n",
+		__func__, PREV, PREV->br_startoff, PREV->br_startoff, PREV->br_blockcount, whichfork);
 	__xfs_bmap_add(tp, XFS_BMAP_UNMAP, ip, whichfork, PREV);
 }
 
