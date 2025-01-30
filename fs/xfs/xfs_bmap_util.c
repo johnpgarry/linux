@@ -712,7 +712,6 @@ xfs_alloc_file_space(
 			rblocks = 0;
 		}
 
-		pr_err("%s calling xfs_trans_alloc_inode\n", __func__);
 		error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write,
 				dblocks, rblocks, false, &tp);
 		if (error)
@@ -732,7 +731,6 @@ xfs_alloc_file_space(
 		 * startoffset_fsb so that one of the following allocations
 		 * will eventually reach the requested range.
 		 */
-		pr_err("%s calling xfs_bmapi_write\n", __func__);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
 				allocatesize_fsb, XFS_BMAPI_PREALLOC, 0, imapp,
 				&nimaps);
@@ -772,7 +770,6 @@ xfs_unmap_extent(
 	uint			resblks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
 	int			error;
 
-	pr_err("%s calling xfs_trans_alloc_inode\n", __func__);
 	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write, resblks, 0,
 			false, &tp);
 	if (error)

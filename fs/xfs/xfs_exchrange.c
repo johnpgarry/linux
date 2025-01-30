@@ -204,8 +204,6 @@ xfs_exchrange_mappings(
 	bool				retried = false;
 	int				error;
 
-	pr_err("%s ip1=%pS ip2=%pS\n", __func__, ip1, ip2);
-
 	trace_xfs_exchrange_mappings(fxr, ip1, ip2);
 
 	if (fxr->flags & XFS_EXCHANGE_RANGE_TO_EOF)
@@ -617,18 +615,14 @@ xfs_exchrange_prep(
 	trace_xfs_exchrange_prep(fxr, ip1, ip2);
 
 	/* Verify both files are either real-time or non-realtime */
-	if (XFS_IS_REALTIME_INODE(ip1) != XFS_IS_REALTIME_INODE(ip2)) {
-		pr_err("%s ERROR XFS_IS_REALTIME_INODE\n", __func__);
+	if (XFS_IS_REALTIME_INODE(ip1) != XFS_IS_REALTIME_INODE(ip2))
 		return -EINVAL;
-	}
 
 	/* Check non-power of two alignment issues, if necessary. */
 	if (!is_power_of_2(alloc_unit)) {
 		error = xfs_exchrange_check_rtalign(fxr, ip1, ip2, alloc_unit);
-		if (error) {
-			pr_err("%s ERROR xfs_exchrange_check_rtalign\n", __func__);
+		if (error)
 			return error;
-		}
 
 		/*
 		 * Do the generic file-level checks with the regular block
@@ -638,44 +632,32 @@ xfs_exchrange_prep(
 	}
 
 	error = xfs_exchange_range_prep(fxr, alloc_unit);
-	if (error || fxr->length == 0) {
-		pr_err("%s ERROR xfs_exchange_range_prep error=%d fxr->length=%lld alloc_unit=%d\n", __func__, error, fxr->length, alloc_unit);
+	if (error || fxr->length == 0)
 		return error;
-	}
 
 	if (fxr->flags & __XFS_EXCHANGE_RANGE_CHECK_FRESH2) {
 		error = xfs_exchrange_check_freshness(fxr, ip2);
-		if (error) {
-			pr_err("%s ERROR xfs_exchrange_check_freshness\n", __func__);
+		if (error)
 			return error;
-		}
 	}
 
 	/* Attach dquots to both inodes before changing block maps. */
 	error = xfs_qm_dqattach(ip2);
-	if (error) {
-		pr_err("%s ERROR xfs_qm_dqattach\n", __func__);
+	if (error)
 		return error;
-	}
 	error = xfs_qm_dqattach(ip1);
-	if (error) {
-		pr_err("%s ERROR xfs_qm_dqattach\n", __func__);
+	if (error)
 		return error;
-	}
 
 	trace_xfs_exchrange_flush(fxr, ip1, ip2);
 
 	/* Flush the relevant ranges of both files. */
 	error = xfs_flush_unmap_range(ip2, fxr->file2_offset, fxr->length);
-	if (error) {
-		pr_err("%s ERROR xfs_flush_unmap_range\n", __func__);
+	if (error)
 		return error;
-	}
 	error = xfs_flush_unmap_range(ip1, fxr->file1_offset, fxr->length);
-	if (error) {
-		pr_err("%s ERROR xfs_flush_unmap_range\n", __func__);
+	if (error)
 		return error;
-	}
 
 	/*
 	 * Cancel CoW fork preallocations for the ranges of both files.  The
@@ -685,19 +667,15 @@ xfs_exchrange_prep(
 	if (xfs_inode_has_cow_data(ip1)) {
 		error = xfs_reflink_cancel_cow_range(ip1, fxr->file1_offset,
 				fxr->length, true);
-		if (error) {
-			pr_err("%s ERROR xfs_reflink_cancel_cow_range\n", __func__);
+		if (error)
 			return error;
-		}
 	}
 
 	if (xfs_inode_has_cow_data(ip2)) {
 		error = xfs_reflink_cancel_cow_range(ip2, fxr->file2_offset,
 				fxr->length, true);
-		if (error) {
-			pr_err("%s ERROR xfs_reflink_cancel_cow_range\n", __func__);
+		if (error)
 			return error;
-		}
 	}
 
 	return 0;
@@ -718,43 +696,29 @@ xfs_exchrange_contents(
 	struct xfs_mount	*mp = ip1->i_mount;
 	int			error;
 
-	if (!xfs_has_exchange_range(mp)) {
-		pr_err("%s ERROR !xfs_has_exchange_range\n", __func__);
+	if (!xfs_has_exchange_range(mp))
 		return -EOPNOTSUPP;
-	}
-
-	pr_err("%s ip1=%pS (reflink_inode=%d, always_cow_inode=%d) ip2=%pS (reflink_inode=%d, always_cow_inode=%d)\n",
-		__func__, ip1, xfs_is_reflink_inode(ip1), xfs_is_always_cow_inode(ip1),
-		ip2, xfs_is_reflink_inode(ip2), xfs_is_always_cow_inode(ip2));
 
 	if (fxr->flags & ~(XFS_EXCHANGE_RANGE_ALL_FLAGS |
-			   XFS_EXCHANGE_RANGE_PRIV_FLAGS)) {
-		pr_err("%s ERROR XFS_EXCHANGE_RANGE_ALL_FLAGS\n", __func__);
+			   XFS_EXCHANGE_RANGE_PRIV_FLAGS))
 		return -EINVAL;
-	}
 
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
 	/* Lock both files against IO */
 	error = xfs_ilock2_io_mmap(ip1, ip2);
-	if (error) {
-		pr_err("%s ERROR xfs_ilock2_io_mmap\n", __func__);
+	if (error)
 		goto out_err;
-	}
 
 	/* Prepare and then exchange file contents. */
 	error = xfs_exchrange_prep(fxr, ip1, ip2);
-	if (error) {
-		pr_err("%s ERROR xfs_exchrange_prep\n", __func__);
+	if (error)
 		goto out_unlock;
-	}
 
 	error = xfs_exchrange_mappings(fxr, ip1, ip2);
-	if (error) {
-		pr_err("%s ERROR xfs_exchrange_mappings\n", __func__);
+	if (error)
 		goto out_unlock;
-	}
 
 	/*
 	 * Finish the exchange by removing special file privileges like any
@@ -762,20 +726,14 @@ xfs_exchrange_contents(
 	 * logged xattrs if either file has security capabilities.
 	 */
 	error = xfs_exchange_range_finish(fxr);
-	if (error) {
-		pr_err("%s ERROR xfs_exchange_range_finish\n", __func__);
+	if (error)
 		goto out_unlock;
-	}
 
 out_unlock:
 	xfs_iunlock2_io_mmap(ip1, ip2);
 out_err:
 	if (error)
 		trace_xfs_exchrange_error(ip2, error, _RET_IP_);
-
-	pr_err("%s10 ip1=%pS (reflink_inode=%d, always_cow_inode=%d) ip2=%pS (reflink_inode=%d, always_cow_inode=%d)\n",
-		__func__, ip1, xfs_is_reflink_inode(ip1), xfs_is_always_cow_inode(ip1),
-		ip2, xfs_is_reflink_inode(ip2), xfs_is_always_cow_inode(ip2));
 	return error;
 }
 
@@ -856,55 +814,12 @@ xfs_ioc_exchange_range(
 	};
 	struct xfs_exchange_range	args;
 
-
 	if (copy_from_user(&args, argp, sizeof(args)))
 		return -EFAULT;
 	if (memchr_inv(&args.pad, 0, sizeof(args.pad)))
 		return -EINVAL;
 	if (args.flags & ~XFS_EXCHANGE_RANGE_ALL_FLAGS)
 		return -EINVAL;
-#ifdef sdsd
-
-
-#define XFS_EXCHANGE_RANGE_TO_EOF	(1ULL << 0)
-
-/* Flush all changes in file data and file metadata to disk before returning. */
-#define XFS_EXCHANGE_RANGE_DSYNC	(1ULL << 1)
-
-/* Dry run; do all the parameter verification but do not change anything. */
-#define XFS_EXCHANGE_RANGE_DRY_RUN	(1ULL << 2)
-
-/*
- * Exchange only the parts of the two files where the file allocation units
- * mapped to file1's range have been written to.  This can accelerate
- * scatter-gather atomic writes with a temp file if all writes are aligned to
- * the file allocation unit.
- */
-#define XFS_EXCHANGE_RANGE_FILE1_WRITTEN (1ULL << 3)
-
-#define XFS_EXCHANGE_RANGE_ALL_FLAGS	(XFS_EXCHANGE_RANGE_TO_EOF | \
-					 XFS_EXCHANGE_RANGE_DSYNC | \
-					 XFS_EXCHANGE_RANGE_DRY_RUN | \
-					 XFS_EXCHANGE_RANGE_FILE1_WRITTEN)
-
-
-struct xfs_exchange_range {
-	__s32		file1_fd;
-	__u32		pad;		/* must be zeroes */
-	__u64		file1_offset;	/* file1 offset, bytes */
-	__u64		file2_offset;	/* file2 offset, bytes */
-	__u64		length;		/* bytes to exchange */
-
-	__u64		flags;		/* see XFS_EXCHANGE_RANGE_* below */
-};
-#endif
-
-	pr_err("%s args.file1_fd=%d, .file1_offset=%lld, file2_offset=%lld, length=%lld, flags=0x%llx (TO_EOF=%d, DSYNC=%d DRY_RUN=%d FILE1_WRITTEN=%d)\n",
-		__func__, args.file1_fd, args.file1_offset, args.file2_offset, args.length, args.flags,
-		!!(args.flags & XFS_EXCHANGE_RANGE_TO_EOF),
-		!!(args.flags & XFS_EXCHANGE_RANGE_DSYNC),
-		!!(args.flags & XFS_EXCHANGE_RANGE_DRY_RUN),
-		!!(args.flags & XFS_EXCHANGE_RANGE_FILE1_WRITTEN));
 
 	fxr.file1_offset	= args.file1_offset;
 	fxr.file2_offset	= args.file2_offset;

@@ -255,7 +255,6 @@ xfs_trans_alloc(
 	bool			want_retry = true;
 	int			error;
 
-	pr_err_once("%s blocks=%d\n", __func__, blocks);
 	/*
 	 * Allocate the handle before we do our freeze accounting and setting up
 	 * GFP_NOFS allocation context so that we avoid lockdep false positives
@@ -308,7 +307,6 @@ retry:
 	trace_xfs_trans_alloc(tp, _RET_IP_);
 
 	*tpp = tp;
-	pr_err_once("%s10 return tp=%pS\n", __func__, tp);
 	return 0;
 }
 
@@ -382,11 +380,8 @@ xfs_trans_mod_sb(
 		 */
 		if (delta < 0) {
 			tp->t_blk_res_used += (uint)-delta;
-			if (tp->t_blk_res_used > tp->t_blk_res) {
-				pr_err("%s tp=%pS tp->t_blk_res_used=%d > tp->t_blk_res=%d\n",
-					__func__, tp, tp->t_blk_res_used, tp->t_blk_res);
+			if (tp->t_blk_res_used > tp->t_blk_res)
 				xfs_force_shutdown(mp, SHUTDOWN_CORRUPT_INCORE);
-			}
 		} else if (delta > 0 && (tp->t_flags & XFS_TRANS_RES_FDBLKS)) {
 			int64_t	blkres_delta;
 
@@ -948,7 +943,6 @@ xfs_trans_commit(
 	 * Finish deferred items on final commit. Only permanent transactions
 	 * should ever have deferred ops.
 	 */
-	pr_err_once("%s tp=%pS\n", __func__, tp);
 	WARN_ON_ONCE(!list_empty(&tp->t_dfops) &&
 		     !(tp->t_flags & XFS_TRANS_PERM_LOG_RES));
 	if (tp->t_flags & XFS_TRANS_PERM_LOG_RES) {
@@ -985,8 +979,6 @@ xfs_trans_cancel(
 	struct xfs_mount	*mp = tp->t_mountp;
 	struct xlog		*log = mp->m_log;
 	bool			dirty = (tp->t_flags & XFS_TRANS_DIRTY);
-
-	//pr_err("%s tp=%pS\n", __func__, tp);
 
 	trace_xfs_trans_cancel(tp, _RET_IP_);
 

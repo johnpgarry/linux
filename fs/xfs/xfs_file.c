@@ -538,7 +538,7 @@ xfs_dio_write_end_io(
 
 		_atomic_cowkk = atomic_inc_return(&atomic_cowkk);
 
-		if ((_atomic_cowkk % 1000) == 0)
+		if ((_atomic_cowkk % 10000) == 0)
 			pr_err("%s _atomic_cowkk=%d\n", __func__, _atomic_cowkk);
 		if (0) {
 		} else {
@@ -667,7 +667,7 @@ retry:
 		_nest = atomic_inc_return(&nest);
 		BUG_ON(_nest > 1);
 	}
-	
+
 	trace_xfs_file_direct_write(iocb, from);
 	if (use_cow)
 		dio_flags = IOMAP_DIO_ATOMIC_COW;

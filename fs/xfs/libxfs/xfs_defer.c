@@ -587,8 +587,6 @@ xfs_defer_finish_one(
 
 	trace_xfs_defer_pending_finish(tp->t_mountp, dfp);
 
-	//pr_err("%s tp=%pS dfp=%pS\n", __func__, tp, dfp);
-
 	xfs_defer_create_done(tp, dfp);
 	list_for_each_safe(li, n, &dfp->dfp_work) {
 		list_del(li);
@@ -684,15 +682,12 @@ xfs_defer_finish_noroll(
 
 		if (has_intents < 0) {
 			error = has_intents;
-			pr_err("%s1 error=%d\n", __func__, error);
 			goto out_shutdown;
 		}
 		if (has_intents || dfp) {
 			error = xfs_defer_trans_roll(tp);
-			if (error) {
-				pr_err("%s2 error=%d\n", __func__, error);
+			if (error)
 				goto out_shutdown;
-			}
 
 			/* Relog intent items to keep the log moving. */
 			xfs_defer_relog(tp, &dop_pending);
@@ -700,10 +695,8 @@ xfs_defer_finish_noroll(
 
 			if ((*tp)->t_flags & XFS_TRANS_DIRTY) {
 				error = xfs_defer_trans_roll(tp);
-				if (error) {
-					pr_err("%s3 error=%d\n", __func__, error);
+				if (error)
 					goto out_shutdown;
-				}
 			}
 		}
 
@@ -712,10 +705,8 @@ xfs_defer_finish_noroll(
 		if (!dfp)
 			break;
 		error = xfs_defer_finish_one(*tp, dfp);
-		if (error && error != -EAGAIN) {
-			pr_err("%s4 error=%d\n", __func__, error);
+		if (error && error != -EAGAIN)
 			goto out_shutdown;
-		}
 	}
 
 	/* Requeue the paused items in the outgoing transaction. */
@@ -865,7 +856,6 @@ xfs_defer_add(
 	if (!dfp || !xfs_defer_can_append(dfp, ops))
 		dfp = xfs_defer_alloc(&tp->t_dfops, ops);
 
-	//pr_err("%s calling xfs_defer_add_item tp=%pS dfp=%pS\n", __func__, tp, dfp);
 	xfs_defer_add_item(dfp, li);
 	trace_xfs_defer_add_item(tp->t_mountp, dfp, li);
 	return dfp;

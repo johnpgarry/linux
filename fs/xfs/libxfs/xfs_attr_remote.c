@@ -630,7 +630,6 @@ xfs_attr_rmtval_set_blk(
 	int error;
 
 	nmap = 1;
-	pr_err("%s calling xfs_bmapi_write\n", __func__);
 	error = xfs_bmapi_write(args->trans, dp,
 			(xfs_fileoff_t)attr->xattri_lblkno,
 			attr->xattri_blkcnt, XFS_BMAPI_ATTRFORK, args->total,

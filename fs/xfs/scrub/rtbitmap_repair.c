@@ -102,7 +102,6 @@ xrep_rtbitmap_data_mappings(
 
 		/* Make sure this block has a real zeroed extent mapped. */
 		nmaps = 1;
-		pr_err("%s calling xfs_bmapi_write\n", __func__);
 		error = xfs_bmapi_write(sc->tp, sc->ip, map.br_startoff,
 				map.br_blockcount,
 				XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO,

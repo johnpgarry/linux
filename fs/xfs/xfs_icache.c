@@ -1397,7 +1397,6 @@ xfs_inode_free_cowblocks(
 	bool			wait;
 	int			ret = 0;
 
-	pr_err("%s ip=%pS\n", __func__, ip);
 	wait = icw && (icw->icw_flags & XFS_ICWALK_FLAG_SYNC);
 
 	if (!xfs_iflags_test(ip, XFS_ICOWBLOCKS))

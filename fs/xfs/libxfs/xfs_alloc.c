@@ -445,8 +445,6 @@ xfs_alloc_fix_len(
 
 	ASSERT(args->mod < args->prod);
 	rlen = args->len;
-	pr_err_once("%s args->len=%d args->prod=%d, mod=%d, maxlen=%d, minlen=%d, maxlen=%d\n",
-		__func__, args->len, args->prod, args->mod, args->maxlen, args->minlen, args->maxlen);
 	ASSERT(rlen >= args->minlen);
 	ASSERT(rlen <= args->maxlen);
 	if (args->prod <= 1 || rlen < args->mod || rlen == args->maxlen ||
@@ -467,8 +465,6 @@ xfs_alloc_fix_len(
 	ASSERT(args->pag->pagf_freeblks + args->pag->pagf_flcount >=
 		rlen + args->minleft);
 	args->len = rlen;
-
-	pr_err_once("%s10 fixed args->len=%d\n", __func__, args->len);
 }
 
 /*
@@ -1058,7 +1054,6 @@ xfs_alloc_cur_check(
 		goto out;
 
 	args->len = XFS_EXTLEN_MIN(lena, args->maxlen);
-	pr_err_once("%s args->len=%d, maxlen=%d\n", __func__, args->len, args->maxlen);
 	xfs_alloc_fix_len(args);
 	ASSERT(args->len >= args->minlen);
 	if (args->len < acur->len)
@@ -1128,7 +1123,6 @@ xfs_alloc_cur_finish(
 
 	args->agbno = acur->bno;
 	args->len = acur->len;
-	pr_err_once("%s args->len=%d\n", __func__, args->len);
 	args->wasfromfl = 0;
 
 	trace_xfs_alloc_cur(args);
@@ -1394,7 +1388,6 @@ xfs_alloc_ag_vextent_exact(
 	 */
 	args->len = XFS_AGBLOCK_MIN(tend, args->agbno + args->maxlen)
 						- args->agbno;
-	pr_err_once("%s args->len=%d\n", __func__, args->len);
 	xfs_alloc_fix_len(args);
 	ASSERT(args->agbno + args->len <= tend);
 
@@ -1973,7 +1966,6 @@ restart:
 	 * Fix up the length.
 	 */
 	args->len = rlen;
-	pr_err_once("%s args->len=%d\n", __func__, args->len);
 	if (rlen < args->minlen) {
 		if (busy) {
 			/*
@@ -2016,7 +2008,6 @@ restart:
 	xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 	cnt_cur = bno_cur = NULL;
 	args->len = rlen;
-	pr_err_once("%s1 args->len=%d\n", __func__, args->len);
 	args->agbno = rbno;
 	if (XFS_IS_CORRUPT(args->mp,
 			   args->agbno + args->len >
@@ -3642,7 +3633,6 @@ xfs_alloc_vextent_finish(
 				args->agbno, args->len));
 	}
 
-	pr_err_once("%s calling xfs_ag_resv_alloc_extent\n", __func__);
 	xfs_ag_resv_alloc_extent(args->pag, args->resv, args);
 
 	XFS_STATS_INC(mp, xs_allocx);

@@ -945,36 +945,26 @@ xfs_iext_lookup_extent(
 	cur->leaf = xfs_iext_find_level(ifp, offset, 1);
 	if (!cur->leaf) {
 		cur->pos = 0;
-		pr_err_once("%s !cur->leaf, return false", __func__);
 		return false;
 	}
 
 	for (cur->pos = 0; cur->pos < xfs_iext_max_recs(ifp); cur->pos++) {
 		struct xfs_iext_rec *rec = cur_rec(cur);
 
-		if (xfs_iext_rec_is_empty(rec)) {
-			pr_err_once("%s1 after xfs_iext_rec_is_empty, break\n", __func__);
+		if (xfs_iext_rec_is_empty(rec))
 			break;
-		}
-		if (xfs_iext_rec_cmp(rec, offset) >= 0) {
-			pr_err_once("%s1.1 after xfs_iext_rec_cmp, goto found:\n", __func__);
+		if (xfs_iext_rec_cmp(rec, offset) >= 0)
 			goto found;
-		}
 	}
 
 	/* Try looking in the next node for an entry > offset */
-	if (ifp->if_height == 1 || !cur->leaf->next) {
-		pr_err_once("%s2 ifp->if_height == 1 || !cur->leaf->next, return false", __func__);
+	if (ifp->if_height == 1 || !cur->leaf->next)
 		return false;
-	}
 	cur->leaf = cur->leaf->next;
 	cur->pos = 0;
-	if (!xfs_iext_valid(ifp, cur)) {
-		pr_err_once("%s3 !xfs_iext_valid, return false", __func__);
+	if (!xfs_iext_valid(ifp, cur))
 		return false;
-	}
 found:
-	pr_err_once("%s9 found: return true\n", __func__);
 	xfs_iext_get(gotp, cur_rec(cur));
 	return true;
 }

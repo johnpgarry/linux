@@ -94,11 +94,8 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 	loff_t offset = iocb->ki_pos;
 	ssize_t ret = dio->error;
 
-	if (dops && dops->end_io) {
-	//	pr_err("%s calling dops->end_io=%pS dio->size=%lld\n", __func__,
-	//		dops->end_io, dio->size);
+	if (dops && dops->end_io)
 		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
-	}
 
 	if (likely(!ret)) {
 		ret = dio->size;
@@ -132,12 +129,8 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 		 * If this is a DSYNC write, make sure we push it to stable
 		 * storage now that we've written data.
 		 */
-	//	pr_err("%s2 IOMAP_DIO_NEED_SYNC set=%d\n", __func__, !!(dio->flags & IOMAP_DIO_NEED_SYNC));
-		if (dio->flags & IOMAP_DIO_NEED_SYNC) {
-	//		pr_err("%s3 calling generic_write_sync\n", __func__);
+		if (dio->flags & IOMAP_DIO_NEED_SYNC)
 			ret = generic_write_sync(iocb, ret);
-	//		pr_err("%s3.1 called generic_write_sync ret=%zd\n", __func__, ret);
-		}
 		if (ret > 0)
 			ret += dio->done_before;
 	}
@@ -176,9 +169,6 @@ void iomap_dio_bio_end_io(struct bio *bio)
 	bool should_dirty = (dio->flags & IOMAP_DIO_DIRTY);
 	struct kiocb *iocb = dio->iocb;
 
-//	if (bio->bi_opf & REQ_ATOMIC)
-//		pr_err("%s bio=%pS (bi_sector=%lld, bi_size=%d)\n", __func__,
-//			bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	if (bio->bi_status)
 		iomap_dio_set_error(dio, blk_status_to_errno(bio->bi_status));
 	if (!atomic_dec_and_test(&dio->ref))
@@ -358,7 +348,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	if (iomap->flags & IOMAP_F_SHARED) {
 		atomic_bio = false;
 		dio->flags |= IOMAP_DIO_COW;
-	} else if (iomap->flags & IOMAP_F_SHARED) {
+	} else if (atomic) {
 		atomic_bio = true;
 	}
 

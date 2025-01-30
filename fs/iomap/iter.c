@@ -45,8 +45,6 @@ static inline int iomap_iter_advance(struct iomap_iter *iter)
 
 static inline void iomap_iter_done(struct iomap_iter *iter)
 {
-	pr_err_once("%s iter->iomap.offset=%lld > iter->pos=%lld is bad, iter->iomap.length=%lld == 0 is bad\n",
-		__func__, iter->iomap.offset, iter->pos, iter->iomap.length);
 	WARN_ON_ONCE(iter->iomap.offset > iter->pos);
 	WARN_ON_ONCE(iter->iomap.length == 0);
 	WARN_ON_ONCE(iter->iomap.offset + iter->iomap.length <= iter->pos);
@@ -76,8 +74,6 @@ int iomap_iter(struct iomap_iter *iter, const struct iomap_ops *ops)
 {
 	int ret;
 
-	pr_err_once("%s iter->iomap.length=%lld ops->iomap_end=%pS\n",
-		__func__, iter->iomap.length, ops->iomap_end);
 	if (iter->iomap.length && ops->iomap_end) {
 		ret = ops->iomap_end(iter->inode, iter->pos, iomap_length(iter),
 				iter->processed > 0 ? iter->processed : 0,

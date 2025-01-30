@@ -33,21 +33,17 @@ xfs_aligned_fsb_count(
 	xfs_filblks_t		count_fsb,
 	xfs_extlen_t		extsz)
 {
-	pr_err_once("%s offset_fsb=%lld count_fsb=%lld extsz=%d\n", __func__, offset_fsb, count_fsb, extsz);
 	if (extsz) {
 		xfs_extlen_t	align;
 
 		div_u64_rem(offset_fsb, extsz, &align);
 		if (align)
 			count_fsb += align;
-		pr_err_once("%s1 after align to offset_fsb: count_fsb=%lld align=%d\n", __func__, count_fsb, extsz);
 		div_u64_rem(count_fsb, extsz, &align);
 		if (align)
 			count_fsb += extsz - align;
-		pr_err_once("%s2 after align to count_fsb: count_fsb=%lld align=%d\n", __func__, count_fsb, extsz);
 	}
 
-	pr_err_once("%s10 count_fsb=%lld\n", __func__, count_fsb);
 	return count_fsb;
 }
 

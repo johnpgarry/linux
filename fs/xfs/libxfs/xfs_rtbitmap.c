@@ -1338,7 +1338,6 @@ xfs_rtfile_alloc_blocks(
 	if (error)
 		goto out_trans_cancel;
 
-	pr_err("%s calling xfs_bmapi_write\n", __func__);
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 			XFS_BMAPI_METADATA, 0, map, &nmap);
 	if (error)
