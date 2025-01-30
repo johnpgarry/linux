@@ -1958,7 +1958,7 @@ xfs_rtallocate_align(
 	}
 
 	error = xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 1,
-			ap->eof, 0, ap->conv, &ap->offset, &ap->length);
+			ap->eof, 0, ap->conv, &ap->offset, &ap->length, false);
 	if (error)
 		return error;
 	ASSERT(ap->length);
