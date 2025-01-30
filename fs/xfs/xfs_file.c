@@ -533,6 +533,13 @@ xfs_dio_write_end_io(
 	nofs_flag = memalloc_nofs_save();
 
 	if (flags & IOMAP_DIO_COW) {
+		static atomic_t atomic_cowkk;
+		unsigned int _atomic_cowkk;
+
+		_atomic_cowkk = atomic_inc_return(&atomic_cowkk);
+
+		if ((_atomic_cowkk % 10000) == 0)
+			pr_err("%s _atomic_cowkk=%d\n", __func__, _atomic_cowkk);
 		if (0) {
 			pr_err("%s2 calling xfs_reflink_end_atomic_cow offset=%lld size=%zd atomic=%d\n",
 				__func__, offset, size, atomic);
