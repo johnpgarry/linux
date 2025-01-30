@@ -667,7 +667,7 @@ retry:
 	pr_err("%s3 calling iomap_dio_rw\n", __func__);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			&xfs_dio_write_ops, dio_flags, NULL, 0);
-	pr_err("%s3.1 called iomap_dio_rw ret=%zd\n", __func__, ret);
+	pr_err("%s3.1 called iomap_dio_rw ret=%zd use_cow=%d\n", __func__, ret, use_cow);
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) && !use_cow) {
 		xfs_iunlock(ip, iolock);

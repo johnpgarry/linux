@@ -517,6 +517,7 @@ xfs_do_force_shutdown(
 		"Please unmount the filesystem and rectify the problem(s)");
 	if (xfs_error_level >= XFS_ERRLEVEL_HIGH)
 		xfs_stack_trace();
+	panic("xfs_do_force_shutdown\n");
 }
 
 /*

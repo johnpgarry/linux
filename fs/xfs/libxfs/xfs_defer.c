@@ -684,12 +684,15 @@ xfs_defer_finish_noroll(
 
 		if (has_intents < 0) {
 			error = has_intents;
+			pr_err("%s1 error=%d\n", __func__, error);
 			goto out_shutdown;
 		}
 		if (has_intents || dfp) {
 			error = xfs_defer_trans_roll(tp);
-			if (error)
+			if (error) {
+				pr_err("%s2 error=%d\n", __func__, error);
 				goto out_shutdown;
+			}
 
 			/* Relog intent items to keep the log moving. */
 			xfs_defer_relog(tp, &dop_pending);
@@ -697,8 +700,10 @@ xfs_defer_finish_noroll(
 
 			if ((*tp)->t_flags & XFS_TRANS_DIRTY) {
 				error = xfs_defer_trans_roll(tp);
-				if (error)
+				if (error) {
+					pr_err("%s3 error=%d\n", __func__, error);
 					goto out_shutdown;
+				}
 			}
 		}
 
@@ -707,8 +712,10 @@ xfs_defer_finish_noroll(
 		if (!dfp)
 			break;
 		error = xfs_defer_finish_one(*tp, dfp);
-		if (error && error != -EAGAIN)
+		if (error && error != -EAGAIN) {
+			pr_err("%s4 error=%d\n", __func__, error);
 			goto out_shutdown;
+		}
 	}
 
 	/* Requeue the paused items in the outgoing transaction. */
