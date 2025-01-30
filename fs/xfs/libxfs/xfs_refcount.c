@@ -1402,10 +1402,12 @@ xfs_refcount_finish_one(
 		ri->ri_blockcount = 0;
 		break;
 	case XFS_REFCOUNT_FREE_COW:
-		pr_err("%s XFS_REFCOUNT_FREE_COW calling __xfs_refcount_cow_free\n", __func__);
+		//pr_err("%s XFS_REFCOUNT_FREE_COW calling __xfs_refcount_cow_free\n", __func__);
 		error = __xfs_refcount_cow_free(rcur, bno, ri->ri_blockcount);
-		if (error)
+		if (error) {
+			pr_err("%s ERROR\n", __func__);
 			return error;
+		}
 		ri->ri_blockcount = 0;
 		break;
 	default:
@@ -1430,8 +1432,8 @@ __xfs_refcount_add(
 	struct xfs_refcount_intent	*ri;
 
 
-	pr_err("%s tp=%pS startblock=%lld blockcount=%d\n",
-		__func__, tp, startblock, blockcount);
+//	pr_err("%s tp=%pS startblock=%lld blockcount=%d\n",
+//		__func__, tp, startblock, blockcount);
 	ri = kmem_cache_alloc(xfs_refcount_intent_cache,
 			GFP_KERNEL | __GFP_NOFAIL);
 	INIT_LIST_HEAD(&ri->ri_list);
@@ -1848,7 +1850,7 @@ xfs_refcount_free_cow_extent(
 {
 	struct xfs_mount		*mp = tp->t_mountp;
 
-	pr_err("%s fsb=%lld len=%d\n", __func__, fsb, len);
+	//pr_err("%s fsb=%lld len=%d\n", __func__, fsb, len);
 	if (!xfs_has_reflink(mp))
 		return;
 

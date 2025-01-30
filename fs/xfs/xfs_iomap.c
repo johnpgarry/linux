@@ -1085,19 +1085,19 @@ relock:
 	pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
 
 	if (flags & IOMAP_ATOMIC) {
-		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d need_alloc=%d\n",
+		pr_err_once("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d need_alloc=%d\n",
 			__func__,
 			offset_fsb, end_fsb,
 			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, need_alloc);
 		error = -EAGAIN;
 
 		if (need_alloc) {
-			pr_err("%s3.1 ATOMIC needs_alloc\n", __func__);
+			pr_err_once("%s3.1 ATOMIC needs_alloc\n", __func__);
 			goto out_unlock;
 		}
 
 		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
-			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
+			pr_err_once("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
 				__func__,
 				offset_fsb, end_fsb,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
@@ -1106,7 +1106,7 @@ relock:
 		}
 		
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
-			pr_err("%s3.3  ATOMIC !imap_spans_range\n", __func__);
+			pr_err_once("%s3.3  ATOMIC !imap_spans_range\n", __func__);
 			goto out_unlock;
 		}
 
@@ -1229,8 +1229,9 @@ out_found_cow:
 	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
 
 out_unlock:
-	//pr_err("%s10 out_unlock: error=%d\n",
-	//	__func__, error);
+	if (error)
+	pr_err("%s10 out_unlock: error=%d\n",
+			__func__, error);
 	if (lockmode)
 		xfs_iunlock(ip, lockmode);
 	return error;
