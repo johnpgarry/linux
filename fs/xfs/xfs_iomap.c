@@ -1063,8 +1063,8 @@ relock:
 			seq = xfs_iomap_inode_sequence(ip, 0);
 	//		pr_err("%s4.3.1 != HOLESTARTBLOCK calling xfs_bmbt_to_iomap length=%lld imap.br_startblock=%lld HOLESTARTBLOCK=%lld\n",
 	//			__func__, length, imap.br_startblock, HOLESTARTBLOCK);
-			pr_err("%s4.3.2 imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
-				__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+	//		pr_err("%s4.3.2 imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+	//			__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 			error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0, seq);
 			if (error)
 				goto out_unlock;
@@ -1073,8 +1073,8 @@ relock:
 		xfs_iunlock(ip, lockmode);
 	//	pr_err("%s4.4 != HOLESTARTBLOCK calling xfs_bmbt_to_iomap length=%lld imap.br_startblock=%lld HOLESTARTBLOCK=%lld\n",
 	//		__func__, length, imap.br_startblock, HOLESTARTBLOCK);
-		pr_err("%s4.5 imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
-			__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+		//pr_err("%s4.5 imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
+		//	__func__, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 		return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
 		
 	}
@@ -1082,7 +1082,7 @@ relock:
 
 	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
 
-	pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
+	//pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
 
 	if (flags & IOMAP_ATOMIC) {
 		pr_err_once("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d need_alloc=%d\n",
@@ -1229,8 +1229,8 @@ out_found_cow:
 	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
 
 out_unlock:
-	if (error)
-	pr_err("%s10 out_unlock: error=%d\n",
+	if (error && error != -EAGAIN)
+		pr_err("%s10 out_unlock: error=%d\n",
 			__func__, error);
 	if (lockmode)
 		xfs_iunlock(ip, lockmode);

@@ -686,7 +686,7 @@ out_unlock:
 	pr_err_once("%s9 out_unlock: ret=%zd\n", __func__, ret);
 	if (iolock)
 		xfs_iunlock(ip, iolock);
-	if (ret < 0)
+	if (ret < 0 && ret != -529)
 		pr_err("%s10 ret=%zd\n", __func__, ret);
 	return ret;
 }

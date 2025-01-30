@@ -986,7 +986,7 @@ xfs_trans_cancel(
 	struct xlog		*log = mp->m_log;
 	bool			dirty = (tp->t_flags & XFS_TRANS_DIRTY);
 
-	pr_err("%s tp=%pS\n", __func__, tp);
+	//pr_err("%s tp=%pS\n", __func__, tp);
 
 	trace_xfs_trans_cancel(tp, _RET_IP_);
 
