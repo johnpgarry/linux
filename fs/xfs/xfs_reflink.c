@@ -451,7 +451,7 @@ xfs_reflink_fill_cow_hole(
 	xfs_filblks_t br_blockcount;
 
 	if (atomic) {
-		bmapi_flags |= XFS_BMAPI_ATOMIC;
+		bmapi_flags |= XFS_BMAPI_NALIGN;
 	//	bmapi_flags |= XFS_BMAPI_ENTIRE;
 	}
 

@@ -3476,7 +3476,7 @@ xfs_bmap_compute_alignments(
 	struct xfs_mount	*mp = args->mp;
 	xfs_extlen_t		align = 0; /* minimum allocation alignment */
 	int			stripe_align = 0;
-	bool atomic = ap->flags & XFS_BMAPI_ATOMIC;
+	bool atomic = ap->flags & XFS_BMAPI_NALIGN;
 
 	pr_err("%s atomic=%d ap->total=%d, minlen=%d, minleft=%d, offset=%lld, length=%d XFS_BMAPI_COWFORK set=%d\n", __func__,
 		atomic, ap->total, ap->minlen, ap->minleft, ap->offset, ap->length,
@@ -3490,7 +3490,7 @@ xfs_bmap_compute_alignments(
 
 	if (atomic && 0) {
 		//align = ap->atomic_length;
-		pr_err("%s1.0 align=%d from XFS_BMAPI_ATOMIC\n", __func__, align);
+		pr_err("%s1.0 align=%d from XFS_BMAPI_NALIGN\n", __func__, align);
 
 	} else if (ap->flags & XFS_BMAPI_COWFORK) {
 		align = xfs_get_cowextsz_hint(ap->ip);
@@ -4622,14 +4622,14 @@ xfs_bmapi_write(
 	xfs_fileoff_t		obno;		/* old block number (offset) */
 
 
-	pr_err("%s bno=%lld len=%lld total=%d flags=0x%x (COWFORK=%d, CONVERT=%d, PREALLOC=%d, ZERO=%d, ATOMIC=%d, ENTIRE=%d) mval=%pS (cmap when fill_cow_hole caller)\n",
+	pr_err("%s bno=%lld len=%lld total=%d flags=0x%x (COWFORK=%d, CONVERT=%d, PREALLOC=%d, ZERO=%d, NALIGN=%d, ENTIRE=%d) mval=%pS (cmap when fill_cow_hole caller)\n",
 		__func__, bno, len, total,
 		flags,
 		!!(flags & XFS_BMAPI_COWFORK),
 		!!(flags & XFS_BMAPI_CONVERT),
 		!!(flags & XFS_BMAPI_PREALLOC),
 		!!(flags & XFS_BMAPI_ZERO),
-		!!(flags & XFS_BMAPI_ATOMIC),
+		!!(flags & XFS_BMAPI_NALIGN),
 		!!(flags & XFS_BMAPI_ENTIRE),
 		mval);
 

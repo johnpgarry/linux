@@ -317,7 +317,7 @@ xfs_iomap_write_direct(
 	}
 
 	if (flags & IOMAP_ATOMIC)
-		bmapi_flags |= XFS_BMAPI_ATOMIC;
+		bmapi_flags |= XFS_BMAPI_NALIGN;
 
 
 	pr_err("%s0 calling xfs_trans_alloc_inode offset_fsb=%lld count_fsb=%lld\n",
