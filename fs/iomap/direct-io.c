@@ -319,7 +319,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	int nr_pages, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
-	bool atomic_bio = true;
+	bool atomic_bio = false;
 #ifdef fdfdf
 	u64			addr; /* disk offset of mapping, bytes */
 	loff_t			offset;	/* file offset of mapping, bytes */
@@ -355,6 +355,8 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	if (iomap->flags & IOMAP_F_SHARED) {
 		atomic_bio = false;
 		dio->flags |= IOMAP_DIO_COW;
+	} else if (iomap->flags & IOMAP_F_SHARED) {
+		atomic_bio = true;
 	}
 
 	if (iomap->flags & IOMAP_F_NEW) {
