@@ -662,7 +662,7 @@ retry:
 	if (use_cow)
 		dio_flags = IOMAP_DIO_ATOMIC_COW;
 	else
-		dio_flags = 0;
+		dio_flags = IOMAP_DIO_OVERWRITE_ONLY;
 
 	pr_err("%s3 calling iomap_dio_rw\n", __func__);
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,

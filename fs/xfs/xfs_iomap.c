@@ -273,6 +273,7 @@ xfs_iomap_write_direct(
 	int			error;
 	int			bmapi_flags = XFS_BMAPI_PREALLOC;
 	int			nr_exts = XFS_IEXT_ADD_NOSPLIT_CNT;
+	bool atomic = flags & IOMAP_ATOMIC;
 
 	ASSERT(count_fsb > 0);
 
@@ -316,7 +317,7 @@ xfs_iomap_write_direct(
 		}
 	}
 
-	if (flags & IOMAP_ATOMIC)
+	if (atomic)
 		bmapi_flags |= XFS_BMAPI_NALIGN;
 
 
@@ -1043,7 +1044,7 @@ typedef struct xfs_bmbt_irec
 	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
 
 	pr_err("%s2.1 need_alloc=%d\n", __func__, need_alloc);
-	if (need_alloc && !(flags & IOMAP_ATOMIC))
+	if (need_alloc && !(IOMAP_ATOMIC_COW))
 		goto allocate_blocks;
 
 	/*
@@ -1065,16 +1066,6 @@ typedef struct xfs_bmbt_irec
 			__func__,
 			offset_fsb, end_fsb,
 			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
-			error = -EFAULT;
-			pr_err("%s3.1 ATOMIC !spans offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d\n",
-				__func__,
-				offset_fsb, end_fsb,
-				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-		//	WARN_ON_ONCE(1);
-			error = -EAGAIN;
-			goto out_unlock;
-		}
 
 		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
 			error = -EFAULT;
@@ -1155,8 +1146,10 @@ cont:
 
 allocate_blocks:
 	error = -EAGAIN;
-	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY))
+	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY)) {
+		pr_err("%s5.0 allocate_blocks: IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY set\n", __func__);
 		goto out_unlock;
+	}
 
 	/*
 	 * We cap the maximum length we map to a sane size  to keep the chunks
@@ -1176,7 +1169,7 @@ allocate_blocks:
 	else if (nimaps && imap.br_startblock == HOLESTARTBLOCK)
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
 	xfs_iunlock(ip, lockmode);
-	pr_err("%s5.0 atomic=%d allocate_blocks: offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d calling xfs_iomap_write_direct\n",
+	pr_err("%s5.0.1 atomic=%d allocate_blocks: offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d calling xfs_iomap_write_direct\n",
 			__func__, atomic,
 			offset_fsb, end_fsb,
 			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
