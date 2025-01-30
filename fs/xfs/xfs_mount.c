@@ -657,8 +657,6 @@ xfs_mp_compute_awu_max(
 	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
 	xfs_agblock_t		awu_max;
 
-	agsize = 67108864;
-
 	if (is_power_of_2(agsize) && 0) {
 		mp->awu_max = agsize;
 		pr_err("%s0 agsize=%d mp->awu_max=%d sb_agblklog=%d\n", __func__, agsize, mp->awu_max, mp->m_sb.sb_agblklog);
