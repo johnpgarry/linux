@@ -3454,6 +3454,12 @@ xfs_bmap_compute_alignments(
 		align = xfs_get_cowextsz_hint(ap->ip);
 	else if (ap->datatype & XFS_ALLOC_USERDATA)
 		align = xfs_get_extsz_hint(ap->ip);
+
+	if (align)
+		args->alignment = align;
+	else
+		args->alignment = 1;
+
 	if (align) {
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,
 					ap->eof, 0, ap->conv, &ap->offset,
@@ -3816,6 +3822,7 @@ xfs_bmap_btalloc(
 		ap->blkno = NULLFSBLOCK;
 		ap->length = 0;
 	}
+	pr_err("%s ap->blkno=%lld, length=%d\n", __func__, ap->blkno, ap->length);
 	return 0;
 }
 
