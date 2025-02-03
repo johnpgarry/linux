@@ -795,6 +795,12 @@ imap_spans_range(
 	return true;
 }
 
+static inline uint32_t xfs_mask32lo(int n)
+{
+	return ((uint32_t)1 << (n)) - 1;
+}
+
+
 static int
 xfs_direct_write_iomap_begin(
 	struct inode		*inode,
@@ -806,7 +812,7 @@ xfs_direct_write_iomap_begin(
 {
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_mount	*mp = ip->i_mount;
-	struct xfs_bmbt_irec	imap, cmap;
+	struct xfs_bmbt_irec	imap = {-69, -69, -69, -69}, cmap = {-69, -69, -69, -69};
 	xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_fileoff_t		end_fsb = xfs_iomap_end_fsb(mp, offset, length);
 	int			nimaps = 1, error = 0;
@@ -815,10 +821,40 @@ xfs_direct_write_iomap_begin(
 	unsigned int		lockmode;
 	u64			seq;
 
+	bool needs_cow;
+	bool need_alloc;
+	bool atomic = flags & IOMAP_ATOMIC;
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	struct block_device *target_bdev = target->bt_bdev;
+	unsigned int awu_max = bdev_atomic_write_unit_max_bytes(target_bdev);
+	__maybe_unused unsigned int awu_max_fsb = XFS_B_TO_FSB(mp, awu_max);
+	__maybe_unused unsigned int extsz = xfs_get_extsz_hint(ip);
+	unsigned int agno, agbno;
+	__maybe_unused xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
+
+
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
+	pr_err("%s ***** offset=%lld length=%lld offset_fsb=%lld end_fsb=%lld &cmap=%pS agsize=%d\n",
+		__func__, offset, length, offset_fsb, end_fsb, &cmap, agsize);
+	pr_err("%s0 srcmap=%pS (addr=%lld, offset=%lld, type=%d, flags=%d)\n",
+		__func__, srcmap, srcmap->addr, srcmap->offset, srcmap->type, srcmap->flags);
+	pr_err("%s0.1 iomap=%pS (addr=%lld, offset=%lld, type=%d, flags=%d)\n",
+		__func__, iomap, iomap->addr, iomap->offset, iomap->type, iomap->flags);
+	pr_err("%s0.2 flags=0x%x (UNSHARE=%d, ATOMIC=%d, ZERO=%d, ATOMIC_COW=%d, OVERWRITE_ONLY=%d)\n",
+		__func__, flags,
+		!!(flags & IOMAP_UNSHARE),
+		!!(flags & IOMAP_ATOMIC),
+		!!(flags & IOMAP_ZERO),
+		!!(flags & IOMAP_ATOMIC_COW),
+		!!(flags & IOMAP_OVERWRITE_ONLY));
 	if (xfs_is_shutdown(mp))
 		return -EIO;
+
+	if (flags & IOMAP_ATOMIC_COW) {
+	//	pr_err("%s bodge to return -EIO for IOMAP_ATOMIC_COW\n", __func__);
+	//	return -EIO;
+	}
 
 	/*
 	 * Writes that span EOF might trigger an IO size update on completion,
@@ -832,7 +868,7 @@ xfs_direct_write_iomap_begin(
 	 * COW writes may allocate delalloc space or convert unwritten COW
 	 * extents, so we need to make sure to take the lock exclusively here.
 	 */
-	if (xfs_is_cow_inode(ip))
+	if (xfs_is_cow_inode(ip) || atomic)
 		lockmode = XFS_ILOCK_EXCL;
 	else
 		lockmode = XFS_ILOCK_SHARED;
@@ -857,24 +893,94 @@ relock:
 	if (error)
 		goto out_unlock;
 
-	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
+	agno = XFS_FSB_TO_AGNO(mp, imap.br_startblock);
+	agbno = XFS_FSB_TO_AGBNO(mp, imap.br_startblock);
+
+
+	if (flags & IOMAP_ATOMIC_COW) {
+		BUG_ON(!atomic);
+		pr_err("%s4 atomic_try_cow: ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d &cmap=%pS\n",
+				__func__,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, &cmap);
+		error = xfs_reflink_allocate_cow_atomic(ip, &imap, &cmap,
+				&lockmode, flags & IOMAP_DIRECT);
+		pr_err("%s4.1 ATOMIC called xfs_reflink_allocate_cow error=%d imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d shared=%d br_startblock == HOLESTARTBLOCK=%d\n",
+				__func__, error,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, shared, !!(imap.br_startblock == HOLESTARTBLOCK));
+		pr_err("%s4.2 ATOMIC called xfs_reflink_allocate_cow cmap.startoff=%lld, startblock=%lld blockcount=%lld (0x%llx) state=%d isnullstartblock()=%d\n",
+					__func__,
+					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_blockcount, cmap.br_state, isnullstartblock(cmap.br_startblock));
+		if (error)
+			goto out_unlock;
+		if (shared) {
+			BUG();
+			goto out_found_cow;
+		}
+		end_fsb = imap.br_startoff + imap.br_blockcount;
+		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
+		pr_err("%s4.3 ATOMIC called end_fsb=%lld length=%lld ip->i_cowfp=%pS\n", __func__, end_fsb, length, ip->i_cowfp);
+		goto normal;
+	}
+
+
+	needs_cow = imap_needs_cow(ip, flags, &imap, nimaps);
+	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
+
+	pr_err("%s1 needs_cow=%d need_alloc=%d\n", __func__, needs_cow, need_alloc);
+
+	if (atomic) {
+		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d need_alloc=%d\n",
+			__func__,
+			offset_fsb, end_fsb,
+			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, need_alloc);
 		error = -EAGAIN;
+
+		if (need_alloc) {
+			pr_err_once("%s3.1 ATOMIC needs_alloc\n", __func__);
+			goto out_unlock;
+		}
+
+		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
+			pr_err("%s3.2 ATOMIC !IS_ALIGNED offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d awu_max_fsb=%d goto atomic_try_cow;\n",
+				__func__,
+				offset_fsb, end_fsb,
+				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state,
+				awu_max_fsb);
+			goto out_unlock;
+		}
+		
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
+			pr_err("%s3.3  ATOMIC !imap_spans_range\n", __func__);
+			goto out_unlock;
+		}
+	}
+
+	if (needs_cow) {
+		error = -EAGAIN;
+		pr_err("%s4 in needs_cow handling\n", __func__);
 		if (flags & IOMAP_NOWAIT)
 			goto out_unlock;
 
 		/* may drop and re-acquire the ilock */
+		pr_err("%s4.1 calling xfs_reflink_allocate_cow\n", __func__);
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
 				(flags & IOMAP_DIRECT) || IS_DAX(inode));
+		pr_err("%s4.2 called xfs_reflink_allocate_cow error=%d shared=%d\n", __func__, error, shared);
 		if (error)
 			goto out_unlock;
-		if (shared)
+		if (shared) {
+			if (atomic) {
+				error = -EAGAIN;
+				goto out_unlock;
+			}
 			goto out_found_cow;
+		}
 		end_fsb = imap.br_startoff + imap.br_blockcount;
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 	}
 
-	if (imap_needs_alloc(inode, flags, &imap, nimaps))
+	if (need_alloc)
 		goto allocate_blocks;
 
 	/*
@@ -902,13 +1008,19 @@ relock:
 			goto out_unlock;
 	}
 
+normal:
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
 	trace_xfs_iomap_found(ip, offset, length, XFS_DATA_FORK, &imap);
+	pr_err("%s4.9 calling xfs_bmbt_to_iomap length=%lld imap.startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, length,
+		imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
 
 allocate_blocks:
 	error = -EAGAIN;
+	pr_err("%s5 allocate_blocks:\n", __func__);
 	if (flags & (IOMAP_NOWAIT | IOMAP_OVERWRITE_ONLY))
 		goto out_unlock;
 
@@ -940,6 +1052,8 @@ allocate_blocks:
 				 iomap_flags | IOMAP_F_NEW, seq);
 
 out_found_cow:
+	pr_err("%s6 out_found_cow: cmap.startoff=%lld, startblock=%lld blockcount=%lld (0x%llx) state=%d isnullstartblock()=%d\n",
+		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_blockcount, cmap.br_state, isnullstartblock(cmap.br_startblock));
 	length = XFS_FSB_TO_B(mp, cmap.br_startoff + cmap.br_blockcount);
 	trace_xfs_iomap_found(ip, offset, length - offset, XFS_COW_FORK, &cmap);
 	if (imap.br_startblock != HOLESTARTBLOCK) {
