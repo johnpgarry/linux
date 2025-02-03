@@ -306,8 +306,20 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t copied = 0;
 	size_t orig_count;
 
-	if (atomic && length != iter->len)
+
+	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld, flags=0x%x (SHARED=%d, NEW=%d, DIRTY=%d) IOMAP_ATOMIC_COW set=%d\n",
+		__func__, pos, length, iomap->addr, iomap->offset, iomap->length,
+		iomap->flags,
+		!!(iomap->flags & IOMAP_F_SHARED),
+		!!(iomap->flags & IOMAP_F_NEW),
+		!!(iomap->flags & IOMAP_F_DIRTY),
+		!!(iter->flags & IOMAP_ATOMIC_COW));
+
+	if (atomic && (length != iter->len) && !(iter->flags & IOMAP_ATOMIC_COW)) {
+		pr_err("%s2 EINVAL length=%lld iter->len=%lld\n",
+				__func__, length, iter->len);
 		return -EINVAL;
+	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -319,6 +331,9 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	}
 
 	if (iomap->flags & IOMAP_F_SHARED)
+		dio->flags |= IOMAP_DIO_COW;
+		
+	if (iter->flags & IOMAP_ATOMIC_COW)
 		dio->flags |= IOMAP_DIO_COW;
 
 	if (iomap->flags & IOMAP_F_NEW) {

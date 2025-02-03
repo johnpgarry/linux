@@ -893,21 +893,24 @@ relock:
 	if (error)
 		goto out_unlock;
 
+	pr_err("%s0.3 after xfs_bmapi_read imap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+		__func__,
+		&imap, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 	agno = XFS_FSB_TO_AGNO(mp, imap.br_startblock);
 	agbno = XFS_FSB_TO_AGBNO(mp, imap.br_startblock);
 
 
 	if (flags & IOMAP_ATOMIC_COW) {
 		BUG_ON(!atomic);
-		pr_err("%s4 atomic_try_cow: ATOMIC calling xfs_reflink_allocate_cow imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d &cmap=%pS\n",
+		pr_err("%s4 atomic_try_cow: ATOMIC calling xfs_reflink_allocate_cow_atomic imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d &cmap=%pS\n",
 				__func__,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, &cmap);
 		error = xfs_reflink_allocate_cow_atomic(ip, &imap, &cmap,
 				&lockmode, flags & IOMAP_DIRECT);
-		pr_err("%s4.1 ATOMIC called xfs_reflink_allocate_cow error=%d imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d shared=%d br_startblock == HOLESTARTBLOCK=%d\n",
+		pr_err("%s4.1 ATOMIC called xfs_reflink_allocate_cow_atomic error=%d imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d shared=%d br_startblock == HOLESTARTBLOCK=%d\n",
 				__func__, error,
 				imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, shared, !!(imap.br_startblock == HOLESTARTBLOCK));
-		pr_err("%s4.2 ATOMIC called xfs_reflink_allocate_cow cmap.startoff=%lld, startblock=%lld blockcount=%lld (0x%llx) state=%d isnullstartblock()=%d\n",
+		pr_err("%s4.2 ATOMIC called xfs_reflink_allocate_cow_atomic cmap.startoff=%lld, startblock=%lld blockcount=%lld (0x%llx) state=%d isnullstartblock()=%d\n",
 					__func__,
 					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_blockcount, cmap.br_state, isnullstartblock(cmap.br_startblock));
 		if (error)
@@ -919,6 +922,7 @@ relock:
 		end_fsb = imap.br_startoff + imap.br_blockcount;
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 		pr_err("%s4.3 ATOMIC called end_fsb=%lld length=%lld ip->i_cowfp=%pS\n", __func__, end_fsb, length, ip->i_cowfp);
+
 		goto normal;
 	}
 
@@ -926,7 +930,7 @@ relock:
 	needs_cow = imap_needs_cow(ip, flags, &imap, nimaps);
 	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
 
-	pr_err("%s1 needs_cow=%d need_alloc=%d\n", __func__, needs_cow, need_alloc);
+	pr_err("%s1 atomic=%d needs_cow=%d need_alloc=%d\n", __func__, atomic, needs_cow, need_alloc);
 
 	if (atomic) {
 		pr_err("%s3 ATOMIC spans and aligned? offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d need_alloc=%d\n",
@@ -967,6 +971,10 @@ relock:
 				&lockmode,
 				(flags & IOMAP_DIRECT) || IS_DAX(inode));
 		pr_err("%s4.2 called xfs_reflink_allocate_cow error=%d shared=%d\n", __func__, error, shared);
+		pr_err("%s4.2.1 imap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+			__func__, &imap, imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+		pr_err("%s4.2.2 cmap=%pS (startoff=%lld, startblock=%lld, blockcount=%lld, state=%d)\n",
+			__func__, &cmap, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
 		if (error)
 			goto out_unlock;
 		if (shared) {
@@ -1041,6 +1049,10 @@ allocate_blocks:
 	else if (nimaps && imap.br_startblock == HOLESTARTBLOCK)
 		end_fsb = min(end_fsb, imap.br_startoff + imap.br_blockcount);
 	xfs_iunlock(ip, lockmode);
+	pr_err("%s5.0.1 atomic=%d allocate_blocks: offset_fsb=%lld end_fsb=%lld imap.startoff=%lld, startblock=%lld blockcount=%lld state=%d calling xfs_iomap_write_direct\n",
+			__func__, atomic,
+			offset_fsb, end_fsb,
+			imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 
 	error = xfs_iomap_write_direct(ip, offset_fsb, end_fsb - offset_fsb,
 			flags, &imap, &seq);

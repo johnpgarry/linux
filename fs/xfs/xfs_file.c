@@ -506,11 +506,12 @@ xfs_dio_write_end_io(
 
 	trace_xfs_end_io_direct_write(ip, offset, size);
 
-	pr_err("%s IOMAP_DIO_UNWRITTEN set=%d IOMAP_DIO_COW set=%d offset=%lld size=%zd atomic=%d\n",
+	pr_err("%s IOMAP_DIO_UNWRITTEN set=%d IOMAP_DIO_COW set=%d offset=%lld size=%zd atomic=%d error=%d\n",
 		__func__,
 		!!(flags & IOMAP_DIO_UNWRITTEN),
 		!!(flags & IOMAP_DIO_COW),
-		offset, size, atomic);
+		offset, size, atomic,
+		error);
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
@@ -583,6 +584,8 @@ xfs_dio_write_end_io(
 	}
 
 out:
+	if (error)
+		pr_err("%s error=%d\n", __func__, error);
 	memalloc_nofs_restore(nofs_flag);
 	return error;
 }
