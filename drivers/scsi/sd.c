@@ -3375,6 +3375,15 @@ config_atomic:
 		sdkp->max_atomic_with_boundary = get_unaligned_be32(&vpd->data[56]);
 		sdkp->max_atomic_boundary = get_unaligned_be32(&vpd->data[60]);
 
+		sdkp->max_atomic = 256;
+		sdkp->atomic_alignment = 2;
+		sdkp->atomic_granularity = 2;
+		sdkp->max_atomic_with_boundary = 256;
+		sdkp->max_atomic_boundary = 256;
+
+		pr_err("%s sdkp->max_atomic=%d, atomic_alignment=%d, atomic_granularity=%d, max_atomic_with_boundary=%d, max_atomic_boundary=%d\n",
+			__func__, sdkp->max_atomic, sdkp->atomic_alignment, sdkp->atomic_granularity, sdkp->max_atomic_with_boundary, sdkp->max_atomic_boundary);
+
 		sd_config_atomic(sdkp, lim);
 	}
 
