@@ -357,7 +357,7 @@ xfs_reflink_convert_cow(
  * is not shared we might have a preallocation for it in the COW fork. If so we
  * use it that rather than trigger a new allocation.
  */
-static int
+int
 xfs_find_trim_cow_extent(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
@@ -380,16 +380,19 @@ xfs_find_trim_cow_extent(
 	if (cmap->br_startoff > offset_fsb) {
 		xfs_trim_extent(imap, imap->br_startoff,
 				cmap->br_startoff - imap->br_startoff);
+		pr_err("%s calling xfs_bmap_trim_cow\n", __func__);
 		return xfs_bmap_trim_cow(ip, imap, shared);
 	}
 
 	*shared = true;
 	if (isnullstartblock(cmap->br_startblock)) {
+		pr_err("%s1 calling xfs_trim_extent as isnullstartblock(cmap->br_startblock)\n", __func__);
 		xfs_trim_extent(imap, cmap->br_startoff, cmap->br_blockcount);
 		return 0;
 	}
 
 	/* real extent found - no need to allocate */
+	pr_err("%s2 calling xfs_trim_extent real extent found - no need to allocate\n", __func__);
 	xfs_trim_extent(cmap, offset_fsb, count_fsb);
 	*found = true;
 	return 0;
@@ -574,69 +577,6 @@ out_trans_cancel:
 	return error;
 }
 
-
-/* Allocate all CoW reservations covering a range of blocks in a file. */
-int
-xfs_reflink_allocate_cow_atomic(
-	struct xfs_inode	*ip,
-	struct xfs_bmbt_irec	*imap,
-	struct xfs_bmbt_irec	*cmap,
-	uint			*lockmode,
-	bool			convert_now)
-{
-	int			error;
-	bool			found;
-	bool always_cow = false;
-	bool atomic = false;
-	bool shared = false;
-
-	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
-	
-	pr_err("%s ip=%pS (i_cowfp=%pS) imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d always_cow=%d atomic=%d cmap=%pS\n",
-		__func__, ip, ip->i_cowfp,
-		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, always_cow, atomic, cmap);
-	if (!ip->i_cowfp) {
-		ASSERT(!xfs_is_reflink_inode(ip));
-		xfs_ifork_init_cow(ip);
-	}
-
-	pr_err("%s0.1 ip=%pS (i_cowfp=%pS) maybe called xfs_ifork_init_cow and calling xfs_find_trim_cow_extent cmap=%pS\n",
-		__func__, ip, ip->i_cowfp, cmap);
-	error = xfs_find_trim_cow_extent(ip, imap, cmap, &shared, &found);
-	pr_err("%s0.2 called xfs_find_trim_cow_extent ip=%pS imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d found=%d shared=%d\n",
-		__func__, ip,
-		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, error, found, shared);
-	pr_err("%s0.2.1 ******** cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d) found=%d shared=%d\n",
-			__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state,
-			found, shared);
-	if (error || shared || found) {
-		pr_err("%s1.2 return error=%d || shared=%d || found=%d\n", __func__, error, shared, found);
-		return 0;
-	}
-
-	/*
-	 * CoW fork does not have an extent and data extent is shared.
-	 * Allocate a real extent in the CoW fork.
-	 */
-	if (cmap->br_startoff > imap->br_startoff) {
-		pr_err("%s3 calling xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld > imap->br_startoff=%lld\n",
-			__func__, ip, cmap->br_startoff, imap->br_startoff);
-		pr_err("%s3.0 CoW fork does not have an extent and data extent is shared. Allocate a real extent in the CoW fork.\n", __func__);
-		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, &shared,
-				lockmode, convert_now, true);
-
-		pr_err("%s3.1 called xfs_reflink_fill_cow_hole ip=%pS error=%d\n",
-			__func__, ip, error);
-		pr_err("%s3.2 called xfs_reflink_fill_cow_hole ip=%pS cmap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
-		__func__, ip, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
-		return error;
-	}
-
-	/* Shouldn't get here. */
-	ASSERT(0);
-	return -EFSCORRUPTED;
-}
-
 /* Allocate all CoW reservations covering a range of blocks in a file. */
 int
 xfs_reflink_allocate_cow(
@@ -645,18 +585,18 @@ xfs_reflink_allocate_cow(
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
 	uint			*lockmode,
-	bool			convert_now)
+	bool			convert_now,
+	bool 			atomic)
 {
 	int			error;
 	bool			found;
-	bool always_cow = false;
-	bool atomic = false;
+
 
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 	
-	pr_err("%s ip=%pS (i_cowfp=%pS) imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d always_cow=%d *shared=%d atomic=%d cmap=%pS\n",
+	pr_err("%s ip=%pS (i_cowfp=%pS) imap->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d *shared=%d atomic=%d cmap=%pS\n",
 		__func__, ip, ip->i_cowfp,
-		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, always_cow, *shared, atomic, cmap);
+		imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, *shared, atomic, cmap);
 	if (!ip->i_cowfp) {
 		ASSERT(!xfs_is_reflink_inode(ip));
 		xfs_ifork_init_cow(ip);
@@ -671,7 +611,7 @@ xfs_reflink_allocate_cow(
 	pr_err("%s0.2.1 ******** cmap=%pS (br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d) found=%d *shared=%d\n",
 			__func__, cmap, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state,
 			found, *shared);
-	if (error || !*shared) {
+	if (error || (!*shared && !atomic)) {
 		pr_err("%s1.2 return error=%d || !*shared=%d\n", __func__, error, *shared);
 		return error;
 	}
@@ -698,7 +638,7 @@ xfs_reflink_allocate_cow(
 			__func__, ip, cmap->br_startoff, imap->br_startoff);
 		pr_err("%s3.0 CoW fork does not have an extent and data extent is shared. Allocate a real extent in the CoW fork.\n", __func__);
 		error = xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
-				lockmode, convert_now, false);
+				lockmode, convert_now, atomic);
 
 		pr_err("%s3.1 called xfs_reflink_fill_cow_hole ip=%pS error=%d\n",
 			__func__, ip, error);
