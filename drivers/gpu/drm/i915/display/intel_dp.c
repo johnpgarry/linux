@@ -2512,12 +2512,13 @@ static void
 intel_dp_dsc_compute_pipe_bpp_limits(struct intel_dp *intel_dp,
 				     struct link_config_limits *limits)
 {
-	struct intel_display *display = to_intel_display(intel_dp);
-	int dsc_min_bpc = intel_dp_dsc_min_src_input_bpc();
-	int dsc_max_bpc = intel_dp_dsc_max_src_input_bpc(display);
+	//struct intel_display *display = to_intel_display(intel_dp);
+	//int dsc_min_bpc = intel_dp_dsc_min_src_input_bpc();
+	//int dsc_max_bpc = intel_dp_dsc_max_src_input_bpc(display);
 
-	limits->pipe.max_bpp = clamp(limits->pipe.max_bpp, dsc_min_bpc * 3, dsc_max_bpc * 3);
-	limits->pipe.min_bpp = clamp(limits->pipe.min_bpp, dsc_min_bpc * 3, dsc_max_bpc * 3);
+	//limits->pipe.max_bpp = clamp(limits->pipe.max_bpp, dsc_min_bpc * 3, dsc_max_bpc * 3);
+	//limits->pipe.min_bpp = clamp(limits->pipe.min_bpp, dsc_min_bpc * 3, dsc_max_bpc * 3);
+	BUG();
 }
 
 bool
