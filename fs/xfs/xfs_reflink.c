@@ -1043,57 +1043,63 @@ out_cancel:
 	return error;
 }
 
-
 /*
- * Remap part of the CoW fork into the data fork.
- *
- * We aim to remap the range starting at @offset_fsb and ending at @end_fsb
- * into the data fork; this function will remap what it can (at the end of the
- * range) and update @end_fsb appropriately.  Each remap gets its own
- * transaction because we can end up merging and splitting bmbt blocks for
- * every remap operation and we'd like to keep the block reservation
- * requirements as low as possible.
+ * Remap parts of a file's data fork after a successful CoW.
  */
-STATIC int
-__maybe_unused
-xfs_reflink_end_cow_extent_(
-	struct xfs_inode	*ip,
-	xfs_fileoff_t		*offset_fsb,
-	xfs_fileoff_t		end_fsb)
+int
+xfs_reflink_end_atomic_cow(
+	struct xfs_inode		*ip,
+	xfs_off_t			offset,
+	xfs_off_t			count)
 {
-	struct xfs_mount	*mp = ip->i_mount;
-	struct xfs_trans	*tp;
-	unsigned int		resblks;
-	int			error;
-	resblks = XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK);
-	pr_err("%s *offset_fsb=%lld end_fsb=%lld calling xfs_trans_alloc resblks=%d\n",
-		__func__, offset_fsb ? *offset_fsb : -1, end_fsb, resblks);
-	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_write, resblks, 0,
-			XFS_TRANS_RESERVE, &tp);
-	pr_err("%s0 called xfs_trans_alloc tp=%pS\n", __func__, tp);
-	if (error)
-		return error;
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	xfs_trans_ijoin(tp, ip, 0);
+	xfs_fileoff_t			offset_fsb;
+	xfs_fileoff_t			end_fsb;
+	int				error = 0;
 
-	error = xfs_reflink_end_cow_extent_locked(ip, offset_fsb, end_fsb, tp, NULL);
-	pr_err("%s1 called xfs_reflink_end_cow_extent_locked error=%d\n", __func__, error);
-	if (error)
-		goto out_cancel;
-	error = xfs_trans_commit(tp);
-	pr_err("%s2 called xfs_trans_commit error=%d, calling xfs_iunlock\n", __func__, error);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	pr_err("%s9 called xfs_iunlock, returning error=%d\n", __func__, error);
-	return error;
+	trace_xfs_reflink_end_cow(ip, offset, count);
 
-out_cancel:
-	pr_err("%s6 out_cancel: calling xfs_trans_cancel tp=%pS\n", __func__, tp);
-	xfs_trans_cancel(tp);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	pr_err("%s10 error=%d\n", __func__, error);
+	offset_fsb = XFS_B_TO_FSBT(ip->i_mount, offset);
+	end_fsb = XFS_B_TO_FSB(ip->i_mount, offset + count);
+
+	/*
+	 * Walk forwards until we've remapped the I/O range.  The loop function
+	 * repeatedly cycles the ILOCK to allocate one transaction per remapped
+	 * extent.
+	 *
+	 * If we're being called by writeback then the pages will still
+	 * have PageWriteback set, which prevents races with reflink remapping
+	 * and truncate.  Reflink remapping prevents races with writeback by
+	 * taking the iolock and mmaplock before flushing the pages and
+	 * remapping, which means there won't be any further writeback or page
+	 * cache dirtying until the reflink completes.
+	 *
+	 * We should never have two threads issuing writeback for the same file
+	 * region.  There are also have post-eof checks in the writeback
+	 * preparation code so that we don't bother writing out pages that are
+	 * about to be truncated.
+	 *
+	 * If we're being called as part of directio write completion, the dio
+	 * count is still elevated, which reflink and truncate will wait for.
+	 * Reflink remapping takes the iolock and mmaplock and waits for
+	 * pending dio to finish, which should prevent any directio until the
+	 * remap completes.  Multiple concurrent directio writes to the same
+	 * region are handled by end_cow processing only occurring for the
+	 * threads which succeed; the outcome of multiple overlapping direct
+	 * writes is not well defined anyway.
+	 *
+	 * It's possible that a buffered write and a direct write could collide
+	 * here (the buffered write stumbles in after the dio flushes and
+	 * invalidates the page cache and immediately queues writeback), but we
+	 * have never supported this 100%.  If either disk write succeeds the
+	 * blocks will be remapped.
+	 */
+	while (end_fsb > offset_fsb && !error)
+		error = xfs_reflink_end_cow_extent(ip, &offset_fsb, end_fsb);
+
+	if (error)
+		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
 	return error;
 }
-
 
 /*
  * Remap parts of a file's data fork after a successful CoW.

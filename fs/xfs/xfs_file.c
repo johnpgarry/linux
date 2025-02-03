@@ -540,7 +540,10 @@ xfs_dio_write_end_io(
 
 		if ((_atomic_cowkk % 10000) == 0)
 			pr_err("%s _atomic_cowkk=%d\n", __func__, _atomic_cowkk);
-		if (0) {
+		if (atomic) {
+			error = xfs_reflink_end_atomic_cow(ip, offset, size);
+			if (error)
+				goto out;
 		} else {
 			error = xfs_reflink_end_cow(ip, offset, size);
 			if (error)
