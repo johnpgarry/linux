@@ -3459,6 +3459,7 @@ xfs_bmap_compute_alignments(
 		args->alignment = align;
 	else
 		args->alignment = 1;
+	args->alignment = 1;
 
 	if (align) {
 		if (xfs_bmap_extsize_align(mp, &ap->got, &ap->prev, align, 0,

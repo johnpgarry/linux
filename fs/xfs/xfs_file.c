@@ -527,7 +527,7 @@ xfs_dio_write_end_io(
 	nofs_flag = memalloc_nofs_save();
 
 	if (flags & IOMAP_DIO_COW) {
-		if (iocb->ki_flags & IOCB_ATOMIC)
+		if (0)
 			error = xfs_reflink_end_atomic_cow(ip, offset, size);
 		else
 			error = xfs_reflink_end_cow(ip, offset, size);
