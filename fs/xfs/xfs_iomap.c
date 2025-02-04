@@ -809,9 +809,12 @@ xfs_direct_write_iomap_begin(
 	struct xfs_bmbt_irec	imap, cmap;
 	xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_fileoff_t		end_fsb = xfs_iomap_end_fsb(mp, offset, length);
+	bool			atomic = flags & IOMAP_ATOMIC;
 	int			nimaps = 1, error = 0;
 	bool			shared = false;
+	bool			found = false;
 	u16			iomap_flags = 0;
+	bool			need_alloc;
 	unsigned int		lockmode;
 	u64			seq;
 
@@ -832,7 +835,7 @@ xfs_direct_write_iomap_begin(
 	 * COW writes may allocate delalloc space or convert unwritten COW
 	 * extents, so we need to make sure to take the lock exclusively here.
 	 */
-	if (xfs_is_cow_inode(ip))
+	if (xfs_is_cow_inode(ip) || atomic)
 		lockmode = XFS_ILOCK_EXCL;
 	else
 		lockmode = XFS_ILOCK_SHARED;
@@ -857,12 +860,73 @@ relock:
 	if (error)
 		goto out_unlock;
 
+
+	if (flags & IOMAP_ATOMIC_COW) {
+		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
+				&lockmode,
+				(flags & IOMAP_DIRECT) || IS_DAX(inode), true);
+		if (error)
+			goto out_unlock;
+
+		end_fsb = imap.br_startoff + imap.br_blockcount;
+		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
+
+		if (imap.br_startblock != HOLESTARTBLOCK) {
+			seq = xfs_iomap_inode_sequence(ip, 0);
+
+			error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags,
+				iomap_flags | IOMAP_F_ATOMIC_COW, seq);
+			if (error)
+				goto out_unlock;
+		}
+		seq = xfs_iomap_inode_sequence(ip, 0);
+		xfs_iunlock(ip, lockmode);
+		return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags,
+					iomap_flags | IOMAP_F_ATOMIC_COW, seq);
+	}
+
+	need_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
+
+	if (atomic) {
+		/* Use CoW-based method if any of the following fail */
+		error = -EAGAIN;
+
+		/*
+		 * Lazily use CoW-based method for initial alloc of data.
+		 * Check br_blockcount for FSes which do not support atomic
+		 * writes > 1x block.
+		 */
+		if (need_alloc && imap.br_blockcount > 1)
+			goto out_unlock;
+
+		/* Misaligned start block wrt size */
+		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount))
+			goto out_unlock;
+
+		/* Discontiguous or mixed extents */
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
+			goto out_unlock;
+	}
+
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;
 		if (flags & IOMAP_NOWAIT)
 			goto out_unlock;
 
+		if (atomic) {
+			/* Detect whether we're already covered in a cow fork */
+			error  = xfs_find_trim_cow_extent(ip, &imap, &cmap, &shared, &found);
+			if (error)
+				goto out_unlock;
+
+			if (shared) {
+				error = -EAGAIN;
+				goto out_unlock;
+			}
+		}
+
 		/* may drop and re-acquire the ilock */
+		shared = false;
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode,
 				(flags & IOMAP_DIRECT) || IS_DAX(inode), false);
@@ -874,7 +938,7 @@ relock:
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 	}
 
-	if (imap_needs_alloc(inode, flags, &imap, nimaps))
+	if (need_alloc)
 		goto allocate_blocks;
 
 	/*
