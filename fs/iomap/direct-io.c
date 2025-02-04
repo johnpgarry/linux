@@ -271,7 +271,7 @@ static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
  * clearing the WRITE_THROUGH flag in the dio request.
  */
 static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
-		const struct iomap *iomap, bool use_fua, bool atomic)
+		const struct iomap *iomap, bool use_fua, bool atomic_bio)
 {
 	blk_opf_t opflags = REQ_SYNC | REQ_IDLE;
 
@@ -283,7 +283,7 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 		opflags |= REQ_FUA;
 	else
 		dio->flags &= ~IOMAP_DIO_WRITE_THROUGH;
-	if (atomic)
+	if (atomic_bio)
 		opflags |= REQ_ATOMIC;
 
 	return opflags;
@@ -301,13 +301,19 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	blk_opf_t bio_opf;
 	struct bio *bio;
 	bool need_zeroout = false;
+	bool atomic_bio = false;
 	bool use_fua = false;
 	int nr_pages, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
 
-	if (atomic && length != iter->len)
-		return -EINVAL;
+	if (atomic) {
+		if (!(iomap->flags & IOMAP_F_ATOMIC_COW)) {
+			if (length != iter->len)
+				return -EINVAL;
+			atomic_bio = true;
+		}
+	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
 	    !bdev_iter_is_aligned(iomap->bdev, dio->submit.iter))
@@ -318,7 +324,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		need_zeroout = true;
 	}
 
-	if (iomap->flags & IOMAP_F_SHARED)
+	if (iomap->flags & (IOMAP_F_SHARED | IOMAP_F_ATOMIC_COW))
 		dio->flags |= IOMAP_DIO_COW;
 
 	if (iomap->flags & IOMAP_F_NEW) {
@@ -383,7 +389,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			goto out;
 	}
 
-	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, atomic);
+	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, atomic_bio);
 
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
 	do {
@@ -416,7 +422,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		n = bio->bi_iter.bi_size;
-		if (WARN_ON_ONCE(atomic && n != length)) {
+		if (WARN_ON_ONCE(atomic_bio && n != length)) {
 			/*
 			 * This bio should have covered the complete length,
 			 * which it doesn't, so error. We may need to zero out
@@ -638,6 +644,9 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		 */
 		if (iocb->ki_flags & IOCB_DIO_CALLER_COMP)
 			dio->flags |= IOMAP_DIO_CALLER_COMP;
+
+		if (dio_flags & IOMAP_DIO_ATOMIC_COW)
+			iomi.flags |= IOMAP_ATOMIC_COW;
 
 		if (dio_flags & IOMAP_DIO_OVERWRITE_ONLY) {
 			ret = -EAGAIN;
