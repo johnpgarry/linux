@@ -906,6 +906,9 @@ relock:
 		/* Discontiguous or mixed extents */
 		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
 			goto out_unlock;
+		
+		/* bodge to always do CoW based */
+		goto out_unlock;
 	}
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {

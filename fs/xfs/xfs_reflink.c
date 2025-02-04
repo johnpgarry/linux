@@ -949,6 +949,8 @@ xfs_reflink_end_cow(
 	xfs_fileoff_t			offset_fsb;
 	xfs_fileoff_t			end_fsb;
 	int				error = 0;
+	unsigned int jjcount = 0;
+	static atomic_t prints;
 
 	trace_xfs_reflink_end_cow(ip, offset, count);
 
@@ -987,8 +989,16 @@ xfs_reflink_end_cow(
 	 * have never supported this 100%.  If either disk write succeeds the
 	 * blocks will be remapped.
 	 */
-	while (end_fsb > offset_fsb && !error)
+	while (end_fsb > offset_fsb && !error) {
 		error = xfs_reflink_end_cow_extent(ip, &offset_fsb, end_fsb);
+		jjcount++;
+		if (jjcount > 1) {
+			unsigned int _prints = atomic_inc_return(&prints);
+			mdelay(25);
+			if ((_prints % 100) == 0)
+				pr_err("%s jjcount=%d _prints=%d\n", __func__, jjcount, _prints);
+		}
+	}
 
 	if (error)
 		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
@@ -1007,6 +1017,8 @@ xfs_reflink_end_atomic_cow(
 	struct xfs_trans		*tp;
 	unsigned int			resblks;
 	bool				commit = false;
+	unsigned int jjcount = 0;
+	static atomic_t prints;
 
 	trace_xfs_reflink_end_cow(ip, offset, count);
 
@@ -1025,9 +1037,16 @@ xfs_reflink_end_atomic_cow(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, 0);
 
-	while (end_fsb > offset_fsb && !error)
+	while (end_fsb > offset_fsb && !error) {
 		error = xfs_reflink_end_cow_extent_locked(ip, &offset_fsb,
 						end_fsb, tp, &commit);
+		jjcount++;
+		if (jjcount > 1) {
+			unsigned int _prints = atomic_inc_return(&prints);
+			if ((_prints % 100) == 0)
+				pr_err("%s jjcount=%d _prints=%d\n", __func__, jjcount, _prints);
+		}
+	}
 
 	if (error || !commit)
 		goto out_cancel;
