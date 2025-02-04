@@ -937,6 +937,8 @@ xfs_reflink_end_cow_extent(
 	return error;
 }
 
+extern int sysctl_xfs_reflink_delay;
+
 /*
  * Remap parts of a file's data fork after a successful CoW.
  */
@@ -994,9 +996,10 @@ xfs_reflink_end_cow(
 		jjcount++;
 		if (jjcount > 1) {
 			unsigned int _prints = atomic_inc_return(&prints);
-			mdelay(25);
+			if (sysctl_xfs_reflink_delay)
+				mdelay(sysctl_xfs_reflink_delay);
 			if ((_prints % 100) == 0)
-				pr_err("%s jjcount=%d _prints=%d\n", __func__, jjcount, _prints);
+				pr_err("%s jjcount=%d _prints=%d sysctl_xfs_reflink_delay=%d\n", __func__, jjcount, _prints, sysctl_xfs_reflink_delay);
 		}
 	}
 
@@ -1043,8 +1046,10 @@ xfs_reflink_end_atomic_cow(
 		jjcount++;
 		if (jjcount > 1) {
 			unsigned int _prints = atomic_inc_return(&prints);
+			if (sysctl_xfs_reflink_delay)
+				mdelay(sysctl_xfs_reflink_delay);
 			if ((_prints % 100) == 0)
-				pr_err("%s jjcount=%d _prints=%d\n", __func__, jjcount, _prints);
+				pr_err("%s jjcount=%d _prints=%d sysctl_xfs_reflink_delay=%d\n", __func__, jjcount, _prints, sysctl_xfs_reflink_delay);
 		}
 	}
 
