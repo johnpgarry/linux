@@ -271,7 +271,7 @@ static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
  * clearing the WRITE_THROUGH flag in the dio request.
  */
 static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
-		const struct iomap *iomap, bool use_fua, bool atomic)
+		const struct iomap *iomap, bool use_fua, bool atomic_bio)
 {
 	blk_opf_t opflags = REQ_SYNC | REQ_IDLE;
 
@@ -283,7 +283,7 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 		opflags |= REQ_FUA;
 	else
 		dio->flags &= ~IOMAP_DIO_WRITE_THROUGH;
-	if (atomic)
+	if (atomic_bio)
 		opflags |= REQ_ATOMIC;
 
 	return opflags;
@@ -302,23 +302,29 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	struct bio *bio;
 	bool need_zeroout = false;
 	bool use_fua = false;
+	bool atomic_bio = false;
 	int nr_pages, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
 
 
-	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld, flags=0x%x (SHARED=%d, NEW=%d, DIRTY=%d) IOMAP_ATOMIC_COW set=%d\n",
+	pr_err("%s pos=%lld length=%lld iomap->addr=%lld, offset=%lld, length=%lld, flags=0x%x (SHARED=%d, NEW=%d, DIRTY=%d, ATOMIC_COW=%d)\n",
 		__func__, pos, length, iomap->addr, iomap->offset, iomap->length,
 		iomap->flags,
 		!!(iomap->flags & IOMAP_F_SHARED),
 		!!(iomap->flags & IOMAP_F_NEW),
 		!!(iomap->flags & IOMAP_F_DIRTY),
-		!!(iter->flags & IOMAP_ATOMIC_COW));
+		!!(iomap->flags & IOMAP_F_ATOMIC_COW));
 
-	if (atomic && (length != iter->len) && !(iter->flags & IOMAP_ATOMIC_COW)) {
-		pr_err("%s2 EINVAL length=%lld iter->len=%lld\n",
-				__func__, length, iter->len);
-		return -EINVAL;
+	if (atomic) {
+		if (!(iomap->flags & IOMAP_F_ATOMIC_COW)) {
+			if (length != iter->len) {
+				pr_err("%s2 EINVAL length=%lld iter->len=%lld\n",
+					__func__, length, iter->len);
+				return -EINVAL;
+			}
+			atomic_bio = true;
+		}
 	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
@@ -330,10 +336,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		need_zeroout = true;
 	}
 
-	if (iomap->flags & IOMAP_F_SHARED)
-		dio->flags |= IOMAP_DIO_COW;
-		
-	if (iter->flags & IOMAP_ATOMIC_COW)
+	if (iomap->flags & (IOMAP_F_SHARED | IOMAP_F_ATOMIC_COW))
 		dio->flags |= IOMAP_DIO_COW;
 
 	if (iomap->flags & IOMAP_F_NEW) {
@@ -398,7 +401,11 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			goto out;
 	}
 
-	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, atomic);
+	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, atomic_bio);
+
+	if (atomic)
+		pr_err("%s3 atomic_bio=%d IOMAP_F_ATOMIC_COW set=%d\n",
+			__func__, atomic_bio, !!(iomap->flags & IOMAP_F_ATOMIC_COW));
 
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
 	do {
@@ -431,7 +438,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 		}
 
 		n = bio->bi_iter.bi_size;
-		if (WARN_ON_ONCE(atomic && n != length)) {
+		if (WARN_ON_ONCE(atomic_bio && n != length)) {
 			/*
 			 * This bio should have covered the complete length,
 			 * which it doesn't, so error. We may need to zero out

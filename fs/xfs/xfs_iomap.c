@@ -929,7 +929,7 @@ relock:
 			seq = xfs_iomap_inode_sequence(ip, 0);
 			pr_err("%s4.3 ATOMIC calling xfs_bmbt_to_iomap with imap end_fsb=%lld length=%lld ip->i_cowfp=%pS\n",
 				__func__, end_fsb, length, ip->i_cowfp);
-			error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, iomap_flags, seq);
+			error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, iomap_flags | IOMAP_F_ATOMIC_COW, seq);
 			if (error)
 				goto out_unlock;
 		}
@@ -937,7 +937,7 @@ relock:
 		xfs_iunlock(ip, lockmode);
 		pr_err("%s4.4 ATOMIC calling xfs_bmbt_to_iomap with cmap end_fsb=%lld length=%lld ip->i_cowfp=%pS\n",
 				__func__, end_fsb, length, ip->i_cowfp);
-		return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, iomap_flags, seq);
+		return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, iomap_flags | IOMAP_F_ATOMIC_COW, seq);
 	}
 
 
@@ -971,6 +971,9 @@ relock:
 			pr_err("%s3.3  ATOMIC !imap_spans_range\n", __func__);
 			goto out_unlock;
 		}
+		
+		/* bodge to always do CoW based */
+		goto out_unlock;
 	}
 
 	if (needs_cow) {
