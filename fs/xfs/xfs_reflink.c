@@ -357,7 +357,7 @@ xfs_reflink_convert_cow(
  * is not shared we might have a preallocation for it in the COW fork. If so we
  * use it that rather than trigger a new allocation.
  */
-static int
+int
 xfs_find_trim_cow_extent(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
