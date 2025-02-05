@@ -271,7 +271,7 @@ static int iomap_dio_zero(const struct iomap_iter *iter, struct iomap_dio *dio,
  * clearing the WRITE_THROUGH flag in the dio request.
  */
 static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
-		const struct iomap *iomap, bool use_fua, bool atomic_bio)
+		const struct iomap *iomap, bool use_fua, bool atomic, bool atomic_bio)
 {
 	blk_opf_t opflags = REQ_SYNC | REQ_IDLE;
 
@@ -285,6 +285,8 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 		dio->flags &= ~IOMAP_DIO_WRITE_THROUGH;
 	if (atomic_bio)
 		opflags |= REQ_ATOMIC;
+	else if (atomic)
+		opflags |= REQ_FUA;
 
 	return opflags;
 }
@@ -389,7 +391,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 			goto out;
 	}
 
-	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, atomic_bio);
+	bio_opf = iomap_dio_bio_opflags(dio, iomap, use_fua, atomic, atomic_bio);
 
 	nr_pages = bio_iov_vecs_to_alloc(dio->submit.iter, BIO_MAX_VECS);
 	do {
