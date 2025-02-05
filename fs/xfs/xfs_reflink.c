@@ -1019,7 +1019,6 @@ xfs_reflink_end_atomic_cow(
 	struct xfs_mount		*mp = ip->i_mount;
 	struct xfs_trans		*tp;
 	unsigned int			resblks;
-	bool				commit = false;
 	unsigned int jjcount = 0;
 	static atomic_t prints;
 
@@ -1041,19 +1040,27 @@ xfs_reflink_end_atomic_cow(
 	xfs_trans_ijoin(tp, ip, 0);
 
 	while (end_fsb > offset_fsb && !error) {
+		bool				commit = false;
+
 		error = xfs_reflink_end_cow_extent_locked(ip, &offset_fsb,
 						end_fsb, tp, &commit);
+
 		jjcount++;
 		if (jjcount > 1) {
 			unsigned int _prints = atomic_inc_return(&prints);
 			if (sysctl_xfs_reflink_delay)
 				mdelay(sysctl_xfs_reflink_delay);
 			if ((_prints % 100) == 0)
-				pr_err("%s jjcount=%d _prints=%d sysctl_xfs_reflink_delay=%d\n", __func__, jjcount, _prints, sysctl_xfs_reflink_delay);
+				pr_err("%s1 jjcount=%d _prints=%d sysctl_xfs_reflink_delay=%d\n", __func__, jjcount, _prints, sysctl_xfs_reflink_delay);
+		}
+		if (!commit) {
+			pr_err("%s2 did not commit\n", __func__);
+			error = -EIO;
+			break;
 		}
 	}
 
-	if (error || !commit)
+	if (error)
 		goto out_cancel;
 
 	if (error)
