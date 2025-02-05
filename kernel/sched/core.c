@@ -4613,6 +4613,50 @@ static int xfs_reflink_delay(const struct ctl_table *table, int write,
 	return err;
 }
 
+int sysctl_xfs_reflink_cow_crash_before;
+static int xfs_reflink_cow_crash_before(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_reflink_cow_crash_before;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_reflink_cow_crash_before = state;
+	}
+	return err;
+}
+
+int sysctl_xfs_reflink_cow_crash_middle;
+static int xfs_reflink_cow_crash_middle(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_reflink_cow_crash_middle;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_reflink_cow_crash_middle = state;
+	}
+	return err;
+}
+
 int sysctl_xfs_reflink_atomic_cow = 1;
 static int xfs_reflink_atomic_cow(const struct ctl_table *table, int write,
 			  void *buffer, size_t *lenp, loff_t *ppos)
@@ -4761,6 +4805,24 @@ static const struct ctl_table sched_core_sysctls[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= xfs_reflink_atomic_cow,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+	},
+	{
+		.procname	= "xfs_reflink_cow_crash_before",
+		.data		= NULL, /* filled in by handler */
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= xfs_reflink_cow_crash_before,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+	},
+	{
+		.procname	= "xfs_reflink_cow_crash_middle",
+		.data		= NULL, /* filled in by handler */
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= xfs_reflink_cow_crash_middle,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_ONE,
 	},

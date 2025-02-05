@@ -1007,6 +1007,11 @@ xfs_reflink_end_cow(
 		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
 	return error;
 }
+
+
+extern int sysctl_xfs_reflink_cow_crash_before;
+extern int sysctl_xfs_reflink_cow_crash_middle;
+
 int
 xfs_reflink_end_atomic_cow(
 	struct xfs_inode		*ip,
@@ -1039,6 +1044,9 @@ xfs_reflink_end_atomic_cow(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, 0);
 
+	if (sysctl_xfs_reflink_cow_crash_before)
+		panic("sysctl_xfs_reflink_cow_crash_before\n");
+
 	while (end_fsb > offset_fsb && !error) {
 		bool				commit = false;
 
@@ -1048,6 +1056,11 @@ xfs_reflink_end_atomic_cow(
 		jjcount++;
 		if (jjcount > 1) {
 			unsigned int _prints = atomic_inc_return(&prints);
+
+
+			if (sysctl_xfs_reflink_cow_crash_middle)
+				panic("sysctl_xfs_reflink_cow_crash_middle\n");
+
 			if (sysctl_xfs_reflink_delay)
 				mdelay(sysctl_xfs_reflink_delay);
 			if ((_prints % 100) == 0)
