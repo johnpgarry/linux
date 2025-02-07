@@ -937,6 +937,8 @@ xfs_reflink_end_cow_extent(
 	return error;
 }
 
+extern int sysctl_xfs_reflink_delay;
+
 /*
  * Remap parts of a file's data fork after a successful CoW.
  */
@@ -987,13 +989,21 @@ xfs_reflink_end_cow(
 	 * have never supported this 100%.  If either disk write succeeds the
 	 * blocks will be remapped.
 	 */
-	while (end_fsb > offset_fsb && !error)
+	while (end_fsb > offset_fsb && !error) {
 		error = xfs_reflink_end_cow_extent(ip, &offset_fsb, end_fsb);
+		if (sysctl_xfs_reflink_delay)
+			mdelay(sysctl_xfs_reflink_delay);
+	}
 
 	if (error)
 		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
 	return error;
 }
+
+
+extern int sysctl_xfs_reflink_cow_crash_before;
+extern int sysctl_xfs_reflink_cow_crash_middle;
+
 int
 xfs_reflink_end_atomic_cow(
 	struct xfs_inode		*ip,
@@ -1006,7 +1016,6 @@ xfs_reflink_end_atomic_cow(
 	struct xfs_mount		*mp = ip->i_mount;
 	struct xfs_trans		*tp;
 	unsigned int			resblks;
-	bool				commit = false;
 
 	trace_xfs_reflink_end_cow(ip, offset, count);
 
@@ -1016,7 +1025,6 @@ xfs_reflink_end_atomic_cow(
 	resblks = XFS_NEXTENTADD_SPACE_RES(ip->i_mount,
 				(unsigned int)(end_fsb - offset_fsb),
 				XFS_DATA_FORK);
-
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_write, resblks, 0,
 			XFS_TRANS_RESERVE, &tp);
 	if (error)
@@ -1025,11 +1033,28 @@ xfs_reflink_end_atomic_cow(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, 0);
 
-	while (end_fsb > offset_fsb && !error)
+	if (sysctl_xfs_reflink_cow_crash_before)
+		panic("sysctl_xfs_reflink_cow_crash_before\n");
+
+	while (end_fsb > offset_fsb && !error) {
+		bool				commit = false;
+
 		error = xfs_reflink_end_cow_extent_locked(ip, &offset_fsb,
 						end_fsb, tp, &commit);
 
-	if (error || !commit)
+		if (sysctl_xfs_reflink_cow_crash_middle)
+			panic("sysctl_xfs_reflink_cow_crash_middle\n");
+
+		if (sysctl_xfs_reflink_delay)
+			mdelay(sysctl_xfs_reflink_delay);
+		if (!commit) {
+		//	pr_err("%s2 did not commit\n", __func__);
+		//	error = -EIO;
+		//	break;
+		}
+	}
+
+	if (error)
 		goto out_cancel;
 
 	if (error)
