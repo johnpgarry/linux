@@ -87,8 +87,7 @@ static int panel_bridge_attach(struct drm_bridge *bridge,
 					  bridge->encoder);
 
 #if IS_REACHABLE(CONFIG_BACKLIGHT_CLASS_DEVICE)
-	backlight_set_display_name(panel_bridge->panel->backlight,
-				   panel_bridge->connector.name);
+
 #endif
 
 	if (bridge->dev->registered) {
