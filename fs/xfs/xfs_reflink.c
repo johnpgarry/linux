@@ -813,8 +813,8 @@ xfs_reflink_end_cow_extent_locked(
 	 */
 	if (!xfs_iext_lookup_extent(ip, ifp, *offset_fsb, &icur, &got) ||
 	    got.br_startoff >= end_fsb) {
-//		*offset_fsb = end_fsb;
-//		return 0;
+		*offset_fsb = end_fsb;
+		return 0;
 	}
 
 	/*
@@ -827,8 +827,8 @@ xfs_reflink_end_cow_extent_locked(
 	while (!xfs_bmap_is_written_extent(&got)) {
 		if (!xfs_iext_next_extent(ifp, &icur, &got) ||
 		    got.br_startoff >= end_fsb) {
-//			*offset_fsb = end_fsb;
-//			return 0;
+			*offset_fsb = end_fsb;
+			return 0;
 		}
 	}
 	del = got;
@@ -1049,7 +1049,7 @@ xfs_reflink_end_atomic_cow(
 		if (sysctl_xfs_reflink_delay)
 			mdelay(sysctl_xfs_reflink_delay);
 		if (!commit) {
-			pr_err("%s2 did not commit offset_fsb=%lld (orig=%lld) end_fsb=%lld\n",
+			pr_err_once("%s2 did not commit offset_fsb=%lld (orig=%lld) end_fsb=%lld\n",
 				__func__, offset_fsb, offset_fsb_orig, end_fsb);
 		//	error = -EIO;
 		//	break;
