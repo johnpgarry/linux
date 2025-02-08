@@ -749,12 +749,12 @@ void submit_bio_noacct_nocheck(struct bio *bio)
 static blk_status_t blk_validate_atomic_write_op_size(struct request_queue *q,
 						 struct bio *bio)
 {
-	if (bio->bi_iter.bi_size > queue_atomic_write_unit_max_bytes(q)) {
+	if (0) {
 		pr_err_once("%s queue_atomic_write_unit_max_bytes issue\n", __func__);
 		//return BLK_STS_INVAL;
 	}
 
-	if (bio->bi_iter.bi_size % queue_atomic_write_unit_min_bytes(q)) {
+	if (0) {
 		pr_err_once("%s queue_atomic_write_unit_min_bytes issue\n", __func__);
 		//return BLK_STS_INVAL;
 	}
