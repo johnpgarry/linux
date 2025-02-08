@@ -313,6 +313,7 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 				return -EINVAL;
 			atomic_bio = true;
 		}
+		use_fua = true;
 	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
