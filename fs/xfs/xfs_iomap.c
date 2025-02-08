@@ -918,7 +918,7 @@ relock:
 			pr_err("%s !imap_spans_range, use CoW\n", __func__);
 			goto out_unlock;
 		}
-
+	//	BUG();
 	}
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
