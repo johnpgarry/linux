@@ -795,6 +795,7 @@ imap_spans_range(
 	return true;
 }
 
+extern int sysctl_xfs_use_cow_atomic_always;
 static int
 xfs_direct_write_iomap_begin(
 	struct inode		*inode,
@@ -891,24 +892,33 @@ relock:
 		/* Use CoW-based method if any of the following fail */
 		error = -EAGAIN;
 
+		if (sysctl_xfs_use_cow_atomic_always) {
+			pr_err_once("%s bodge to always use software-fallback atomic writes\n", __func__);
+			goto out_unlock;
+		}
+
 		/*
 		 * Lazily use CoW-based method for initial alloc of data.
 		 * Check br_blockcount for FSes which do not support atomic
 		 * writes > 1x block.
 		 */
-		if (need_alloc && imap.br_blockcount > 1)
+		if (need_alloc && imap.br_blockcount > 1) {
+			pr_err("%s need_alloc && imap.br_blockcount, use CoW\n", __func__);
 			goto out_unlock;
+		}
 
 		/* Misaligned start block wrt size */
-		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount))
+		if (!IS_ALIGNED(imap.br_startblock, imap.br_blockcount)) {
+			pr_err("%s !IS_ALIGNED, use CoW\n", __func__);
 			goto out_unlock;
+		}
 
 		/* Discontiguous or mixed extents */
-		if (!imap_spans_range(&imap, offset_fsb, end_fsb))
+		if (!imap_spans_range(&imap, offset_fsb, end_fsb)) {
+			pr_err("%s !imap_spans_range, use CoW\n", __func__);
 			goto out_unlock;
+		}
 
-		pr_err_once("%s bodge to always use software-fallback atomic writes\n", __func__);
-		goto out_unlock;
 	}
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
