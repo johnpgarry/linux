@@ -227,6 +227,8 @@ xfs_ilock_iocb_for_write(
 	return 0;
 }
 
+atomic_t atomic_writing;
+
 STATIC ssize_t
 xfs_file_dio_read(
 	struct kiocb		*iocb,
@@ -242,9 +244,11 @@ xfs_file_dio_read(
 
 	file_accessed(iocb->ki_filp);
 
+
 	ret = xfs_ilock_iocb(iocb, XFS_IOLOCK_SHARED);
 	if (ret)
 		return ret;
+	BUG_ON(atomic_read(&atomic_writing));
 	ret = iomap_dio_rw(iocb, to, &xfs_read_iomap_ops, NULL, 0, NULL, 0);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
@@ -624,6 +628,7 @@ out_unlock:
 	return ret;
 }
 
+
 static noinline ssize_t
 xfs_file_dio_write_atomic(
 	struct xfs_inode	*ip,
@@ -634,6 +639,7 @@ xfs_file_dio_write_atomic(
 	bool			use_cow = false;
 	unsigned int		dio_flags;
 	ssize_t			ret;
+	unsigned int _atomic_writing;
 
 retry:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
@@ -649,7 +655,12 @@ retry:
 			iov_iter_count(from));
 		if (ret)
 			goto out_unlock;
+		_atomic_writing = atomic_inc_return(&atomic_writing);
+
+		BUG_ON(_atomic_writing > 1);
 	}
+
+
 
 	trace_xfs_file_direct_write(iocb, from);
 	if (use_cow)
@@ -659,6 +670,9 @@ retry:
 
 	ret = iomap_dio_rw(iocb, from, &xfs_direct_write_iomap_ops,
 			&xfs_dio_write_ops, dio_flags, NULL, 0);
+
+	if (use_cow)
+		atomic_dec(&atomic_writing);
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) && !use_cow) {
 		xfs_iunlock(ip, iolock);
