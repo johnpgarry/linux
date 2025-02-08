@@ -587,12 +587,12 @@ static inline unsigned int blk_rq_get_max_sectors(struct request *rq,
 	struct request_queue *q = rq->q;
 	struct queue_limits *lim = &q->limits;
 	unsigned int max_sectors, boundary_sectors;
-	bool is_atomic = rq->cmd_flags & REQ_ATOMIC;
+	__maybe_unused bool is_atomic = rq->cmd_flags & REQ_ATOMIC;
 
 	if (blk_rq_is_passthrough(rq))
 		return q->limits.max_hw_sectors;
 
-	boundary_sectors = blk_boundary_sectors(lim, is_atomic);
+	boundary_sectors = blk_boundary_sectors(lim, false);
 	max_sectors = blk_queue_get_max_sectors(rq);
 
 	if (!boundary_sectors ||
