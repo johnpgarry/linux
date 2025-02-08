@@ -813,8 +813,8 @@ xfs_reflink_end_cow_extent_locked(
 	 */
 	if (!xfs_iext_lookup_extent(ip, ifp, *offset_fsb, &icur, &got) ||
 	    got.br_startoff >= end_fsb) {
-		*offset_fsb = end_fsb;
-		return 0;
+//		*offset_fsb = end_fsb;
+//		return 0;
 	}
 
 	/*
@@ -827,8 +827,8 @@ xfs_reflink_end_cow_extent_locked(
 	while (!xfs_bmap_is_written_extent(&got)) {
 		if (!xfs_iext_next_extent(ifp, &icur, &got) ||
 		    got.br_startoff >= end_fsb) {
-			*offset_fsb = end_fsb;
-			return 0;
+//			*offset_fsb = end_fsb;
+//			return 0;
 		}
 	}
 	del = got;
