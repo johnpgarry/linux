@@ -228,6 +228,7 @@ xfs_ilock_iocb_for_write(
 }
 
 atomic_t atomic_writing;
+atomic_t atomic_reading;
 
 STATIC ssize_t
 xfs_file_dio_read(
@@ -249,7 +250,9 @@ xfs_file_dio_read(
 	if (ret)
 		return ret;
 	BUG_ON(atomic_read(&atomic_writing));
+	atomic_inc(&atomic_reading);
 	ret = iomap_dio_rw(iocb, to, &xfs_read_iomap_ops, NULL, 0, NULL, 0);
+	atomic_dec(&atomic_reading);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	return ret;
@@ -658,6 +661,7 @@ retry:
 		_atomic_writing = atomic_inc_return(&atomic_writing);
 
 		BUG_ON(_atomic_writing > 1);
+		BUG_ON(atomic_read(&atomic_reading));
 	}
 
 
