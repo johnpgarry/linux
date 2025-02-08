@@ -1038,6 +1038,7 @@ xfs_reflink_end_atomic_cow(
 
 	while (end_fsb > offset_fsb && !error) {
 		bool				commit = false;
+		xfs_fileoff_t			offset_fsb_orig = offset_fsb;
 
 		error = xfs_reflink_end_cow_extent_locked(ip, &offset_fsb,
 						end_fsb, tp, &commit);
@@ -1048,7 +1049,8 @@ xfs_reflink_end_atomic_cow(
 		if (sysctl_xfs_reflink_delay)
 			mdelay(sysctl_xfs_reflink_delay);
 		if (!commit) {
-		//	pr_err("%s2 did not commit\n", __func__);
+			pr_err("%s2 did not commit offset_fsb=%lld (orig=%lld) end_fsb=%lld\n",
+				__func__, offset_fsb, offset_fsb_orig, end_fsb);
 		//	error = -EIO;
 		//	break;
 		}
@@ -1063,6 +1065,7 @@ xfs_reflink_end_atomic_cow(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
 out_cancel:
+	pr_err("%s9 out_cancel: error=%d\n", __func__, error);
 	xfs_trans_cancel(tp);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
