@@ -4613,6 +4613,30 @@ static int xfs_reflink_delay(const struct ctl_table *table, int write,
 	return err;
 }
 
+
+int sysctl_xfs_use_cow_atomic_always = 1;
+EXPORT_SYMBOL_GPL(sysctl_xfs_use_cow_atomic_always);
+static int xfs_use_cow_atomic_always(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_use_cow_atomic_always;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_use_cow_atomic_always = state;
+	}
+	return err;
+}
+
 int sysctl_xfs_reflink_cow_crash_before;
 static int xfs_reflink_cow_crash_before(const struct ctl_table *table, int write,
 			  void *buffer, size_t *lenp, loff_t *ppos)
@@ -4814,6 +4838,15 @@ static const struct ctl_table sched_core_sysctls[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= xfs_reflink_cow_crash_before,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+	},
+	{
+		.procname	= "xfs_use_cow_atomic_always",
+		.data		= NULL, /* filled in by handler */
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= xfs_use_cow_atomic_always,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_ONE,
 	},
