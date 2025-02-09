@@ -283,10 +283,6 @@ static inline blk_opf_t iomap_dio_bio_opflags(struct iomap_dio *dio,
 		opflags |= REQ_FUA;
 	else
 		dio->flags &= ~IOMAP_DIO_WRITE_THROUGH;
-	if (atomic_bio)
-		opflags |= REQ_ATOMIC;
-	else if (atomic)
-		opflags |= REQ_FUA;
 
 	return opflags;
 }
@@ -310,11 +306,13 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	size_t orig_count;
 
 	if (atomic) {
+		/* 
 		if (!(iomap->flags & IOMAP_F_ATOMIC_COW)) {
 			if (length != iter->len)
 				return -EINVAL;
 			atomic_bio = true;
 		}
+		*/
 	}
 
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1) ||
