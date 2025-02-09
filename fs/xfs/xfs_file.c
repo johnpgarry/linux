@@ -630,7 +630,7 @@ xfs_file_dio_write_atomic(
 	struct kiocb		*iocb,
 	struct iov_iter		*from)
 {
-	unsigned int		iolock = XFS_IOLOCK_SHARED;
+	unsigned int		iolock = XFS_IOLOCK_EXCL;
 	bool			use_cow = false;
 	unsigned int		dio_flags;
 	ssize_t			ret;
