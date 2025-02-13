@@ -669,9 +669,12 @@ retry:
 			goto out_unlock;
 	}
 
+	if (dio_flags & IOMAP_DIO_FORCE_WAIT)
+               inode_dio_wait(VFS_I(ip));
+
 	trace_xfs_file_direct_write(iocb, from);
 	if (use_cow)
-		dio_flags = IOMAP_DIO_ATOMIC_COW;
+		dio_flags = IOMAP_DIO_ATOMIC_COW | IOMAP_DIO_FORCE_WAIT;
 	else
 		dio_flags = 0;
 
