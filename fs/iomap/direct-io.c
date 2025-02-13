@@ -616,8 +616,11 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		iomi.flags |= IOMAP_NOWAIT;
 
-	if (iocb->ki_flags & IOCB_ATOMIC)
+	if (iocb->ki_flags & IOCB_ATOMIC) {
 		iomi.flags |= IOMAP_ATOMIC;
+		if (iov_iter_count(iter) != SZ_64K && iov_iter_count(iter) != SZ_4K)
+			pr_err("%s iov_iter_count=%zd\n", __func__, iov_iter_count(iter));
+	}
 
 	if (iov_iter_rw(iter) == READ) {
 		/* reads can always complete inline */

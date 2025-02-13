@@ -4590,119 +4590,6 @@ static int sysctl_numa_balancing(const struct ctl_table *table, int write,
 #endif
 #endif
 
-
-int sysctl_xfs_reflink_delay;
-static int xfs_reflink_delay(const struct ctl_table *table, int write,
-			  void *buffer, size_t *lenp, loff_t *ppos)
-{
-	struct ctl_table t;
-	int err;
-	int state = sysctl_xfs_reflink_delay;
-
-	if (write && !capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
-	t = *table;
-	t.data = &state;
-	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
-	if (err < 0)
-		return err;
-	if (write) {
-		sysctl_xfs_reflink_delay = state;
-	}
-	return err;
-}
-
-
-int sysctl_xfs_use_cow_atomic_always = 1;
-EXPORT_SYMBOL_GPL(sysctl_xfs_use_cow_atomic_always);
-static int xfs_use_cow_atomic_always(const struct ctl_table *table, int write,
-			  void *buffer, size_t *lenp, loff_t *ppos)
-{
-	struct ctl_table t;
-	int err;
-	int state = sysctl_xfs_use_cow_atomic_always;
-
-	if (write && !capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
-	t = *table;
-	t.data = &state;
-	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
-	if (err < 0)
-		return err;
-	if (write) {
-		sysctl_xfs_use_cow_atomic_always = state;
-	}
-	return err;
-}
-
-int sysctl_xfs_reflink_cow_crash_before;
-static int xfs_reflink_cow_crash_before(const struct ctl_table *table, int write,
-			  void *buffer, size_t *lenp, loff_t *ppos)
-{
-	struct ctl_table t;
-	int err;
-	int state = sysctl_xfs_reflink_cow_crash_before;
-
-	if (write && !capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
-	t = *table;
-	t.data = &state;
-	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
-	if (err < 0)
-		return err;
-	if (write) {
-		sysctl_xfs_reflink_cow_crash_before = state;
-	}
-	return err;
-}
-
-int sysctl_xfs_reflink_cow_crash_middle;
-static int xfs_reflink_cow_crash_middle(const struct ctl_table *table, int write,
-			  void *buffer, size_t *lenp, loff_t *ppos)
-{
-	struct ctl_table t;
-	int err;
-	int state = sysctl_xfs_reflink_cow_crash_middle;
-
-	if (write && !capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
-	t = *table;
-	t.data = &state;
-	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
-	if (err < 0)
-		return err;
-	if (write) {
-		sysctl_xfs_reflink_cow_crash_middle = state;
-	}
-	return err;
-}
-
-int sysctl_xfs_reflink_atomic_cow = 1;
-static int xfs_reflink_atomic_cow(const struct ctl_table *table, int write,
-			  void *buffer, size_t *lenp, loff_t *ppos)
-{
-	struct ctl_table t;
-	int err;
-	int state = sysctl_xfs_reflink_atomic_cow;
-
-	if (write && !capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
-	t = *table;
-	t.data = &state;
-	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
-	if (err < 0)
-		return err;
-	if (write) {
-		sysctl_xfs_reflink_atomic_cow = state;
-	}
-	return err;
-}
-
 #ifdef CONFIG_SCHEDSTATS
 
 DEFINE_STATIC_KEY_FALSE(sched_schedstats);
@@ -4766,6 +4653,124 @@ static int sysctl_schedstats(const struct ctl_table *table, int write, void *buf
 }
 #endif /* CONFIG_PROC_SYSCTL */
 #endif /* CONFIG_SCHEDSTATS */
+
+
+int sysctl_xfs_reflink_delay;
+EXPORT_SYMBOL_GPL(sysctl_xfs_reflink_delay);
+static int xfs_reflink_delay(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_reflink_delay;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_reflink_delay = state;
+	}
+	return err;
+}
+
+
+int sysctl_xfs_use_cow_atomic_always = 1;
+EXPORT_SYMBOL_GPL(sysctl_xfs_use_cow_atomic_always);
+static int xfs_use_cow_atomic_always(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_use_cow_atomic_always;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_use_cow_atomic_always = state;
+	}
+	return err;
+}
+
+int sysctl_xfs_reflink_cow_crash_before;
+EXPORT_SYMBOL_GPL(sysctl_xfs_reflink_cow_crash_before);
+static int xfs_reflink_cow_crash_before(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_reflink_cow_crash_before;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_reflink_cow_crash_before = state;
+	}
+	return err;
+}
+
+int sysctl_xfs_reflink_cow_crash_middle;
+EXPORT_SYMBOL_GPL(sysctl_xfs_reflink_cow_crash_middle);
+static int xfs_reflink_cow_crash_middle(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_reflink_cow_crash_middle;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_reflink_cow_crash_middle = state;
+	}
+	return err;
+}
+
+int sysctl_xfs_reflink_atomic_cow = 1;
+EXPORT_SYMBOL_GPL(sysctl_xfs_reflink_atomic_cow);
+static int xfs_reflink_atomic_cow(const struct ctl_table *table, int write,
+			  void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = sysctl_xfs_reflink_atomic_cow;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write) {
+		sysctl_xfs_reflink_atomic_cow = state;
+	}
+	return err;
+}
+
 
 #ifdef CONFIG_SYSCTL
 static const struct ctl_table sched_core_sysctls[] = {

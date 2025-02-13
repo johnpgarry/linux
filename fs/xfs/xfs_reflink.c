@@ -1067,9 +1067,9 @@ xfs_reflink_end_atomic_cow(
 				pr_err("%s1 jjcount=%d _prints=%d sysctl_xfs_reflink_delay=%d\n", __func__, jjcount, _prints, sysctl_xfs_reflink_delay);
 		}
 		if (!commit) {
-			pr_err("%s2 did not commit\n", __func__);
-			error = -EIO;
-			break;
+		//	pr_err("%s2 did not commit\n", __func__);
+	//		error = -EIO;
+	//		break;
 		}
 	}
 

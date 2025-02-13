@@ -33,6 +33,9 @@
 #include <linux/fadvise.h>
 #include <linux/mount.h>
 
+atomic_t readers;
+atomic_t atomic_writers;
+
 static const struct vm_operations_struct xfs_file_vm_ops;
 
 /*
@@ -245,7 +248,11 @@ xfs_file_dio_read(
 	ret = xfs_ilock_iocb(iocb, XFS_IOLOCK_SHARED);
 	if (ret)
 		return ret;
+	atomic_inc(&readers);
+	WARN_ON_ONCE(atomic_read(&atomic_writers));
+		
 	ret = iomap_dio_rw(iocb, to, &xfs_read_iomap_ops, NULL, 0, NULL, 0);
+	atomic_dec(&readers);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	return ret;
@@ -287,6 +294,8 @@ xfs_file_buffered_read(
 	ret = xfs_ilock_iocb(iocb, XFS_IOLOCK_SHARED);
 	if (ret)
 		return ret;
+		
+	WARN_ON_ONCE(atomic_read(&atomic_writers));
 	ret = generic_file_read_iter(iocb, to);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
@@ -602,6 +611,7 @@ xfs_file_dio_write_aligned(
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
+	WARN_ON_ONCE(atomic_read(&atomic_writers));
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
@@ -636,14 +646,22 @@ xfs_file_dio_write_atomic(
 	ssize_t			ret;
 
 retry:
+	if (iolock != XFS_IOLOCK_EXCL)
+		pr_err_once("%s1 retry: iolock=%d XFS_IOLOCK_EXCL=%d use_cow=%d\n", __func__,
+			iolock, XFS_IOLOCK_EXCL, use_cow);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
+	WARN_ON_ONCE(atomic_read(&atomic_writers));
+	WARN_ON_ONCE(atomic_read(&readers));
+	atomic_inc(&atomic_writers);
 
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
 		goto out_unlock;
-
+	if (iolock != XFS_IOLOCK_EXCL)
+		pr_err_once("%s2 iolock=%d XFS_IOLOCK_EXCL=%d\n", __func__,
+			iolock, XFS_IOLOCK_EXCL);
 	if (use_cow) {
 		ret = xfs_reflink_unshare(ip, iocb->ki_pos,
 			iov_iter_count(from));
@@ -661,6 +679,7 @@ retry:
 			&xfs_dio_write_ops, dio_flags, NULL, 0);
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) && !use_cow) {
+		atomic_dec(&atomic_writers);
 		xfs_iunlock(ip, iolock);
 		iolock = XFS_IOLOCK_EXCL;
 		use_cow = true;
@@ -668,8 +687,13 @@ retry:
 	}
 
 out_unlock:
-	if (iolock)
+	atomic_dec(&atomic_writers);
+	if (iolock) {
 		xfs_iunlock(ip, iolock);
+	} else {
+		pr_err_once("%s3 iolock=0 XFS_IOLOCK_EXCL=%d\n", __func__,
+			XFS_IOLOCK_EXCL);
+	}
 	return ret;
 }
 
@@ -718,6 +742,7 @@ retry_exclusive:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
+	WARN_ON_ONCE(atomic_read(&atomic_writers));
 
 	/*
 	 * We can't properly handle unaligned direct I/O to reflink files yet,
@@ -839,6 +864,7 @@ write_retry:
 	ret = xfs_ilock_iocb(iocb, iolock);
 	if (ret)
 		return ret;
+	WARN_ON_ONCE(atomic_read(&atomic_writers));
 
 	ret = xfs_file_write_checks(iocb, from, &iolock);
 	if (ret)
