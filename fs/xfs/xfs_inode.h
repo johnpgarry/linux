@@ -363,10 +363,17 @@ xfs_inode_can_atomicwrite(
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 
-	if (mp->m_sb.sb_blocksize < target->bt_bdev_awu_min)
+	
+	if (mp->m_sb.sb_blocksize < target->bt_bdev_awu_min) {
+		pr_err("%s false sb_blocksize=%d target->bt_bdev_awu_min=%d\n",
+			__func__, mp->m_sb.sb_blocksize, target->bt_bdev_awu_min);
 		return false;
-	if (mp->m_sb.sb_blocksize > target->bt_bdev_awu_max)
+	}
+	if (mp->m_sb.sb_blocksize > target->bt_bdev_awu_max) {
+		pr_err("%s2 false sb_blocksize=%d target->bt_bdev_awu_max=%d\n",
+			__func__, mp->m_sb.sb_blocksize, target->bt_bdev_awu_max);
 		return false;
+	}
 
 	return true;
 }

@@ -916,11 +916,36 @@ static blk_status_t nvme_map_metadata(struct nvme_dev *dev, struct request *req)
 		return nvme_pci_setup_meta_sgls(dev, req);
 	return nvme_pci_setup_meta_mptr(dev, req);
 }
-
+#include <linux/delay.h>
+extern int sysctl_john_panic_val;
 static blk_status_t nvme_prep_rq(struct nvme_dev *dev, struct request *req)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
+	__maybe_unused static atomic_t countjj;
+	struct bio *jbio = req->bio;
+	bool write = false;
+	
+	if (jbio && (bio_op(jbio) == REQ_OP_WRITE))
+		write = true;
+	
+	if (write) {
+		if ((atomic_inc_return(&countjj) % 10000) == 0)
+			pr_err("%s write length=%d fua=%d\n",
+				__func__, blk_rq_bytes(req),
+				!(req->cmd_flags & REQ_FUA));
+		if (sysctl_john_panic_val)
+			panic("nvme_prep_rq sysctl_john_panic_val\n");
+		#ifdef dsdd
+		if ((atomic_inc_return(&countjj) % 3) == 0) {
+			pr_err_once("%s 5000 uldeay for write every 3\n", __func__);
+			udelay(5000);
+		} else {
+			pr_err_once("%2s 1000 uldeay for write every time\n", __func__);
+			udelay(1000);
+		}
+		#endif
+	}
 
 	iod->aborted = false;
 	iod->nr_allocations = -1;

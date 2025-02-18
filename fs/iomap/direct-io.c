@@ -305,6 +305,14 @@ static loff_t iomap_dio_bio_iter(const struct iomap_iter *iter,
 	int nr_pages, ret = 0;
 	size_t copied = 0;
 	size_t orig_count;
+	static int max_ref;
+	unsigned int this_ref = atomic_read(&dio->ref);
+	
+	if (this_ref > max_ref) {
+		max_ref = this_ref;
+		pr_err("%s max_ref=%d\n", __func__, max_ref);
+	}
+	
 
 	if (atomic_hw && length != iter->len)
 		return -EINVAL;

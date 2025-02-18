@@ -897,6 +897,12 @@ relock:
 		length = XFS_FSB_TO_B(mp, end_fsb) - offset;
 		goto out_found_cow;
 	}
+	
+	if (atomic_hw) {
+		pr_err_once("%s always atomic CoW\n", __func__);
+		error = -EAGAIN;
+		goto out_unlock;
+	}
 
 	if (imap_needs_cow(ip, flags, &imap, nimaps)) {
 		error = -EAGAIN;

@@ -901,8 +901,13 @@ xfs_file_write_iter(
 		unsigned int	unit_min, unit_max;
 
 		xfs_get_atomic_write_attr(ip, &unit_min, &unit_max);
-		if (ocount < unit_min || ocount > unit_max)
+		pr_err_once("%s ocount=%zd unit_min=%d unit_max=%d\n",
+				__func__, ocount, unit_min, unit_max);
+		if (ocount < unit_min || ocount > unit_max) {
+			pr_err("%s2 ocount=%zd unit_min=%d unit_max=%d\n",
+				__func__, ocount, unit_min, unit_max);
 			return -EINVAL;
+		}
 
 		ret = generic_atomic_write_valid(iocb, from);
 		if (ret)

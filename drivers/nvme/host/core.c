@@ -986,7 +986,7 @@ static inline blk_status_t nvme_setup_rw(struct nvme_ns *ns,
 	u32 dsmgmt = 0;
 
 	if (req->cmd_flags & REQ_FUA)
-		control |= NVME_RW_FUA;
+		control |= 0;//NVME_RW_FUA;
 	if (req->cmd_flags & (REQ_FAILFAST_DEV | REQ_RAHEAD))
 		control |= NVME_RW_LR;
 
