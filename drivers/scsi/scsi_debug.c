@@ -13,7 +13,6 @@
  */
 
 
-#define pr_fmt(fmt) KBUILD_MODNAME ":%s: " fmt, __func__
 
 #include <linux/module.h>
 #include <linux/align.h>
@@ -6360,11 +6359,23 @@ static enum hrtimer_restart sdebug_q_cmd_hrt_complete(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
+#include <linux/delay.h>
 /* When work queue schedules work, it calls this function. */
 static void sdebug_q_cmd_wq_complete(struct work_struct *work)
 {
+	static atomic_t jjcount;
 	struct sdebug_defer *sd_dp = container_of(work, struct sdebug_defer,
 						  ew.work);
+
+	if (atomic_inc_return(&jjcount) == 1000000) {
+			struct sdebug_scsi_cmd *sdsc = container_of(sd_dp,
+					typeof(*sdsc), sd_dp);
+			struct scsi_cmnd *scp = (struct scsi_cmnd *)sdsc - 1;
+			pr_err("%s starting big sleep for scp=%pS\n", __func__, scp);
+		//	msleep(1000*60);
+			pr_err("%s2 finished big sleep for scp=%pS\n", __func__, scp);
+	}
+	
 	sdebug_q_cmd_complete(sd_dp);
 }
 
@@ -6677,9 +6688,11 @@ static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 		}
 	} else if (defer_t == SDEB_DEFER_WQ) {
 		/* Cancel if pending */
+		pr_err("%s calling cancel_work cmnd=%pS\n", __func__, cmnd);
 		if (cancel_work(&sd_dp->ew.work))
 			return true;
 		/* callback may be running, so return false */
+		pr_err("%s2 called cancel_work cmnd=%pS, failed\n", __func__, cmnd);
 		return false;
 	} else if (defer_t == SDEB_DEFER_POLL) {
 		return true;
@@ -6698,7 +6711,9 @@ static bool scsi_debug_abort_cmnd(struct scsi_cmnd *cmnd)
 	bool res;
 
 	spin_lock_irqsave(&sdsc->lock, flags);
+	pr_err("%s calling scsi_debug_stop_cmnd cmnd=%pS\n", __func__, cmnd);
 	res = scsi_debug_stop_cmnd(cmnd);
+	pr_err("%s1 called scsi_debug_stop_cmnd cmnd=%pS res=%d\n", __func__, cmnd, res);
 	spin_unlock_irqrestore(&sdsc->lock, flags);
 
 	return res;
@@ -6710,8 +6725,11 @@ static bool scsi_debug_abort_cmnd(struct scsi_cmnd *cmnd)
  */
 static bool sdebug_stop_cmnd(struct request *rq, void *data)
 {
+	pr_err("%s calling scsi_debug_abort_cmnd blk_mq_rq_to_pdu(rq)=%pS\n",
+		__func__, blk_mq_rq_to_pdu(rq));
 	scsi_debug_abort_cmnd(blk_mq_rq_to_pdu(rq));
 
+	/* Return true to keep iter'ing */
 	return true;
 }
 
@@ -6720,10 +6738,12 @@ static void stop_all_queued(void)
 {
 	struct sdebug_host_info *sdhp;
 
+	pr_err("%s\n", __func__);
 	mutex_lock(&sdebug_host_list_mutex);
 	list_for_each_entry(sdhp, &sdebug_host_list, host_list) {
 		struct Scsi_Host *shost = sdhp->shost;
 
+		pr_err("%s2 calling sdebug_stop_cmnd in iter\n", __func__);
 		blk_mq_tagset_busy_iter(&shost->tag_set, sdebug_stop_cmnd, NULL);
 	}
 	mutex_unlock(&sdebug_host_list_mutex);
@@ -6762,6 +6782,8 @@ static int scsi_debug_abort(struct scsi_cmnd *SCpnt)
 	bool aborted = scsi_debug_abort_cmnd(SCpnt);
 	u8 *cmd = SCpnt->cmnd;
 	u8 opcode = cmd[0];
+
+	pr_err("%s SCpnt=%pS aborted=%d\n", __func__, SCpnt, aborted);
 
 	++num_aborts;
 
@@ -6859,6 +6881,7 @@ static int scsi_debug_device_reset(struct scsi_cmnd *SCpnt)
 	if (SDEBUG_OPT_ALL_NOISE & sdebug_opts)
 		sdev_printk(KERN_INFO, sdp, "%s\n", __func__);
 
+	pr_err("%s SCpnt=%pS calling scsi_debug_stop_all_queued\n", __func__, SCpnt);
 	scsi_debug_stop_all_queued(sdp);
 	if (devip) {
 		set_bit(SDEBUG_UA_POR, devip->uas_bm);
@@ -6894,6 +6917,7 @@ static int scsi_debug_target_reset(struct scsi_cmnd *SCpnt)
 	u8 opcode = cmd[0];
 	int k = 0;
 
+	pr_err("%s SCpnt=%pS\n", __func__, SCpnt);
 	++num_target_resets;
 	if (SDEBUG_OPT_ALL_NOISE & sdebug_opts)
 		sdev_printk(KERN_INFO, sdp, "%s\n", __func__);
@@ -6926,6 +6950,7 @@ static int scsi_debug_bus_reset(struct scsi_cmnd *SCpnt)
 	struct sdebug_dev_info *devip;
 	int k = 0;
 
+	pr_err("%s SCpnt=%pS\n", __func__, SCpnt);
 	++num_bus_resets;
 
 	if (SDEBUG_OPT_ALL_NOISE & sdebug_opts)
@@ -6949,6 +6974,7 @@ static int scsi_debug_host_reset(struct scsi_cmnd *SCpnt)
 	struct sdebug_dev_info *devip;
 	int k = 0;
 
+	pr_err("%s SCpnt=%pS\n", __func__, SCpnt);
 	++num_host_resets;
 	if (SDEBUG_OPT_ALL_NOISE & sdebug_opts)
 		sdev_printk(KERN_INFO, SCpnt->device, "%s\n", __func__);
@@ -7128,7 +7154,7 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 
 	/* one of the resp_*() response functions is called here */
 	cmnd->result = pfp ? pfp(cmnd, devip) : 0;
-	if (cmnd->result & SDEG_RES_IMMED_MASK) {
+	if (1) {
 		cmnd->result &= ~SDEG_RES_IMMED_MASK;
 		delta_jiff = ndelay = 0;
 	}
@@ -8906,8 +8932,10 @@ static bool fake_timeout(struct scsi_cmnd *scp)
 	if (0 == (atomic_read(&sdebug_cmnd_count) % abs(sdebug_every_nth))) {
 		if (sdebug_every_nth < -1)
 			sdebug_every_nth = -1;
-		if (SDEBUG_OPT_TIMEOUT & sdebug_opts)
+		if (SDEBUG_OPT_TIMEOUT & sdebug_opts) {
+			pr_err("%s SDEBUG_OPT_TIMEOUT ignore command causing timeout scp=%pS\n", __func__, scp);
 			return true; /* ignore command causing timeout */
+		}
 		else if (SDEBUG_OPT_MAC_TIMEOUT & sdebug_opts &&
 			 scsi_medium_access_command(scp))
 			return true; /* time out reads and writes */

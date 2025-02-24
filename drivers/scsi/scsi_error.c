@@ -337,6 +337,8 @@ enum blk_eh_timer_return scsi_timeout(struct request *req)
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct Scsi_Host *host = scmd->device->host;
 
+	pr_err("%s scmd=%pS\n", __func__, scmd);
+
 	trace_scsi_dispatch_cmd_timeout(scmd);
 	scsi_log_completion(scmd, TIMEOUT_ERROR);
 
@@ -993,6 +995,7 @@ static enum scsi_disposition scsi_try_bus_device_reset(struct scsi_cmnd *scmd)
 	if (!hostt->eh_device_reset_handler)
 		return FAILED;
 
+	pr_err("%s calling eh_device_reset_handler for scmd=%pS\n", __func__, scmd);
 	rtn = hostt->eh_device_reset_handler(scmd);
 	if (rtn == SUCCESS)
 		__scsi_report_device_reset(scmd->device, NULL);
@@ -1027,11 +1030,15 @@ scsi_try_to_abort_cmd(const struct scsi_host_template *hostt, struct scsi_cmnd *
 
 static void scsi_abort_eh_cmnd(struct scsi_cmnd *scmd)
 {
-	if (scsi_try_to_abort_cmd(scmd->device->host->hostt, scmd) != SUCCESS)
+	pr_err("%s scmd=%pS calling scsi_try_to_abort_cmd\n", __func__, scmd);
+	if (scsi_try_to_abort_cmd(scmd->device->host->hostt, scmd) != SUCCESS) {
+		pr_err("%s2 calling scsi_try_bus_device_reset (eh_device_reset_handler) scmd=%pS\n",
+			__func__, scmd);
 		if (scsi_try_bus_device_reset(scmd) != SUCCESS)
 			if (scsi_try_target_reset(scmd) != SUCCESS)
 				if (scsi_try_bus_reset(scmd) != SUCCESS)
 					scsi_try_host_reset(scmd);
+	}
 }
 
 /**
@@ -1159,8 +1166,10 @@ static enum scsi_disposition scsi_send_eh_cmnd(struct scsi_cmnd *scmd,
 	struct scsi_eh_save ses;
 	const unsigned long stall_for = msecs_to_jiffies(100);
 	int rtn;
+	pr_err("%s scmd=%pS timeout=%d\n", __func__, scmd, timeout);
 
 retry:
+	pr_err("%s0 retry: scmd=%pS\n", __func__, scmd);
 	scsi_eh_prep_cmnd(scmd, &ses, cmnd, cmnd_size, sense_bytes);
 	shost->eh_action = &done;
 
@@ -1209,7 +1218,7 @@ retry:
 	shost->eh_action = NULL;
 
 	scsi_log_completion(scmd, rtn);
-
+	pr_err("%s1 scmd=%pS\n", __func__, scmd);
 	SCSI_LOG_ERROR_RECOVERY(3, scmd_printk(KERN_INFO, scmd,
 			"%s timeleft: %ld\n",
 			__func__, timeleft));
@@ -1241,12 +1250,16 @@ retry:
 			break;
 		}
 	} else if (rtn != FAILED) {
+		pr_err("%s2 calling scsi_abort_eh_cmnd for scmd=%pS\n", __func__, scmd);
 		scsi_abort_eh_cmnd(scmd);
+		pr_err("%s2.1 called scsi_abort_eh_cmnd for scmd=%pS\n", __func__, scmd);
 		rtn = FAILED;
 	}
 
+	pr_err("%s9 calling scsi_eh_restore_cmnd scmd=%pS\n", __func__, scmd);
 	scsi_eh_restore_cmnd(scmd, &ses);
 
+	pr_err("%s10 scmd=%pS rtn=%d\n", __func__, scmd, rtn);
 	return rtn;
 }
 
@@ -1261,6 +1274,7 @@ retry:
  */
 static enum scsi_disposition scsi_request_sense(struct scsi_cmnd *scmd)
 {
+	pr_err("%s calling scsi_send_eh_cmnd scmd=%pS\n", __func__, scmd);
 	return scsi_send_eh_cmnd(scmd, NULL, 0, scmd->device->eh_timeout, ~0);
 }
 
@@ -1399,7 +1413,9 @@ static int scsi_eh_tur(struct scsi_cmnd *scmd)
 	int retry_cnt = 1;
 	enum scsi_disposition rtn;
 
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 retry_tur:
+	pr_err("%s retry_tur: calling scsi_send_eh_cmnd scmd=%pS\n", __func__, scmd);
 	rtn = scsi_send_eh_cmnd(scmd, tur_command, 6,
 				scmd->device->eh_timeout, 0);
 
@@ -1484,11 +1500,13 @@ static int scsi_eh_try_stu(struct scsi_cmnd *scmd)
 {
 	static unsigned char stu_command[6] = {START_STOP, 0, 0, 0, 1, 0};
 
+	pr_err("%s scmd=%pS\n", __func__, scmd);
 	if (scmd->device->allow_restart) {
 		int i;
 		enum scsi_disposition rtn = NEEDS_RETRY;
 
 		for (i = 0; rtn == NEEDS_RETRY && i < 2; i++)
+			pr_err("%s2 calling scsi_send_eh_cmnd scmd=%pS\n", __func__, scmd);
 			rtn = scsi_send_eh_cmnd(scmd, stu_command, 6,
 						scmd->device->eh_timeout, 0);
 
@@ -2191,13 +2209,24 @@ void scsi_eh_ready_devs(struct Scsi_Host *shost,
 			struct list_head *work_q,
 			struct list_head *done_q)
 {
-	if (!scsi_eh_stu(shost, work_q, done_q))
-		if (!scsi_eh_bus_device_reset(shost, work_q, done_q))
-			if (!scsi_eh_target_reset(shost, work_q, done_q))
-				if (!scsi_eh_bus_reset(shost, work_q, done_q))
-					if (!scsi_eh_host_reset(shost, work_q, done_q))
+	pr_err("%s calling scsi_eh_stu\n", __func__);
+	if (!scsi_eh_stu(shost, work_q, done_q)) {
+		pr_err("%s1 calling scsi_eh_bus_device_reset\n", __func__);
+		if (!scsi_eh_bus_device_reset(shost, work_q, done_q)) {
+			pr_err("%s2 calling scsi_eh_target_reset\n", __func__);
+			if (!scsi_eh_target_reset(shost, work_q, done_q)) {
+				pr_err("%s3 calling scsi_eh_bus_reset\n", __func__);
+				if (!scsi_eh_bus_reset(shost, work_q, done_q)) {
+					pr_err("%s4 calling scsi_eh_host_reset\n", __func__);
+					if (!scsi_eh_host_reset(shost, work_q, done_q)) {
+						pr_err("%s5 calling scsi_eh_offline_sdevs\n", __func__);
 						scsi_eh_offline_sdevs(work_q,
 								      done_q);
+					}
+				}
+			}
+		}
+	}
 }
 EXPORT_SYMBOL_GPL(scsi_eh_ready_devs);
 
@@ -2269,6 +2298,8 @@ static void scsi_unjam_host(struct Scsi_Host *shost)
 	unsigned long flags;
 	LIST_HEAD(eh_work_q);
 	LIST_HEAD(eh_done_q);
+
+	pr_err("%s\n", __func__);
 
 	spin_lock_irqsave(shost->host_lock, flags);
 	list_splice_init(&shost->eh_cmd_q, &eh_work_q);
