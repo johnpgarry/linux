@@ -127,7 +127,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_CDB_LEN 10
 #define DEF_JDELAY   1		/* if > 0 unit is a jiffy */
 #define DEF_DEV_SIZE_PRE_INIT   0
-#define DEF_DEV_SIZE_MB   8
+#define DEF_DEV_SIZE_MB   400
 #define DEF_ZBC_DEV_SIZE_MB   128
 #define DEF_DIF 0
 #define DEF_DIX 0
@@ -169,7 +169,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_ATOMIC_WR_MAX_BNDRY 128
 #define DEF_STRICT 0
 #define DEF_STATISTICS false
-#define DEF_SUBMIT_QUEUES 1
+#define DEF_SUBMIT_QUEUES 10
 #define DEF_TUR_MS_TO_READY 0
 #define DEF_UUID_CTL 0
 #define JDELAY_OVERRIDDEN -9999
@@ -342,6 +342,8 @@ enum sdebug_err_type {
 	ERR_LUN_RESET_FAILED	= 4,	/* control return FAILED from */
 					/* scsi_debug_device_reseLUN_RESET_FAILEDt() */
 };
+
+int print_rate = 1000000;
 
 struct sdebug_err_inject {
 	int type;
@@ -987,7 +989,7 @@ static int sdeb_zbc_max_open = DEF_ZBC_MAX_OPEN_ZONES;
 static int sdeb_zbc_nr_conv = DEF_ZBC_NR_CONV_ZONES;
 
 static int submit_queues = DEF_SUBMIT_QUEUES;  /* > 1 for multi-queue (mq) */
-static int poll_queues; /* iouring iopoll interface.*/
+static int poll_queues = 2; /* iouring iopoll interface.*/
 
 static atomic_long_t writes_by_group_number[64];
 
@@ -7092,6 +7094,11 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 	u64 ns_from_boot = 0;
 	struct scsi_device *sdp;
 	struct sdebug_defer *sd_dp;
+	static atomic_t jcount;
+	unsigned int _jcount = atomic_inc_return(&jcount);
+	
+	if ((_jcount % print_rate) == 0)
+		pr_err("%s delta_jiff=%d ndelay=%d polled=%d\n", __func__, delta_jiff, ndelay, polled);
 
 	if (unlikely(devip == NULL)) {
 		if (scsi_result == 0)
@@ -7145,6 +7152,9 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 	if (unlikely(sdebug_verbose && cmnd->result))
 		sdev_printk(KERN_INFO, sdp, "%s: non-zero result=0x%x\n",
 			    __func__, cmnd->result);
+	
+	if ((_jcount % print_rate) == 0)
+		pr_err("%s2 delta_jiff=%d ndelay=%d\n", __func__, delta_jiff, ndelay);
 
 	if (delta_jiff > 0 || ndelay > 0) {
 		ktime_t kt;
@@ -7169,6 +7179,10 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 
 				if (kt <= d) {	/* elapsed duration >= kt */
 					/* call scsi_done() from this thread */
+
+					if ((_jcount % print_rate) == 0)
+						pr_err("%s3 delta_jiff=%d ndelay=%d call scsi_done\n", __func__, delta_jiff, ndelay);
+
 					scsi_done(cmnd);
 					return 0;
 				}
@@ -7181,12 +7195,20 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 		if (polled) {
 			spin_lock_irqsave(&sdsc->lock, flags);
 			sd_dp->cmpl_ts = ktime_add(ns_to_ktime(ns_from_boot), kt);
+			if ((_jcount % print_rate) == 0)
+				pr_err("%s4 delta_jiff=%d ndelay=%d call SDEB_DEFER_POLL kt=%lld\n",
+					__func__, delta_jiff, ndelay, kt);
 			WRITE_ONCE(sd_dp->defer_t, SDEB_DEFER_POLL);
 			spin_unlock_irqrestore(&sdsc->lock, flags);
 		} else {
 			/* schedule the invocation of scsi_done() for a later time */
 			spin_lock_irqsave(&sdsc->lock, flags);
 			WRITE_ONCE(sd_dp->defer_t, SDEB_DEFER_HRT);
+
+			if ((_jcount % print_rate) == 0)
+				pr_err("%s5 delta_jiff=%d ndelay=%d call hrtimer_start kt=%lld\n",
+					__func__, delta_jiff, ndelay, kt);
+
 			hrtimer_start(&sd_dp->hrt, kt, HRTIMER_MODE_REL_PINNED);
 			/*
 			 * The completion handler will try to grab sqcp->lock,
@@ -9177,6 +9199,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 	bool inject_now;
 	int ret = 0;
 	struct sdebug_err_inject err;
+	static atomic_t jcount;
+	unsigned int _jcount = atomic_inc_return(&jcount);
 
 	scsi_set_resid(scp, 0);
 	if (sdebug_statistics) {
@@ -9185,6 +9209,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 	} else {
 		inject_now = false;
 	}
+	if ((_jcount % print_rate) == 0)
+		pr_err("%s1\n", __func__);
 	if (unlikely(sdebug_verbose &&
 		     !(SDEBUG_OPT_NO_CDB_NOISE & sdebug_opts))) {
 		char b[120];
@@ -9217,6 +9243,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 			goto err_out;
 	}
 
+	if ((_jcount % print_rate) == 0)
+		pr_err("%s2\n", __func__);
 	if (sdebug_timeout_cmd(scp)) {
 		scmd_printk(KERN_INFO, scp, "timeout command 0x%x\n", opcode);
 		return 0;
@@ -9242,6 +9270,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 	if (unlikely(inject_now && !atomic_read(&sdeb_inject_pending)))
 		atomic_set(&sdeb_inject_pending, 1);
 
+	if ((_jcount % print_rate) == 0)
+		pr_err("%s3\n", __func__);
 	na = oip->num_attached;
 	r_pfp = oip->pfp;
 	if (na) {	/* multiple commands with this opcode */
@@ -9283,6 +9313,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 		mk_sense_invalid_opcode(scp);
 		goto check_cond;
 	}
+	if ((_jcount % print_rate) == 0)
+		pr_err("%s4\n", __func__);
 	if (unlikely(sdebug_strict)) {	/* check cdb against mask */
 		u8 rem;
 		int j;
@@ -9324,6 +9356,8 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 		pfp = r_pfp;    /* if leaf function ptr NULL, try the root's */
 
 fini:
+	if ((_jcount % print_rate) == 0)
+		pr_err("%s5 fini:\n", __func__);
 	if (F_DELAY_OVERR & flags)	/* cmds like INQUIRY respond asap */
 		return schedule_resp(scp, devip, errsts, pfp, 0, 0);
 	else if ((flags & F_LONG_DELAY) && (sdebug_jdelay > 0 ||
