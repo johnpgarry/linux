@@ -605,9 +605,11 @@ unsigned int
 xfs_get_atomic_write_min(
 	struct xfs_inode	*ip)
 {
-	if (!xfs_inode_can_atomicwrite(ip))
-		return 0;
+	struct xfs_mount	*mp = ip->i_mount;
 
+	if (!xfs_has_reflink(mp) && !xfs_inode_can_hw_atomicwrite(ip))
+		return 0;
+	/* sub-block atomic writes just aren't supported yet */
 	return ip->i_mount->m_sb.sb_blocksize;
 }
 
@@ -615,22 +617,47 @@ unsigned int
 xfs_get_atomic_write_max(
 	struct xfs_inode	*ip)
 {
-	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	struct xfs_mount	*mp = ip->i_mount;
 
-	if (!xfs_inode_can_atomicwrite(ip))
-		return 0;
-
 	/*
+	 * If no reflink, then best we can do is 1x block as no CoW fallback
+	 * for when HW offload not possible.
+	 *
 	 * rtvol is not commonly used and supporting large atomic writes
 	 * would also be complicated to support there, so limit to a single
 	 * block for now.
 	 */
-	if (XFS_IS_REALTIME_INODE(ip))
-		return mp->m_sb.sb_blocksize;
+	if (!xfs_has_reflink(mp) || XFS_IS_REALTIME_INODE(ip)) {
+		if (xfs_inode_can_hw_atomicwrite(ip))
+			return ip->i_mount->m_sb.sb_blocksize;
+		return 0;
+	}
 
-	return min_t(unsigned int, XFS_FSB_TO_B(mp, mp->m_awu_max),
-				target->bt_bdev_awu_max);
+	/*
+	 * Even though HW support could be larger (than CoW), we rely on CoW-method as a
+	 * fallback for when HW-based is not possible, so always limit at
+	 * XFS_SW_MAX_ATOMIC.
+	 */
+	return XFS_SW_MAX_ATOMIC;
+}
+
+unsigned int
+xfs_get_atomic_write_max_opt(
+	struct xfs_inode	*ip)
+{
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	struct xfs_mount	*mp = ip->i_mount;
+
+	/* See xfs_get_atomic_write_max() for limit */
+	if (XFS_IS_REALTIME_INODE(ip)) {
+		if (xfs_inode_can_hw_atomicwrite(ip))
+			return ip->i_mount->m_sb.sb_blocksize; 
+		return 0;
+	}
+
+	return min3(xfs_get_atomic_write_max(ip),
+				target->bt_bdev_awu_max,
+				(unsigned int)XFS_FSB_TO_B(mp, mp->m_atomic_write_unit_max));
 }
 
 static void
@@ -640,7 +667,8 @@ xfs_report_atomic_write(
 {
 	generic_fill_statx_atomic_writes(stat,
 			xfs_get_atomic_write_min(ip),
-			xfs_get_atomic_write_max(ip), 0);
+			XFS_SW_MAX_ATOMIC,
+			xfs_get_atomic_write_max_opt(ip));
 }
 
 STATIC int

@@ -673,11 +673,6 @@ xfs_compute_awu_max(
 	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
 	xfs_agblock_t		awmax;
 
-	if (!xfs_has_reflink(mp)) {
-		mp->m_atomic_write_unit_max = 1;
-		return;
-	}
-
 	awmax = 1;
 	while (1) {
 		/*
