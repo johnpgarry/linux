@@ -605,20 +605,41 @@ unsigned int
 xfs_get_atomic_write_min(
 	struct xfs_inode	*ip)
 {
-	if (!xfs_inode_can_atomicwrite(ip))
-		return 0;
+	struct xfs_mount	*mp = ip->i_mount;
 
-	return ip->i_mount->m_sb.sb_blocksize;
+	if (xfs_inode_can_hw_atomicwrite(ip) || xfs_has_reflink(mp))
+		return ip->i_mount->m_sb.sb_blocksize;
+
+	return 0;
 }
 
 unsigned int
 xfs_get_atomic_write_max(
 	struct xfs_inode	*ip)
 {
-	if (!xfs_inode_can_atomicwrite(ip))
-		return 0;
+	struct xfs_mount	*mp = ip->i_mount;
 
-	return ip->i_mount->m_sb.sb_blocksize;
+	/*
+	 * If no reflink, then best we can do is 1x block as no CoW fallback
+	 * for when HW offload not possible.
+	 *
+	 * rtvol is not commonly used and supporting large atomic writes
+	 * would also be complicated to support there, so limit to a single
+	 * block for now.
+	 */
+	if (!xfs_has_reflink(mp) || XFS_IS_REALTIME_INODE(ip)) {
+		if (xfs_inode_can_hw_atomicwrite(ip))
+			return ip->i_mount->m_sb.sb_blocksize;
+		return 0;
+	}
+
+	/*
+	 * Even though HW support could be larger (than CoW), we rely on CoW-method as a
+	 * fallback for when HW-based is not possible, so always limit at
+	 * XFS_SW_MAX_ATOMIC.
+	 */
+	return min_t(unsigned int, XFS_SW_MAX_ATOMIC,
+			XFS_FSB_TO_B(mp, mp->m_atomic_write_unit_max));
 }
 
 static void

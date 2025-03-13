@@ -357,7 +357,7 @@ static inline bool xfs_inode_has_bigrtalloc(const struct xfs_inode *ip)
 		(ip)->i_mount->m_rtdev_targp : (ip)->i_mount->m_ddev_targp)
 
 static inline bool
-xfs_inode_can_atomicwrite(
+xfs_inode_can_hw_atomicwrite(
 	struct xfs_inode	*ip)
 {
 	struct xfs_mount	*mp = ip->i_mount;
@@ -674,5 +674,8 @@ unsigned int xfs_inode_alloc_unitsize(struct xfs_inode *ip);
 int xfs_icreate_dqalloc(const struct xfs_icreate_args *args,
 		struct xfs_dquot **udqpp, struct xfs_dquot **gdqpp,
 		struct xfs_dquot **pdqpp);
+
+// TODO: give a proper value from how much a single transaction can fit
+#define XFS_SW_MAX_ATOMIC (SZ_1M)
 
 #endif	/* __XFS_INODE_H__ */

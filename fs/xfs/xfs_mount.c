@@ -666,6 +666,37 @@ xfs_agbtree_compute_maxlevels(
 	mp->m_agbtree_maxlevels = max(levels, mp->m_refc_maxlevels);
 }
 
+static inline void
+xfs_compute_awu_max(
+	struct xfs_mount	*mp)
+{
+	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
+	xfs_agblock_t		awmax;
+
+	if (!xfs_has_reflink(mp)) {
+		mp->m_atomic_write_unit_max = 1;
+		return;
+	}
+
+	awmax = 1;
+	while (1) {
+		/*
+		 * Limit the size of atomic writes to the greatest
+		 * power-of-two factor of the agsize so that allocations for an
+		 * atomic write will always be aligned compatibly with the
+		 * alignment requirements of the storage.
+		 */
+		if (agsize % (awmax * 2))
+			break;
+
+		/* Ensure that we fit in an unsigned int */
+		if (XFS_FSB_TO_B(mp, awmax * 2) > UINT_MAX)
+			break;
+		awmax *= 2;
+	}
+	mp->m_atomic_write_unit_max = awmax;
+}
+
 /* Compute maximum possible height for realtime btree types for this fs. */
 static inline void
 xfs_rtbtree_compute_maxlevels(
@@ -750,6 +781,8 @@ xfs_mountfs(
 
 	xfs_agbtree_compute_maxlevels(mp);
 	xfs_rtbtree_compute_maxlevels(mp);
+
+	xfs_compute_awu_max(mp);
 
 	/*
 	 * Check if sb_agblocks is aligned at stripe boundary.  If sb_agblocks
