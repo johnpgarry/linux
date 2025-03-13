@@ -400,7 +400,7 @@ xfs_reflink_convert_unwritten(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
 	struct xfs_bmbt_irec	*cmap,
-	bool			convert_now)
+	unsigned int		flags)
 {
 	xfs_fileoff_t		offset_fsb = imap->br_startoff;
 	xfs_filblks_t		count_fsb = imap->br_blockcount;
@@ -411,12 +411,8 @@ xfs_reflink_convert_unwritten(
 	 */
 	xfs_trim_extent(cmap, offset_fsb, count_fsb);
 
-	/*
-	 * COW fork extents are supposed to remain unwritten until we're ready
-	 * to initiate a disk write.  For direct I/O we are going to write the
-	 * data and need the conversion, but for buffered writes we're done.
-	 */
-	if (!convert_now || cmap->br_state == XFS_EXT_NORM)
+	if (!(flags & XFS_REFLINK_CONVERT_UNWRITTEN) ||
+	    cmap->br_state == XFS_EXT_NORM)
 		return 0;
 
 	trace_xfs_reflink_convert_cow(ip, cmap);
@@ -435,7 +431,7 @@ xfs_reflink_fill_cow_hole(
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
 	uint			*lockmode,
-	bool			convert_now)
+	unsigned int		flags)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_trans	*tp;
@@ -488,7 +484,7 @@ xfs_reflink_fill_cow_hole(
 		return error;
 
 convert:
-	return xfs_reflink_convert_unwritten(ip, imap, cmap, convert_now);
+	return xfs_reflink_convert_unwritten(ip, imap, cmap, flags);
 
 out_trans_cancel:
 	xfs_trans_cancel(tp);
@@ -502,7 +498,7 @@ xfs_reflink_fill_delalloc(
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
 	uint			*lockmode,
-	bool			convert_now)
+	unsigned int		flags)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_trans	*tp;
@@ -551,7 +547,7 @@ xfs_reflink_fill_delalloc(
 			return error;
 	} while (cmap->br_startoff + cmap->br_blockcount <= imap->br_startoff);
 
-	return xfs_reflink_convert_unwritten(ip, imap, cmap, convert_now);
+	return xfs_reflink_convert_unwritten(ip, imap, cmap, flags);
 
 out_trans_cancel:
 	xfs_trans_cancel(tp);
@@ -566,7 +562,7 @@ xfs_reflink_allocate_cow(
 	struct xfs_bmbt_irec	*cmap,
 	bool			*shared,
 	uint			*lockmode,
-	bool			convert_now)
+	unsigned int		flags)
 {
 	int			error;
 	bool			found;
@@ -583,8 +579,7 @@ xfs_reflink_allocate_cow(
 
 	/* CoW fork has a real extent */
 	if (found)
-		return xfs_reflink_convert_unwritten(ip, imap, cmap,
-				convert_now);
+		return xfs_reflink_convert_unwritten(ip, imap, cmap, flags);
 
 	/*
 	 * CoW fork does not have an extent and data extent is shared.
@@ -592,7 +587,7 @@ xfs_reflink_allocate_cow(
 	 */
 	if (cmap->br_startoff > imap->br_startoff)
 		return xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
-				lockmode, convert_now);
+				lockmode, flags);
 
 	/*
 	 * CoW fork has a delalloc reservation. Replace it with a real extent.
@@ -601,7 +596,7 @@ xfs_reflink_allocate_cow(
 	if (isnullstartblock(cmap->br_startblock) ||
 	    cmap->br_startblock == DELAYSTARTBLOCK)
 		return xfs_reflink_fill_delalloc(ip, imap, cmap, shared,
-				lockmode, convert_now);
+				lockmode, flags);
 
 	/* Shouldn't get here. */
 	ASSERT(0);
