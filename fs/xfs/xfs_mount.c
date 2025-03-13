@@ -666,6 +666,41 @@ xfs_agbtree_compute_maxlevels(
 	mp->m_agbtree_maxlevels = max(levels, mp->m_refc_maxlevels);
 }
 
+static inline void
+xfs_compute_atomic_write_unit_max(
+	struct xfs_mount	*mp)
+{
+	xfs_agblock_t		agsize = mp->m_sb.sb_agblocks;
+	unsigned int		max_extents_logitems;
+	unsigned int		max_agsize;
+
+
+	if (!xfs_has_reflink(mp)) {
+		mp->m_atomic_write_unit_max = 1;
+		return;
+	}
+
+	/*
+	 * Find limit according to logitems - atomic write limits are always a
+	 * power-of-2.
+	 */
+	max_extents_logitems = rounddown_pow_of_two(xfs_atomic_logitems(mp));
+
+	/*
+	 * Also limit the size of atomic writes to the greatest power-of-two
+	 * factor of the agsize so that allocations for an atomic write will
+	 * always be aligned compatibly with the alignment requirements of the
+	 * storage.
+	 * The greatest power-of-two is the value according to the lowest bit
+	 * set.
+	 */
+	max_agsize = 1 << (ffs(agsize) - 1);
+
+	mp->m_atomic_write_unit_max = min(max_extents_logitems, max_agsize);
+	pr_err("%s max_agsize=%d max_extents_logitems=%d mp->m_atomic_write_unit_max=%d agsize=%d ffs=%d\n",
+		__func__, max_agsize, max_extents_logitems, mp->m_atomic_write_unit_max, agsize, ffs(agsize));
+}
+
 /* Compute maximum possible height for realtime btree types for this fs. */
 static inline void
 xfs_rtbtree_compute_maxlevels(
@@ -841,6 +876,12 @@ xfs_mountfs(
 	 * Initialize the precomputed transaction reservations values.
 	 */
 	xfs_trans_init(mp);
+
+
+	/*
+	 * Pre-calculate atomic write unit max.
+	 */
+	xfs_compute_atomic_write_unit_max(mp);
 
 	/*
 	 * Allocate and initialize the per-ag data.
