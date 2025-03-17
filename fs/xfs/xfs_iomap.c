@@ -1095,10 +1095,16 @@ xfs_atomic_write_cow_iomap_begin(
 
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_mount	*mp = ip->i_mount;
-	struct xfs_bmbt_irec	imap, cmap;
 	xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_fileoff_t		end_fsb = xfs_iomap_end_fsb(mp, offset, length);
-	int			nimaps = 1, error;
+	struct xfs_bmbt_irec	imap = {
+		.br_startoff = offset_fsb,
+		.br_startblock = HOLESTARTBLOCK,
+		.br_blockcount = end_fsb - offset_fsb,
+		.br_state = XFS_EXT_UNWRITTEN,
+	};
+	struct xfs_bmbt_irec	cmap;
+	int			error;
 	bool			shared = false;
 	unsigned int		lockmode = XFS_ILOCK_EXCL;
 	u64			seq;
