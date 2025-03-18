@@ -754,7 +754,6 @@ xreap_rgextent_iter(
 {
 	struct xfs_scrub	*sc = rs->sc;
 	xfs_rtblock_t		rtbno;
-	int			error;
 
 	/*
 	 * The only caller so far is CoW fork repair, so we only know how to
@@ -770,6 +769,13 @@ xreap_rgextent_iter(
 	rtbno = xfs_rgbno_to_rtb(sc->sr.rtg, rgbno);
 
 	/*
+	 * We're not worried about the system going down here because log
+	 * recovery walks the refcount btree to clean out the CoW staging
+	 * extents.
+	 */
+	rs->force_roll = true;
+
+	/*
 	 * If there are other rmappings, this block is cross linked and must
 	 * not be freed.  Remove the forward and reverse mapping and move on.
 	 */
@@ -778,7 +784,6 @@ xreap_rgextent_iter(
 				*rglenp);
 
 		xfs_refcount_free_cow_extent(sc->tp, true, rtbno, *rglenp);
-		rs->deferred++;
 		return 0;
 	}
 
@@ -787,20 +792,13 @@ xreap_rgextent_iter(
 	/*
 	 * The CoW staging extent is not crosslinked.  Use deferred work items
 	 * to remove the refcountbt records (which removes the rmap records)
-	 * and free the extent.  We're not worried about the system going down
-	 * here because log recovery walks the refcount btree to clean out the
-	 * CoW staging extents.
+	 * and free the extent.
 	 */
 	xfs_refcount_free_cow_extent(sc->tp, true, rtbno, *rglenp);
-	error = xfs_free_extent_later(sc->tp, rtbno, *rglenp, NULL,
+	return xfs_free_extent_later(sc->tp, rtbno, *rglenp, NULL,
 			rs->resv,
 			XFS_FREE_EXTENT_REALTIME |
 			XFS_FREE_EXTENT_SKIP_DISCARD);
-	if (error)
-		return error;
-
-	rs->deferred++;
-	return 0;
 }
 
 #define XREAP_RTGLOCK_ALL	(XFS_RTGLOCK_BITMAP | \
