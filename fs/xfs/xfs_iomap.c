@@ -809,18 +809,23 @@ xfs_bmap_hw_atomic_write_possible(
 	 * which ensures that we adhere to block layer rules that we won't
 	 * straddle any boundary or violate write alignment requirement.
 	 */
-	if (!IS_ALIGNED(imap->br_startblock, imap->br_blockcount))
+	if (!IS_ALIGNED(imap->br_startblock, imap->br_blockcount)) {
+		pr_err("%s !IS_ALIGNED\n", __func__);
 		return false;
+	}
 
 	/*
 	 * Spanning multiple extents would mean that multiple BIOs would be
 	 * issued, and so lose atomicity required for REQ_ATOMIC-based atomic
 	 * writes.
 	 */
-	if (!imap_spans_range(imap, offset_fsb, end_fsb))
+	if (!imap_spans_range(imap, offset_fsb, end_fsb)) {
+		pr_err("%s2 !imap_spans_range\n", __func__);
 		return false;
+	}
 
-	return false;
+	pr_err("%s10 always true\n", __func__);
+	return true;
 }
 
 static int
@@ -1120,6 +1125,8 @@ xfs_atomic_write_cow_iomap_begin(
 	bool			shared = false;
 	unsigned int		lockmode = XFS_ILOCK_EXCL;
 	u64			seq;
+	bool 		lookup_extent;
+	struct xfs_iext_cursor	icur;
 
 	pr_err("%s\n", __func__);
 
@@ -1138,6 +1145,20 @@ xfs_atomic_write_cow_iomap_begin(
 //	if (error)
 //		goto out_unlock;
 
+
+	if (!ip->i_cowfp) {
+		ASSERT(!xfs_is_reflink_inode(ip));
+		xfs_ifork_init_cow(ip);
+	}
+
+	pr_err("%s0 calling xfs_iext_lookup_extent shared=%d imap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
+		shared,
+		imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+	lookup_extent = xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &cmap);
+	pr_err("%s0.0 called xfs_iext_lookup_extent shared=%d cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d lookup_extent=%d isnullstartblock(br_startblock)=%d\n", __func__,
+		shared,
+		cmap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state, lookup_extent,
+		isnullstartblock(cmap.br_startblock));
 
 	pr_err("%s1 calling xfs_reflink_allocate_cow shared=%d imap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
 		shared,

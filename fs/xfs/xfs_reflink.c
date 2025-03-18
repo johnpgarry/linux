@@ -375,9 +375,17 @@ xfs_find_trim_cow_extent(
 	 * If we don't find an overlapping extent, trim the range we need to
 	 * allocate to fit the hole we found.
 	 */
-	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, cmap))
+	pr_err("%s offset_fsb=%lld count_fsb=%lld\n",
+		__func__, offset_fsb, count_fsb);
+	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, cmap)) {
+
 		cmap->br_startoff = offset_fsb + count_fsb;
+		pr_err("%s1 !xfs_iext_lookup_extent cmap->br_startoff=%lld\n", __func__, cmap->br_startoff);
+	}
+	pr_err("%s1.1 called xfs_iext_lookup_extent cmap.offset=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	if (cmap->br_startoff > offset_fsb) {
+		pr_err("%s2 calling xfs_trim_extent and xfs_bmap_trim_cow and return\n", __func__);
 		xfs_trim_extent(imap, imap->br_startoff,
 				cmap->br_startoff - imap->br_startoff);
 		return xfs_bmap_trim_cow(ip, imap, shared);
@@ -385,11 +393,13 @@ xfs_find_trim_cow_extent(
 
 	*shared = true;
 	if (isnullstartblock(cmap->br_startblock)) {
+		pr_err("%s3 isnullstartblock true, so return xfs_trim_extent found=false, shared=true\n", __func__);
 		xfs_trim_extent(imap, cmap->br_startoff, cmap->br_blockcount);
 		return 0;
 	}
 
 	/* real extent found - no need to allocate */
+	pr_err("%s4 calling xfs_trim_extent and return found=true, shared=true\n", __func__);
 	xfs_trim_extent(cmap, offset_fsb, count_fsb);
 	*found = true;
 	return 0;
@@ -477,6 +487,8 @@ xfs_reflink_fill_cow_hole(
 
 	/* Allocate the entire reservation as unwritten blocks. */
 	nimaps = 1;
+	pr_err("%s calling xfs_bmapi_write imap->br_startoff=%lld, br_blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_blockcount);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			bmapi_flags, 0, cmap, &nimaps);
 	if (error)
