@@ -953,8 +953,10 @@ xfs_iext_lookup_extent(
 
 		if (xfs_iext_rec_is_empty(rec))
 			break;
-		if (xfs_iext_rec_cmp(rec, offset) >= 0)
+		if (xfs_iext_rec_cmp(rec, offset) >= 0) {
+			pr_err("%s1 goto found offset=%lld\n", __func__, offset);
 			goto found;
+		}
 	}
 
 	/* Try looking in the next node for an entry > offset */
@@ -964,6 +966,7 @@ xfs_iext_lookup_extent(
 	cur->pos = 0;
 	if (!xfs_iext_valid(ifp, cur))
 		return false;
+	pr_err("%s2 got something in next\n", __func__);
 found:
 	xfs_iext_get(gotp, cur_rec(cur));
 	return true;

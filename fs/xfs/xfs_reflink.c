@@ -357,7 +357,7 @@ xfs_reflink_convert_cow(
  * is not shared we might have a preallocation for it in the COW fork. If so we
  * use it that rather than trigger a new allocation.
  */
-static int
+int
 xfs_find_trim_cow_extent(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
@@ -380,15 +380,16 @@ xfs_find_trim_cow_extent(
 	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, cmap)) {
 
 		cmap->br_startoff = offset_fsb + count_fsb;
-		pr_err("%s1 !xfs_iext_lookup_extent cmap->br_startoff=%lld\n", __func__, cmap->br_startoff);
+		pr_err("%s1 !xfs_iext_lookup_extent cmap->br_startoff=%lld = offset_fsb + count_fsb\n", __func__, cmap->br_startoff);
 	}
 	pr_err("%s1.1 called xfs_iext_lookup_extent cmap.offset=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
 		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	if (cmap->br_startoff > offset_fsb) {
-		pr_err("%s2 calling xfs_trim_extent and xfs_bmap_trim_cow and return\n", __func__);
+		pr_err("%s2 calling xfs_trim_extent and xfs_bmap_trim_cow\n", __func__);
 		xfs_trim_extent(imap, imap->br_startoff,
 				cmap->br_startoff - imap->br_startoff);
 		return xfs_bmap_trim_cow(ip, imap, shared);
+		pr_err("%s2.1 called xfs_trim_extent and xfs_bmap_trim_cow, shared=%d found=false\n", __func__, *shared);
 	}
 
 	*shared = true;
@@ -405,7 +406,7 @@ xfs_find_trim_cow_extent(
 	return 0;
 }
 
-static int
+int
 xfs_reflink_convert_unwritten(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
@@ -434,7 +435,7 @@ xfs_reflink_convert_unwritten(
 	return error;
 }
 
-static int
+int
 xfs_reflink_fill_cow_hole(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
@@ -477,6 +478,7 @@ xfs_reflink_fill_cow_hole(
 	*lockmode = XFS_ILOCK_EXCL;
 
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
+	pr_err("%s *shared=%d error=%d\n", __func__, *shared, error);
 	if (error || (!*shared && !(flags & XFS_REFLINK_FORCE_COW)))
 		goto out_trans_cancel;
 
@@ -621,7 +623,8 @@ xfs_reflink_allocate_cow(
 	 * Allocate a real extent in the CoW fork.
 	 */
 	if (cmap->br_startoff > imap->br_startoff) {
-		pr_err("%s3 calling xfs_reflink_fill_cow_hole and return\n", __func__);
+		pr_err("%s3 calling xfs_reflink_fill_cow_hole and return cmap->br_startoff=%lld imap->br_startoff=%lld imap->start_block=%lld\n",
+			__func__, cmap->br_startoff, imap->br_startoff, imap->br_startblock);
 		return xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
 				lockmode, flags);
 	}
