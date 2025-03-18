@@ -615,6 +615,40 @@ out:
 	return -ENOMEM;
 }
 
+void
+xfs_logres(
+	struct xfs_mount	*mp)
+{
+	unsigned int		efi = xfs_efi_item_overhead(1);
+	unsigned int		efd = xfs_efd_item_overhead(1);
+	unsigned int		rui = xfs_rui_item_overhead(1);
+	unsigned int		rud = xfs_rud_item_overhead(1);
+	unsigned int		cui = xfs_cui_item_overhead(1);
+	unsigned int		cud = xfs_cud_item_overhead(1);
+	unsigned int		bui = xfs_bui_item_overhead(1);
+	unsigned int		bud = xfs_bud_item_overhead(1);
+	unsigned int		logres = M_RES(mp)->tr_write.tr_logres;
+
+	/*
+	 * Maximum overhead to complete an atomic write ioend in software:
+	 * remove data fork extent + remove cow fork extent +
+	 * map extent into data fork
+	 */
+	unsigned int		atomic_logitems =
+		(bui + cui + rui + efi) + (cui + rui) + (bui + rui);
+
+	/*
+	 * Maybe you should use tr_itruncate for the ioend, because it reserves
+	 * enough log space to free two file extents per transaction, but with
+	 * intent items we only ever log one step at a time.  Thus we can use
+	 * half the log reservation per transaction for the intent items.
+	 */
+	xfs_err(mp, "logres %u efi %u efd %u rui %u rud %u cui %u cud %u bui %u bud %u",
+			logres, efi, efd, rui, rud, cui, cud, bui, bud);
+	xfs_err(mp, "aw   logitems %u max_extents %u",
+			atomic_logitems, logres / (2 * atomic_logitems));
+}
+
 STATIC void
 xfs_destroy_mount_workqueues(
 	struct xfs_mount	*mp)

@@ -1110,6 +1110,8 @@ xfs_mountfs(
 		xfs_zone_gc_start(mp);
 	}
 
+	xfs_logres(mp);
+
 	return 0;
 
  out_agresv:
