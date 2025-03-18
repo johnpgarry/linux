@@ -757,8 +757,21 @@ xfs_file_dio_write_atomic(
 {
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
 	unsigned int		dio_flags = 0;
-	const struct iomap_ops	*dops = &xfs_direct_write_iomap_ops;
-	ssize_t			ret;
+	const struct iomap_ops	*dops;
+	ssize_t			ret, ocount = iov_iter_count(from);
+
+	ret = generic_atomic_write_valid(iocb, from);
+	if (ret)
+		return ret;
+
+	if (ocount > xfs_get_atomic_write_max(ip))
+		return -EINVAL;
+	if (ocount < xfs_get_atomic_write_min(ip))
+		return -EINVAL;
+	if (ocount <= xfs_get_atomic_write_max_opt(ip))
+		dops = &xfs_direct_write_iomap_ops;
+	else
+		dops = &xfs_atomic_write_cow_iomap_ops;
 
 retry:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
@@ -1113,18 +1126,6 @@ xfs_file_write_iter(
 
 	if (IS_DAX(inode))
 		return xfs_file_dax_write(iocb, from);
-
-	if (iocb->ki_flags & IOCB_ATOMIC) {
-		if (ocount < xfs_get_atomic_write_min(ip))
-			return -EINVAL;
-
-		if (ocount > xfs_get_atomic_write_max(ip))
-			return -EINVAL;
-
-		ret = generic_atomic_write_valid(iocb, from);
-		if (ret)
-			return ret;
-	}
 
 	if (iocb->ki_flags & IOCB_DIRECT) {
 		/*
