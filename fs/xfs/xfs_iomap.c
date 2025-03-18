@@ -1157,18 +1157,18 @@ xfs_atomic_write_cow_iomap_begin(
 	pr_err("%s0.0 called xfs_iext_lookup_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d lookup_extent=%d isnullstartblock(br_startblock)=%d\n", __func__,
 		cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, lookup_extent,
 		isnullstartblock(cmap.br_startblock));
-
-	if (lookup_extent) {
+	if (cmap.br_startoff == 123123123)
+		goto oldway;
+	if (lookup_extent && cmap.br_startoff <= offset_fsb) {
 		if (cmap.br_state == XFS_EXT_UNWRITTEN) {
 			xfs_trim_extent(&cmap, offset_fsb, count_fsb);
-			pr_err("%s0.1 called xfs_trim_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
+			pr_err("%s0.1 called xfs_trim_extent, calling xfs_reflink_convert_unwritten cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
 					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
 					isnullstartblock(cmap.br_startblock));
 
 			trace_xfs_reflink_convert_cow(ip, &cmap);
 
-			error = xfs_reflink_convert_unwritten(ip, &imap, &cmap, XFS_REFLINK_CONVERT_UNWRITTEN |
-				XFS_REFLINK_FORCE_COW | XFS_REFLINK_ALLOC_EXTSZALIGN);
+			error = xfs_reflink_convert_unwritten(ip, &imap, &cmap, XFS_REFLINK_CONVERT_UNWRITTEN);
 			pr_err("%s0.2 called xfs_reflink_convert_unwritten cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d error=%d isnullstartblock(br_startblock)=%d\n", __func__,
 					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, error,
 					isnullstartblock(cmap.br_startblock));
@@ -1176,9 +1176,8 @@ xfs_atomic_write_cow_iomap_begin(
 				goto out_unlock;
 
 			goto theend;
-		} else {
-			BUG(); //todo
 		}
+		goto theend;
 	} else {
 		pr_err("%s0.5 calling xfs_reflink_fill_cow_hole cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
 					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
@@ -1197,7 +1196,7 @@ xfs_atomic_write_cow_iomap_begin(
 			goto out_unlock;
 		goto theend;
 	}
-
+oldway:
 	pr_err("%s1 calling xfs_reflink_allocate_cow imap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
 		imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 

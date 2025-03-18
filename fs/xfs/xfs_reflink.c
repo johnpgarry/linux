@@ -417,6 +417,10 @@ xfs_reflink_convert_unwritten(
 	xfs_filblks_t		count_fsb = imap->br_blockcount;
 	int			error;
 
+	pr_err("%s calling xfs_trim_extent cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d offset_fsb=%lld count_fsb=%lld\n",
+		__func__,
+		cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state,
+		offset_fsb, count_fsb);
 	/*
 	 * cmap might larger than imap due to cowextsize hint.
 	 */
@@ -428,9 +432,17 @@ xfs_reflink_convert_unwritten(
 
 	trace_xfs_reflink_convert_cow(ip, cmap);
 
+	pr_err("%s1 calling xfs_reflink_convert_cow_locked cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d offset_fsb=%lld count_fsb=%lld\n",
+		__func__,
+		cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state,
+		offset_fsb, count_fsb);
 	error = xfs_reflink_convert_cow_locked(ip, offset_fsb, count_fsb);
 	if (!error)
 		cmap->br_state = XFS_EXT_NORM;
+	pr_err("%s1.1 called xfs_reflink_convert_cow_locked cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d offset_fsb=%lld count_fsb=%lld\n",
+		__func__,
+		cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state,
+		offset_fsb, count_fsb);
 
 	return error;
 }
@@ -457,6 +469,10 @@ xfs_reflink_fill_cow_hole(
 	if (flags & XFS_REFLINK_ALLOC_EXTSZALIGN)
 		bmapi_flags |= XFS_BMAPI_EXTSZALIGN;
 
+	pr_err("%s imap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d *shared=%d\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, *shared);
+	pr_err("%s0 cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	resaligned = xfs_aligned_fsb_count(imap->br_startoff,
 		imap->br_blockcount, xfs_get_cowextsz_hint(ip));
 	if (XFS_IS_REALTIME_INODE(ip)) {
@@ -478,7 +494,9 @@ xfs_reflink_fill_cow_hole(
 	*lockmode = XFS_ILOCK_EXCL;
 
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
-	pr_err("%s *shared=%d error=%d\n", __func__, *shared, error);
+	pr_err("%s1 after xfs_find_trim_cow_extent *shared=%d error=%d\n", __func__, *shared, error);
+	pr_err("%s1.1 cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	if (error || (!*shared && !(flags & XFS_REFLINK_FORCE_COW)))
 		goto out_trans_cancel;
 
@@ -489,10 +507,16 @@ xfs_reflink_fill_cow_hole(
 
 	/* Allocate the entire reservation as unwritten blocks. */
 	nimaps = 1;
-	pr_err("%s calling xfs_bmapi_write imap->br_startoff=%lld, br_blockcount=%lld\n",
+	pr_err("%s2 calling xfs_bmapi_write imap->br_startoff=%lld, br_blockcount=%lld\n",
 		__func__, imap->br_startoff, imap->br_blockcount);
+	pr_err("%s2.1 cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	error = xfs_bmapi_write(tp, ip, imap->br_startoff, imap->br_blockcount,
 			bmapi_flags, 0, cmap, &nimaps);
+	pr_err("%s3 called xfs_bmapi_write imap->br_startoff=%lld, br_blockcount=%lld\n",
+		__func__, imap->br_startoff, imap->br_blockcount);
+	pr_err("%s3.1 cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	if (error)
 		goto out_trans_cancel;
 
@@ -614,7 +638,10 @@ xfs_reflink_allocate_cow(
 
 	/* CoW fork has a real extent */
 	if (found) {
-		pr_err("%s2 calling xfs_reflink_convert_unwritten as found set\n", __func__);
+		pr_err("%s2 calling xfs_reflink_convert_unwritten as found set imap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+			__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
+		pr_err("%s2.1 cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+			__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 		return xfs_reflink_convert_unwritten(ip, imap, cmap, flags);
 	}
 
@@ -623,8 +650,10 @@ xfs_reflink_allocate_cow(
 	 * Allocate a real extent in the CoW fork.
 	 */
 	if (cmap->br_startoff > imap->br_startoff) {
-		pr_err("%s3 calling xfs_reflink_fill_cow_hole and return cmap->br_startoff=%lld imap->br_startoff=%lld imap->start_block=%lld\n",
-			__func__, cmap->br_startoff, imap->br_startoff, imap->br_startblock);
+		pr_err("%s3 calling xfs_reflink_fill_cow_hole and return imap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+			__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
+		pr_err("%s3.1 cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+			__func__, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 		return xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
 				lockmode, flags);
 	}

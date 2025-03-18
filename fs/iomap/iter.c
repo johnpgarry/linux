@@ -30,6 +30,8 @@ int iomap_iter_advance(struct iomap_iter *iter, u64 *count)
 
 static inline void iomap_iter_done(struct iomap_iter *iter)
 {
+	if (iter->iomap.offset > iter->pos)
+		pr_err("%s iter->iomap.offset=%lld iter->pos=%lld\n", __func__, iter->iomap.offset, iter->pos);
 	WARN_ON_ONCE(iter->iomap.offset > iter->pos);
 	WARN_ON_ONCE(iter->iomap.length == 0);
 	WARN_ON_ONCE(iter->iomap.offset + iter->iomap.length <= iter->pos);
