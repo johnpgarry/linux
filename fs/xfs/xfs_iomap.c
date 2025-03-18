@@ -820,7 +820,7 @@ xfs_bmap_hw_atomic_write_possible(
 	if (!imap_spans_range(imap, offset_fsb, end_fsb))
 		return false;
 
-	return true;
+	return false;
 }
 
 static int
@@ -838,6 +838,7 @@ xfs_direct_write_iomap_begin(
 	xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_fileoff_t		end_fsb = xfs_iomap_end_fsb(mp, offset, length);
 	xfs_fileoff_t		orig_end_fsb = end_fsb;
+	bool			atomic_bio = flags & IOMAP_ATOMIC;
 	int			nimaps = 1, error = 0;
 	unsigned int		reflink_flags = 0;
 	bool			shared = false;
@@ -845,6 +846,8 @@ xfs_direct_write_iomap_begin(
 	bool			needs_alloc;
 	unsigned int		lockmode;
 	u64			seq;
+
+	pr_err("%s offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
 
 	ASSERT(flags & (IOMAP_WRITE | IOMAP_ZERO));
 
@@ -906,8 +909,10 @@ relock:
 			goto out_unlock;
 
 		/* may drop and re-acquire the ilock */
+		pr_err("%s calling xfs_reflink_allocate_cow\n", __func__);
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 				&lockmode, reflink_flags);
+		pr_err("%s1 called xfs_reflink_allocate_cow error=%d shared=%d\n", __func__, error, shared);
 		if (error)
 			goto out_unlock;
 		if (shared) {
@@ -915,6 +920,7 @@ relock:
 			    !xfs_bmap_hw_atomic_write_possible(&cmap,
 					offset_fsb, end_fsb)) {
 				error = -EAGAIN;
+				pr_err("%s1.2 bad atomic_bio\n", __func__);
 				goto out_unlock;
 			}
 			goto out_found_cow;
@@ -925,6 +931,7 @@ relock:
 
 	needs_alloc = imap_needs_alloc(inode, flags, &imap, nimaps);
 
+	pr_err("%s2 atomic_bio=%d needs_alloc=%d\n", __func__, atomic_bio, needs_alloc);
 	if (flags & IOMAP_ATOMIC) {
 		error = -EAGAIN;
 		/*
@@ -932,12 +939,16 @@ relock:
 		 * then we may end up with multiple extents, which means that
 		 * REQ_ATOMIC-based cannot be used, so avoid this possibility.
 		 */
-		if (needs_alloc && orig_end_fsb - offset_fsb > 1)
+		if (needs_alloc && orig_end_fsb - offset_fsb > 1) {
+			pr_err("%s3 bailing as needs_alloc && orig_end_fsb - offset_fsb > 1\n", __func__);
 			goto out_unlock;
+		}
 
 		if (!xfs_bmap_hw_atomic_write_possible(&imap, offset_fsb,
-				orig_end_fsb))
+				orig_end_fsb)) {
+			pr_err("%s3.1 bailing as !xfs_bmap_valid_for_atomic_write\n", __func__);
 			goto out_unlock;
+		}
 	}
 
 	if (needs_alloc)
@@ -1006,6 +1017,7 @@ allocate_blocks:
 				 iomap_flags | IOMAP_F_NEW, seq);
 
 out_found_cow:
+	pr_err("%s8 out_found_cow: atomic_bio=%d\n", __func__, atomic_bio);
 	length = XFS_FSB_TO_B(mp, cmap.br_startoff + cmap.br_blockcount);
 	trace_xfs_iomap_found(ip, offset, length - offset, XFS_COW_FORK, &cmap);
 	if (imap.br_startblock != HOLESTARTBLOCK) {
@@ -1109,6 +1121,8 @@ xfs_atomic_write_cow_iomap_begin(
 	unsigned int		lockmode = XFS_ILOCK_EXCL;
 	u64			seq;
 
+	pr_err("%s\n", __func__);
+
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -1119,10 +1133,15 @@ xfs_atomic_write_cow_iomap_begin(
 	if (error)
 		return error;
 
-	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
-			&nimaps, 0);
-	if (error)
-		goto out_unlock;
+//	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
+//			&nimaps, 0);
+//	if (error)
+//		goto out_unlock;
+
+
+	pr_err("%s1 calling xfs_reflink_allocate_cow shared=%d imap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
+		shared,
+		imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
 
 	 /*
 	  * Use XFS_REFLINK_ALLOC_EXTSZALIGN to hint at aligning new extents
@@ -1133,6 +1152,9 @@ xfs_atomic_write_cow_iomap_begin(
 	error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
 			&lockmode, XFS_REFLINK_CONVERT_UNWRITTEN |
 			XFS_REFLINK_FORCE_COW | XFS_REFLINK_ALLOC_EXTSZALIGN);
+	pr_err("%s1.1 called xfs_reflink_allocate_cow shared=%d cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
+		shared,
+		cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
 	/*
 	 * Don't check @shared. For atomic writes, we should error when
 	 * we don't get a COW fork extent mapping.

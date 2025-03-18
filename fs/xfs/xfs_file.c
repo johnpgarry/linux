@@ -774,7 +774,12 @@ xfs_file_dio_write_atomic(
 	else
 		dops = &xfs_atomic_write_cow_iomap_ops;
 
+	pr_err("%s iocb->ki_pos=%lld len=%zd\n", __func__,
+		iocb->ki_pos, iov_iter_count(from));
 retry:
+	pr_err("%s0 retry: iocb->ki_pos=%lld len=%zd dops=%pS\n", __func__,
+		iocb->ki_pos, iov_iter_count(from),
+		dops);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -802,8 +807,15 @@ retry:
 		inode_dio_wait(VFS_I(ip));
 
 	trace_xfs_file_direct_write(iocb, from);
+	pr_err("%s1 calling iomap_dio_rw iocb->ki_pos=%lld len=%zd dops=%pS\n", __func__,
+		iocb->ki_pos, iov_iter_count(from),
+		dops);
 	ret = iomap_dio_rw(iocb, from, dops, &xfs_dio_write_ops,
-			dio_flags, NULL, 0);
+				dio_flags, NULL, 0);
+	pr_err("%s1.1 called iomap_dio_rw ret=%zd iocb->ki_pos=%lld len=%zd dops=%pS\n", __func__,
+		ret,
+		iocb->ki_pos, iov_iter_count(from),
+		dops);
 
 	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) &&
 	    dops == &xfs_direct_write_iomap_ops) {
@@ -817,6 +829,9 @@ retry:
 out_unlock:
 	if (iolock)
 		xfs_iunlock(ip, iolock);
+	pr_err("%s10 out ret=%zd iocb->ki_pos=%lld len=%zd\n", __func__,
+		ret,
+		iocb->ki_pos, iov_iter_count(from));
 	return ret;
 }
 

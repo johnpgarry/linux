@@ -577,7 +577,10 @@ xfs_reflink_allocate_cow(
 		xfs_ifork_init_cow(ip);
 	}
 
+	pr_err("%s calling xfs_find_trim_cow_extent\n", __func__);
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
+	pr_err("%s1.1 called xfs_find_trim_cow_extent error=%d found=%d *shared=%d cmap->startoff=%lld, start_block=%lld, block_count=%lld, state=%d\n",
+		__func__, error, found, *shared, cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 	if (error)
 		return error;
 
@@ -596,16 +599,20 @@ xfs_reflink_allocate_cow(
 		return 0;
 
 	/* CoW fork has a real extent */
-	if (found)
+	if (found) {
+		pr_err("%s2 calling xfs_reflink_convert_unwritten as found set\n", __func__);
 		return xfs_reflink_convert_unwritten(ip, imap, cmap, flags);
+	}
 
 	/*
 	 * CoW fork does not have an extent and data extent is shared.
 	 * Allocate a real extent in the CoW fork.
 	 */
-	if (cmap->br_startoff > imap->br_startoff)
+	if (cmap->br_startoff > imap->br_startoff) {
+		pr_err("%s3 calling xfs_reflink_fill_cow_hole and return\n", __func__);
 		return xfs_reflink_fill_cow_hole(ip, imap, cmap, shared,
 				lockmode, flags);
+	}
 
 	/*
 	 * CoW fork has a delalloc reservation. Replace it with a real extent.
@@ -1022,6 +1029,7 @@ xfs_reflink_end_atomic_cow(
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	end_fsb = XFS_B_TO_FSB(mp, offset + count);
 
+	pr_err("%s offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
 	/*
 	 * Each remapping operation could cause a btree split, so in the worst
 	 * case that's one for each block.
