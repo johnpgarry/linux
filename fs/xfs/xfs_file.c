@@ -768,6 +768,7 @@ xfs_file_dio_write_atomic(
 		return -EINVAL;
 	if (ocount < xfs_get_atomic_write_min(ip))
 		return -EINVAL;
+	/* HW offload should be faster, so try that first */
 	if (ocount <= xfs_get_atomic_write_max_opt(ip))
 		dops = &xfs_direct_write_iomap_ops;
 	else
