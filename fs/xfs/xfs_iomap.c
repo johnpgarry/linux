@@ -1116,7 +1116,7 @@ xfs_atomic_write_cow_iomap_begin(
 		.br_state = XFS_EXT_UNWRITTEN,
 	};
 	struct xfs_bmbt_irec	cmap;
-	int			nimaps = 1, error;
+	__maybe_unused int			nimaps = 1, error;
 	bool			shared = false;
 	unsigned int		lockmode = XFS_ILOCK_EXCL;
 	u64			seq;
