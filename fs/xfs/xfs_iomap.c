@@ -1107,140 +1107,135 @@ xfs_atomic_write_cow_iomap_begin(
 	struct iomap		*iomap,
 	struct iomap		*srcmap)
 {
-	ASSERT(flags & IOMAP_WRITE);
-	ASSERT(flags & IOMAP_DIRECT);
-
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_mount	*mp = ip->i_mount;
 	xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_fileoff_t		end_fsb = xfs_iomap_end_fsb(mp, offset, length);
-	xfs_fileoff_t		count_fsb = end_fsb - offset_fsb;
-	struct xfs_bmbt_irec	imap = {
-		.br_startoff = offset_fsb,
-		.br_startblock = HOLESTARTBLOCK,
-		.br_blockcount = end_fsb - offset_fsb,
-		.br_state = XFS_EXT_UNWRITTEN,
-	};
+	xfs_filblks_t		count_fsb = end_fsb - offset_fsb;
+	int			nmaps = 1;
+	xfs_filblks_t		resaligned;
 	struct xfs_bmbt_irec	cmap;
-	__maybe_unused int			nimaps = 1, error;
-	bool			shared = false;
-	unsigned int		lockmode = XFS_ILOCK_EXCL;
-	u64			seq;
-	bool 		lookup_extent;
 	struct xfs_iext_cursor	icur;
+	struct xfs_trans	*tp;
+	int			error;
+	u64			seq;
 
-	pr_err("%s\n", __func__);
+	ASSERT(!XFS_IS_REALTIME_INODE(ip));
+	ASSERT(flags & IOMAP_WRITE);
+	ASSERT(flags & IOMAP_DIRECT);
 
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
-	if (!xfs_has_reflink(mp))
+	if (WARN_ON_ONCE(!xfs_has_reflink(mp)))
 		return -EINVAL;
 
-	error = xfs_ilock_for_iomap(ip, flags, &lockmode);
-	if (error)
-		return error;
-
-//	error = xfs_bmapi_read(ip, offset_fsb, end_fsb - offset_fsb, &imap,
-//			&nimaps, 0);
-//	if (error)
-//		goto out_unlock;
-
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 	if (!ip->i_cowfp) {
 		ASSERT(!xfs_is_reflink_inode(ip));
 		xfs_ifork_init_cow(ip);
 	}
 //XFS_EXT_NORM = 0
-	pr_err("%s0 calling xfs_iext_lookup_extent offset_fsb=%lld\n", __func__, offset_fsb);
-	lookup_extent = xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &cmap);
-	pr_err("%s0.0 called xfs_iext_lookup_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d lookup_extent=%d isnullstartblock(br_startblock)=%d\n", __func__,
-		cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, lookup_extent,
-		isnullstartblock(cmap.br_startblock));
-	if (cmap.br_startoff == 123123123)
-		goto oldway;
-	if (lookup_extent && cmap.br_startoff <= offset_fsb) {
-		if (cmap.br_state == XFS_EXT_UNWRITTEN) {
-			xfs_trim_extent(&cmap, offset_fsb, count_fsb);
-			pr_err("%s0.1 called xfs_trim_extent, calling xfs_reflink_convert_unwritten cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
-					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
-					isnullstartblock(cmap.br_startblock));
 
-			trace_xfs_reflink_convert_cow(ip, &cmap);
+	pr_err("%s offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
 
-			error = xfs_reflink_convert_unwritten(ip, &imap, &cmap, XFS_REFLINK_CONVERT_UNWRITTEN);
-			pr_err("%s0.2 called xfs_reflink_convert_unwritten cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d error=%d isnullstartblock(br_startblock)=%d\n", __func__,
-					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, error,
-					isnullstartblock(cmap.br_startblock));
-			if (error)
-				goto out_unlock;
 
-			goto theend;
-		}
-		goto theend;
-	} else {
-		pr_err("%s0.5 calling xfs_reflink_fill_cow_hole cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
-					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
-					isnullstartblock(cmap.br_startblock));
-		pr_err("%s0.5.1 imap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
-					imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-		error = xfs_reflink_fill_cow_hole(ip, &imap, &cmap, &shared,
-				&lockmode, XFS_REFLINK_CONVERT_UNWRITTEN |
-			XFS_REFLINK_FORCE_COW | XFS_REFLINK_ALLOC_EXTSZALIGN);
-		pr_err("%s0.6 called xfs_reflink_fill_cow_hole cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d error=%d isnullstartblock(br_startblock)=%d\n", __func__,
-					cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, error,
-					isnullstartblock(cmap.br_startblock));
-		pr_err("%s0.6.1 imap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
-					imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
-		if (error)
-			goto out_unlock;
-		goto theend;
+	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &cmap)) {
+		pr_err("%s1.0 called xfs_iext_lookup_extent failed cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
+			cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
+			isnullstartblock(cmap.br_startblock));
+		cmap.br_startoff = end_fsb;
 	}
-oldway:
-	pr_err("%s1 calling xfs_reflink_allocate_cow imap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
-		imap.br_startoff, imap.br_startblock, imap.br_blockcount, imap.br_state);
+	pr_err("%s1.1 called xfs_iext_lookup_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
+		cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
+		isnullstartblock(cmap.br_startblock));
+	if (cmap.br_startoff <= offset_fsb) {
+		pr_err("%s2 calling xfs_trim_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
+			cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
+			isnullstartblock(cmap.br_startblock));
+		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
+		pr_err("%s2.1 called xfs_trim_extent and then goto found cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
+			cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
+			isnullstartblock(cmap.br_startblock));
+		goto found;
+	}
 
-	 /*
-	  * Use XFS_REFLINK_ALLOC_EXTSZALIGN to hint at aligning new extents
-	  * according to extszhint, such that there will be a greater chance
-	  * that future atomic writes to that same range will be aligned (and
-	  * don't require this COW-based method).
-	  */
-	error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
-			&lockmode, XFS_REFLINK_CONVERT_UNWRITTEN |
-			XFS_REFLINK_FORCE_COW | XFS_REFLINK_ALLOC_EXTSZALIGN);
-	pr_err("%s1.1 called xfs_reflink_allocate_cow shared=%d cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n", __func__,
-		shared,
-		cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
+	end_fsb = cmap.br_startoff;
+	count_fsb = end_fsb - offset_fsb;
+	
+	pr_err("%s3 offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
+	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
+			xfs_get_cowextsz_hint(ip));
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+	error = xfs_trans_alloc_inode(ip, &M_RES(mp)->tr_write,
+			XFS_DIOSTRAT_SPACE_RES(mp, resaligned), 0, false, &tp);
+	if (error)
+		return error;
+
+	pr_err("%s4 calling xfs_iext_lookup_extent offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
+	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &cmap)) {
+		pr_err("%s4.1 called xfs_iext_lookup_extent failed cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
+			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
+		cmap.br_startoff = end_fsb;
+	}
+	pr_err("%s4.2 called xfs_iext_lookup_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d offset_fsb=%lld\n",
+		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, offset_fsb);
+	if (cmap.br_startoff <= offset_fsb) {
+		pr_err("%s4.3 cmap.br_startoff <= offset_fsb, so call xfs_trim_extent and xfs_trans_cancel and then goto found\n",
+			__func__);
+		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
+		xfs_trans_cancel(tp);
+		goto found;
+	}
+
 	/*
-	 * Don't check @shared. For atomic writes, we should error when
-	 * we don't get a COW fork extent mapping.
+	 * Allocate the entire reservation as unwritten blocks.
+	 *
+	 * Use XFS_BMAPI_EXTSZALIGN to hint at aligning new extents according to
+	 * extszhint, such that there will be a greater chance that future
+	 * atomic writes to that same range will be aligned (and don't require
+	 * this COW-based method).
 	 */
+	pr_err("%s5 calling xfs_bmapi_write cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d offset_fsb=%lld\n",
+		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, offset_fsb);
+	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
+			XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC |
+			XFS_BMAPI_EXTSZALIGN, 0, &cmap, &nmaps);
+	pr_err("%s5.1 called xfs_bmapi_write cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d offset_fsb=%lld error=%d\n",
+		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, offset_fsb, error);
+	if (error) {
+		xfs_trans_cancel(tp);
+		goto out_unlock;
+	}
+
+	xfs_inode_set_cowblocks_tag(ip);
+	error = xfs_trans_commit(tp);
 	if (error)
 		goto out_unlock;
 
-theend:
-	end_fsb = imap.br_startoff + imap.br_blockcount;
+found:
 
-	length = XFS_FSB_TO_B(mp, cmap.br_startoff + cmap.br_blockcount);
-	pr_err("%s9 endend: imap.br_startoff=%lld, br_blockcount=%lld, br_startblock=%lld length=%lld cmap.br_startoff=%lld, br_blockcount=%lld end_fsb=%lld\n",
-		__func__, imap.br_startoff, imap.br_blockcount, imap.br_startblock, length, cmap.br_startoff, cmap.br_blockcount, end_fsb);
-	trace_xfs_iomap_found(ip, offset, length - offset, XFS_COW_FORK, &cmap);
-	if (imap.br_startblock != HOLESTARTBLOCK) {
-		pr_err("%s9.1 !HOLESTARTBLOCK calling xfs_bmbt_to_iomap\n", __func__);
-		seq = xfs_iomap_inode_sequence(ip, 0);
-		error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0, seq);
+	pr_err("%s9 found: cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d offset_fsb=%lld count_fsb=%lld\n",
+			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, offset_fsb, count_fsb);
+	if (cmap.br_state != XFS_EXT_NORM) {
+		error = xfs_reflink_convert_cow_locked(ip, offset_fsb,
+				count_fsb);
 		if (error)
 			goto out_unlock;
+		cmap.br_state = XFS_EXT_NORM;
 	}
+
+	length = XFS_FSB_TO_B(mp, cmap.br_startoff + cmap.br_blockcount);
+	trace_xfs_iomap_found(ip, offset, length - offset, XFS_COW_FORK, &cmap);
 	seq = xfs_iomap_inode_sequence(ip, IOMAP_F_SHARED);
-	xfs_iunlock(ip, lockmode);
-	pr_err("%s9.2 IOMAP_F_SHARED calling xfs_bmbt_to_iomap\n", __func__);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
 
 out_unlock:
-	if (lockmode)
-		xfs_iunlock(ip, lockmode);
+	pr_err("%s9.1 out_unlock error=%d\n", __func__, error);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
 }
 

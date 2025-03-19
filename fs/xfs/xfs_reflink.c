@@ -293,7 +293,7 @@ xfs_bmap_trim_cow(
 	return xfs_reflink_trim_around_shared(ip, imap, shared);
 }
 
-static int
+int
 xfs_reflink_convert_cow_locked(
 	struct xfs_inode	*ip,
 	xfs_fileoff_t		offset_fsb,
@@ -357,7 +357,7 @@ xfs_reflink_convert_cow(
  * is not shared we might have a preallocation for it in the COW fork. If so we
  * use it that rather than trigger a new allocation.
  */
-int
+static int
 xfs_find_trim_cow_extent(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
@@ -406,7 +406,7 @@ xfs_find_trim_cow_extent(
 	return 0;
 }
 
-int
+static int
 xfs_reflink_convert_unwritten(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,
@@ -447,7 +447,7 @@ xfs_reflink_convert_unwritten(
 	return error;
 }
 
-int
+static int
 xfs_reflink_fill_cow_hole(
 	struct xfs_inode	*ip,
 	struct xfs_bmbt_irec	*imap,

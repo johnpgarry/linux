@@ -43,29 +43,11 @@ int xfs_bmap_trim_cow(struct xfs_inode *ip, struct xfs_bmbt_irec *imap,
 int xfs_reflink_allocate_cow(struct xfs_inode *ip, struct xfs_bmbt_irec *imap,
 		struct xfs_bmbt_irec *cmap, bool *shared, uint *lockmode,
 		unsigned int flags);
-int xfs_reflink_convert_unwritten(
-	struct xfs_inode	*ip,
-	struct xfs_bmbt_irec	*imap,
-	struct xfs_bmbt_irec	*cmap,
-	unsigned int		flags);
-
 extern int xfs_reflink_convert_cow(struct xfs_inode *ip, xfs_off_t offset,
 		xfs_off_t count);
-int
-xfs_reflink_fill_cow_hole(
-	struct xfs_inode	*ip,
-	struct xfs_bmbt_irec	*imap,
-	struct xfs_bmbt_irec	*cmap,
-	bool			*shared,
-	uint			*lockmode,
-	unsigned int		flags);
-int
-xfs_find_trim_cow_extent(
-	struct xfs_inode	*ip,
-	struct xfs_bmbt_irec	*imap,
-	struct xfs_bmbt_irec	*cmap,
-	bool			*shared,
-	bool			*found);
+int xfs_reflink_convert_cow_locked(struct xfs_inode *ip,
+		xfs_fileoff_t offset_fsb, xfs_filblks_t count_fsb);
+
 extern int xfs_reflink_cancel_cow_blocks(struct xfs_inode *ip,
 		struct xfs_trans **tpp, xfs_fileoff_t offset_fsb,
 		xfs_fileoff_t end_fsb, bool cancel_real);
