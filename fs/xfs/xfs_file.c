@@ -743,7 +743,7 @@ xfs_file_dio_write_zoned(
  * write spans multiple extents or the disk blocks are misaligned.
  *
  * Similar to xfs_file_dio_write_unaligned(), the retry mechanism is based on
- * the ->iomap_begin method returning -EAGAIN, which would be when the
+ * the ->iomap_begin method returning -ENOPROTOOPT, which would be when the
  * REQ_ATOMIC-based write is not possible. In the case of IOCB_NOWAIT being set,
  * then we will not retry with the COW-based method, and instead pass that
  * error code back to the caller immediately.
@@ -817,7 +817,7 @@ retry:
 		iocb->ki_pos, iov_iter_count(from),
 		dops);
 
-	if (ret == -EAGAIN && !(iocb->ki_flags & IOCB_NOWAIT) &&
+	if (ret == -ENOPROTOOPT && !(iocb->ki_flags & IOCB_NOWAIT) &&
 	    dops == &xfs_direct_write_iomap_ops) {
 		xfs_iunlock(ip, iolock);
 		dio_flags = IOMAP_DIO_FORCE_WAIT;

@@ -924,7 +924,7 @@ relock:
 			if ((flags & IOMAP_ATOMIC) &&
 			    !xfs_bmap_hw_atomic_write_possible(&cmap,
 					offset_fsb, end_fsb)) {
-				error = -EAGAIN;
+				error = -ENOPROTOOPT;
 				pr_err("%s1.2 bad atomic_bio\n", __func__);
 				goto out_unlock;
 			}
@@ -938,7 +938,7 @@ relock:
 
 	pr_err("%s2 atomic_bio=%d needs_alloc=%d\n", __func__, atomic_bio, needs_alloc);
 	if (flags & IOMAP_ATOMIC) {
-		error = -EAGAIN;
+		error = -ENOPROTOOPT;
 		/*
 		 * If we allocate less than what is required for the write
 		 * then we may end up with multiple extents, which means that
