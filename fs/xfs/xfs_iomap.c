@@ -1109,7 +1109,7 @@ xfs_atomic_write_cow_iomap_begin(
 {
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_mount	*mp = ip->i_mount;
-	xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
+	const xfs_fileoff_t		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_fileoff_t		end_fsb = xfs_iomap_end_fsb(mp, offset, length);
 	xfs_filblks_t		count_fsb = end_fsb - offset_fsb;
 	int			nmaps = 1;
@@ -1138,16 +1138,19 @@ xfs_atomic_write_cow_iomap_begin(
 	}
 //XFS_EXT_NORM = 0
 
-	pr_err("%s offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
+	pr_err("%s offset_fsb=%lld end_fsb=%lld count_fsb=%lld calling xfs_iext_lookup_extent\n", __func__, offset_fsb, end_fsb, count_fsb);
 
 
 	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &cmap)) {
-		pr_err("%s1.0 called xfs_iext_lookup_extent failed cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
+		pr_err("%s1.0 failed lookup cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
 			cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
 			isnullstartblock(cmap.br_startblock));
 		cmap.br_startoff = end_fsb;
+	} else {
+		pr_err("%s1.1 !!!! passed cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
+			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
 	}
-	pr_err("%s1.1 called xfs_iext_lookup_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
+	pr_err("%s1.2 called xfs_iext_lookup_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d isnullstartblock(br_startblock)=%d\n", __func__,
 		cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
 		isnullstartblock(cmap.br_startblock));
 	if (cmap.br_startoff <= offset_fsb) {
@@ -1164,7 +1167,7 @@ xfs_atomic_write_cow_iomap_begin(
 	end_fsb = cmap.br_startoff;
 	count_fsb = end_fsb - offset_fsb;
 	
-	pr_err("%s3 offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
+	pr_err("%s3 offset_fsb=%lld end_fsb=%lld count_fsb=%lld\n", __func__, offset_fsb, end_fsb, count_fsb);
 	resaligned = xfs_aligned_fsb_count(offset_fsb, count_fsb,
 			xfs_get_cowextsz_hint(ip));
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -1174,11 +1177,17 @@ xfs_atomic_write_cow_iomap_begin(
 	if (error)
 		return error;
 
-	pr_err("%s4 calling xfs_iext_lookup_extent offset_fsb=%lld end_fsb=%lld\n", __func__, offset_fsb, end_fsb);
+	pr_err("%s4 calling xfs_iext_lookup_extent offset_fsb=%lld end_fsb=%lld cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
+		__func__, offset_fsb, end_fsb, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
 	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &cmap)) {
-		pr_err("%s4.1 called xfs_iext_lookup_extent failed cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
+		pr_err("%s4.1 failed lookup cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
 			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
+		BUG_ON(cmap.br_startoff != end_fsb);
 		cmap.br_startoff = end_fsb;
+	} else {
+		pr_err("%s4.2 !!!! passed cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
+		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
+		
 	}
 	pr_err("%s4.2 called xfs_iext_lookup_extent cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d offset_fsb=%lld\n",
 		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, offset_fsb);
@@ -1187,6 +1196,7 @@ xfs_atomic_write_cow_iomap_begin(
 			__func__);
 		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
 		xfs_trans_cancel(tp);
+		BUG();
 		goto found;
 	}
 
@@ -1198,8 +1208,8 @@ xfs_atomic_write_cow_iomap_begin(
 	 * atomic writes to that same range will be aligned (and don't require
 	 * this COW-based method).
 	 */
-	pr_err("%s5 calling xfs_bmapi_write cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d offset_fsb=%lld\n",
-		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, offset_fsb);
+	pr_err("%s5 calling xfs_bmapi_write cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d offset_fsb=%lld count_fsb=%lld\n",
+		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, offset_fsb, count_fsb);
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 			XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC |
 			XFS_BMAPI_EXTSZALIGN, 0, &cmap, &nmaps);
