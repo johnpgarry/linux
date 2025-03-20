@@ -824,7 +824,7 @@ xfs_bmap_hw_atomic_write_possible(
 		return false;
 	}
 
-	pr_err("%s10 always true\n", __func__);
+	pr_err("%s10 always false\n", __func__);
 	return true;
 }
 
