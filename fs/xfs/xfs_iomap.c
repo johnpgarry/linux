@@ -1179,6 +1179,7 @@ xfs_atomic_write_cow_iomap_begin(
 
 	pr_err("%s4 calling xfs_iext_lookup_extent offset_fsb=%lld end_fsb=%lld cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
 		__func__, offset_fsb, end_fsb, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
+	/* extent layout could have changed since the unlock, so check again */
 	if (!xfs_iext_lookup_extent(ip, ip->i_cowfp, offset_fsb, &icur, &cmap)) {
 		pr_err("%s4.1 failed lookup cmap.start_off=%lld, start_block=%lld, block_count=%lld, state=%d\n",
 			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
