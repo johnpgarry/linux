@@ -755,7 +755,7 @@ xfs_file_dio_write_atomic(
 	struct kiocb		*iocb,
 	struct iov_iter		*from)
 {
-	unsigned int		iolock = XFS_IOLOCK_SHARED;
+	unsigned int		iolock;
 	unsigned int		dio_flags;
 	const struct iomap_ops	*dops;
 	ssize_t			ret, ocount = iov_iter_count(from);
@@ -775,9 +775,11 @@ xfs_file_dio_write_atomic(
 	if (ocount <= xfs_get_atomic_write_max_opt(ip)) {
 		dops = &xfs_direct_write_iomap_ops;
 		dio_flags = 0;
+		iolock = XFS_IOLOCK_SHARED;
 	} else {
 		dops = &xfs_atomic_write_cow_iomap_ops;
 		dio_flags = IOMAP_DIO_FORCE_WAIT;
+		iolock = XFS_IOLOCK_EXCL;
 	}
 
 retry:
