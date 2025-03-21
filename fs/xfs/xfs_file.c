@@ -756,8 +756,8 @@ xfs_file_dio_write_atomic(
 	struct iov_iter		*from)
 {
 	unsigned int		iolock = XFS_IOLOCK_SHARED;
-	unsigned int		dio_flags = 0;
-	const struct iomap_ops	*dops = &xfs_direct_write_iomap_ops;
+	unsigned int		dio_flags;
+	const struct iomap_ops	*dops;
 	ssize_t			ret, ocount = iov_iter_count(from);
 
 	ret = generic_atomic_write_valid(iocb, from);
@@ -768,6 +768,17 @@ xfs_file_dio_write_atomic(
 		return -EINVAL;
 	if (ocount < xfs_get_atomic_write_min(ip))
 		return -EINVAL;
+	/*
+	 * HW offload should be faster, so try that first, but only if we know
+	 * that we have a chance of that working in terms of length.
+	 */
+	if (ocount <= xfs_get_atomic_write_max_opt(ip)) {
+		dops = &xfs_direct_write_iomap_ops;
+		dio_flags = 0;
+	} else {
+		dops = &xfs_atomic_write_cow_iomap_ops;
+		dio_flags = IOMAP_DIO_FORCE_WAIT;
+	}
 
 retry:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);

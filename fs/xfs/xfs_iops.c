@@ -642,6 +642,15 @@ xfs_get_atomic_write_max(
 			XFS_FSB_TO_B(mp, mp->m_atomic_write_unit_max));
 }
 
+unsigned int
+xfs_get_atomic_write_max_opt(
+	struct xfs_inode	*ip)
+{
+	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+
+	return min(xfs_get_atomic_write_max(ip), target->bt_bdev_awu_max);
+}
+
 static void
 xfs_report_atomic_write(
 	struct xfs_inode	*ip,
@@ -650,7 +659,7 @@ xfs_report_atomic_write(
 	generic_fill_statx_atomic_writes(stat,
 			xfs_get_atomic_write_min(ip),
 			xfs_get_atomic_write_max(ip),
-			0);
+			xfs_get_atomic_write_max_opt(ip));
 }
 
 STATIC int
