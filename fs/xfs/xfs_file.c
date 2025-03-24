@@ -782,6 +782,9 @@ xfs_file_dio_write_atomic(
 		iolock = XFS_IOLOCK_EXCL;
 	}
 
+	dio_flags = 0;
+	iolock = XFS_IOLOCK_SHARED;
+
 retry:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
@@ -792,7 +795,7 @@ retry:
 		goto out_unlock;
 
 	/* Demote similar to xfs_file_dio_write_aligned() */
-	if (iolock == XFS_IOLOCK_EXCL && dops == &xfs_direct_write_iomap_ops) {
+	if (iolock == XFS_IOLOCK_EXCL) {
 		xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
 		iolock = XFS_IOLOCK_SHARED;
 	}
@@ -816,9 +819,9 @@ retry:
 	if (ret == -ENOPROTOOPT && !(iocb->ki_flags & IOCB_NOWAIT) &&
 	    dops == &xfs_direct_write_iomap_ops) {
 		xfs_iunlock(ip, iolock);
-		dio_flags = IOMAP_DIO_FORCE_WAIT;
+	//	dio_flags = IOMAP_DIO_FORCE_WAIT;
 		dops = &xfs_atomic_write_cow_iomap_ops;
-		iolock = XFS_IOLOCK_EXCL;
+	//	iolock = XFS_IOLOCK_EXCL;
 		goto retry;
 	}
 
