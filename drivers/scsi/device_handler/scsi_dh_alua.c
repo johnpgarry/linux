@@ -133,6 +133,7 @@ static int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 		.sshdr = sshdr,
 	};
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	/* Prepare the command. */
 	memset(cdb, 0x0, MAX_COMMAND_SIZE);
 	cdb[0] = MAINTENANCE_IN;
@@ -166,6 +167,7 @@ static int submit_stpg(struct scsi_device *sdev, int group_id,
 		.sshdr = sshdr,
 	};
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	/* Prepare the data buffer */
 	memset(stpg_data, 0, stpg_len);
 	stpg_data[4] = SCSI_ACCESS_STATE_OPTIMAL;
@@ -219,6 +221,7 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 {
 	struct alua_port_group *pg, *tmp_pg;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	pg = kzalloc(sizeof(struct alua_port_group), GFP_KERNEL);
 	if (!pg)
 		return ERR_PTR(-ENOMEM);
@@ -275,6 +278,7 @@ static int alua_check_tpgs(struct scsi_device *sdev)
 {
 	int tpgs = TPGS_MODE_NONE;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	/*
 	 * ALUA support for non-disk devices is fraught with
 	 * difficulties, so disable it for now.
@@ -331,6 +335,7 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 	bool pg_updated = false;
 	unsigned long flags;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	group_id = scsi_vpd_tpg_id(sdev, &rel_port);
 	if (group_id < 0) {
 		/*
@@ -512,6 +517,7 @@ static int alua_tur(struct scsi_device *sdev)
 	struct scsi_sense_hdr sense_hdr;
 	int retval;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	retval = scsi_test_unit_ready(sdev, ALUA_FAILOVER_TIMEOUT * HZ,
 				      ALUA_FAILOVER_RETRIES, &sense_hdr);
 	if ((sense_hdr.sense_key == NOT_READY ||
@@ -1011,6 +1017,7 @@ static bool alua_rtpg_queue(struct alua_port_group *pg,
 	int start_queue = 0;
 	unsigned long flags;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	if (WARN_ON_ONCE(!pg) || scsi_device_get(sdev))
 		return false;
 
@@ -1094,6 +1101,7 @@ static int alua_set_params(struct scsi_device *sdev, const char *params)
 	int result = SCSI_DH_OK;
 	unsigned long flags;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	if ((sscanf(params, "%u", &argc) != 1) || (argc != 1))
 		return -EINVAL;
 
@@ -1137,6 +1145,7 @@ static int alua_activate(struct scsi_device *sdev,
 	struct alua_queue_data *qdata;
 	struct alua_port_group *pg;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	qdata = kzalloc(sizeof(*qdata), GFP_KERNEL);
 	if (!qdata) {
 		err = SCSI_DH_RES_TEMP_UNAVAIL;
@@ -1182,6 +1191,7 @@ static void alua_check(struct scsi_device *sdev, bool force)
 	struct alua_dh_data *h = sdev->handler_data;
 	struct alua_port_group *pg;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	rcu_read_lock();
 	pg = rcu_dereference(h->pg);
 	if (!pg || !kref_get_unless_zero(&pg->kref)) {
@@ -1205,12 +1215,15 @@ static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 	struct alua_port_group *pg;
 	unsigned char state = SCSI_ACCESS_STATE_OPTIMAL;
 
+	//sdev_printk(KERN_ERR, sdev, "%s req=%pS\n", __func__, req);
+	//WARN_ON_ONCE(1);
 	rcu_read_lock();
 	pg = rcu_dereference(h->pg);
 	if (pg)
 		state = pg->state;
 	rcu_read_unlock();
 
+	//sdev_printk(KERN_ERR, sdev, "%s req=%pS state=%d pg=%pS\n", __func__, req, state, pg);
 	switch (state) {
 	case SCSI_ACCESS_STATE_OPTIMAL:
 	case SCSI_ACCESS_STATE_ACTIVE:
@@ -1238,7 +1251,7 @@ static int alua_bus_attach(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h;
 	int err;
-
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
 	if (!h)
 		return SCSI_DH_NOMEM;
@@ -1269,6 +1282,7 @@ static void alua_bus_detach(struct scsi_device *sdev)
 	struct alua_dh_data *h = sdev->handler_data;
 	struct alua_port_group *pg;
 
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	spin_lock(&h->pg_lock);
 	pg = rcu_dereference_protected(h->pg, lockdep_is_held(&h->pg_lock));
 	rcu_assign_pointer(h->pg, NULL);
