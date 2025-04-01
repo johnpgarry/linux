@@ -173,7 +173,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_TUR_MS_TO_READY 0
 #define DEF_UUID_CTL 0
 #define JDELAY_OVERRIDDEN -9999
-#define DEF_ALUA_MPATH	0
+#define DEF_ALUA_MPATH	1
 
 /* Default parameters for ZBC drives */
 #define DEF_ZBC_ZONE_SIZE_MB	128
@@ -2203,7 +2203,7 @@ static int resp_inquiry(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 	if (sdebug_vpd_use_hostno == 0) {
 		 arr[5] |= 0x10;
 	} else {
-		if (sdebug_alua_mpath == 1)
+		if (sdebug_alua_mpath == 1) // check versus alua_check_tpgs()
 			arr[5] |= 0x11;
 		else
 			arr[5] |= 0x10;

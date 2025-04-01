@@ -1723,8 +1723,11 @@ int scsi_rescan_device(struct scsi_device *sdev)
 	scsi_attach_vpd(sdev);
 	scsi_cdl_check(sdev);
 
-	if (sdev->handler && sdev->handler->rescan)
+	sdev_printk(KERN_ERR, sdev, "%s sdev->handler=%pS\n", __func__, sdev->handler);
+	if (sdev->handler && sdev->handler->rescan) {
+		sdev_printk(KERN_ERR, sdev, "%s2 calling sdev->handler->rescan=%pS\n", __func__, sdev->handler->rescan);
 		sdev->handler->rescan(sdev);
+	}
 
 	if (dev->driver && try_module_get(dev->driver->owner)) {
 		struct scsi_driver *drv = to_scsi_driver(dev->driver);

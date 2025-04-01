@@ -3822,7 +3822,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	if (scsi_is_sdev_multipath(sdp)) {
 		struct queue_limits *mpath_lim = &sdp->mpath_disk->queue->limits;
 
-		blk_mq_freeze_queue(sdp->mpath_disk->queue);
+		//blk_mq_freeze_queue(sdp->mpath_disk->queue);
 		lim = queue_limits_start_update(sdp->mpath_disk->queue);
 		lim.logical_block_size = mpath_lim->logical_block_size;
 		lim.physical_block_size = mpath_lim->physical_block_size;
@@ -3841,7 +3841,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 		scsi_mpath_revalidate_path(sdp->mpath_disk,
 		    logical_to_sectors(sdp, sdkp->capacity));
 
-		blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
+		//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
 		if (err)
 			return err;
 	}
