@@ -2003,6 +2003,11 @@ static void nvme_update_atomic_write_disk_info(struct nvme_ns *ns,
 {
 	unsigned int boundary = 0;
 
+	pr_err("%s NVME_NS_FEAT_ATOMICS set=%d id->nawupf=%d atomic_bs=%d\n",
+		__func__,
+		!!(id->nsfeat & NVME_NS_FEAT_ATOMICS),
+		id->nawupf, atomic_bs);
+
 	if (id->nsfeat & NVME_NS_FEAT_ATOMICS && id->nawupf) {
 		if (le16_to_cpu(id->nabspf))
 			boundary = (le16_to_cpu(id->nabspf) + 1) * bs;
@@ -2050,16 +2055,27 @@ static bool nvme_update_disk_info(struct nvme_ns *ns, struct nvme_id_ns *id,
 	}
 
 	atomic_bs = phys_bs = bs;
+
+	pr_err("%s id->nabo=%d\n",
+		__func__, id->nabo);
+
 	if (id->nabo == 0) {
 		/*
 		 * Bit 1 indicates whether NAWUPF is defined for this namespace
 		 * and whether it should be used instead of AWUPF. If NAWUPF ==
 		 * 0 then AWUPF must be used instead.
 		 */
-		if (id->nsfeat & NVME_NS_FEAT_ATOMICS && id->nawupf)
+		if (id->nsfeat & NVME_NS_FEAT_ATOMICS && id->nawupf) {
+
+			pr_err("%s2 NVME_NS_FEAT_ATOMICS set id->nawupf=%d\n",
+				__func__, id->nawupf);
 			atomic_bs = (1 + le16_to_cpu(id->nawupf)) * bs;
-		else
+		}
+		else {
+			pr_err("%s3 NVME_NS_FEAT_ATOMICS unset ns->ctrl->subsys->awupf=%d\n",
+				__func__, ns->ctrl->subsys->awupf);
 			atomic_bs = (1 + ns->ctrl->subsys->awupf) * bs;
+		}
 
 		nvme_update_atomic_write_disk_info(ns, id, lim, bs, atomic_bs);
 	}
@@ -2294,6 +2310,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		ret = 0;
 	}
 
+	pr_err("%s ret=%d nvme_ns_head_multipath=%d\n", __func__, ret, nvme_ns_head_multipath(ns->head));
 	if (!ret && nvme_ns_head_multipath(ns->head)) {
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
 		struct queue_limits lim;

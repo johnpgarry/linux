@@ -563,6 +563,7 @@ void ata_scsi_error(struct Scsi_Host *host)
 	struct ata_port *ap = ata_shost_to_port(host);
 	unsigned long flags;
 	LIST_HEAD(eh_work_q);
+	pr_err("%s ap=%pS\n", __func__, ap);
 
 	spin_lock_irqsave(host->host_lock, flags);
 	list_splice_init(&host->eh_cmd_q, &eh_work_q);
@@ -599,6 +600,7 @@ void ata_scsi_cmd_error_handler(struct Scsi_Host *host, struct ata_port *ap,
 
 	/* make sure sff pio task is not running */
 	ata_sff_flush_pio_task(ap);
+	pr_err("%s ap=%pS\n", __func__, ap);
 
 	/* synchronize with host lock and sort out timeouts */
 
@@ -698,6 +700,7 @@ void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 
 	/* acquire EH ownership */
 	ata_eh_acquire(ap);
+	pr_err("%s ap=%pS\n", __func__, ap);
  repeat:
 	/* kill fast drain timer */
 	del_timer_sync(&ap->fastdrain_timer);
@@ -947,6 +950,8 @@ static void ata_eh_set_pending(struct ata_port *ap, int fastdrain)
 void ata_qc_schedule_eh(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
+
+	pr_err("%s qc=%pS\n", __func__, qc);
 
 	qc->flags |= ATA_QCFLAG_EH;
 	ata_eh_set_pending(ap, 1);
