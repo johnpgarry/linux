@@ -744,18 +744,25 @@ xfs_file_dio_write_atomic(
 	struct kiocb		*iocb,
 	struct iov_iter		*from)
 {
-	unsigned int		iolock = XFS_IOLOCK_SHARED;
+	unsigned int		iolock;
 	ssize_t			ret, ocount = iov_iter_count(from);
 	const struct iomap_ops	*dops;
+	unsigned int		dio_flags = 0;
 
 	/*
 	 * HW offload should be faster, so try that first if it is already
 	 * known that the write length is not too large.
 	 */
-	if (ocount > xfs_inode_hw_atomicwrite_max(ip))
+
+	if (ocount > xfs_inode_hw_atomicwrite_max(ip)) {
+		iolock = XFS_IOLOCK_EXCL;
+		dio_flags = IOMAP_DIO_FORCE_WAIT;
 		dops = &xfs_atomic_write_cow_iomap_ops;
-	else
+	} else {
+		iolock = XFS_IOLOCK_SHARED;
+		dio_flags = 0;
 		dops = &xfs_direct_write_iomap_ops;
+	}
 
 retry:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
@@ -768,13 +775,16 @@ retry:
 
 	/* Demote similar to xfs_file_dio_write_aligned() */
 	if (iolock == XFS_IOLOCK_EXCL) {
-		xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
-		iolock = XFS_IOLOCK_SHARED;
+	//	xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
+	//	iolock = XFS_IOLOCK_SHARED;
 	}
+
+	if (dio_flags & IOMAP_DIO_FORCE_WAIT)
+		inode_dio_wait(VFS_I(ip));
 
 	trace_xfs_file_direct_write(iocb, from);
 	ret = iomap_dio_rw(iocb, from, dops, &xfs_dio_write_ops,
-			0, NULL, 0);
+			dio_flags, NULL, 0);
 
 	/*
 	 * The retry mechanism is based on the ->iomap_begin method returning
@@ -784,7 +794,9 @@ retry:
 	 */
 	if (ret == -ENOPROTOOPT && dops == &xfs_direct_write_iomap_ops) {
 		xfs_iunlock(ip, iolock);
+		dio_flags = IOMAP_DIO_FORCE_WAIT;
 		dops = &xfs_atomic_write_cow_iomap_ops;
+		iolock = XFS_IOLOCK_EXCL;
 		goto retry;
 	}
 
