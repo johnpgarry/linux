@@ -732,6 +732,8 @@ xfs_compute_atomic_write_unit_max(
 	else
 		max_rgsize = rgs->blocks;
 
+	pr_err("%s max_ioend=%d max_agsize=%d max_rgsize=%d max_write=%d\n",
+		__func__, max_ioend, max_agsize, max_rgsize, max_write);
 	ags->awu_max = min3(max_write, max_ioend, max_agsize);
 	rgs->awu_max = min3(max_write, max_ioend, max_rgsize);
 
@@ -1160,6 +1162,8 @@ xfs_mountfs(
 	 * derived from transaction reservations, so we must do this after the
 	 * log is fully initialized.
 	 */
+
+	pr_err("%s mp->m_awu_max_bytes=%d\n", __func__, mp->m_awu_max_bytes);
 	if (!xfs_calc_atomic_write_reservation(mp, mp->m_awu_max_bytes)) {
 		xfs_warn(mp, "cannot support atomic writes of %u bytes",
 				mp->m_awu_max_bytes);

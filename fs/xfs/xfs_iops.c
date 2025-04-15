@@ -633,6 +633,8 @@ xfs_get_atomic_write_max(
 	 * write of exactly one single fsblock if the bdev will make that
 	 * guarantee for us.
 	 */
+	pr_err("%s xfs_has_reflink=%d xfs_inode_can_hw_atomicwrite=%d\n",
+		__func__, xfs_has_reflink(mp), xfs_inode_can_hw_atomicwrite(ip));
 	if (!xfs_has_reflink(mp)) {
 		if (xfs_inode_can_hw_atomicwrite(ip))
 			return mp->m_sb.sb_blocksize;
@@ -644,6 +646,8 @@ xfs_get_atomic_write_max(
 	 * then advertise a maximum size of whatever we can complete through
 	 * that means.  Hardware support is reported via max_opt, not here.
 	 */
+	pr_err("%s1 mp->m_groups[XG_TYPE_AG].awu_max=%d mp->m_groups[XG_TYPE_RTG].awu_max=%d\n",
+		__func__, mp->m_groups[XG_TYPE_AG].awu_max, mp->m_groups[XG_TYPE_RTG].awu_max);
 	if (XFS_IS_REALTIME_INODE(ip))
 		return XFS_FSB_TO_B(mp, mp->m_groups[XG_TYPE_RTG].awu_max);
 	return XFS_FSB_TO_B(mp, mp->m_groups[XG_TYPE_AG].awu_max);
@@ -674,6 +678,7 @@ xfs_report_atomic_write(
 	struct xfs_inode	*ip,
 	struct kstat		*stat)
 {
+	pr_err("%s\n", __func__);
 	generic_fill_statx_atomic_writes(stat,
 			xfs_get_atomic_write_min(ip),
 			xfs_get_atomic_write_max(ip),
@@ -743,6 +748,8 @@ xfs_vn_getattr(
 	case S_IFREG:
 		if (request_mask & (STATX_DIOALIGN | STATX_DIO_READ_ALIGN))
 			xfs_report_dioalign(ip, stat);
+		pr_err("%s STATX_WRITE_ATOMIC set=%d\n", __func__,
+			!!(request_mask & STATX_WRITE_ATOMIC));
 		if (request_mask & STATX_WRITE_ATOMIC)
 			xfs_report_atomic_write(ip, stat);
 		fallthrough;

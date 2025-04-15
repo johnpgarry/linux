@@ -1526,6 +1526,8 @@ xfs_fs_parse_param(
 		if (suffix_kstrtoint(param->string, 10,
 				     &parsing_mp->m_awu_max_bytes))
 			return -EINVAL;
+		pr_err("%s parsing_mp->m_awu_max_bytes=%d\n", __func__,
+			parsing_mp->m_awu_max_bytes);
 		if (parsing_mp->m_awu_max_bytes < 0)
 			return -EINVAL;
 		return 0;
@@ -2126,6 +2128,8 @@ xfs_fs_reconfigure(
 		return error;
 
 	/* validate new max_atomic_write option before making other changes */
+	pr_err("%s mp->m_awu_max_bytes=%d new_mp->m_awu_max_bytes=%d\n",
+		__func__, mp->m_awu_max_bytes, new_mp->m_awu_max_bytes);
 	if (mp->m_awu_max_bytes != new_mp->m_awu_max_bytes) {
 		if (!xfs_calc_atomic_write_reservation(mp,
 					new_mp->m_awu_max_bytes)) {
@@ -2161,6 +2165,8 @@ xfs_fs_reconfigure(
 			return error;
 	}
 
+	pr_err("%s2 mp->m_awu_max_bytes=%d new_mp->m_awu_max_bytes=%d\n",
+		__func__, mp->m_awu_max_bytes, new_mp->m_awu_max_bytes);
 	/* set new atomic write max here */
 	if (mp->m_awu_max_bytes != new_mp->m_awu_max_bytes) {
 		xfs_compute_atomic_write_unit_max(mp);

@@ -202,9 +202,10 @@ xfs_log_calc_minimum_size(
 	xfs_log_get_max_trans_res(mp, &tres);
 
 	max_logres = xfs_log_calc_unit_res(mp, tres.tr_logres);
+	pr_err("%s max_logres=%d\n", __func__, max_logres);
 	if (tres.tr_logcount > 1)
 		max_logres *= tres.tr_logcount;
-
+	pr_err("%s2 max_logres=%d\n", __func__, max_logres);
 	if (xfs_has_logv2(mp) && mp->m_sb.sb_logsunit > 1)
 		lsunit = BTOBB(mp->m_sb.sb_logsunit);
 

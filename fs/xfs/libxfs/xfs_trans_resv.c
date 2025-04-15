@@ -1499,8 +1499,10 @@ xfs_calc_atomic_write_reservation(
 	 * we'll use conservatively use tr_itruncate as the basis for computing
 	 * a reasonable maximum.
 	 */
+	pr_err("%s blockcount=%d old_logres=%d\n", __func__, blockcount, old_logres);
 	if (blockcount == 0) {
 		curr_res->tr_logres = M_RES(mp)->tr_itruncate.tr_logres;
+		pr_err("%s2 curr_res->tr_logres=%d\n", __func__, curr_res->tr_logres);
 		return true;
 	}
 
@@ -1521,9 +1523,12 @@ xfs_calc_atomic_write_reservation(
 	trace_xfs_calc_max_atomic_write_reservation(mp, per_intent, step_size,
 			blockcount, min_logblocks, curr_res->tr_logres);
 
+	pr_err("%s3 blockcount=%d per_intent=%d old_logres=%d min_logblocks=%d > mp->m_sb.sb_logblocks=%d is bad \n",
+		__func__, blockcount, per_intent, old_logres, min_logblocks, mp->m_sb.sb_logblocks);
 	if (min_logblocks > mp->m_sb.sb_logblocks) {
 		/* Log too small, revert changes. */
 		curr_res->tr_logres = old_logres;
+		pr_err("%s4 revert change?\n", __func__);
 		return false;
 	}
 
