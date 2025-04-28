@@ -339,6 +339,11 @@ static struct dma_page *pool_alloc_page(struct dma_pool *pool, gfp_t mem_flags)
 {
 	struct dma_page *page;
 
+	if (pool->node != NUMA_NO_NODE) {
+		dev_err(pool->dev, "%s pool->node=%d\n", __func__, pool->node);
+		WARN_ON_ONCE(pool->node != numa_node_id());
+	}
+
 	page = kmalloc_node(sizeof(*page), mem_flags, pool->node);
 	if (!page)
 		return NULL;
