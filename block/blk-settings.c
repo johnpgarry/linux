@@ -629,8 +629,15 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 				struct queue_limits *b, sector_t start)
 {
-	if (!(b->features & BLK_FEAT_ATOMIC_WRITES))
+	pr_err("%s0 b=%pS BLK_FEAT_ATOMIC_WRITES=%d t=%pS BLK_FEAT_ATOMIC_WRITES=%d\n",
+			__func__, b, !!(b->features & BLK_FEAT_ATOMIC_WRITES),
+			t, !!(t->features & BLK_FEAT_ATOMIC_WRITES));
+	if (!(b->features & BLK_FEAT_ATOMIC_WRITES)) {
+		pr_err("%s0 !!!! b=%pS BLK_FEAT_ATOMIC_WRITES=0 t=%pS BLK_FEAT_ATOMIC_WRITES=%d\n",
+			__func__, b,
+			t, !!(t->features & BLK_FEAT_ATOMIC_WRITES));
 		goto unsupported;
+	}
 
 	if (!b->atomic_write_hw_unit_min)
 		goto unsupported;

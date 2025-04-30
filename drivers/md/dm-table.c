@@ -431,11 +431,19 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 	}
 
+	pr_err("%s0 limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d &q->limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min,
+			&q->limits, !!(q->limits.features & BLK_FEAT_ATOMIC_WRITES), q->limits.atomic_write_hw_unit_min);
+
 	/*
 	 * BLK_FEAT_ATOMIC_WRITES is not inherited from the bottom device in
 	 * blk_stack_limits(), so do it manually.
 	 */
 	limits->features |= (q->limits.features & BLK_FEAT_ATOMIC_WRITES);
+	
+	pr_err("%s1 limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d &q->limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min,
+			&q->limits, !!(q->limits.features & BLK_FEAT_ATOMIC_WRITES), q->limits.atomic_write_hw_unit_min);
 
 	if (blk_stack_limits(limits, &q->limits,
 			get_start_sect(bdev) + start) < 0)
@@ -448,6 +456,9 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		       q->limits.alignment_offset,
 		       (unsigned long long) start << SECTOR_SHIFT);
 
+	pr_err("%s2 called blk_stack_limits limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d &q->limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min,
+			&q->limits, !!(q->limits.features & BLK_FEAT_ATOMIC_WRITES), q->limits.atomic_write_hw_unit_min);
 	/*
 	 * Only stack the integrity profile if the target doesn't have native
 	 * integrity support.
@@ -1599,6 +1610,8 @@ int dm_calculate_queue_limits(struct dm_table *t,
 
 	dm_set_stacking_limits(limits);
 
+	pr_err("%s limits=%pS ti_limits=%pS\n", __func__, limits, &ti_limits);
+
 	t->integrity_supported = true;
 	for (unsigned int i = 0; i < t->num_targets; i++) {
 		struct dm_target *ti = dm_table_get_target(t, i);
@@ -1624,6 +1637,10 @@ int dm_calculate_queue_limits(struct dm_table *t,
 		 */
 		ti->type->iterate_devices(ti, dm_set_device_limits,
 					  &ti_limits);
+		pr_err("%s1 after iterate_devices limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min/max=%d %d ti_limits=%pS BLK_FEAT_ATOMIC_WRITES=%d\n",
+			__func__,
+			limits, !!(limits->features & BLK_FEAT_ZONED), limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max,
+			&ti_limits, !!(ti_limits.features & BLK_FEAT_ZONED));
 
 		if (!zoned && (ti_limits.features & BLK_FEAT_ZONED)) {
 			/*
@@ -1651,12 +1668,18 @@ combine_limits:
 		 * Merge this target's queue limits into the overall limits
 		 * for the table.
 		 */
+		pr_err("%s1 combine_limits: calling blk_stack_limits limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min/max=%d %d ti_limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min/max=%d %d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max,
+			&ti_limits, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES), ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max);
 		if (blk_stack_limits(limits, &ti_limits, 0) < 0)
 			DMWARN("%s: adding target device (start sect %llu len %llu) "
 			       "caused an alignment inconsistency",
 			       dm_device_name(t->md),
 			       (unsigned long long) ti->begin,
 			       (unsigned long long) ti->len);
+		pr_err("%s2 combine_limits: called blk_stack_limits limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min/max=%d %d ti_limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min/max=%d %d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max,
+			&ti_limits, !!(ti_limits.features & BLK_FEAT_ATOMIC_WRITES), ti_limits.atomic_write_hw_unit_min, ti_limits.atomic_write_hw_unit_max);
 
 		if (t->integrity_supported ||
 		    dm_target_has_integrity(ti->type)) {
@@ -1688,7 +1711,8 @@ combine_limits:
 	}
 	if (validate_hardware_zoned(t, zoned, zone_sectors))
 		return -EINVAL;
-
+	pr_err("%s9 limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min);
 	return validate_hardware_logical_block_alignment(t, limits);
 }
 
@@ -1840,6 +1864,9 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 {
 	int r;
 
+	pr_err("%s limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min,max=%d %d q->limits=%pS\n",
+		__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min, limits->atomic_write_hw_unit_max,
+		&q->limits);
 	if (!dm_table_supports_nowait(t))
 		limits->features &= ~BLK_FEAT_NOWAIT;
 
@@ -1883,9 +1910,15 @@ int dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 			return r;
 	}
 
-	if (dm_table_supports_atomic_writes(t))
+	if (dm_table_supports_atomic_writes(t)) {
+		pr_err("%s1 dm_table_supports_atomic_writes=1 limits=%pS BLK_FEAT_ATOMIC_WRITES=%d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES));
 		limits->features |= BLK_FEAT_ATOMIC_WRITES;
+	}
 
+	pr_err("%s2 calling queue_limits_set limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_min=%d q->limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_min=%d\n",
+			__func__, limits, !!(limits->features & BLK_FEAT_ATOMIC_WRITES), limits->atomic_write_hw_unit_min,
+			&q->limits, !!(q->limits.features & BLK_FEAT_ATOMIC_WRITES), q->limits.atomic_write_hw_unit_min);
 	r = queue_limits_set(q, limits);
 	if (r)
 		return r;

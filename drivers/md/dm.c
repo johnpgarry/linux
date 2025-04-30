@@ -2554,6 +2554,8 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 
 	WARN_ON_ONCE(type == DM_TYPE_NONE);
 
+	pr_err("%s limits=%pS md->queue=%pS\n",
+		__func__, &limits, md->queue);
 	if (type == DM_TYPE_REQUEST_BASED) {
 		md->disk->fops = &dm_rq_blk_dops;
 		r = dm_mq_init_request_queue(md, t);
@@ -2568,6 +2570,10 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 		DMERR("Cannot calculate initial queue limits");
 		return r;
 	}
+	pr_err("%s2  limits=%pS BLK_FEAT_ATOMIC_WRITES=%d hw_unit_min=%d md->queue=%pS calling dm_table_set_restrictions\n",
+		__func__,
+		&limits, !!(limits.features & BLK_FEAT_ATOMIC_WRITES), limits.atomic_write_hw_unit_min,
+		md->queue);
 	r = dm_table_set_restrictions(t, md->queue, &limits);
 	if (r)
 		return r;
