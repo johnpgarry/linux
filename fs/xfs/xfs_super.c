@@ -508,7 +508,11 @@ xfs_open_devices(
 			bdev_fput(logdev_file);
 	}
 
-	return 0;
+	/*
+	 * Flush and invalidate the data device pagecache before reading the
+	 * primary super because XFS doesn't use the bdev pagecache.
+	 */
+	return xfs_buftarg_sync(mp->m_ddev_targp);
 
  out_free_rtdev_targ:
 	if (mp->m_rtdev_targp)
