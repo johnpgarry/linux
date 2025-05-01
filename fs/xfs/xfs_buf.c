@@ -1714,6 +1714,35 @@ xfs_free_buftarg(
 	kfree(btp);
 }
 
+/*
+ * Configure this buffer target for hardware-assisted atomic writes if the
+ * underlying block device supports is congruent with the filesystem geometry.
+ */
+static inline void
+xfs_buftarg_config_atomic_writes(
+	struct xfs_buftarg	*btp)
+{
+	struct xfs_mount	*mp = btp->bt_mount;
+	unsigned int		min_bytes, max_bytes;
+
+	min_bytes = bdev_atomic_write_unit_min_bytes(btp->bt_bdev);
+	max_bytes = bdev_atomic_write_unit_max_bytes(btp->bt_bdev);
+
+	/*
+	 * Ignore atomic write geometry that is nonsense or doesn't even cover
+	 * a single fsblock.
+	 */
+	if (min_bytes > max_bytes ||
+	    min_bytes > mp->m_sb.sb_blocksize ||
+	    max_bytes < mp->m_sb.sb_blocksize) {
+		min_bytes = 0;
+		max_bytes = 0;
+	}
+
+	btp->bt_bdev_awu_min = min_bytes;
+	btp->bt_bdev_awu_max = max_bytes;
+}
+
 int
 xfs_setsize_buftarg(
 	struct xfs_buftarg	*btp,
@@ -1732,6 +1761,9 @@ xfs_setsize_buftarg(
 			sectorsize, btp->bt_bdev, error);
 		return -EINVAL;
 	}
+
+	if (bdev_can_atomic_write(btp->bt_bdev))
+		xfs_buftarg_config_atomic_writes(btp);
 
 	/*
 	 * Flush the block device pagecache so our bios see anything dirtied
@@ -1777,40 +1809,6 @@ out_destroy_io_count:
 out_destroy_lru:
 	list_lru_destroy(&btp->bt_lru);
 	return -ENOMEM;
-}
-
-/*
- * Configure this buffer target for hardware-assisted atomic writes if the
- * underlying block device supports is congruent with the filesystem geometry.
- */
-void
-xfs_buftarg_config_atomic_writes(
-	struct xfs_buftarg	*btp)
-{
-	struct xfs_mount	*mp = btp->bt_mount;
-	unsigned int		min_bytes, max_bytes;
-
-	ASSERT(btp->bt_bdev != NULL);
-
-	if (!bdev_can_atomic_write(btp->bt_bdev))
-		return;
-
-	min_bytes = bdev_atomic_write_unit_min_bytes(btp->bt_bdev);
-	max_bytes = bdev_atomic_write_unit_max_bytes(btp->bt_bdev);
-
-	/*
-	 * Ignore atomic write geometry that is nonsense or doesn't even cover
-	 * a single fsblock.
-	 */
-	if (min_bytes > max_bytes ||
-	    min_bytes > mp->m_sb.sb_blocksize ||
-	    max_bytes < mp->m_sb.sb_blocksize) {
-		min_bytes = 0;
-		max_bytes = 0;
-	}
-
-	btp->bt_bdev_awu_min = min_bytes;
-	btp->bt_bdev_awu_max = max_bytes;
 }
 
 struct xfs_buftarg *

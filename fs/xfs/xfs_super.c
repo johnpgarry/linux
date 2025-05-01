@@ -541,7 +541,6 @@ xfs_setup_devices(
 	error = xfs_setsize_buftarg(mp->m_ddev_targp, mp->m_sb.sb_sectsize);
 	if (error)
 		return error;
-	xfs_buftarg_config_atomic_writes(mp->m_ddev_targp);
 
 	if (mp->m_logdev_targp && mp->m_logdev_targp != mp->m_ddev_targp) {
 		unsigned int	log_sector_size = BBSIZE;
@@ -552,7 +551,6 @@ xfs_setup_devices(
 					    log_sector_size);
 		if (error)
 			return error;
-		xfs_buftarg_config_atomic_writes(mp->m_logdev_targp);
 	}
 
 	if (mp->m_sb.sb_rtstart) {
@@ -567,7 +565,6 @@ xfs_setup_devices(
 					    mp->m_sb.sb_sectsize);
 		if (error)
 			return error;
-		xfs_buftarg_config_atomic_writes(mp->m_rtdev_targp);
 	}
 
 	return 0;
