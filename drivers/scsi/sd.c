@@ -110,6 +110,7 @@ static int  sd_revalidate_disk(struct gendisk *);
 static void sd_unlock_native_capacity(struct gendisk *disk);
 static void sd_shutdown(struct device *);
 static void scsi_disk_release(struct device *cdev);
+static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim);
 
 static DEFINE_IDA(sd_index_ida);
 
@@ -599,6 +600,126 @@ max_write_same_blocks_store(struct device *dev, struct device_attribute *attr,
 static DEVICE_ATTR_RW(max_write_same_blocks);
 
 static ssize_t
+max_atomic_write_blocks_show(struct device *dev, struct device_attribute *attr,
+			   char *buf)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+
+	return sprintf(buf, "%u\n", sdkp->max_atomic);
+}
+
+static ssize_t
+max_atomic_write_blocks_store(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+	struct scsi_device *sdp = sdkp->device;
+	struct queue_limits lim;
+	unsigned long max;
+	int err;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (sdp->type != TYPE_DISK)
+		return -EINVAL;
+
+	err = kstrtoul(buf, 10, &max);
+	if (err)
+		return err;
+
+	sdkp->max_atomic = max;
+
+	lim = queue_limits_start_update(sdkp->disk->queue);
+	sd_config_atomic(sdkp, &lim);
+	err = queue_limits_commit_update_frozen(sdkp->disk->queue, &lim);
+	if (err)
+		return err;
+	return count;
+}
+static DEVICE_ATTR_RW(max_atomic_write_blocks);
+
+static ssize_t
+align_atomic_write_blocks_show(struct device *dev, struct device_attribute *attr,
+			   char *buf)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+
+	return sprintf(buf, "%u\n", sdkp->atomic_alignment);
+}
+
+static ssize_t
+align_atomic_write_blocks_store(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+	struct scsi_device *sdp = sdkp->device;
+	struct queue_limits lim;
+	unsigned long align;
+	int err;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (sdp->type != TYPE_DISK)
+		return -EINVAL;
+
+	err = kstrtoul(buf, 10, &align);
+	if (err)
+		return err;
+
+	sdkp->atomic_alignment = align;
+
+	lim = queue_limits_start_update(sdkp->disk->queue);
+	sd_config_atomic(sdkp, &lim);
+	err = queue_limits_commit_update_frozen(sdkp->disk->queue, &lim);
+	if (err)
+		return err;
+	return count;
+}
+static DEVICE_ATTR_RW(align_atomic_write_blocks);
+
+static ssize_t
+gran_atomic_write_blocks_show(struct device *dev, struct device_attribute *attr,
+			   char *buf)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+
+	return sprintf(buf, "%u\n", sdkp->atomic_granularity);
+}
+
+static ssize_t
+gran_atomic_write_blocks_store(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+	struct scsi_device *sdp = sdkp->device;
+	struct queue_limits lim;
+	unsigned long granularity;
+	int err;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (sdp->type != TYPE_DISK)
+		return -EINVAL;
+
+	err = kstrtoul(buf, 10, &granularity);
+	if (err)
+		return err;
+
+	sdkp->atomic_granularity = granularity;
+
+	lim = queue_limits_start_update(sdkp->disk->queue);
+	sd_config_atomic(sdkp, &lim);
+	err = queue_limits_commit_update_frozen(sdkp->disk->queue, &lim);
+	if (err)
+		return err;
+	return count;
+}
+static DEVICE_ATTR_RW(gran_atomic_write_blocks);
+
+static ssize_t
 zoned_cap_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct scsi_disk *sdkp = to_scsi_disk(dev);
@@ -664,6 +785,9 @@ static struct attribute *sd_disk_attrs[] = {
 	&dev_attr_max_medium_access_timeouts.attr,
 	&dev_attr_zoned_cap.attr,
 	&dev_attr_max_retries.attr,
+	&dev_attr_max_atomic_write_blocks.attr,
+	&dev_attr_align_atomic_write_blocks.attr,
+	&dev_attr_gran_atomic_write_blocks.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(sd_disk);
