@@ -244,6 +244,8 @@ struct scsi_device {
 	unsigned cdl_supported:1;	/* Command duration limits supported */
 	unsigned cdl_enable:1;		/* Enable/disable Command duration limits */
 
+	unsigned no_write_atomic_16:1;		/* Enable/disable WRITE ATOMIC (16) */
+
 	unsigned int queue_stopped;	/* request queue is quiesced */
 	bool offline_already;		/* Device offline message logged */
 

@@ -351,6 +351,37 @@ allow_restart_store(struct device *dev, struct device_attribute *attr,
 static DEVICE_ATTR_RW(allow_restart);
 
 static ssize_t
+no_write_atomic_16_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+
+	return sprintf(buf, "%u\n", sdkp->device->no_write_atomic_16);
+}
+
+static ssize_t
+no_write_atomic_16_store(struct device *dev, struct device_attribute *attr,
+		    const char *buf, size_t count)
+{
+	bool v;
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
+	struct scsi_device *sdp = sdkp->device;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (sdp->type != TYPE_DISK)
+		return -EINVAL;
+
+	if (kstrtobool(buf, &v))
+		return -EINVAL;
+
+	sdp->no_write_atomic_16 = v;
+
+	return count;
+}
+static DEVICE_ATTR_RW(no_write_atomic_16);
+
+static ssize_t
 cache_type_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct scsi_disk *sdkp = to_scsi_disk(dev);
@@ -788,6 +819,7 @@ static struct attribute *sd_disk_attrs[] = {
 	&dev_attr_max_atomic_write_blocks.attr,
 	&dev_attr_align_atomic_write_blocks.attr,
 	&dev_attr_gran_atomic_write_blocks.attr,
+	&dev_attr_no_write_atomic_16.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(sd_disk);
@@ -1501,7 +1533,7 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 	if (protect && sdkp->protection_type == T10_PI_TYPE2_PROTECTION) {
 		ret = sd_setup_rw32_cmnd(cmd, write, lba, nr_blocks,
 					 protect | fua, dld);
-	} else if (rq->cmd_flags & REQ_ATOMIC) {
+	} else if (rq->cmd_flags & REQ_ATOMIC && !sdp->no_write_atomic_16) {
 		ret = sd_setup_atomic_cmnd(cmd, lba, nr_blocks,
 				sdkp->use_atomic_write_boundary,
 				protect | fua);
