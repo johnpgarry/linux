@@ -198,6 +198,8 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 			 lim->atomic_write_hw_unit_max))
 		goto unsupported;
 
+	pr_err("%s atomic_write_hw_unit_max=%d atomic_write_hw_max=%d\n",
+		__func__, lim->atomic_write_hw_unit_max, lim->atomic_write_hw_max);
 	if (WARN_ON_ONCE(lim->atomic_write_hw_unit_max >
 			 lim->atomic_write_hw_max))
 		goto unsupported;
@@ -551,18 +553,27 @@ static bool blk_stack_atomic_writes_tail(struct queue_limits *t,
 {
 
 	pr_err("%s t->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, t->atomic_write_hw_max, t->io_min, t->physical_block_size);
-	pr_err("%s2 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size);
+	pr_err("%s0 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size);
 	/* We're not going to support different boundary sizes.. yet */
-	if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary)
+	if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary) {
+		pr_err("%s1 fail t->atomic_write_hw_boundary %d != b->atomic_write_hw_boundary %d\n",
+			__func__, t->atomic_write_hw_boundary, b->atomic_write_hw_boundary);
 		return false;
+	}
 
 	/* Can't support this */
-	if (t->atomic_write_hw_unit_min > b->atomic_write_hw_unit_max)
+	if (t->atomic_write_hw_unit_min > b->atomic_write_hw_unit_max) {
+		pr_err("%s2 fail t->atomic_write_hw_unit_min %d > b->atomic_write_hw_unit_max %d\n",
+			__func__, t->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max);
 		return false;
+	}
 
 	/* Or this */
-	if (t->atomic_write_hw_unit_max < b->atomic_write_hw_unit_min)
+	if (t->atomic_write_hw_unit_max < b->atomic_write_hw_unit_min) {
+		pr_err("%s2 fail t->atomic_write_hw_unit_max %d < b->atomic_write_hw_unit_min %d\n",
+			__func__, t->atomic_write_hw_unit_max, b->atomic_write_hw_unit_min);
 		return false;
+	}
 
 	t->atomic_write_hw_max = min(t->atomic_write_hw_max,
 				b->atomic_write_hw_max);
@@ -597,20 +608,16 @@ static bool blk_stack_atomic_writes_boundary_head(struct queue_limits *t,
 static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 				struct queue_limits *b)
 {
+	unsigned int chunk_size = t->max_hw_sectors << SECTOR_SHIFT;
+
+	pr_err("%s t->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d, max_hw_sectors=%d chunk_size=%d\n",
+		__func__, t->atomic_write_hw_max, t->io_min, t->physical_block_size, t->max_hw_sectors, chunk_size);
+	pr_err("%s0 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d, max_hw_sectors=%d\n",
+		__func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size, b->max_hw_sectors);
+
 	if (b->atomic_write_hw_boundary &&
 	    !blk_stack_atomic_writes_boundary_head(t, b))
 		return false;
-
-	pr_err("%s t->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, t->atomic_write_hw_max, t->io_min, t->physical_block_size);
-	pr_err("%s2 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size);
-	if (t->io_min <= SECTOR_SIZE) {
-		/* No chunk sectors, so use bottom device values directly */
-		t->atomic_write_hw_unit_max = b->atomic_write_hw_unit_max;
-		t->atomic_write_hw_unit_min = b->atomic_write_hw_unit_min;
-		t->atomic_write_hw_max = b->atomic_write_hw_max;
-		pr_err("%s3 No chunk sectors b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size);
-		return true;
-	}
 
 	/*
 	 * Find values for limits which work for chunk size.
@@ -623,28 +630,36 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 	 * aligned with both limits, i.e. 8K in this example.
 	 */
 	t->atomic_write_hw_unit_max = b->atomic_write_hw_unit_max;
-	while (t->io_min % t->atomic_write_hw_unit_max)
+	while (chunk_size % t->atomic_write_hw_unit_max)
 		t->atomic_write_hw_unit_max /= 2;
 
 	pr_err("%s9 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d t->atomic_write_hw_unit_max=%d\n",
 		__func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size, t->atomic_write_hw_unit_max);
 	t->atomic_write_hw_unit_min = min(b->atomic_write_hw_unit_min,
 					  t->atomic_write_hw_unit_max);
-	t->atomic_write_hw_max = min(b->atomic_write_hw_max, t->io_min);
-	pr_err("%s10 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d t->atomic_write_hw_unit_max=%d\n",
-		__func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size, t->atomic_write_hw_unit_max);
+	t->atomic_write_hw_max = min(b->atomic_write_hw_max, chunk_size);
+	pr_err("%s10 b->atomic_write_hw_unit_min / max=%d %d, io_min=%d, physical_block_size=%d t->atomic_write_hw_unit_min/max=%d %d\n",
+		__func__, b->atomic_write_hw_unit_min, b->atomic_write_hw_unit_max, b->io_min, b->physical_block_size,
+		t->atomic_write_hw_unit_min, t->atomic_write_hw_unit_max);
 	return true;
 }
 
 static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 				struct queue_limits *b, sector_t start)
 {
+	pr_err("%s t=%pS t->max_hw_sectors=%d, io_min=%d\n", __func__, t, t->max_hw_sectors, t->io_min);
+	pr_err("%s0 b=%pS b->max_hw_sectors=%d BLK_FEAT_ATOMIC_WRITES=%d io_min=%d\n",
+		__func__, b, b->max_hw_sectors, !!(b->features & BLK_FEAT_ATOMIC_WRITES), b->io_min);
 	if (!(b->features & BLK_FEAT_ATOMIC_WRITES))
 		goto unsupported;
 
+	pr_err("%s1 b->atomic_write_hw_unit_min=%d\n",
+		__func__, b->atomic_write_hw_unit_min);
 	if (!b->atomic_write_hw_unit_min)
 		goto unsupported;
 
+	pr_err("%s1 blk_atomic_write_start_sect_aligned=%d\n",
+		__func__, blk_atomic_write_start_sect_aligned(start, b));
 	if (!blk_atomic_write_start_sect_aligned(start, b))
 		goto unsupported;
 
@@ -652,18 +667,23 @@ static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 	 * If atomic_write_hw_max is set, we have already stacked 1x bottom
 	 * device, so check for compliance.
 	 */
-	pr_err("%s t->atomic_write_hw_max=%d\n", __func__, t->atomic_write_hw_max);
+	pr_err("%s3 t->atomic_write_hw_max=%d\n", __func__, t->atomic_write_hw_max);
 	if (t->atomic_write_hw_max) {
-		if (!blk_stack_atomic_writes_tail(t, b))
+		if (!blk_stack_atomic_writes_tail(t, b)) {
+			pr_err("%s5 blk_stack_atomic_writes_tail failed\n", __func__);
 			goto unsupported;
+		}
 		return;
 	}
 
-	if (!blk_stack_atomic_writes_head(t, b))
+	if (!blk_stack_atomic_writes_head(t, b)) {
+		pr_err("%s6 blk_stack_atomic_writes_head failed\n", __func__);
 		goto unsupported;
+	}
 	return;
 
 unsupported:
+	pr_err("%s10 unsupported: t=%pS b=%pS\n", __func__, t, b);
 	t->atomic_write_hw_max = 0;
 	t->atomic_write_hw_unit_max = 0;
 	t->atomic_write_hw_unit_min = 0;
@@ -696,7 +716,11 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 {
 	unsigned int top, bottom, alignment, ret = 0;
 
-	pr_err("%s t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
+	pr_err("%s t->io_min=%d, physical_block_size=%d, max_hw_sectors=%d\n",
+		__func__, t->io_min, t->physical_block_size, t->max_hw_sectors);
+
+	pr_err("%s0 b->io_min=%d, physical_block_size=%d, max_hw_sectors=%d\n",
+		__func__, b->io_min, b->physical_block_size, b->max_hw_sectors);
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
 
 	/*
@@ -716,6 +740,12 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	t->max_user_sectors = min_not_zero(t->max_user_sectors,
 			b->max_user_sectors);
 	t->max_hw_sectors = min_not_zero(t->max_hw_sectors, b->max_hw_sectors);
+
+	pr_err("%s1.0 t->io_min=%d, physical_block_size=%d, max_hw_sectors=%d\n",
+		__func__, t->io_min, t->physical_block_size, t->max_hw_sectors);
+
+	pr_err("%s1.1 b->io_min=%d, physical_block_size=%d, max_hw_sectors=%d\n",
+		__func__, b->io_min, b->physical_block_size, b->max_hw_sectors);
 	t->max_dev_sectors = min_not_zero(t->max_dev_sectors, b->max_dev_sectors);
 	t->max_write_zeroes_sectors = min(t->max_write_zeroes_sectors,
 					b->max_write_zeroes_sectors);
@@ -760,10 +790,10 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	t->physical_block_size = max(t->physical_block_size,
 				     b->physical_block_size);
 
-	pr_err("%s0.0 t->io_min=%d t->physical_block_size=%d b->io_min=%d\n",
+	pr_err("%s2.0 t->io_min=%d t->physical_block_size=%d b->io_min=%d\n",
 		__func__, t->io_min, t->physical_block_size, b->io_min);
 	t->io_min = max(t->io_min, b->io_min);
-	pr_err("%s0.1 t->io_min=%d t->physical_block_size=%d b->io_min=%d\n",
+	pr_err("%s2.1 t->io_min=%d t->physical_block_size=%d b->io_min=%d\n",
 		__func__, t->io_min, t->physical_block_size, b->io_min);
 	t->io_opt = lcm_not_zero(t->io_opt, b->io_opt);
 	t->dma_alignment = max(t->dma_alignment, b->dma_alignment);
@@ -776,22 +806,24 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	if (t->physical_block_size & (t->logical_block_size - 1)) {
 		t->physical_block_size = t->logical_block_size;
 		t->flags |= BLK_FLAG_MISALIGNED;
+		pr_err("%sxx0 BLK_FLAG_MISALIGNED\n", __func__);
 		ret = -1;
 	}
 
 	/* Minimum I/O a multiple of the physical block size? */
-	pr_err("%s1 t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
+	pr_err("%s3 t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
 	if (t->io_min & (t->physical_block_size - 1)) {
 		t->io_min = t->physical_block_size;
 		t->flags |= BLK_FLAG_MISALIGNED;
 		ret = -1;
-		pr_err("%s2 t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
+		pr_err("%s3.1 t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
 	}
 
 	/* Optimal I/O a multiple of the physical block size? */
 	if (t->io_opt & (t->physical_block_size - 1)) {
 		t->io_opt = 0;
 		t->flags |= BLK_FLAG_MISALIGNED;
+		pr_err("%s4.1 BLK_FLAG_MISALIGNED\n", __func__);
 		ret = -1;
 	}
 
@@ -799,6 +831,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	if ((t->chunk_sectors << 9) & (t->physical_block_size - 1)) {
 		t->chunk_sectors = 0;
 		t->flags |= BLK_FLAG_MISALIGNED;
+		pr_err("%s5.1 BLK_FLAG_MISALIGNED\n", __func__);
 		ret = -1;
 	}
 
@@ -809,6 +842,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	/* Verify that new alignment_offset is on a logical block boundary */
 	if (t->alignment_offset & (t->logical_block_size - 1)) {
 		t->flags |= BLK_FLAG_MISALIGNED;
+		pr_err("%s6.1 BLK_FLAG_MISALIGNED\n", __func__);
 		ret = -1;
 	}
 
@@ -839,6 +873,8 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	}
 	blk_stack_atomic_writes_limits(t, b, start);
 
+	pr_err("%s10 BLK_FLAG_MISALIGNED set=%d ret=%d\n",
+		__func__, !!(t->flags & BLK_FLAG_MISALIGNED), ret);
 	return ret;
 }
 EXPORT_SYMBOL(blk_stack_limits);

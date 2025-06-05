@@ -423,6 +423,7 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 	struct queue_limits *limits = data;
 	struct block_device *bdev = dev->bdev;
 	struct request_queue *q = bdev_get_queue(bdev);
+	struct queue_limits *limits2 = &q->limits;
 
 	if (unlikely(!q)) {
 		DMWARN("%s: Cannot set limits for nonexistent device %pg",
@@ -430,6 +431,14 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 	}
 
+
+	pr_err("%s limits=%pS max_hw_sectors=%d atomic_write_hw_unit_min/max=%d %d start=%lld len=%lld\n",
+		__func__, limits, limits->max_hw_sectors, limits->atomic_write_hw_unit_min,
+		limits->atomic_write_hw_unit_max, start, len);
+	
+	pr_err("%s0 calling blk_stack_limits limits2=%pS max_hw_sectors=%d atomic_write_hw_unit_min/max=%d %d\n",
+		__func__, limits2, limits2->max_hw_sectors, limits2->atomic_write_hw_unit_min,
+		limits2->atomic_write_hw_unit_max);
 	mutex_lock(&q->limits_lock);
 	/*
 	 * BLK_FEAT_ATOMIC_WRITES is not inherited from the bottom device in
@@ -1789,7 +1798,7 @@ int dm_calculate_queue_limits(struct dm_table *t,
 	bool zoned = false;
 
 	dm_set_stacking_limits(limits);
-
+	pr_err("%s limits=%pS max_hw_sectors=%d ti_limits=%pS\n", __func__, limits, limits->max_hw_sectors, &ti_limits);
 	t->integrity_supported = true;
 	for (unsigned int i = 0; i < t->num_targets; i++) {
 		struct dm_target *ti = dm_table_get_target(t, i);
@@ -1803,10 +1812,16 @@ int dm_calculate_queue_limits(struct dm_table *t,
 
 		dm_set_stacking_limits(&ti_limits);
 
+		pr_err("%s2.0 i=%d iterate_devices=%pS\n", __func__, i, ti->type->iterate_devices);
+
 		if (!ti->type->iterate_devices) {
 			/* Set I/O hints portion of queue limits */
+			pr_err("%s2.0 limits=%pS max_hw_sectors=%d ti_limits=%pS max_hw_sectors=%d calling io_hints=%pS\n",
+				__func__, limits, limits->max_hw_sectors, &ti_limits, ti_limits.max_hw_sectors, ti->type->io_hints);
 			if (ti->type->io_hints)
 				ti->type->io_hints(ti, &ti_limits);
+			pr_err("%s2.1 limits=%pS max_hw_sectors=%d ti_limits=%pS max_hw_sectors=%d called io_hints\n",
+				__func__, limits, limits->max_hw_sectors, &ti_limits, ti_limits.max_hw_sectors);
 			goto combine_limits;
 		}
 

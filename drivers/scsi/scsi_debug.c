@@ -147,7 +147,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_NUM_PARTS   0
 #define DEF_OPTS   0
 #define DEF_OPT_BLKS 1024
-#define DEF_PHYSBLK_EXP 5
+#define DEF_PHYSBLK_EXP 0
 #define DEF_OPT_XFERLEN_EXP 0
 #define DEF_PTYPE   TYPE_DISK
 #define DEF_RANDOM false

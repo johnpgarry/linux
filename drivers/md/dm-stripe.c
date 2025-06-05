@@ -443,6 +443,8 @@ static int stripe_iterate_devices(struct dm_target *ti,
 	int ret = 0;
 	unsigned int i = 0;
 
+
+	pr_err("%s fn=%pS data=%pS sc->stripe_width=%lld\n", __func__, fn, data, sc->stripe_width);
 	do {
 		ret = fn(ti, sc->stripe[i].dev,
 			 sc->stripe[i].physical_start,
@@ -461,6 +463,7 @@ static void stripe_io_hints(struct dm_target *ti,
 	limits->io_min = chunk_size;
 	limits->io_opt = chunk_size * sc->stripes;
 	limits->max_hw_sectors = sc->chunk_size;
+	pr_err("%s limits=%pS limits->max_hw_sectors=%d\n", __func__, limits, limits->max_hw_sectors);
 }
 
 static struct target_type stripe_target = {
