@@ -1871,6 +1871,7 @@ static int super_1_validate(struct mddev *mddev, struct md_rdev *freshest, struc
 		mddev->patch_version = 0;
 		mddev->external = 0;
 		mddev->chunk_sectors = le32_to_cpu(sb->chunksize);
+		pr_err("%s chunk_sectors=%d\n", __func__, mddev->chunk_sectors);
 		mddev->ctime = le64_to_cpu(sb->ctime);
 		mddev->utime = le64_to_cpu(sb->utime);
 		mddev->level = le32_to_cpu(sb->level);
@@ -1918,6 +1919,7 @@ static int super_1_validate(struct mddev *mddev, struct md_rdev *freshest, struc
 			mddev->new_level = le32_to_cpu(sb->new_level);
 			mddev->new_layout = le32_to_cpu(sb->new_layout);
 			mddev->new_chunk_sectors = le32_to_cpu(sb->new_chunk);
+			pr_err("%s2 new_chunk_sectors=%d\n", __func__, mddev->new_chunk_sectors);
 			if (mddev->delta_disks < 0 ||
 			    (mddev->delta_disks == 0 &&
 			     (le32_to_cpu(sb->feature_map)
@@ -1929,6 +1931,7 @@ static int super_1_validate(struct mddev *mddev, struct md_rdev *freshest, struc
 			mddev->new_level = mddev->level;
 			mddev->new_layout = mddev->layout;
 			mddev->new_chunk_sectors = mddev->chunk_sectors;
+			pr_err("%s3 new_chunk_sectors=%d\n", __func__, mddev->new_chunk_sectors);
 		}
 
 		if (mddev->level == 0 &&

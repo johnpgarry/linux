@@ -549,6 +549,9 @@ static unsigned int blk_round_down_sectors(unsigned int sectors, unsigned int lb
 static bool blk_stack_atomic_writes_tail(struct queue_limits *t,
 				struct queue_limits *b)
 {
+
+	pr_err("%s t->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, t->atomic_write_hw_max, t->io_min, t->physical_block_size);
+	pr_err("%s2 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size);
 	/* We're not going to support different boundary sizes.. yet */
 	if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary)
 		return false;
@@ -598,11 +601,14 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 	    !blk_stack_atomic_writes_boundary_head(t, b))
 		return false;
 
+	pr_err("%s t->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, t->atomic_write_hw_max, t->io_min, t->physical_block_size);
+	pr_err("%s2 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size);
 	if (t->io_min <= SECTOR_SIZE) {
 		/* No chunk sectors, so use bottom device values directly */
 		t->atomic_write_hw_unit_max = b->atomic_write_hw_unit_max;
 		t->atomic_write_hw_unit_min = b->atomic_write_hw_unit_min;
 		t->atomic_write_hw_max = b->atomic_write_hw_max;
+		pr_err("%s3 No chunk sectors b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d\n", __func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size);
 		return true;
 	}
 
@@ -620,10 +626,13 @@ static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 	while (t->io_min % t->atomic_write_hw_unit_max)
 		t->atomic_write_hw_unit_max /= 2;
 
+	pr_err("%s9 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d t->atomic_write_hw_unit_max=%d\n",
+		__func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size, t->atomic_write_hw_unit_max);
 	t->atomic_write_hw_unit_min = min(b->atomic_write_hw_unit_min,
 					  t->atomic_write_hw_unit_max);
 	t->atomic_write_hw_max = min(b->atomic_write_hw_max, t->io_min);
-
+	pr_err("%s10 b->atomic_write_hw_max=%d, io_min=%d, physical_block_size=%d t->atomic_write_hw_unit_max=%d\n",
+		__func__, b->atomic_write_hw_max, b->io_min, b->physical_block_size, t->atomic_write_hw_unit_max);
 	return true;
 }
 
@@ -643,6 +652,7 @@ static void blk_stack_atomic_writes_limits(struct queue_limits *t,
 	 * If atomic_write_hw_max is set, we have already stacked 1x bottom
 	 * device, so check for compliance.
 	 */
+	pr_err("%s t->atomic_write_hw_max=%d\n", __func__, t->atomic_write_hw_max);
 	if (t->atomic_write_hw_max) {
 		if (!blk_stack_atomic_writes_tail(t, b))
 			goto unsupported;
@@ -686,6 +696,7 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 {
 	unsigned int top, bottom, alignment, ret = 0;
 
+	pr_err("%s t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
 
 	/*
@@ -749,7 +760,11 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	t->physical_block_size = max(t->physical_block_size,
 				     b->physical_block_size);
 
+	pr_err("%s0.0 t->io_min=%d t->physical_block_size=%d b->io_min=%d\n",
+		__func__, t->io_min, t->physical_block_size, b->io_min);
 	t->io_min = max(t->io_min, b->io_min);
+	pr_err("%s0.1 t->io_min=%d t->physical_block_size=%d b->io_min=%d\n",
+		__func__, t->io_min, t->physical_block_size, b->io_min);
 	t->io_opt = lcm_not_zero(t->io_opt, b->io_opt);
 	t->dma_alignment = max(t->dma_alignment, b->dma_alignment);
 
@@ -765,10 +780,12 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 	}
 
 	/* Minimum I/O a multiple of the physical block size? */
+	pr_err("%s1 t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
 	if (t->io_min & (t->physical_block_size - 1)) {
 		t->io_min = t->physical_block_size;
 		t->flags |= BLK_FLAG_MISALIGNED;
 		ret = -1;
+		pr_err("%s2 t->io_min=%d t->physical_block_size=%d\n", __func__, t->io_min, t->physical_block_size);
 	}
 
 	/* Optimal I/O a multiple of the physical block size? */

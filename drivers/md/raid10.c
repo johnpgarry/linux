@@ -1199,8 +1199,12 @@ static void raid10_read_request(struct mddev *mddev, struct bio *bio,
 				   rdev->bdev,
 				   (unsigned long long)r10_bio->sector);
 	if (max_sectors < bio_sectors(bio)) {
-		struct bio *split = bio_split(bio, max_sectors,
+		struct bio *split;
+
+	
+		split = bio_split(bio, max_sectors,
 					      gfp, &conf->bio_split);
+	//	pr_err("%s2 split=%pS\n", __func__, split);
 		if (IS_ERR(split)) {
 			error = PTR_ERR(split);
 			goto err_handle;
@@ -1347,6 +1351,7 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 	int max_sectors;
 	int error;
 
+	pr_err("%s r10_bio->sectors=%d bio->sectors=%d\n", __func__, r10_bio->sectors, bio->bi_iter.bi_size);
 	if ((mddev_is_clustered(mddev) &&
 	     mddev->cluster_ops->area_resyncing(mddev, WRITE,
 						bio->bi_iter.bi_sector,
@@ -1411,6 +1416,8 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 	wait_blocked_dev(mddev, r10_bio);
 
 	max_sectors = r10_bio->sectors;
+	pr_err("%s0 r10_bio->sectors=%d bio->sectors=%d max_sectors=%d\n",
+		__func__, r10_bio->sectors, bio->bi_iter.bi_size, max_sectors);
 
 	for (i = 0;  i < conf->copies; i++) {
 		int d = r10_bio->devs[i].devnum;
@@ -1480,8 +1487,10 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 		r10_bio->sectors = max_sectors;
 
 	if (r10_bio->sectors < bio_sectors(bio)) {
+		pr_err("%s1 r10_bio->sectors=%d bio->sectors=%d\n", __func__, r10_bio->sectors, bio->bi_iter.bi_size);
 		struct bio *split = bio_split(bio, r10_bio->sectors,
 					      GFP_NOIO, &conf->bio_split);
+		pr_err("%s2 split=%pS\n", __func__, split);
 		if (IS_ERR(split)) {
 			error = PTR_ERR(split);
 			goto err_handle;
@@ -1534,6 +1543,7 @@ static void __make_request(struct mddev *mddev, struct bio *bio, int sectors)
 
 	r10_bio = mempool_alloc(&conf->r10bio_pool, GFP_NOIO);
 
+	pr_err("%s sectors=%d\n", __func__, sectors);
 	r10_bio->master_bio = bio;
 	r10_bio->sectors = sectors;
 
@@ -1865,6 +1875,7 @@ static bool raid10_make_request(struct mddev *mddev, struct bio *bio)
 	sector_t chunk_mask = (conf->geo.chunk_mask & conf->prev.chunk_mask);
 	int chunk_sects = chunk_mask + 1;
 	int sectors = bio_sectors(bio);
+	pr_err("%s sectors=%d chunk_sects=%d\n", __func__, sectors, chunk_sects);
 
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
@@ -3993,14 +4004,24 @@ static unsigned int raid10_nr_stripes(struct r10conf *conf)
 		return raid_disks;
 	return raid_disks / conf->geo.near_copies;
 }
+#if 0
 
+	struct r10conf *conf = mddev->private;
+	sector_t chunk_mask = (conf->geo.chunk_mask & conf->prev.chunk_mask);
+	int chunk_sects = chunk_mask + 1;
+
+#endif
 static int raid10_set_queue_limits(struct mddev *mddev)
 {
 	struct r10conf *conf = mddev->private;
 	struct queue_limits lim;
+	sector_t chunk_mask = (conf->geo.chunk_mask & conf->prev.chunk_mask);
+	int chunk_sects = chunk_mask + 1;
 	int err;
 
 	md_init_stacking_limits(&lim);
+	pr_err("%s lim.io_min=%d chunk_sects=%d chunk_mask=%lld\n",
+		__func__, lim.io_min, chunk_sects, chunk_mask);
 	lim.max_write_zeroes_sectors = 0;
 	lim.io_min = mddev->chunk_sectors << 9;
 	lim.io_opt = lim.io_min * raid10_nr_stripes(conf);
@@ -4008,6 +4029,7 @@ static int raid10_set_queue_limits(struct mddev *mddev)
 	err = mddev_stack_rdev_limits(mddev, &lim, MDDEV_STACK_INTEGRITY);
 	if (err)
 		return err;
+	pr_err("%s2 lim.io_min=%d\n", __func__, lim.io_min);
 	return queue_limits_set(mddev->gendisk->queue, &lim);
 }
 
@@ -5100,6 +5122,7 @@ static void raid10_finish_reshape(struct mddev *mddev)
 	}
 	mddev->layout = mddev->new_layout;
 	mddev->chunk_sectors = 1 << conf->geo.chunk_shift;
+	pr_err("%s mddev->chunk_sectors=%d\n", __func__, mddev->chunk_sectors);
 	mddev->reshape_position = MaxSector;
 	mddev->delta_disks = 0;
 	mddev->reshape_backwards = 0;
