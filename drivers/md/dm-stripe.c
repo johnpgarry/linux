@@ -460,6 +460,7 @@ static void stripe_io_hints(struct dm_target *ti,
 
 	limits->io_min = chunk_size;
 	limits->io_opt = chunk_size * sc->stripes;
+	limits->max_hw_sectors = sc->chunk_size;
 }
 
 static struct target_type stripe_target = {
