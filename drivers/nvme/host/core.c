@@ -2097,9 +2097,13 @@ static bool nvme_update_disk_info(struct nvme_ns *ns, struct nvme_id_ns *id,
 		nvme_update_atomic_write_disk_info(ns, id, lim, bs, atomic_bs);
 	}
 
+	pr_err("%s NVME_NS_FEAT_IO_OPT set=%d ns=%pS id=%pS\n",
+		__func__, !!(id->nsfeat & NVME_NS_FEAT_IO_OPT), ns, id);
 	if (id->nsfeat & NVME_NS_FEAT_IO_OPT) {
 		/* NPWG = Namespace Preferred Write Granularity */
-		phys_bs = bs * (1 + le16_to_cpu(id->npwg));
+		phys_bs = bs * (1 + 1 /*le16_to_cpu(id->npwg)*/);
+		pr_err("%s2 NVME_NS_FEAT_IO_OPT set=%d ns=%pS id=%pS phys_bs=%d\n",
+			__func__, !!(id->nsfeat & NVME_NS_FEAT_IO_OPT), ns, id, phys_bs);
 		/* NOWS = Namespace Optimal Write Size */
 		if (id->nows)
 			io_opt = bs * (1 + le16_to_cpu(id->nows));
@@ -2458,7 +2462,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 {
 	bool unsupported = false;
 	int ret;
-
+	pr_err("%s ns=%pS info=%pS\n", __func__, ns, info);
 	switch (info->ids.csi) {
 	case NVME_CSI_ZNS:
 		if (!IS_ENABLED(CONFIG_BLK_DEV_ZONED)) {
@@ -2518,8 +2522,12 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		lim.physical_block_size = ns_lim->physical_block_size;
 		lim.io_min = ns_lim->io_min;
 		lim.io_opt = ns_lim->io_opt;
+		pr_err("%s2 ns=%pS info=%pS calling queue_limits_stack_bdev lim.atomic_write_hw_unit_max=%d ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max=%d\n",
+			__func__, ns, info, lim.atomic_write_hw_unit_max, ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max);
 		queue_limits_stack_bdev(&lim, ns->disk->part0, 0,
 					ns->head->disk->disk_name);
+		pr_err("%s2.1 ns=%pS info=%pS called queue_limits_stack_bdev lim.atomic_write_hw_unit_max=%d ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max=%d\n",
+			__func__, ns, info, lim.atomic_write_hw_unit_max, ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max);
 		if (unsupported)
 			ns->head->disk->flags |= GENHD_FL_HIDDEN;
 		else
@@ -3170,7 +3178,7 @@ static bool nvme_validate_cntlid(struct nvme_subsystem *subsys,
 		struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 {
 	struct nvme_ctrl *tmp;
-
+	pr_err("%s subsys=%pS ctrl=%pS id=%pS\n", __func__, subsys, ctrl, id);
 	lockdep_assert_held(&nvme_subsystems_lock);
 
 	list_for_each_entry(tmp, &subsys->ctrls, subsys_entry) {
@@ -3185,6 +3193,8 @@ static bool nvme_validate_cntlid(struct nvme_subsystem *subsys,
 			return false;
 		}
 
+		pr_err("%s id->cmic & NVME_CTRL_CMIC_MULTI_CTRL=%d\n",
+			__func__, !!(id->cmic & NVME_CTRL_CMIC_MULTI_CTRL));
 		if ((id->cmic & NVME_CTRL_CMIC_MULTI_CTRL) ||
 		    nvme_discovery_ctrl(ctrl))
 			continue;
@@ -3205,6 +3215,7 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	subsys = kzalloc(sizeof(*subsys), GFP_KERNEL);
 	if (!subsys)
 		return -ENOMEM;
+	pr_err("%s subsys=%pS ctrl=%pS id=%pS id->cmic=%d\n", __func__, subsys, ctrl, id, id->cmic);
 
 	subsys->instance = -1;
 	mutex_init(&subsys->lock);
@@ -3215,7 +3226,7 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	memcpy(subsys->serial, id->sn, sizeof(subsys->serial));
 	memcpy(subsys->model, id->mn, sizeof(subsys->model));
 	subsys->vendor_id = le16_to_cpu(id->vid);
-	subsys->cmic = id->cmic;
+	subsys->cmic = id->cmic = NVME_CTRL_CMIC_MULTI_CTRL;
 
 	/* Versions prior to 1.4 don't necessarily report a valid type */
 	if (id->cntrltype == NVME_CTRL_DISC ||
@@ -4127,13 +4138,16 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	 * devices.
 	 */
 	if (nvme_ns_head_multipath(ns->head)) {
+		pr_err("%s nvme_ns_head_multipath ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 		sprintf(disk->disk_name, "nvme%dc%dn%d", ctrl->subsys->instance,
 			ctrl->instance, ns->head->instance);
 		disk->flags |= GENHD_FL_HIDDEN;
 	} else if (multipath) {
+		pr_err("%s2 multipath ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->subsys->instance,
 			ns->head->instance);
 	} else {
+		pr_err("%s3 ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->instance,
 			ns->head->instance);
 	}
