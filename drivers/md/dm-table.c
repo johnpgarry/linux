@@ -435,6 +435,10 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 	pr_err("%s limits=%pS max_hw_sectors=%d atomic_write_hw_unit_min/max=%d %d start=%lld len=%lld\n",
 		__func__, limits, limits->max_hw_sectors, limits->atomic_write_hw_unit_min,
 		limits->atomic_write_hw_unit_max, start, len);
+
+	/* For striped types, limit the max_hw_sectors to the chunk size */
+	if (dm_target_supports_striped(ti->type))
+		limits->max_hw_sectors = len >> SECTOR_SHIFT;
 	
 	pr_err("%s0 calling blk_stack_limits limits2=%pS max_hw_sectors=%d atomic_write_hw_unit_min/max=%d %d\n",
 		__func__, limits2, limits2->max_hw_sectors, limits2->atomic_write_hw_unit_min,
