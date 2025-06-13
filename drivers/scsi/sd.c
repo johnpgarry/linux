@@ -3795,6 +3795,8 @@ static int sd_revalidate_disk(struct gendisk *disk)
 
 	sdkp->first_scan = 0;
 
+	lim.chunk_sectors = 128;
+
 	set_capacity_and_notify(disk, logical_to_sectors(sdp, sdkp->capacity));
 	sd_config_write_same(sdkp, &lim);
 	kfree(buffer);
