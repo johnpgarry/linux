@@ -672,6 +672,42 @@ static inline xfs_extlen_t xfs_calc_atomic_write_max(struct xfs_mount *mp)
 	return rounddown_pow_of_two(XFS_B_TO_FSB(mp, MAX_RW_COUNT));
 }
 
+static inline unsigned int max_pow_of_two_factor_orig(const unsigned int nr)
+{
+	return 1 << (ffs(nr) - 1);
+}
+
+static void xfs_pow_of_2_factor_test(void)
+{
+	unsigned int count = 0;
+	pr_err("%s\n", __func__);
+	for (count = 0; count < 10000; count++) {
+		unsigned int value = get_random_u32();
+
+		if (value <= 1)
+			continue;
+
+		if ((count % 50) == 0)
+			pr_err("%s count=%d value=%u\n", __func__, count, value);
+
+		if (max_pow_of_two_factor(value) != max_pow_of_two_factor_orig(value)) {
+			pr_err("%s1 value=%u\n", __func__, value);
+			BUG();
+		}
+
+		if (!is_power_of_2(max_pow_of_two_factor(value))) {
+			pr_err("%s2 value=%u\n", __func__, value);
+			BUG();
+		}
+		if (value % max_pow_of_two_factor(value)) {
+			pr_err("%s3 value=%u\n", __func__, value);
+			BUG();
+		}
+	}
+	pr_err("%s10\n", __func__);
+}
+
+
 /*
  * If the data device advertises atomic write support, limit the size of data
  * device atomic writes to the greatest power-of-two factor of the AG size so
@@ -685,6 +721,7 @@ static inline xfs_extlen_t xfs_calc_atomic_write_max(struct xfs_mount *mp)
  */
 static inline xfs_extlen_t xfs_calc_perag_awu_max(struct xfs_mount *mp)
 {
+	xfs_pow_of_2_factor_test();
 	if (mp->m_ddev_targp->bt_bdev_awu_min > 0)
 		return max_pow_of_two_factor(mp->m_sb.sb_agblocks);
 	return rounddown_pow_of_two(mp->m_ag_max_usable);
@@ -709,6 +746,8 @@ static inline xfs_extlen_t xfs_calc_perag_awu_max(struct xfs_mount *mp)
 static inline xfs_extlen_t xfs_calc_rtgroup_awu_max(struct xfs_mount *mp)
 {
 	struct xfs_groups	*rgs = &mp->m_groups[XG_TYPE_RTG];
+
+	xfs_pow_of_2_factor_test();
 
 	if (rgs->blocks == 0)
 		return 0;
