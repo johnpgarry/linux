@@ -601,6 +601,9 @@ static void blk_stack_atomic_writes_chunk_sectors(struct queue_limits *t)
 	if (!t->chunk_sectors)
 		return;
 
+	pr_err("%s t->chunk_sectors=%u (0x%x)\n", __func__,
+		t->chunk_sectors, t->chunk_sectors);
+
 	/*
 	 * If chunk sectors is so large that its value in bytes overflows
 	 * UINT_MAX, then just shift it down so it definitely will fit.
@@ -608,6 +611,10 @@ static void blk_stack_atomic_writes_chunk_sectors(struct queue_limits *t)
 	 */
 	if (check_shl_overflow(t->chunk_sectors, SECTOR_SHIFT, &chunk_bytes))
 		chunk_bytes = t->chunk_sectors;
+
+	pr_err("%s t->chunk_sectors=%u (0x%x) chunk_bytes=%u (0x%x)\n", __func__,
+		t->chunk_sectors, t->chunk_sectors,
+		chunk_bytes, chunk_bytes);
 
 	/*
 	 * Find values for limits which work for chunk size.
