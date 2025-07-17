@@ -926,6 +926,9 @@ xfs_file_dax_write(
 	ssize_t			ret, error = 0;
 	loff_t			pos;
 
+	pr_err("%s iocb->ki_flags & IOCB_ATOMIC=%d\n",
+		__func__, !!(iocb->ki_flags & IOCB_ATOMIC));
+
 	ret = xfs_ilock_iocb(iocb, iolock);
 	if (ret)
 		return ret;
