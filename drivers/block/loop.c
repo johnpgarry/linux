@@ -213,7 +213,12 @@ static void loop_set_size(struct loop_device *lo, loff_t size)
 
 static void loop_clear_limits(struct loop_device *lo, int mode)
 {
-	struct queue_limits lim = queue_limits_start_update(lo->lo_queue);
+	struct queue_limits lim;
+	int err;
+
+
+	pr_err("%s calling queue_limits_start_update\n", __func__);
+	lim = queue_limits_start_update(lo->lo_queue);
 
 	if (mode & FALLOC_FL_ZERO_RANGE)
 		lim.max_write_zeroes_sectors = 0;
@@ -230,7 +235,9 @@ static void loop_clear_limits(struct loop_device *lo, int mode)
 	 * should move out into a workqueue unless we get the file operations to
 	 * advertise if they support specific fallocate operations.
 	 */
-	queue_limits_commit_update(lo->lo_queue, &lim);
+	pr_err("%s2 calling queue_limits_commit_update\n", __func__);
+	err = queue_limits_commit_update(lo->lo_queue, &lim);
+	pr_err("%s3 called queue_limits_commit_update err=%d\n", __func__, err);
 }
 
 static int lo_fallocate(struct loop_device *lo, struct request *rq, loff_t pos,
@@ -1046,10 +1053,12 @@ static int loop_configure(struct loop_device *lo, blk_mode_t mode,
 	lo->lo_device = bdev;
 	loop_assign_backing_file(lo, file);
 
+	pr_err("%s calling queue_limits_start_update\n", __func__);
 	lim = queue_limits_start_update(lo->lo_queue);
 	loop_update_limits(lo, &lim, config->block_size);
 	/* No need to freeze the queue as the device isn't bound yet. */
 	error = queue_limits_commit_update(lo->lo_queue, &lim);
+	pr_err("%s2 called queue_limits_commit_update error=%d\n", __func__, error);
 	if (error)
 		goto out_unlock;
 
@@ -1105,6 +1114,7 @@ static void __loop_clr_fd(struct loop_device *lo)
 	struct queue_limits lim;
 	struct file *filp;
 	gfp_t gfp = lo->old_gfp_mask;
+	int err;
 
 	spin_lock_irq(&lo->lo_lock);
 	filp = lo->lo_backing_file;
@@ -1122,11 +1132,13 @@ static void __loop_clr_fd(struct loop_device *lo)
 	 * No queue freezing needed because this is called from the final
 	 * ->release call only, so there can't be any outstanding I/O.
 	 */
+	pr_err("%s calling queue_limits_start_update\n", __func__);
 	lim = queue_limits_start_update(lo->lo_queue);
 	lim.logical_block_size = SECTOR_SIZE;
 	lim.physical_block_size = SECTOR_SIZE;
 	lim.io_min = SECTOR_SIZE;
-	queue_limits_commit_update(lo->lo_queue, &lim);
+	err = queue_limits_commit_update(lo->lo_queue, &lim);
+	pr_err("%s2 called queue_limits_commit_update err=%d\n", __func__, err);
 
 	invalidate_disk(lo->lo_disk);
 	loop_sysfs_exit(lo);
@@ -1446,11 +1458,13 @@ static int loop_set_block_size(struct loop_device *lo, unsigned long arg)
 	sync_blockdev(lo->lo_device);
 	invalidate_bdev(lo->lo_device);
 
+	pr_err("%s calling queue_limits_start_update\n", __func__);
 	lim = queue_limits_start_update(lo->lo_queue);
 	loop_update_limits(lo, &lim, arg);
 
 	memflags = blk_mq_freeze_queue(lo->lo_queue);
 	err = queue_limits_commit_update(lo->lo_queue, &lim);
+	pr_err("%s2 called queue_limits_commit_update err=%d\n", __func__, err);
 	loop_update_dio(lo);
 	blk_mq_unfreeze_queue(lo->lo_queue, memflags);
 

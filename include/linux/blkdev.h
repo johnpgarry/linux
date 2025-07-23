@@ -283,8 +283,13 @@ static inline dev_t disk_devt(struct gendisk *disk)
 /* blk_validate_limits() validates bsize, so drivers don't usually need to */
 static inline int blk_validate_block_size(unsigned long bsize)
 {
-	if (bsize < 512 || bsize > BLK_MAX_BLOCK_SIZE || !is_power_of_2(bsize))
+	pr_err("%s PAGE_SHIFT=%d BLK_MAX_BLOCK_SIZE=%ld bsize=%ld\n",
+		__func__, PAGE_SHIFT, BLK_MAX_BLOCK_SIZE, bsize);
+	if (bsize < 512 || bsize > BLK_MAX_BLOCK_SIZE || !is_power_of_2(bsize)) {
+		pr_err("%s2 error PAGE_SHIFT=%d BLK_MAX_BLOCK_SIZE=%ld bsize=%ld\n",
+		__func__, PAGE_SHIFT, BLK_MAX_BLOCK_SIZE, bsize);
 		return -EINVAL;
+	}
 
 	return 0;
 }
