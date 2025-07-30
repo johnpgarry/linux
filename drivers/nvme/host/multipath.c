@@ -108,6 +108,7 @@ void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 {
 	struct nvme_ns_head *h;
 
+	pr_err("%s subsys=%pS\n", __func__, subsys);
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry)
 		if (h->disk)
@@ -118,6 +119,7 @@ void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 {
 	struct nvme_ns_head *h;
 
+	pr_err("%s subsys=%pS\n", __func__, subsys);
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry)
 		if (h->disk)
@@ -128,6 +130,7 @@ void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 {
 	struct nvme_ns_head *h;
 
+	pr_err("%s subsys=%pS\n", __func__, subsys);
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry)
 		if (h->disk)
@@ -141,6 +144,7 @@ void nvme_failover_req(struct request *req)
 	unsigned long flags;
 	struct bio *bio;
 
+	pr_err("%s req=%pS\n", __func__, req);
 	nvme_mpath_clear_current_path(ns);
 
 	/*
@@ -182,6 +186,7 @@ void nvme_mpath_start_request(struct request *rq)
 	struct nvme_ns *ns = rq->q->queuedata;
 	struct gendisk *disk = ns->head->disk;
 
+	pr_err("%s rq=%pS (bio=%pS) disk=%pS (%s)\n", __func__, rq, rq->bio, disk, disk->disk_name);
 	if (READ_ONCE(ns->head->subsys->iopolicy) == NVME_IOPOLICY_QD) {
 		atomic_inc(&ns->ctrl->nr_active);
 		nvme_req(rq)->flags |= NVME_MPATH_CNT_ACTIVE;
@@ -200,6 +205,7 @@ void nvme_mpath_end_request(struct request *rq)
 {
 	struct nvme_ns *ns = rq->q->queuedata;
 
+	pr_err("%s rq=%pS (bio=%pS)\n", __func__, rq, rq->bio);
 	if (nvme_req(rq)->flags & NVME_MPATH_CNT_ACTIVE)
 		atomic_dec_if_positive(&ns->ctrl->nr_active);
 
@@ -215,6 +221,7 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 	struct nvme_ns *ns;
 	int srcu_idx;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
@@ -242,6 +249,7 @@ bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
 	bool changed = false;
 	int node;
 
+	pr_err("%s ns=%pS head=%pS\n", __func__, ns, head);
 	if (!head)
 		goto out;
 
@@ -260,6 +268,7 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 	struct nvme_ns *ns;
 	int srcu_idx;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
@@ -276,6 +285,7 @@ void nvme_mpath_revalidate_paths(struct nvme_ns *ns)
 	int node;
 	int srcu_idx;
 
+	pr_err("%s ns=%pS head=%pS\n", __func__, ns, head);
 	srcu_idx = srcu_read_lock(&head->srcu);
 	list_for_each_entry_srcu(ns, &head->list, siblings,
 				 srcu_read_lock_held(&head->srcu)) {
@@ -293,6 +303,7 @@ static bool nvme_path_is_disabled(struct nvme_ns *ns)
 {
 	enum nvme_ctrl_state state = nvme_ctrl_state(ns->ctrl);
 
+	pr_err("%s ns=%pS\n", __func__, ns);
 	/*
 	 * We don't treat NVME_CTRL_DELETING as a disabled path as I/O should
 	 * still be able to complete assuming that the controller is connected.
@@ -311,8 +322,11 @@ static struct nvme_ns *__nvme_find_path(struct nvme_ns_head *head, int node)
 	int found_distance = INT_MAX, fallback_distance = INT_MAX, distance;
 	struct nvme_ns *found = NULL, *fallback = NULL, *ns;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	list_for_each_entry_srcu(ns, &head->list, siblings,
 				 srcu_read_lock_held(&head->srcu)) {
+		pr_err("%s1 head=%pS looping ns=%pS found=%pS fallback=%pS\n",
+			__func__, head, ns, found, fallback);
 		if (nvme_path_is_disabled(ns))
 			continue;
 
@@ -342,6 +356,7 @@ static struct nvme_ns *__nvme_find_path(struct nvme_ns_head *head, int node)
 
 	if (!found)
 		found = fallback;
+	pr_err("%s9 head=%pS found=%pS fallback=%pS maybe calling rcu_assign_pointer\n", __func__, head, found, fallback);
 	if (found)
 		rcu_assign_pointer(head->current_path[node], found);
 	return found;
@@ -352,6 +367,7 @@ static struct nvme_ns *nvme_next_ns(struct nvme_ns_head *head,
 {
 	ns = list_next_or_null_rcu(&head->list, &ns->siblings, struct nvme_ns,
 			siblings);
+	pr_err("%s head=%pS\n", __func__, head);
 	if (ns)
 		return ns;
 	return list_first_or_null_rcu(&head->list, struct nvme_ns, siblings);
@@ -364,6 +380,7 @@ static struct nvme_ns *nvme_round_robin_path(struct nvme_ns_head *head)
 	struct nvme_ns *old = srcu_dereference(head->current_path[node],
 					       &head->srcu);
 
+	pr_err("%s head=%pS old=%pS\n", __func__, head, old);
 	if (unlikely(!old))
 		return __nvme_find_path(head, node);
 
@@ -411,6 +428,7 @@ static struct nvme_ns *nvme_queue_depth_path(struct nvme_ns_head *head)
 	unsigned int min_depth_opt = UINT_MAX, min_depth_nonopt = UINT_MAX;
 	unsigned int depth;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	list_for_each_entry_srcu(ns, &head->list, siblings,
 				 srcu_read_lock_held(&head->srcu)) {
 		if (nvme_path_is_disabled(ns))
@@ -453,7 +471,9 @@ static struct nvme_ns *nvme_numa_path(struct nvme_ns_head *head)
 	int node = numa_node_id();
 	struct nvme_ns *ns;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	ns = srcu_dereference(head->current_path[node], &head->srcu);
+	pr_err("%s1 head=%pS ns=%pS\n", __func__, head, ns);
 	if (unlikely(!ns))
 		return __nvme_find_path(head, node);
 	if (unlikely(!nvme_path_is_optimized(ns)))
@@ -463,6 +483,7 @@ static struct nvme_ns *nvme_numa_path(struct nvme_ns_head *head)
 
 inline struct nvme_ns *nvme_find_path(struct nvme_ns_head *head)
 {
+	pr_err("%s head=%pS iopolicy=%d\n", __func__, head, READ_ONCE(head->subsys->iopolicy));
 	switch (READ_ONCE(head->subsys->iopolicy)) {
 	case NVME_IOPOLICY_QD:
 		return nvme_queue_depth_path(head);
@@ -477,6 +498,7 @@ static bool nvme_available_path(struct nvme_ns_head *head)
 {
 	struct nvme_ns *ns;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	if (!test_bit(NVME_NSHEAD_DISK_LIVE, &head->flags))
 		return false;
 
@@ -513,6 +535,7 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 	struct nvme_ns *ns;
 	int srcu_idx;
 
+	pr_err("%s head=%pS bio=%pS\n", __func__, head, bio);
 	/*
 	 * The namespace might be going away and the bio might be moved to a
 	 * different queue via blk_steal_bios(), so we need to use the bio_split
@@ -523,12 +546,15 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 		return;
 
 	srcu_idx = srcu_read_lock(&head->srcu);
+	pr_err("%s1 head=%pS bio=%pS calling nvme_find_path\n", __func__, head, bio);
 	ns = nvme_find_path(head);
+	pr_err("%s1.1 head=%pS bio=%pS called nvme_find_path ns=%pS\n", __func__, head, bio, ns);
 	if (likely(ns)) {
 		bio_set_dev(bio, ns->disk->part0);
 		bio->bi_opf |= REQ_NVME_MPATH;
 		trace_block_bio_remap(bio, disk_devt(ns->head->disk),
 				      bio->bi_iter.bi_sector);
+		pr_err("%s1.2 head=%pS bio=%pS ns=%pS REQ_NVME_MPATH being set and calling submit_bio_noacct\n", __func__, head, bio, ns);
 		submit_bio_noacct(bio);
 	} else if (nvme_available_path(head)) {
 		dev_warn_ratelimited(dev, "no usable path - requeuing I/O\n");
@@ -547,6 +573,7 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 
 static int nvme_ns_head_open(struct gendisk *disk, blk_mode_t mode)
 {
+	pr_err("%s disk=%pS (disk_name=%s)\n", __func__, disk, disk->disk_name);
 	if (!nvme_tryget_ns_head(disk->private_data))
 		return -ENXIO;
 	return 0;
@@ -564,8 +591,11 @@ static int nvme_ns_head_get_unique_id(struct gendisk *disk, u8 id[16],
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	srcu_idx = srcu_read_lock(&head->srcu);
+	pr_err("%s1 head=%pS srcu_idx=%d calling nvme_find_path\n", __func__, head, srcu_idx);
 	ns = nvme_find_path(head);
+	pr_err("%s1.1 head=%pS srcu_idx=%d called nvme_find_path ns=%pS\n", __func__, head, srcu_idx, ns);
 	if (ns)
 		ret = nvme_ns_get_unique_id(ns, id, type);
 	srcu_read_unlock(&head->srcu, srcu_idx);
@@ -733,6 +763,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	 * either case, for private namespaces, we ensure that the NSID is
 	 * unique.
 	 */
+	pr_err("%s multipath_always_on=%d\n", __func__, multipath_always_on);
 	if (!multipath_always_on) {
 		if (!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL) ||
 				!multipath)
@@ -775,6 +806,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	struct nvme_ns_head *head = ns->head;
 	int rc;
 
+	pr_err("%s ns=%pS head=%pS\n", __func__, ns, head);
 	if (!head->disk)
 		return;
 
@@ -941,6 +973,7 @@ static int nvme_read_ana_log(struct nvme_ctrl *ctrl)
 	u32 nr_change_groups = 0;
 	int error;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	mutex_lock(&ctrl->ana_lock);
 	error = nvme_get_log(ctrl, NVME_NSID_ALL, NVME_LOG_ANA, 0, NVME_CSI_NVM,
 			ctrl->ana_log_buf, ctrl->ana_log_size, 0);
@@ -1185,6 +1218,7 @@ void nvme_mpath_add_sysfs_link(struct nvme_ns_head *head)
 	struct nvme_ns *ns;
 	struct kobject *kobj;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	/*
 	 * Ensure head disk node is already added otherwise we may get invalid
 	 * kobj for head disk node
@@ -1259,6 +1293,7 @@ void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 
 void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 {
+	pr_err("%s ns=%pS anagrpid=0x%x\n", __func__, ns, anagrpid);
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
 		struct nvme_ana_group_desc desc = {
 			.grpid = anagrpid,
@@ -1340,6 +1375,7 @@ void nvme_mpath_put_disk(struct nvme_ns_head *head)
 
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl)
 {
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	mutex_init(&ctrl->ana_lock);
 	timer_setup(&ctrl->anatt_timer, nvme_anatt_timeout, 0);
 	INIT_WORK(&ctrl->ana_work, nvme_ana_work);
@@ -1351,6 +1387,7 @@ int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	size_t ana_log_size;
 	int error = 0;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	/* check if multipath is enabled and we have the capability */
 	if (!multipath || !ctrl->subsys ||
 	    !(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA))
