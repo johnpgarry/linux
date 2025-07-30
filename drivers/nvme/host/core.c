@@ -189,7 +189,7 @@ static void nvme_failfast_work(struct work_struct *work)
 		return;
 
 	set_bit(NVME_CTRL_FAILFAST_EXPIRED, &ctrl->flags);
-	dev_info(ctrl->device, "failfast expired\n");
+	dev_info(ctrl->device, "failfast expired, calling nvme_kick_requeue_lists\n");
 	nvme_kick_requeue_lists(ctrl);
 }
 
@@ -561,6 +561,7 @@ bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
 	unsigned long flags;
 	bool changed = false;
 
+	pr_err("%s ctrl=%pS new_state=%d\n", __func__, ctrl, new_state);
 	spin_lock_irqsave(&ctrl->lock, flags);
 
 	old_state = nvme_ctrl_state(ctrl);
@@ -640,11 +641,16 @@ bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
 	if (new_state == NVME_CTRL_LIVE) {
 		if (old_state == NVME_CTRL_CONNECTING)
 			nvme_stop_failfast_work(ctrl);
+		pr_err("%s5 ctrl=%pS new_state=%d calling nvme_kick_requeue_lists\n", __func__, ctrl, new_state);
 		nvme_kick_requeue_lists(ctrl);
+		pr_err("%s5.1 ctrl=%pS new_state=%d calling nvme_kick_requeue_lists\n", __func__, ctrl, new_state);
 	} else if (new_state == NVME_CTRL_CONNECTING &&
 		old_state == NVME_CTRL_RESETTING) {
+		pr_err("%s6 ctrl=%pS new_state=%d calling nvme_start_failfast_work\n", __func__, ctrl, new_state);
 		nvme_start_failfast_work(ctrl);
+		pr_err("%s6.1 ctrl=%pS new_state=%d calling nvme_start_failfast_work\n", __func__, ctrl, new_state);
 	}
+	pr_err("%s10 ctrl=%pS\n", __func__, ctrl);
 	return changed;
 }
 EXPORT_SYMBOL_GPL(nvme_change_ctrl_state);
@@ -2482,6 +2488,8 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		ret = 0;
 	}
 
+	pr_err("%s1 ns=%pS info=%pS ret=%d nvme_ns_head_multipath=%d\n",
+		__func__, ns, info, ret, nvme_ns_head_multipath(ns->head));
 	if (!ret && nvme_ns_head_multipath(ns->head)) {
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
 		struct queue_limits lim;
@@ -2524,7 +2532,11 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 		set_capacity_and_notify(ns->head->disk, get_capacity(ns->disk));
 		set_disk_ro(ns->head->disk, nvme_ns_is_readonly(ns, info));
+		pr_err("%s3 ns=%pS info=%pS calling nvme_mpath_revalidate_paths\n",
+			__func__, ns, info);
 		nvme_mpath_revalidate_paths(ns);
+		pr_err("%s3.1 ns=%pS info=%pS called nvme_mpath_revalidate_paths\n",
+			__func__, ns, info);
 
 		blk_mq_unfreeze_queue(ns->head->disk->queue, memflags);
 	}
@@ -3238,7 +3250,9 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	device_initialize(&subsys->dev);
 
 	mutex_lock(&nvme_subsystems_lock);
+	pr_err("%s2 subsys=%pS ctrl=%pS id=%pS id->cmic=%d calling __nvme_find_get_subsystem\n", __func__, subsys, ctrl, id, id->cmic);
 	found = __nvme_find_get_subsystem(subsys->subnqn);
+	pr_err("%s2.1 subsys=%pS ctrl=%pS id=%pS id->cmic=%d called __nvme_find_get_subsystem found=%pS\n", __func__, subsys, ctrl, id, id->cmic, found);
 	if (found) {
 		put_device(&subsys->dev);
 		subsys = found;
@@ -3518,7 +3532,10 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 	bool prev_apst_enabled;
 	int ret;
 
+	pr_err("%s ctrl=%pS calling nvme_identify_ctrl\n", __func__, ctrl);
 	ret = nvme_identify_ctrl(ctrl, &id);
+
+	pr_err("%s0.0 ctrl=%pS called nvme_identify_ctrl id=%pS\n", __func__, ctrl, id);
 	if (ret) {
 		dev_err(ctrl->device, "Identify Controller failed (%d)\n", ret);
 		return -EIO;
@@ -3527,6 +3544,8 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 	if (!(ctrl->ops->flags & NVME_F_FABRICS))
 		ctrl->cntlid = le16_to_cpu(id->cntlid);
 
+	pr_err("%s0.1 ctrl=%pS (identified=%d) id=%pS\n",
+		__func__, ctrl, ctrl->identified, id);
 	if (!ctrl->identified) {
 		unsigned int i;
 
@@ -3543,7 +3562,11 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 				ctrl->quirks |= core_quirks[i].quirks;
 		}
 
+		pr_err("%s1 ctrl=%pS (identified=%d) calling nvme_init_subsystem id=%pS\n",
+			__func__, ctrl, ctrl->identified, id);
 		ret = nvme_init_subsystem(ctrl, id);
+		pr_err("%s1.1 ctrl=%pS (identified=%d) called nvme_init_subsystem id=%pS\n",
+			__func__, ctrl, ctrl->identified, id);
 		if (ret)
 			goto out_free;
 
@@ -3638,7 +3661,11 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 		ctrl->hmmaxd = le16_to_cpu(id->hmmaxd);
 	}
 
+	pr_err("%s3 ctrl=%pS (identified=%d) calling nvme_mpath_init_identify id=%pS\n",
+			__func__, ctrl, ctrl->identified, id);
 	ret = nvme_mpath_init_identify(ctrl, id);
+	pr_err("%s3.1 ctrl=%pS (identified=%d) called nvme_mpath_init_identify id=%pS\n",
+			__func__, ctrl, ctrl->identified, id);
 	if (ret < 0)
 		goto out_free;
 
@@ -3660,6 +3687,7 @@ int nvme_init_ctrl_finish(struct nvme_ctrl *ctrl, bool was_suspended)
 {
 	int ret;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	ret = ctrl->ops->reg_read32(ctrl, NVME_REG_VS, &ctrl->vs);
 	if (ret) {
 		dev_err(ctrl->device, "Reading VS failed (%d)\n", ret);
@@ -3671,7 +3699,9 @@ int nvme_init_ctrl_finish(struct nvme_ctrl *ctrl, bool was_suspended)
 	if (ctrl->vs >= NVME_VS(1, 1, 0))
 		ctrl->subsystem = NVME_CAP_NSSRC(ctrl->cap);
 
+	pr_err("%s1 ctrl=%pS calling nvme_init_identify\n", __func__, ctrl);
 	ret = nvme_init_identify(ctrl);
+	pr_err("%s1.1 ctrl=%pS called nvme_init_identify\n", __func__, ctrl);
 	if (ret)
 		return ret;
 
@@ -3704,6 +3734,7 @@ int nvme_init_ctrl_finish(struct nvme_ctrl *ctrl, bool was_suspended)
 
 	nvme_start_keep_alive(ctrl);
 
+	pr_err("%s10 ctrl=%pS\n", __func__, ctrl);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(nvme_init_ctrl_finish);
@@ -3900,6 +3931,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	} else
 		head->effects = ctrl->effects;
 
+	pr_err("%s ctrl=%pS head=%pS calling nvme_mpath_alloc_disk\n", __func__, ctrl, head);
 	ret = nvme_mpath_alloc_disk(ctrl, head);
 	if (ret)
 		goto out_cleanup_srcu;
@@ -3992,7 +4024,9 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	}
 
 	mutex_lock(&ctrl->subsys->lock);
+	pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x\n", __func__, ns, info->nsid);
 	head = nvme_find_ns_head(ctrl, info->nsid);
+	pr_err("%s1 ns=%pS called nvme_find_ns_head info->nsid=0x%x head=%pS\n", __func__, ns, info->nsid, head);
 	if (!head) {
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, &info->ids);
 		if (ret) {
@@ -4002,6 +4036,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			goto out_unlock;
 		}
 		head = nvme_alloc_ns_head(ctrl, info);
+		pr_err("%s2 ns=%pS called nvme_alloc_ns_head info->nsid=0x%x head=%pS\n", __func__, ns, info->nsid, head);
 		if (IS_ERR(head)) {
 			ret = PTR_ERR(head);
 			goto out_unlock;
@@ -4114,8 +4149,10 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	ns->ctrl = ctrl;
 	kref_init(&ns->kref);
 
+	pr_err("%s ns=%pS info=%pS calling nvme_init_ns_head ns->head=%pS\n", __func__, ns, info, ns->head);
 	if (nvme_init_ns_head(ns, info))
 		goto out_cleanup_disk;
+	pr_err("%s0.1 ns=%pS info=%pS called nvme_init_ns_head ns->head=%pS\n", __func__, ns, info, ns->head);
 
 	/*
 	 * If multipathing is enabled, the device name for all disks and not
@@ -4129,16 +4166,16 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	 * devices.
 	 */
 	if (nvme_ns_head_multipath(ns->head)) {
-		pr_err("%s nvme_ns_head_multipath ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
+		pr_err("%s2.1 nvme_ns_head_multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 		sprintf(disk->disk_name, "nvme%dc%dn%d", ctrl->subsys->instance,
 			ctrl->instance, ns->head->instance);
 		disk->flags |= GENHD_FL_HIDDEN;
 	} else if (multipath) {
-		pr_err("%s2 multipath ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
+		pr_err("%s2.2 multipath=true ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->subsys->instance,
 			ns->head->instance);
 	} else {
-		pr_err("%s3 ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
+		pr_err("%s2.3 ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->instance,
 			ns->head->instance);
 	}
@@ -4159,14 +4196,20 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	mutex_unlock(&ctrl->namespaces_lock);
 	synchronize_srcu(&ctrl->srcu);
 	nvme_get_ctrl(ctrl);
-
+	pr_err("%s4 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS calling device_add_disk \n", __func__, ns, ns->disk, ctrl, ctrl->device, info);
 	if (device_add_disk(ctrl->device, ns->disk, nvme_ns_attr_groups))
 		goto out_cleanup_ns_from_list;
+	pr_err("%s4.1 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS called device_add_disk nvme_ns_head_multipath(ns->head)=%d\n",
+		__func__, ns, ns->disk, ctrl, ctrl->device, info, nvme_ns_head_multipath(ns->head));
 
 	if (!nvme_ns_head_multipath(ns->head))
 		nvme_add_ns_cdev(ns);
 
+	pr_err("%s5 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS calling nvme_mpath_add_disk\n",
+		__func__, ns, ns->disk, ctrl, ctrl->device, info);
 	nvme_mpath_add_disk(ns, info->anagrpid);
+	pr_err("%s5.1 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS called nvme_mpath_add_disk\n",
+		__func__, ns, ns->disk, ctrl, ctrl->device, info);
 	nvme_fault_inject_init(&ns->fault_inject, ns->disk->disk_name);
 
 	/*
@@ -4176,6 +4219,8 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	 */
 	dev_set_drvdata(disk_to_dev(ns->disk), ns);
 
+	pr_err("%s10 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS\n",
+		__func__, ns, ns->disk, ctrl, ctrl->device, info);
 	return;
 
  out_cleanup_ns_from_list:
@@ -4298,6 +4343,7 @@ static void nvme_scan_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 	struct nvme_ns *ns;
 	int ret = 1;
 
+	pr_err("%s ctrl=%pS nsid=0x%x\n", __func__, ctrl, nsid);
 	if (nvme_identify_ns_descs(ctrl, &info))
 		return;
 
@@ -4329,7 +4375,9 @@ static void nvme_scan_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 	if (ret || !info.is_ready)
 		return;
 
+	pr_err("%s2 ctrl=%pS nsid=0x%x calling nvme_find_get_ns\n", __func__, ctrl, nsid);
 	ns = nvme_find_get_ns(ctrl, nsid);
+	pr_err("%s2.1 ctrl=%pS nsid=0x%x called nvme_find_get_ns ns=%pS\n", __func__, ctrl, nsid, ns);
 	if (ns) {
 		nvme_validate_ns(ns, &info);
 		nvme_put_ns(ns);
@@ -4364,6 +4412,7 @@ static void nvme_scan_ns_async(void *data, async_cookie_t cookie)
 	idx = (u32)atomic_fetch_inc(&scan_info->next_nsid);
 	nsid = le32_to_cpu(scan_info->ns_list[idx]);
 
+	pr_err("%s scan_info->ctrl=%pS nsid=0x%x\n", __func__, scan_info->ctrl, nsid);
 	nvme_scan_ns(scan_info->ctrl, nsid);
 }
 
@@ -4443,15 +4492,21 @@ static void nvme_scan_ns_sequential(struct nvme_ctrl *ctrl)
 	struct nvme_id_ctrl *id;
 	u32 nn, i;
 
+	pr_err("%s calling nvme_identify_ctrl ctrl=%pS\n", __func__, ctrl);
 	if (nvme_identify_ctrl(ctrl, &id))
 		return;
 	nn = le32_to_cpu(id->nn);
 	kfree(id);
 
-	for (i = 1; i <= nn; i++)
+	for (i = 1; i <= nn; i++) {
+		pr_err("%s1 calling nvme_scan_ns ctrl=%pS i=%d\n", __func__, ctrl, i);
 		nvme_scan_ns(ctrl, i);
+		pr_err("%s1.1 called nvme_scan_ns ctrl=%pS i=%d\n", __func__, ctrl, i);
+	}
 
+	pr_err("%s3 calling nvme_remove_invalid_namespaces ctrl=%pS\n", __func__, ctrl);
 	nvme_remove_invalid_namespaces(ctrl, nn);
+	pr_err("%s10 called nvme_remove_invalid_namespaces ctrl=%pS\n", __func__, ctrl);
 }
 
 static void nvme_clear_changed_ns_log(struct nvme_ctrl *ctrl)
@@ -5068,6 +5123,7 @@ int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
 	if (ret)
 		return ret;
 
+	dev_err(dev, "%s ctrl=%pS\n", __func__, ctrl);
 	mutex_init(&ctrl->scan_lock);
 	INIT_LIST_HEAD(&ctrl->namespaces);
 	xa_init(&ctrl->cels);
@@ -5104,6 +5160,7 @@ int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
 	if (ret)
 		goto out_release_instance;
 
+	dev_err(dev, "%s1 ctrl=%pS calling nvme_mpath_init_ctrl\n", __func__, ctrl);
 	nvme_mpath_init_ctrl(ctrl);
 
 	device_initialize(&ctrl->ctrl_device);
