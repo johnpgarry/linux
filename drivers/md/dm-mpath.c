@@ -677,6 +677,7 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
 	struct multipath *m = ti->private;
 	struct dm_mpath_io *mpio = NULL;
 
+	pr_err("%s m=%pS\n", __func__, m);
 	multipath_init_per_bio_data(bio, &mpio);
 	return __multipath_map_bio(m, bio, mpio);
 }
@@ -1198,6 +1199,7 @@ static int multipath_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	as.argv = argv;
 
 	m = alloc_multipath(ti);
+	pr_err("%s m=%pS\n", __func__, m);
 	if (!m) {
 		ti->error = "can't allocate multipath";
 		return -EINVAL;
@@ -2203,6 +2205,8 @@ static int multipath_iterate_devices(struct dm_target *ti,
 	struct priority_group *pg;
 	struct pgpath *p;
 	int ret = 0;
+
+	pr_err("%s m=%pS\n", __func__, m);
 
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(p, &pg->pgpaths, list) {
