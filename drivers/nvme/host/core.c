@@ -434,6 +434,8 @@ static inline void nvme_end_req_zoned(struct request *req)
 
 static inline void __nvme_end_req(struct request *req)
 {
+	pr_err("%s req=%pS (bio=%pS, REQ_NVME_MPATH set=%d)\n",
+		__func__, req, req->bio, !!(req->cmd_flags & REQ_NVME_MPATH));
 	if (unlikely(nvme_req(req)->status && !(req->rq_flags & RQF_QUIET))) {
 		if (blk_rq_is_passthrough(req))
 			nvme_log_err_passthru(req);
@@ -450,6 +452,8 @@ void nvme_end_req(struct request *req)
 {
 	blk_status_t status = nvme_error_status(nvme_req(req)->status);
 
+	pr_err("%s req=%pS (bio=%pS, REQ_NVME_MPATH set=%d)\n",
+		__func__, req, req->bio, !!(req->cmd_flags & REQ_NVME_MPATH));
 	__nvme_end_req(req);
 	blk_mq_end_request(req, status);
 }
@@ -458,6 +462,8 @@ void nvme_complete_rq(struct request *req)
 {
 	struct nvme_ctrl *ctrl = nvme_req(req)->ctrl;
 
+	pr_err("%s req=%pS (bio=%pS, REQ_NVME_MPATH set=%d)\n",
+		__func__, req, req->bio, !!(req->cmd_flags & REQ_NVME_MPATH));
 	trace_nvme_complete_rq(req);
 	nvme_cleanup_cmd(req);
 
