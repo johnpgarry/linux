@@ -1179,27 +1179,16 @@ SYSCALL_DEFINE5(preadv, unsigned long, fd, const struct iovec __user *, vec,
 	return do_preadv(fd, vec, vlen, pos, 0);
 }
 
-int doing_pread_or_pwrite;
-
 SYSCALL_DEFINE6(preadv2, unsigned long, fd, const struct iovec __user *, vec,
 		unsigned long, vlen, unsigned long, pos_l, unsigned long, pos_h,
 		rwf_t, flags)
 {
 	loff_t pos = pos_from_hilo(pos_h, pos_l);
-	ssize_t ret;
-	doing_pread_or_pwrite = 1;
-	pr_err("%s pos_l=%ld pos_h=%ld vlen=%ld\n", __func__, pos_l, pos_h, vlen);
-	if (pos == -1) {
-		ret = do_readv(fd, vec, vlen, flags);
-		mb();
-		doing_pread_or_pwrite = 0;
-		return ret;
-	}
 
-	ret = do_preadv(fd, vec, vlen, pos, flags);
-	mb();
-	doing_pread_or_pwrite = 0;
-	return ret;
+	if (pos == -1)
+		return do_readv(fd, vec, vlen, flags);
+
+	return do_preadv(fd, vec, vlen, pos, flags);
 }
 
 SYSCALL_DEFINE5(pwritev, unsigned long, fd, const struct iovec __user *, vec,
@@ -1215,21 +1204,11 @@ SYSCALL_DEFINE6(pwritev2, unsigned long, fd, const struct iovec __user *, vec,
 		rwf_t, flags)
 {
 	loff_t pos = pos_from_hilo(pos_h, pos_l);
-	ssize_t ret;
-	doing_pread_or_pwrite = 1;
 
-	pr_err("%s pos_l=%ld pos_h=%ld vlen=%ld\n", __func__, pos_l, pos_h, vlen);
-	if (pos == -1) {
-		ret = do_writev(fd, vec, vlen, flags);
-		mb();
-		doing_pread_or_pwrite = 0;
-		return ret;
-	}
+	if (pos == -1)
+		return do_writev(fd, vec, vlen, flags);
 
-	ret = do_pwritev(fd, vec, vlen, pos, flags);
-	mb();
-	doing_pread_or_pwrite = 0;
-	return ret;
+	return do_pwritev(fd, vec, vlen, pos, flags);
 }
 
 /*
