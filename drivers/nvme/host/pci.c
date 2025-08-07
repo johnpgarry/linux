@@ -1149,12 +1149,7 @@ static blk_status_t nvme_prep_rq(struct request *req)
 	iod->total_len = 0;
 	iod->meta_total_len = 0;
 
-	if (req->bio)
-		pr_err("%s req=%pS (blk_rq_pos=%lld, blk_rq_bytes=%d) (bio=%pS (bi_iter.bi_sector=%lld, bi_size=%d))\n",
-			__func__, req, blk_rq_pos(req), blk_rq_bytes(req),
-			req->bio, req->bio->bi_iter.bi_sector, req->bio->bi_iter.bi_size);
-	else
-		pr_err("%s req=%pS (bio=%pS )\n", __func__, req, req->bio);
+	pr_err("%s req=%pS (bio=%pS)\n", __func__, req, req->bio);
 	ret = nvme_setup_cmd(req->q->queuedata, req);
 	if (ret)
 		return ret;
