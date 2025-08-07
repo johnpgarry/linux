@@ -393,6 +393,7 @@ static struct nvme_ns *nvme_round_robin_path(struct nvme_ns_head *head)
 	for (ns = nvme_next_ns(head, old);
 	     ns && ns != old;
 	     ns = nvme_next_ns(head, ns)) {
+		pr_err("%s3 head=%pS old=%pS ns=%pS\n", __func__, head, old, ns);
 		if (nvme_path_is_disabled(ns))
 			continue;
 
@@ -528,6 +529,11 @@ static bool nvme_available_path(struct nvme_ns_head *head)
 	return nvme_mpath_queue_if_no_path(head);
 }
 
+static inline bool op_is_read(blk_opf_t op)
+{
+	return (op & REQ_OP_MASK) == REQ_OP_READ;
+}
+extern int doing_pread_or_pwrite;
 static void nvme_ns_head_submit_bio(struct bio *bio)
 {
 	struct nvme_ns_head *head = bio->bi_bdev->bd_disk->private_data;
@@ -535,7 +541,12 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 	struct nvme_ns *ns;
 	int srcu_idx;
 
-	pr_err("%s head=%pS bio=%pS\n", __func__, head, bio);
+	pr_err("%s head=%pS bio=%pS (bi_iter.bi_sector=%lld, bi_size=%d) read=%d flush=%d\n",
+		__func__, head, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+		op_is_read(bio_op(bio)), op_is_flush(bio_op(bio)));
+	WARN_ON(doing_pread_or_pwrite);
+
+
 	/*
 	 * The namespace might be going away and the bio might be moved to a
 	 * different queue via blk_steal_bios(), so we need to use the bio_split
@@ -546,7 +557,7 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 		return;
 
 	srcu_idx = srcu_read_lock(&head->srcu);
-	pr_err("%s1 head=%pS bio=%pS calling nvme_find_path\n", __func__, head, bio);
+	pr_err("%s1 head=%pS bio=%pS calling nvme_find_path srcu_idx=%d\n", __func__, head, bio, srcu_idx);
 	ns = nvme_find_path(head);
 	pr_err("%s1.1 head=%pS bio=%pS called nvme_find_path ns=%pS\n", __func__, head, bio, ns);
 	if (likely(ns)) {

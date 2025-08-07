@@ -986,6 +986,7 @@ static blk_status_t nvme_map_metadata(struct nvme_dev *dev, struct request *req)
 	return nvme_pci_setup_meta_mptr(dev, req);
 }
 
+
 static blk_status_t nvme_prep_rq(struct nvme_dev *dev, struct request *req)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
@@ -996,7 +997,12 @@ static blk_status_t nvme_prep_rq(struct nvme_dev *dev, struct request *req)
 	iod->sgt.nents = 0;
 	iod->meta_sgt.nents = 0;
 
-	pr_err("%s req=%pS (bio=%pS)\n", __func__, req, req->bio);
+	if (req->bio)
+		pr_err("%s req=%pS (blk_rq_pos=%lld, blk_rq_bytes=%d) (bio=%pS (bi_iter.bi_sector=%lld, bi_size=%d))\n",
+			__func__, req, blk_rq_pos(req), blk_rq_bytes(req),
+			req->bio, req->bio->bi_iter.bi_sector, req->bio->bi_iter.bi_size);
+	else
+		pr_err("%s req=%pS (bio=%pS )\n", __func__, req, req->bio);
 	ret = nvme_setup_cmd(req->q->queuedata, req);
 	if (ret)
 		return ret;
