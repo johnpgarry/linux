@@ -31,6 +31,7 @@ static struct nvmf_host *nvmf_host_alloc(const char *hostnqn, uuid_t *id)
 		return NULL;
 
 	kref_init(&host->ref);
+	pr_err("%s hostnqn=%s id=%pU\n", __func__, hostnqn, id);
 	uuid_copy(&host->id, id);
 	strscpy(host->nqn, hostnqn, NVMF_NQN_SIZE);
 
@@ -92,6 +93,8 @@ static struct nvmf_host *nvmf_host_default(void)
 	uuid_gen(&id);
 	snprintf(nqn, NVMF_NQN_SIZE,
 		"nqn.2014-08.org.nvmexpress:uuid:%pUb", &id);
+
+	pr_err("%s %pU calling nvmf_host_alloc\n", __func__, &id);
 
 	host = nvmf_host_alloc(nqn, &id);
 	if (!host)
