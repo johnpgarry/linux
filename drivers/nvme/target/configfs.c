@@ -594,8 +594,10 @@ static ssize_t nvmet_ns_device_uuid_store(struct config_item *item,
 		goto out_unlock;
 	}
 
+	pr_err("%s calling uuid_parse  &ns->uuid=%pU ns=%pS\n", __func__, &ns->uuid, ns);
 	if (uuid_parse(page, &ns->uuid))
 		ret = -EINVAL;
+	pr_err("%s2 called uuid_parse  &ns->uuid=%pU ns=%pS\n", __func__, &ns->uuid, ns);
 
 out_unlock:
 	mutex_unlock(&subsys->lock);

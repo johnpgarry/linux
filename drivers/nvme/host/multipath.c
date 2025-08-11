@@ -939,7 +939,7 @@ static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
 	struct nvme_ns *ns;
 	int srcu_idx;
 
-	dev_dbg(ctrl->device, "ANA group %d: %s.\n",
+	dev_err(ctrl->device, "ANA group %d: %s.\n",
 			le32_to_cpu(desc->grpid),
 			nvme_ana_state_names[desc->state]);
 

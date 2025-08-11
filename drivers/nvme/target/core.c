@@ -193,6 +193,7 @@ void nvmet_add_async_event(struct nvmet_ctrl *ctrl, u8 event_type,
 {
 	struct nvmet_async_event *aen;
 
+	pr_err("%s\n", __func__);
 	aen = kmalloc(sizeof(*aen), GFP_KERNEL);
 	if (!aen)
 		return;
@@ -238,6 +239,7 @@ void nvmet_ns_changed(struct nvmet_subsys *subsys, u32 nsid)
 
 	lockdep_assert_held(&subsys->lock);
 
+	pr_err("%s\n", __func__);
 	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry) {
 		nvmet_add_to_changed_ns_log(ctrl, cpu_to_le32(nsid));
 		if (nvmet_aen_bit_disabled(ctrl, NVME_AEN_BIT_NS_ATTR))
@@ -253,6 +255,7 @@ void nvmet_send_ana_event(struct nvmet_subsys *subsys,
 {
 	struct nvmet_ctrl *ctrl;
 
+	pr_err("%s\n", __func__);
 	mutex_lock(&subsys->lock);
 	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry) {
 		if (port && ctrl->port != port)
@@ -1708,6 +1711,13 @@ struct nvmet_ctrl *nvmet_alloc_ctrl(struct nvmet_alloc_ctrl_args *args)
 	}
 
 	args->status = NVME_SC_SUCCESS;
+
+	pr_info("%s ctrl->cntlid %d\n",
+		__func__, ctrl->cntlid);
+	pr_info("%s2 ctrl->subsys->subsysnqn %s\n",
+		__func__, ctrl->subsys->subsysnqn);
+	pr_info("%s3 ctrl->hostnqn %s\n",
+		__func__, ctrl->hostnqn);
 
 	pr_info("Created %s controller %d for subsystem %s for NQN %s%s%s%s.\n",
 		nvmet_is_disc_subsys(ctrl->subsys) ? "discovery" : "nvm",

@@ -109,18 +109,28 @@ static ssize_t wwid_show(struct device *dev, struct device_attribute *attr,
 	int serial_len = sizeof(subsys->serial);
 	int model_len = sizeof(subsys->model);
 
-	if (!uuid_is_null(&ids->uuid))
+	if (!uuid_is_null(&ids->uuid)) {
+		pr_err("%s !uuid_is_null\n", __func__);
 		return sysfs_emit(buf, "uuid.%pU\n", &ids->uuid);
+	}
 
-	if (memchr_inv(ids->nguid, 0, sizeof(ids->nguid)))
+	if (memchr_inv(ids->nguid, 0, sizeof(ids->nguid))) {
+		pr_err("%s2 ids->nguid\n", __func__);
 		return sysfs_emit(buf, "eui.%16phN\n", ids->nguid);
+	}
 
-	if (memchr_inv(ids->eui64, 0, sizeof(ids->eui64)))
+	if (memchr_inv(ids->eui64, 0, sizeof(ids->eui64))) {
+		pr_err("%s2 ids->eui64\n", __func__);
 		return sysfs_emit(buf, "eui.%8phN\n", ids->eui64);
+	}
 
+	if (serial_len > 0)
+		pr_err("%s3 subsys->serial=%s\n", __func__, subsys->serial);
 	while (serial_len > 0 && (subsys->serial[serial_len - 1] == ' ' ||
 				  subsys->serial[serial_len - 1] == '\0'))
 		serial_len--;
+	if (model_len > 0)
+		pr_err("%s3 subsys->model=%s\n", __func__, subsys->model);
 	while (model_len > 0 && (subsys->model[model_len - 1] == ' ' ||
 				 subsys->model[model_len - 1] == '\0'))
 		model_len--;

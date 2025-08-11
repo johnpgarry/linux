@@ -1518,6 +1518,7 @@ static int nvme_process_ns_desc(struct nvme_ctrl *ctrl, struct nvme_ns_ids *ids,
 		}
 		if (ctrl->quirks & NVME_QUIRK_BOGUS_NID)
 			return NVME_NIDT_UUID_LEN;
+		pr_err("%s setting uuid ids=%pS\n", __func__, ids);
 		uuid_copy(&ids->uuid, data + sizeof(*cur));
 		return NVME_NIDT_UUID_LEN;
 	case NVME_NIDT_CSI:
@@ -3812,15 +3813,26 @@ static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 
 	lockdep_assert_held(&subsys->lock);
 
+	if (has_uuid)
+		pr_err("%s has_uuid=1 %pU ids=%pS subsys=%pS\n", __func__, &ids->uuid, ids, subsys);
+	else
+		pr_err("%s has_uuid=0 ids=%pS subsys=%pS\n", __func__, ids, subsys);
+
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		if (has_uuid && uuid_equal(&ids->uuid, &h->ids.uuid))
+		if (has_uuid && uuid_equal(&ids->uuid, &h->ids.uuid)) {
+			pr_err("%s2 h=%pS uuid_equal\n", __func__, h);
 			return -EINVAL;
+		}
 		if (has_nguid &&
-		    memcmp(&ids->nguid, &h->ids.nguid, sizeof(ids->nguid)) == 0)
+		    memcmp(&ids->nguid, &h->ids.nguid, sizeof(ids->nguid)) == 0) {
+			pr_err("%s3 h=%pS nguid_equal\n", __func__, h);
 			return -EINVAL;
+		}
 		if (has_eui64 &&
-		    memcmp(&ids->eui64, &h->ids.eui64, sizeof(ids->eui64)) == 0)
+		    memcmp(&ids->eui64, &h->ids.eui64, sizeof(ids->eui64)) == 0) {
+			pr_err("%s4 h=%pS eui64_equal\n", __func__, h);
 			return -EINVAL;
+		}
 	}
 
 	return 0;

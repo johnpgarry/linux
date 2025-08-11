@@ -677,7 +677,7 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
 	struct multipath *m = ti->private;
 	struct dm_mpath_io *mpio = NULL;
 
-	pr_err("%s m=%pS\n", __func__, m);
+	pr_err_once("%s m=%pS\n", __func__, m);
 	multipath_init_per_bio_data(bio, &mpio);
 	return __multipath_map_bio(m, bio, mpio);
 }
@@ -2210,6 +2210,7 @@ static int multipath_iterate_devices(struct dm_target *ti,
 
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(p, &pg->pgpaths, list) {
+			pr_err("%s2 m=%pS p=%pS pg=%pS\n", __func__, m, p, pg);
 			ret = fn(ti, p->path.dev, ti->begin, ti->len, data);
 			if (ret)
 				goto out;
