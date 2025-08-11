@@ -9,7 +9,7 @@
 #include <trace/events/block.h>
 #include "nvme.h"
 
-bool multipath = true;
+bool multipath = false;
 static bool multipath_always_on;
 
 static int multipath_param_set(const char *val, const struct kernel_param *kp)
@@ -763,7 +763,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	 * either case, for private namespaces, we ensure that the NSID is
 	 * unique.
 	 */
-	pr_err("%s multipath_always_on=%d\n", __func__, multipath_always_on);
+	pr_err("%s multipath_always_on=%d multipath=%d\n", __func__, multipath_always_on, multipath);
 	if (!multipath_always_on) {
 		if (!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL) ||
 				!multipath)
