@@ -2033,11 +2033,13 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 	if (id->nabo)
 		return bs;
 
-	pr_err("%s NVME_NS_FEAT_ATOMICS set=%d nawupf=%d atomics_params=%d\n",
+	pr_err("%s NVME_NS_FEAT_ATOMICS set=%d nawupf=%d nabspf=%d atomics_params=%d ns->ctrl->subsys->awupf=%d\n",
 		__func__,
 		!!(id->nsfeat & NVME_NS_FEAT_ATOMICS),
 		id->nawupf,
-		ns->ctrl->atomics_params);
+		id->nabspf,
+		ns->ctrl->atomics_params,
+		ns->ctrl->subsys->awupf);
 	if ((id->nsfeat & NVME_NS_FEAT_ATOMICS) && id->nawupf) {
 		/*
 		 * Use the per-namespace atomic write unit when available.
