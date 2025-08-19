@@ -3777,10 +3777,13 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	dev_max = min_not_zero(dev_max, sdkp->max_xfer_blocks);
 	lim.max_dev_sectors = logical_to_sectors(sdp, dev_max);
 
-	if (sd_validate_min_xfer_size(sdkp))
+	if (sd_validate_min_xfer_size(sdkp)) {
 		lim.io_min = logical_to_bytes(sdp, sdkp->min_xfer_blocks);
-	else
+		sdev_printk(KERN_WARNING, sdp, "%s min_xfer_blocks=%d lim.io_min=%d\n", __func__, sdkp->min_xfer_blocks, lim.io_min);
+	} else {
 		lim.io_min = 0;
+		sdev_printk(KERN_WARNING, sdp, "%s lim.io_min=%d\n", __func__, lim.io_min);
+	}
 
 	/*
 	 * Limit default to SCSI host optimal sector limit if set. There may be
@@ -3788,9 +3791,11 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	 * host limit.
 	 */
 	lim.io_opt = sdp->host->opt_sectors << SECTOR_SHIFT;
+	sdev_printk(KERN_WARNING, sdp, "%s2 lim.io_opt=%d sdp->host->opt_sectors=%d\n", __func__, lim.io_opt, sdp->host->opt_sectors);
 	if (sd_validate_opt_xfer_size(sdkp, dev_max)) {
 		lim.io_opt = min_not_zero(lim.io_opt,
 				logical_to_bytes(sdp, sdkp->opt_xfer_blocks));
+		sdev_printk(KERN_WARNING, sdp, "%s3 lim.io_opt=%d sdp->host->opt_xfer_blocks=%d\n", __func__, lim.io_opt, sdkp->opt_xfer_blocks);
 	}
 
 	sdkp->first_scan = 0;
