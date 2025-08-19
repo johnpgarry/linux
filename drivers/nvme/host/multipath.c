@@ -724,6 +724,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	INIT_DELAYED_WORK(&head->remove_work, nvme_remove_head_work);
 	head->delayed_removal_secs = 0;
 
+	pr_err("%s ctrl=%pS head=%pS\n", __func__, ctrl, head);
 	/*
 	 * If "multipath_always_on" is enabled, a multipath node is added
 	 * regardless of whether the disk is single/multi ported, and whether
@@ -750,6 +751,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 		lim.features |= BLK_FEAT_ZONED;
 
 	head->disk = blk_alloc_disk(&lim, ctrl->numa_node);
+	pr_err("%s2 ctrl=%pS head=%pS head->disk=%pS (queue=%pS)\n", __func__, ctrl, head, head->disk, head->disk->queue);
 	if (IS_ERR(head->disk))
 		return PTR_ERR(head->disk);
 	head->disk->fops = &nvme_ns_head_ops;

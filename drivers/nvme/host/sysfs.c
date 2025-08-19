@@ -35,6 +35,75 @@ static ssize_t nvme_sysfs_rescan(struct device *dev,
 }
 static DEVICE_ATTR(rescan_controller, S_IWUSR, NULL, nvme_sysfs_rescan);
 
+static ssize_t nvme_atomics_params_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct nvme_ctrl *ctrl = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, ctrl->atomics_params ? "on\n" : "off\n");
+}
+
+static ssize_t nvme_atomics_params_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	__maybe_unused struct nvme_ctrl *ctrl = dev_get_drvdata(dev);
+	__maybe_unused struct nvme_subsystem *subsys = ctrl->subsys;
+	__maybe_unused struct queue_limits lim;
+	__maybe_unused bool enabled;
+	__maybe_unused int err;
+	__maybe_unused struct nvme_ctrl *tmp;
+	__maybe_unused struct nvme_ns_head *h;
+	__maybe_unused int srcu_idx;
+	__maybe_unused struct nvme_ns *ns;
+
+	err = kstrtobool(buf, &enabled);
+	if (err)
+		return -EINVAL;
+
+	ctrl->atomics_params = enabled;
+
+
+	srcu_idx = srcu_read_lock(&ctrl->srcu);
+	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
+				 srcu_read_lock_held(&ctrl->srcu)) {
+		h = ns->head;
+		pr_err("%s ctrl=%pS ns=%pS ns->head=%pS (nvme_ns_head_multipath(h)=%d) ns->ctrl=%pS\n",
+			__func__, ctrl, ns, h, nvme_ns_head_multipath(h), ns->ctrl);
+		if (nvme_ns_head_multipath(h)) {
+			int ret;
+			pr_err("%s1 calling queue_limits_start_update lim.lim.atomic_write_hw_max=%d\n",
+				__func__, lim.atomic_write_hw_max);
+			lim = queue_limits_start_update(ns->head->disk->queue);
+
+			lim.atomic_write_hw_max = 0;
+			lim.atomic_write_hw_unit_min = 0;
+			lim.atomic_write_hw_unit_max = 0;
+			lim.atomic_write_hw_boundary = 0;
+
+			ret = queue_limits_commit_update(ns->head->disk->queue, &lim);
+			pr_err("%s1.1 called queue_limits_commit_update lim.lim.atomic_write_hw_max=%d ret=%d\n",
+				__func__, lim.atomic_write_hw_max, ret);
+		}
+	}
+	srcu_read_unlock(&ctrl->srcu, srcu_idx);
+
+	pr_err("%s2\n", __func__);
+
+	mutex_lock(&nvme_subsystems_lock);
+	pr_err("%s3 subsys=%pS\n", __func__, subsys);
+	list_for_each_entry(tmp, &subsys->ctrls, subsys_entry) {
+		pr_err("%s2 calling nvme_queue_scan tmp=%pS ctrl=%pS\n", __func__, tmp, ctrl);
+		nvme_queue_scan(tmp);
+	}
+	mutex_unlock(&nvme_subsystems_lock);
+
+	return count;
+}
+
+static struct device_attribute dev_attr_atomics_params = \
+	__ATTR(atomics_params, S_IRUGO | S_IWUSR, \
+	nvme_atomics_params_show, nvme_atomics_params_store);
+
 static ssize_t nvme_adm_passthru_err_log_enabled_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -747,6 +816,7 @@ static struct attribute *nvme_dev_attrs[] = {
 	&dev_attr_dhchap_ctrl_secret.attr,
 #endif
 	&dev_attr_adm_passthru_err_log_enabled.attr,
+	&dev_attr_atomics_params.attr,
 	NULL
 };
 

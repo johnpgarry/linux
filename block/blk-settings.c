@@ -621,6 +621,7 @@ static unsigned int blk_round_down_sectors(unsigned int sectors, unsigned int lb
 static bool blk_stack_atomic_writes_tail(struct queue_limits *t,
 				struct queue_limits *b)
 {
+	pr_err("%s\n", __func__);
 	/* We're not going to support different boundary sizes.. yet */
 	if (t->atomic_write_hw_boundary != b->atomic_write_hw_boundary)
 		return false;
@@ -698,6 +699,7 @@ static void blk_stack_atomic_writes_chunk_sectors(struct queue_limits *t)
 static bool blk_stack_atomic_writes_head(struct queue_limits *t,
 				struct queue_limits *b)
 {
+	pr_err("%s\n", __func__);
 	if (b->atomic_write_hw_boundary &&
 	    !blk_stack_atomic_writes_boundary_head(t, b))
 		return false;

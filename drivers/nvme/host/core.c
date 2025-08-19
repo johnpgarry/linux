@@ -2033,6 +2033,11 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 	if (id->nabo)
 		return bs;
 
+	pr_err("%s NVME_NS_FEAT_ATOMICS set=%d nawupf=%d atomics_params=%d\n",
+		__func__,
+		!!(id->nsfeat & NVME_NS_FEAT_ATOMICS),
+		id->nawupf,
+		ns->ctrl->atomics_params);
 	if ((id->nsfeat & NVME_NS_FEAT_ATOMICS) && id->nawupf) {
 		/*
 		 * Use the per-namespace atomic write unit when available.
@@ -2040,15 +2045,19 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 		atomic_bs = (1 + le16_to_cpu(id->nawupf)) * bs;
 		if (id->nabspf)
 			boundary = (le16_to_cpu(id->nabspf) + 1) * bs;
-	} else {
+//	} else if (1) { // ns->ctrl->atomics_params
+	} else if (ns->ctrl->atomics_params) { 
 		/*
-		 * Use the controller wide atomic write unit.  This sucks
-		 * because the limit is defined in terms of logical blocks while
-		 * namespaces can have different formats, and because there is
-		 * no clear language in the specification prohibiting different
-		 * values for different controllers in the subsystem.
+		 * Don't use the controller-wide atomic write unit, because:
+		 * a. the limit is defined in terms of logical blocks while
+		 *    namespaces can have different formats, and because there
+		 *    is no clear language in the specification prohibiting
+		 *    different values for different controllers in the subsystem.
+		 * b. 
 		 */
 		atomic_bs = (1 + ns->ctrl->subsys->awupf) * bs;
+	} else {
+		atomic_bs = bs;
 	}
 
 	lim->atomic_write_hw_max = atomic_bs;
@@ -2056,6 +2065,8 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 	lim->atomic_write_hw_unit_min = bs;
 	lim->atomic_write_hw_unit_max = rounddown_pow_of_two(atomic_bs);
 	lim->features |= BLK_FEAT_ATOMIC_WRITES;
+	pr_err("%s2 atomic_bs=%d\n",
+		__func__, atomic_bs);
 	return atomic_bs;
 }
 
@@ -2095,6 +2106,7 @@ static bool nvme_update_disk_info(struct nvme_ns *ns, struct nvme_id_ns *id,
 	}
 
 	phys_bs = bs;
+	pr_err("%s ns=%pS id=%pS calling nvme_configure_atomic_write\n", __func__, ns, id);
 	atomic_bs = nvme_configure_atomic_write(ns, id, lim, bs);
 
 	if (id->nsfeat & NVME_NS_FEAT_IO_OPT) {
@@ -2339,6 +2351,12 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	sector_t capacity;
 	unsigned lbaf;
 	int ret;
+	struct queue_limits *part0_limits;
+	struct gendisk *part0_gendisk;
+	struct block_device *part0;
+	struct request_queue *part0_queue;
+//	struct queue_limits *part0_limits = bdev_limits(ns->disk->part0);
+	pr_err("%s ns=%pS (disk=%pS) info=%pS\n", __func__, ns, ns->disk, info);
 
 	ret = nvme_identify_ns(ns->ctrl, info->nsid, &id);
 	if (ret)
@@ -2370,9 +2388,13 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 		if (ret < 0)
 			goto out;
 	}
-
+	part0_gendisk = ns->disk;
+	part0 = part0_gendisk->part0;
+	part0_queue = part0->bd_queue;
+	part0_limits = &part0_queue->limits;
 	lim = queue_limits_start_update(ns->disk->queue);
-
+	pr_err("%s1 after queue_limits_start_update ns->disk=%pS ns->disk->queue=%p lim.atomic_write_hw_max=%d part0_gendisk=%pS part0_queue=%pS part0_limits=%pS part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, lim.atomic_write_hw_max, part0_gendisk, part0_queue, part0_limits, part0_limits->atomic_write_hw_max);
 	memflags = blk_mq_freeze_queue(ns->disk->queue);
 	ns->head->lba_shift = id->lbaf[lbaf].ds;
 	ns->head->nuse = le64_to_cpu(id->nuse);
@@ -2380,14 +2402,20 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	nvme_set_ctrl_limits(ns->ctrl, &lim);
 	nvme_configure_metadata(ns->ctrl, ns->head, id, nvm, info);
 	nvme_set_chunk_sectors(ns, id, &lim);
+	pr_err("%s1.1 calling nvme_update_disk_info ns->disk=%pS ns->disk->queue=%p lim.atomic_write_hw_max=%d part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, lim.atomic_write_hw_max, part0_limits->atomic_write_hw_max);
 	if (!nvme_update_disk_info(ns, id, &lim))
 		capacity = 0;
+	pr_err("%s1.2 called nvme_update_disk_info ns->disk=%pS ns->disk->queue=%p lim.atomic_write_hw_max=%d part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, lim.atomic_write_hw_max, part0_limits->atomic_write_hw_max);
 
 	nvme_config_discard(ns, &lim);
 	if (IS_ENABLED(CONFIG_BLK_DEV_ZONED) &&
 	    ns->head->ids.csi == NVME_CSI_ZNS)
 		nvme_update_zone_info(ns, &lim, &zi);
 
+	pr_err("%s1.4 ns->disk=%pS ns->disk->queue=%p lim.atomic_write_hw_max=%d part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, lim.atomic_write_hw_max, part0_limits->atomic_write_hw_max);
 	if ((ns->ctrl->vwc & NVME_CTRL_VWC_PRESENT) && !info->no_vwc)
 		lim.features |= BLK_FEAT_WRITE_CACHE | BLK_FEAT_FUA;
 	else
@@ -2396,6 +2424,8 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	if (info->is_rotational)
 		lim.features |= BLK_FEAT_ROTATIONAL;
 
+	pr_err("%s1.5 ns->disk=%pS ns->disk->queue=%p lim.atomic_write_hw_max=%d part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, lim.atomic_write_hw_max, part0_limits->atomic_write_hw_max);
 	/*
 	 * Register a metadata profile for PI, or the plain non-integrity NVMe
 	 * metadata masquerading as Type 0 if supported, otherwise reject block
@@ -2411,6 +2441,8 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	else
 		lim.write_stream_granularity = 0;
 
+	pr_err("%s1.6 ns->disk=%pS ns->disk->queue=%p lim.atomic_write_hw_max=%d part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, lim.atomic_write_hw_max, part0_limits->atomic_write_hw_max);
 	/*
 	 * Only set the DEAC bit if the device guarantees that reads from
 	 * deallocated data return zeroes.  While the DEAC bit does not
@@ -2421,8 +2453,11 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 		ns->head->features |= NVME_NS_DEAC;
 		lim.max_hw_wzeroes_unmap_sectors = lim.max_write_zeroes_sectors;
 	}
-
+	pr_err("%s2 calling queue_limits_commit_update ns->disk=%pS ns->disk->queue=%pS part0_queue=%pS lim->atomic_write_hw_max=%d part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, part0_queue, lim.atomic_write_hw_max, part0_limits->atomic_write_hw_max);
 	ret = queue_limits_commit_update(ns->disk->queue, &lim);
+	pr_err("%s2.1 called queue_limits_commit_update ns->disk=%pS ns->disk->queue=%pS lim->atomic_write_hw_max=%d part0_limits->atomic_write_hw_max=%d\n",
+		__func__, ns->disk, ns->disk->queue, lim.atomic_write_hw_max, part0_limits->atomic_write_hw_max);
 	if (ret) {
 		blk_mq_unfreeze_queue(ns->disk->queue, memflags);
 		goto out;
@@ -2451,19 +2486,24 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 	bool unsupported = false;
 	int ret;
 
+	pr_err("%s ns=%pS info=%pS\n", __func__, ns, info);
 	switch (info->ids.csi) {
 	case NVME_CSI_ZNS:
 		if (!IS_ENABLED(CONFIG_BLK_DEV_ZONED)) {
 			dev_info(ns->ctrl->device,
 	"block device for nsid %u not supported without CONFIG_BLK_DEV_ZONED\n",
 				info->nsid);
+			pr_err("%s0 calling nvme_update_ns_info_generic NVME_CSI_NVM ns=%pS info=%pS\n", __func__, ns, info);
 			ret = nvme_update_ns_info_generic(ns, info);
 			break;
 		}
+		pr_err("%s1 calling nvme_update_ns_info_block NVME_CSI_ZNS ns=%pS info=%pS\n", __func__, ns, info);
 		ret = nvme_update_ns_info_block(ns, info);
 		break;
 	case NVME_CSI_NVM:
+		pr_err("%s2 calling nvme_update_ns_info_block NVME_CSI_NVM ns=%pS info=%pS\n", __func__, ns, info);
 		ret = nvme_update_ns_info_block(ns, info);
+		pr_err("%s2.1 called nvme_update_ns_info_block NVME_CSI_NVM ns=%pS info=%pS ret=%d\n", __func__, ns, info, ret);
 		break;
 	default:
 		dev_info(ns->ctrl->device,
@@ -2484,12 +2524,17 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		ret = 0;
 	}
 
+	pr_err("%s3 ns=%pS info=%pS ret=%d nvme_ns_head_multipath=%d\n",
+		__func__, ns, info, ret, nvme_ns_head_multipath(ns->head));
 	if (!ret && nvme_ns_head_multipath(ns->head)) {
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
 		struct queue_limits lim;
 		unsigned int memflags;
+		struct queue_limits *part0_limits = bdev_limits(ns->disk->part0);
 
 		lim = queue_limits_start_update(ns->head->disk->queue);
+		pr_err("%s4 lim.atomic_write_hw_max=%d ns_lim->atomic_write_hw_max=%d ns->disk->part0=%pS part0_limits->atomic_write_hw_max=%d\n",
+			__func__, lim.atomic_write_hw_max, ns_lim->atomic_write_hw_max, ns->disk->part0, part0_limits->atomic_write_hw_max);
 		memflags = blk_mq_freeze_queue(ns->head->disk->queue);
 		/*
 		 * queue_limits mixes values that are the hardware limitations
@@ -2510,8 +2555,16 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		lim.physical_block_size = ns_lim->physical_block_size;
 		lim.io_min = ns_lim->io_min;
 		lim.io_opt = ns_lim->io_opt;
+
+	//	lim.atomic_write_hw_max = ns_lim->atomic_write_hw_max;
+	//	lim.atomic_write_hw_unit_min = ns_lim->atomic_write_hw_unit_min;
+	//	lim.atomic_write_hw_unit_max = ns_lim->atomic_write_hw_unit_max;
+	//	lim.atomic_write_hw_boundary = ns_lim->atomic_write_hw_boundary;
+
 		queue_limits_stack_bdev(&lim, ns->disk->part0, 0,
 					ns->head->disk->disk_name);
+		pr_err("%s4.1 after queue_limits_stack_bdev t=lim.atomic_write_hw_max=%d ns_lim->atomic_write_hw_max=%d b=ns->disk->part0=%pS part0_limits->atomic_write_hw_max=%d ns->head->disk->queue=%pS\n",
+			__func__, lim.atomic_write_hw_max, ns_lim->atomic_write_hw_max, ns->disk->part0, part0_limits->atomic_write_hw_max, ns->head->disk->queue);
 		if (unsupported)
 			ns->head->disk->flags |= GENHD_FL_HIDDEN;
 		else
@@ -4103,6 +4156,10 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	struct gendisk *disk;
 	int node = ctrl->numa_node;
 	bool last_path = false;
+	struct queue_limits *part0_limits;
+	int ret;
+
+	pr_err("%s ctrl=%pS info=%pS\n", __func__, ctrl, info);
 
 	ns = kzalloc_node(sizeof(*ns), GFP_KERNEL, node);
 	if (!ns)
@@ -4124,8 +4181,14 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	ns->queue = disk->queue;
 	ns->ctrl = ctrl;
 	kref_init(&ns->kref);
+	part0_limits = bdev_limits(ns->disk->part0);
+	pr_err("%s1 calling nvme_init_ns_head ctrl=%pS info=%pS disk=%pS (part0=%pS part0_limits=%pS atomic_write_hw_max=%d)\n",
+		__func__, ctrl, info, disk, disk->part0, part0_limits, part0_limits->atomic_write_hw_max);
+	ret = nvme_init_ns_head(ns, info);
+	pr_err("%s1.1 called nvme_init_ns_head ctrl=%pS info=%pS disk=%pS (part0=%pS part0_limits=%pS atomic_write_hw_max=%d) ret=%d\n",
+		__func__, ctrl, info, disk, disk->part0, part0_limits, part0_limits->atomic_write_hw_max, ret);
 
-	if (nvme_init_ns_head(ns, info))
+	if (ret)
 		goto out_cleanup_disk;
 
 	/*
@@ -4151,8 +4214,15 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 			ns->head->instance);
 	}
 
-	if (nvme_update_ns_info(ns, info))
+	pr_err("%s2 calling nvme_update_ns_info ctrl=%pS info=%pS disk=%pS (part0=%pS part0_limits=%pS atomic_write_hw_max=%d)\n",
+		__func__, ctrl, info, disk, disk->part0, part0_limits, part0_limits->atomic_write_hw_max);
+	ret = nvme_update_ns_info(ns, info);
+	pr_err("%s2.1 called nvme_update_ns_info ctrl=%pS info=%pS disk=%pS (part0=%pS part0_limits=%pS atomic_write_hw_max=%d) ret=%d\n",
+		__func__, ctrl, info, disk, disk->part0, part0_limits, part0_limits->atomic_write_hw_max, ret);
+
+	if (ret)
 		goto out_unlink_ns;
+
 
 	mutex_lock(&ctrl->namespaces_lock);
 	/*
@@ -4183,6 +4253,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	 * nvme_io_passthru_err_log_enabled_[store | show]().
 	 */
 	dev_set_drvdata(disk_to_dev(ns->disk), ns);
+	pr_err("%s10 ctrl=%pS info=%pS disk=%pS (part0=%pS part0_limits=%pS atomic_write_hw_max=%d)\n", __func__, ctrl, info, disk, disk->part0, part0_limits, part0_limits->atomic_write_hw_max);
 
 	return;
 
