@@ -2045,14 +2045,7 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 		if (id->nabspf)
 			boundary = (le16_to_cpu(id->nabspf) + 1) * bs;
 	} else {
-		/*
-		 * Use the controller wide atomic write unit.  This sucks
-		 * because the limit is defined in terms of logical blocks while
-		 * namespaces can have different formats, and because there is
-		 * no clear language in the specification prohibiting different
-		 * values for different controllers in the subsystem.
-		 */
-		atomic_bs = (1 + ns->ctrl->subsys->awupf) * bs;
+		atomic_bs = bs;
 	}
 
 	lim->atomic_write_hw_max = atomic_bs;
@@ -3221,7 +3214,6 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	memcpy(subsys->model, id->mn, sizeof(subsys->model));
 	subsys->vendor_id = le16_to_cpu(id->vid);
 	subsys->cmic = id->cmic;
-	subsys->awupf = le16_to_cpu(id->awupf);
 
 	/* Versions prior to 1.4 don't necessarily report a valid type */
 	if (id->cntrltype == NVME_CTRL_DISC ||
