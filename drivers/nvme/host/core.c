@@ -2033,12 +2033,12 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 	if (id->nabo)
 		return bs;
 
-	pr_err("%s NVME_NS_FEAT_ATOMICS set=%d nawupf=%d nabspf=%d atomics_params=%d ns->ctrl->subsys->awupf=%d\n",
+	pr_err("%s NVME_NS_FEAT_ATOMICS set=%d nawupf=%d nabspf=%d use_awupf=%d ns->ctrl->subsys->awupf=%d\n",
 		__func__,
 		!!(id->nsfeat & NVME_NS_FEAT_ATOMICS),
 		id->nawupf,
 		id->nabspf,
-		ns->ctrl->atomics_params,
+		ns->ctrl->subsys->use_awupf,
 		ns->ctrl->subsys->awupf);
 	if ((id->nsfeat & NVME_NS_FEAT_ATOMICS) && id->nawupf) {
 		/*
@@ -2047,8 +2047,7 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 		atomic_bs = (1 + le16_to_cpu(id->nawupf)) * bs;
 		if (id->nabspf)
 			boundary = (le16_to_cpu(id->nabspf) + 1) * bs;
-//	} else if (1) { // ns->ctrl->atomics_params
-	} else if (ns->ctrl->atomics_params) { 
+	} else if (ns->ctrl->subsys->use_awupf) {
 		/*
 		 * Don't use the controller-wide atomic write unit, because:
 		 * a. the limit is defined in terms of logical blocks while
