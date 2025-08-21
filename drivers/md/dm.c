@@ -418,6 +418,7 @@ static int dm_prepare_ioctl(struct mapped_device *md, int *srcu_idx,
 	struct dm_table *map;
 	int r;
 
+	pr_err("%s\n", __func__);
 retry:
 	r = -ENOTTY;
 	map = dm_get_live_table(md, srcu_idx);
@@ -457,6 +458,7 @@ static int dm_blk_ioctl(struct block_device *bdev, blk_mode_t mode,
 	int r, srcu_idx;
 	bool forward = true;
 
+	pr_err("%s\n", __func__);
 	r = dm_prepare_ioctl(md, &srcu_idx, &bdev, cmd, arg, &forward);
 	if (!forward || r < 0)
 		goto out;
