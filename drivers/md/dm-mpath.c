@@ -521,6 +521,7 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	struct request_queue *q;
 	struct request *clone;
 
+	
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
@@ -677,7 +678,7 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
 	struct multipath *m = ti->private;
 	struct dm_mpath_io *mpio = NULL;
 
-	pr_err_once("%s m=%pS\n", __func__, m);
+	pr_err("%s m=%pS\n", __func__, m);
 	multipath_init_per_bio_data(bio, &mpio);
 	return __multipath_map_bio(m, bio, mpio);
 }
@@ -2146,6 +2147,7 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 	struct pgpath *pgpath;
 	int r;
 
+	pr_err("%s\n", __func__);
 	if (_IOC_TYPE(cmd) == DM_IOCTL) {
 		*forward = false;
 		switch (cmd) {
