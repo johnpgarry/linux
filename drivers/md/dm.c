@@ -418,7 +418,7 @@ static int dm_prepare_ioctl(struct mapped_device *md, int *srcu_idx,
 	struct dm_table *map;
 	int r;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s cmd=0x%x\n", __func__, cmd);
 retry:
 	r = -ENOTTY;
 	map = dm_get_live_table(md, srcu_idx);
@@ -436,6 +436,7 @@ retry:
 	if (dm_suspended_md(md))
 		return -EAGAIN;
 
+	pr_err("%s2 cmd=0x%x calling prepare_ioctl=%pS\n", __func__, cmd, ti->type->prepare_ioctl);
 	r = ti->type->prepare_ioctl(ti, bdev, cmd, arg, forward);
 	if (r == -ENOTCONN && *forward && !fatal_signal_pending(current)) {
 		dm_put_live_table(md, *srcu_idx);
@@ -458,7 +459,7 @@ static int dm_blk_ioctl(struct block_device *bdev, blk_mode_t mode,
 	int r, srcu_idx;
 	bool forward = true;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s cmd=0x%x\n", __func__, cmd);
 	r = dm_prepare_ioctl(md, &srcu_idx, &bdev, cmd, arg, &forward);
 	if (!forward || r < 0)
 		goto out;

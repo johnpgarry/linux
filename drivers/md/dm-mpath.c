@@ -2173,7 +2173,7 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 	struct pgpath *pgpath;
 	int r;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x\n", __func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd));
 	if (_IOC_TYPE(cmd) == DM_IOCTL) {
 		*forward = false;
 		switch (cmd) {

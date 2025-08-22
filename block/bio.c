@@ -865,6 +865,10 @@ struct bio *bio_alloc_clone(struct block_device *bdev, struct bio *bio_src,
 {
 	struct bio *bio;
 
+	if (bio_src->directio)
+		pr_err("%s bio=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS)\n",
+			__func__, bio_src, bio_src->bi_iter.bi_sector, bio_src->bi_iter.bi_size, bio_src->bi_io_vec);
+
 	bio = bio_alloc_bioset(bdev, 0, bio_src->bi_opf, gfp, bs);
 	if (!bio)
 		return NULL;
@@ -876,6 +880,10 @@ struct bio *bio_alloc_clone(struct block_device *bdev, struct bio *bio_src,
 	bio->bi_io_vec = bio_src->bi_io_vec;
 	bio->directio = bio_src->directio;
 
+	if (bio_src->directio)
+		pr_err("%s2 bio_src=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS) bio=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS)\n",
+			__func__, bio_src, bio_src->bi_iter.bi_sector, bio_src->bi_iter.bi_size, bio_src->bi_io_vec,
+					bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, bio->bi_io_vec);
 	return bio;
 }
 EXPORT_SYMBOL(bio_alloc_clone);

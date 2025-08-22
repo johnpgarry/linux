@@ -322,11 +322,28 @@ static int setup_clone(struct request *clone, struct request *rq,
 {
 	int r;
 
+	if ((rq && rq->bio && rq->bio->directio) || (rq->directio))
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) calling blk_rq_prep_clone clone=%pS (bio=%pS)\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, clone, clone->bio);
+
 	r = blk_rq_prep_clone(clone, rq, &tio->md->mempools->bs, gfp_mask,
 			      dm_rq_bio_constructor, tio);
+	if ((rq && rq->bio && rq->bio->directio) || (rq->directio)) {
+		pr_err("%s1 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) called blk_rq_prep_clone clone=%pS (bio=%pS) r=%d\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, clone, clone->bio, r);
+	}
 	if (r)
 		return r;
 
+	if ((rq && rq->bio && rq->bio->directio) || (rq->directio)) {
+		if (clone->bio)
+			pr_err("%s2.1 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) called blk_rq_prep_clone clone=%pS (bio=%pS bi_sector=%lld bi_size=%d) r=%d\n",
+				__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size,
+				clone, clone->bio, clone->bio->bi_iter.bi_sector, clone->bio->bi_iter.bi_size, r);
+		else
+			pr_err("%s2.2 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) called blk_rq_prep_clone clone=%pS (bio=%pS) r=%d\n",
+				__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, clone, clone->bio, r);
+	}
 	clone->end_io = end_clone_request;
 	clone->end_io_data = tio;
 
@@ -384,9 +401,15 @@ static int map_request(struct dm_rq_target_io *tio)
 			r, DM_MAPIO_SUBMITTED, DM_MAPIO_REMAPPED, DM_MAPIO_REQUEUE, DM_MAPIO_DELAY_REQUEUE, clone);
 	switch (r) {
 	case DM_MAPIO_SUBMITTED:
+		if ((rq && rq->bio && rq->bio->directio) || (rq->directio))
+			pr_err("%s2 DM_MAPIO_SUBMITTED rq=%pS (bio=%pS bi_sector=%lld bi_size=%d)\n",
+				__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
 		/* The target has taken the I/O to submit by itself later */
 		break;
 	case DM_MAPIO_REMAPPED:
+		if ((rq && rq->bio && rq->bio->directio) || (rq->directio))
+			pr_err("%s DM_MAPIO_REMAPPED rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) calling setup_clone clone=%pS\n",
+				__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, clone);
 		if (setup_clone(clone, rq, tio, GFP_ATOMIC)) {
 			/* -ENOMEM */
 			ti->type->release_clone_rq(clone, &tio->info);
@@ -445,6 +468,15 @@ ssize_t dm_attr_rq_based_seq_io_merge_deadline_store(struct mapped_device *md,
 
 static void dm_start_request(struct mapped_device *md, struct request *orig)
 {
+	if (orig->bio && orig->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s orig=%pS (bio=%pS bi_sector=%lld bi_size=%d) calling blk_mq_start_request\n",
+			__func__, orig, orig->bio, orig->bio->bi_iter.bi_sector, orig->bio->bi_iter.bi_size);
+	} else if (orig->directio) {
+		pr_err("%s0 orig=%pS (bio=%pS) calling blk_mq_start_request\n",
+			__func__, orig, orig->bio);
+	}
+
 	blk_mq_start_request(orig);
 
 	if (unlikely(dm_stats_used(&md->stats))) {
@@ -498,11 +530,11 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	if (rq->bio && rq->bio->directio) {
 	//	WARN_ON_ONCE(1);
-		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d)\n",
-			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, tio);
 	} else if (rq->directio) {
-		pr_err("%s0 rq=%pS (bio=%pS)\n",
-			__func__, rq, rq->bio);
+		pr_err("%s0 rq=%pS (bio=%pS) tio=%pS\n",
+			__func__, rq, rq->bio, tio);
 	}
 
 	/*
@@ -530,6 +562,15 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	if (ti->type->busy && ti->type->busy(ti))
 		return BLK_STS_RESOURCE;
+
+	if (rq->bio && rq->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS calling dm_start_request\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, tio);
+	} else if (rq->directio) {
+		pr_err("%s0 rq=%pS (bio=%pS) tio=%pS  calling dm_start_request\n",
+			__func__, rq, rq->bio, tio);
+	}
 
 	dm_start_request(md, rq);
 
