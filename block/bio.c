@@ -221,6 +221,7 @@ void bio_uninit(struct bio *bio)
 	if (bio_integrity(bio))
 		bio_integrity_free(bio);
 
+	bio->directio = false;
 	bio_crypt_free_ctx(bio);
 }
 EXPORT_SYMBOL(bio_uninit);
@@ -283,6 +284,7 @@ void bio_init(struct bio *bio, struct block_device *bdev, struct bio_vec *table,
 	bio->bi_max_vecs = max_vecs;
 	bio->bi_io_vec = table;
 	bio->bi_pool = NULL;
+	bio->directio = false;
 }
 EXPORT_SYMBOL(bio_init);
 
@@ -872,6 +874,7 @@ struct bio *bio_alloc_clone(struct block_device *bdev, struct bio *bio_src,
 		return NULL;
 	}
 	bio->bi_io_vec = bio_src->bi_io_vec;
+	bio->directio = bio_src->directio;
 
 	return bio;
 }

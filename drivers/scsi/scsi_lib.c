@@ -1815,6 +1815,11 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	blk_status_t ret;
 	int reason;
 
+	if (req->bio && req->bio->directio)
+		pr_err("%s req=%pS bio=%pS bi_sector=%lld bi_size=%d\n",
+			__func__, req, req->bio, req->bio->bi_iter.bi_sector,
+			req->bio->bi_iter.bi_size);
+
 	WARN_ON_ONCE(cmd->budget_token < 0);
 
 	/*

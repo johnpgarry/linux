@@ -482,6 +482,13 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct mapped_device *md = tio->md;
 	struct dm_target *ti = md->immutable_target;
 
+
+	if (rq->bio && rq->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d)\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
+	}
+
 	/*
 	 * blk-mq's unquiesce may come from outside events, such as
 	 * elevator switch, updating nr_requests or others, and request may

@@ -1367,6 +1367,9 @@ void dm_submit_bio_remap(struct bio *clone, struct bio *tgt_clone)
 	if (!tgt_clone)
 		tgt_clone = clone;
 
+	if (clone->directio || tgt_clone->directio)
+		pr_err("%s clone=%pS tgt_clone=%pS\n", __func__, clone, tgt_clone);
+
 	/*
 	 * Account io->origin_bio to DM dev on behalf of target
 	 * that took ownership of IO with DM_MAPIO_SUBMITTED.
@@ -1403,6 +1406,8 @@ static void __map_bio(struct bio *clone)
 	struct mapped_device *md = io->md;
 	int r;
 
+	if (clone->directio)
+		pr_err("%s clone=%pS\n", __func__, clone);
 	clone->bi_end_io = clone_endio;
 
 	/*
@@ -1419,6 +1424,8 @@ static void __map_bio(struct bio *clone)
 		down(&md->swap_bios_semaphore);
 	}
 
+	if (clone->directio)
+			pr_err("%s clone=%pS ti->type->map=%pS\n", __func__, clone, ti->type->map);
 	if (likely(ti->type->map == linear_map))
 		r = linear_map(ti, clone);
 	else if (ti->type->map == stripe_map)
@@ -1428,15 +1435,21 @@ static void __map_bio(struct bio *clone)
 
 	switch (r) {
 	case DM_MAPIO_SUBMITTED:
+		if (clone->directio)
+			pr_err("%s2 clone=%pS DM_MAPIO_SUBMITTED\n", __func__, clone);
 		/* target has assumed ownership of this io */
 		if (!ti->accounts_remapped_io)
 			dm_start_io_acct(io, clone);
 		break;
 	case DM_MAPIO_REMAPPED:
+		if (clone->directio)
+			pr_err("%s3 clone=%pS DM_MAPIO_REMAPPED\n", __func__, clone);
 		dm_submit_bio_remap(clone, NULL);
 		break;
 	case DM_MAPIO_KILL:
 	case DM_MAPIO_REQUEUE:
+		if (clone->directio)
+			pr_err("%s4 clone=%pS DM_MAPIO_KILL or DM_MAPIO_REQUEUE\n", __func__, clone);
 		if (static_branch_unlikely(&swap_bios_enabled) &&
 		    unlikely(swap_bios_limit(ti, clone)))
 			up(&md->swap_bios_semaphore);
@@ -2047,6 +2060,8 @@ static void dm_submit_bio(struct bio *bio)
 	int srcu_idx;
 	struct dm_table *map;
 
+	if (bio->directio)
+			pr_err("%s bio=%pS\n", __func__, bio);
 	map = dm_get_live_table(md, &srcu_idx);
 	if (unlikely(!map)) {
 		DMERR_LIMIT("%s: mapping table unavailable, erroring io",

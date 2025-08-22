@@ -521,6 +521,10 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	struct request_queue *q;
 	struct request *clone;
 
+	if (rq && rq->bio && rq->bio->directio)
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d)\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
+
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
@@ -677,7 +681,8 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
 	struct multipath *m = ti->private;
 	struct dm_mpath_io *mpio = NULL;
 
-	pr_err("%s m=%pS\n", __func__, m);
+	if (bio->directio)
+		pr_err("%s bio=%pS\n", __func__, bio);
 	multipath_init_per_bio_data(bio, &mpio);
 	return __multipath_map_bio(m, bio, mpio);
 }

@@ -75,8 +75,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bio.bi_write_hint = file_inode(iocb->ki_filp)->i_write_hint;
 	bio.bi_write_stream = iocb->ki_write_stream;
 	bio.bi_ioprio = iocb->ki_ioprio;
-	if (iocb->ki_flags & IOCB_ATOMIC)
-		bio.bi_opf |= REQ_ATOMIC;
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		bio.directio = true;
+		pr_err("%s iocb=%pS iter=%pS bio=%pS\n", __func__, iocb, iter, &bio);
+	}
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
 	if (unlikely(ret))
@@ -181,6 +183,8 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 		opf |= REQ_ALLOC_CACHE;
 	bio = bio_alloc_bioset(bdev, nr_pages, opf, GFP_KERNEL,
 			       &blkdev_dio_pool);
+	//pr_err("%s iocb=%pS iter=%pS bio=%pS\n", __func__, iocb, iter, bio);
+	
 	dio = container_of(bio, struct blkdev_dio, bio);
 	atomic_set(&dio->ref, 1);
 	/*
@@ -330,6 +334,8 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 		opf |= REQ_ALLOC_CACHE;
 	bio = bio_alloc_bioset(bdev, nr_pages, opf, GFP_KERNEL,
 			       &blkdev_dio_pool);
+
+
 	dio = container_of(bio, struct blkdev_dio, bio);
 	dio->flags = 0;
 	dio->iocb = iocb;
@@ -370,8 +376,11 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 			goto out_bio_put;
 	}
 
-	if (iocb->ki_flags & IOCB_ATOMIC)
-		bio->bi_opf |= REQ_ATOMIC;
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s iocb=%pS iter=%pS bio=%pS\n", __func__, iocb, iter, bio);
+		bio->directio = true;
+	//	bio->bi_opf |= REQ_ATOMIC;
+	}
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		bio->bi_opf |= REQ_NOWAIT;
@@ -685,8 +694,7 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	if (!bdev)
 		return -ENXIO;
 
-	if (bdev_can_atomic_write(bdev))
-		filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
+	filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
 
 	ret = bdev_open(bdev, mode, filp->private_data, NULL, filp);
 	if (ret)
@@ -706,6 +714,7 @@ blkdev_direct_write(struct kiocb *iocb, struct iov_iter *from)
 	size_t count = iov_iter_count(from);
 	ssize_t written;
 
+	pr_err("%s iocb=%pS from=%pS count=%zd\n", __func__, iocb, from, count);
 	written = kiocb_invalidate_pages(iocb, count);
 	if (written) {
 		if (written == -EBUSY)
@@ -747,6 +756,7 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	size_t shorted = 0;
 	ssize_t ret;
 
+	pr_err("%s iocb=%pS from=%pS size=%lld\n", __func__, iocb, from, size);
 	if (bdev_read_only(bdev))
 		return -EPERM;
 

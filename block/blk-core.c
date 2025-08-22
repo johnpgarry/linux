@@ -730,6 +730,10 @@ void submit_bio_noacct_nocheck(struct bio *bio)
 	blk_cgroup_bio_start(bio);
 	blkcg_bio_issue_init(bio);
 
+	if (bio->directio)
+		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
+
 	if (!bio_flagged(bio, BIO_TRACE_COMPLETION)) {
 		trace_block_bio_queue(bio);
 		/*
@@ -745,12 +749,22 @@ void submit_bio_noacct_nocheck(struct bio *bio)
 	 * to collect a list of requests submited by a ->submit_bio method while
 	 * it is active, and then process them after it returned.
 	 */
-	if (current->bio_list)
+	if (current->bio_list) {
+		if (bio->directio)
+			pr_err("%s1 bio=%pS bi_sector=%lld bi_size=%d calling bio_list_add\n",
+				__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 		bio_list_add(&current->bio_list[0], bio);
-	else if (!bdev_test_flag(bio->bi_bdev, BD_HAS_SUBMIT_BIO))
+	} else if (!bdev_test_flag(bio->bi_bdev, BD_HAS_SUBMIT_BIO)) {
+		if (bio->directio)
+			pr_err("%s2 bio=%pS bi_sector=%lld bi_size=%d calling __submit_bio_noacct_mq\n",
+				__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 		__submit_bio_noacct_mq(bio);
-	else
+	} else {
+		if (bio->directio)
+			pr_err("%s3 bio=%pS bi_sector=%lld bi_size=%d calling __submit_bio_noacct\n",
+				__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 		__submit_bio_noacct(bio);
+	}
 }
 
 static blk_status_t blk_validate_atomic_write_op_size(struct request_queue *q,
