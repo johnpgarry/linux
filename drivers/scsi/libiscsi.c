@@ -320,6 +320,12 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_task *task)
 	unsigned hdrlength, cmd_len, transfer_length;
 	itt_t itt;
 	int rc;
+	struct request *req = scsi_cmd_to_rq(sc);
+
+	if ((req->bio && req->bio->directio) || (req->directio))
+		pr_err("%s req=%pS bio=%pS bi_sector=%lld bi_size=%d\n",
+			__func__, req, req->bio, req->bio->bi_iter.bi_sector,
+			req->bio->bi_iter.bi_size);
 
 	rc = iscsi_check_tmf_restrictions(task, ISCSI_OP_SCSI_CMD);
 	if (rc)
@@ -1755,6 +1761,12 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	struct iscsi_session *session;
 	struct iscsi_conn *conn;
 	struct iscsi_task *task = NULL;
+	struct request *req = scsi_cmd_to_rq(sc);
+
+	if ((req->bio && req->bio->directio) || (req->directio))
+		pr_err("%s req=%pS bio=%pS bi_sector=%lld bi_size=%d\n",
+			__func__, req, req->bio, req->bio->bi_iter.bi_sector,
+			req->bio->bi_iter.bi_size);
 
 	sc->result = 0;
 	iscsi_cmd(sc)->task = NULL;

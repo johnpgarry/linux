@@ -368,7 +368,20 @@ static int map_request(struct dm_rq_target_io *tio)
 	struct request *clone = NULL;
 	blk_status_t ret;
 
+
+	if ((rq && rq->bio && rq->bio->directio) || (rq->directio))
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) calling clone_and_map_rq=%pS\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size,
+			ti->type->clone_and_map_rq);
 	r = ti->type->clone_and_map_rq(ti, rq, &tio->info, &clone);
+	if (rq && rq->bio && rq->bio->directio)
+		pr_err("%s1 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) r=%d  SUBMITTED=%d REMAPPED=%d REQUEUE=%d DELAY_REQUEUE=%d clone=%pS\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size,
+			r, DM_MAPIO_SUBMITTED, DM_MAPIO_REMAPPED, DM_MAPIO_REQUEUE, DM_MAPIO_DELAY_REQUEUE, clone);
+	else if (rq->directio)
+		pr_err("%s1.1 rq=%pS (bio=%pS) r=%d  SUBMITTED=%d REMAPPED=%d REQUEUE=%d DELAY_REQUEUE=%d clone=%pS\n",
+			__func__, rq, rq->bio,
+			r, DM_MAPIO_SUBMITTED, DM_MAPIO_REMAPPED, DM_MAPIO_REQUEUE, DM_MAPIO_DELAY_REQUEUE, clone);
 	switch (r) {
 	case DM_MAPIO_SUBMITTED:
 		/* The target has taken the I/O to submit by itself later */
@@ -487,6 +500,9 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 	//	WARN_ON_ONCE(1);
 		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d)\n",
 			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
+	} else if (rq->directio) {
+		pr_err("%s0 rq=%pS (bio=%pS)\n",
+			__func__, rq, rq->bio);
 	}
 
 	/*
@@ -525,6 +541,13 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 	 */
 	tio->ti = ti;
 
+	if (rq->bio && rq->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s2 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) calling map_request\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
+	} else if (rq->directio)
+		pr_err("%s2.0 rq=%pS (bio=%pS) calling map_request\n",
+			__func__, rq, rq->bio);
 	/* Direct call is fine since .queue_rq allows allocations */
 	if (map_request(tio) == DM_MAPIO_REQUEUE) {
 		/* Undo dm_start_request() before requeuing */

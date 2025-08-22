@@ -1569,6 +1569,7 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 {
 	struct Scsi_Host *host = cmd->device->host;
 	int rtn = 0;
+	struct request *req = scsi_cmd_to_rq(cmd);
 
 	atomic_inc(&cmd->device->iorequest_cnt);
 
@@ -1623,6 +1624,11 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	}
 
 	trace_scsi_dispatch_cmd_start(cmd);
+	if ((req->bio && req->bio->directio) || (req->directio))
+		pr_err("%s req=%pS bio=%pS bi_sector=%lld bi_size=%d calling host->hostt->queuecommand=%pS\n",
+			__func__, req, req->bio, req->bio->bi_iter.bi_sector,
+			req->bio->bi_iter.bi_size,
+			host->hostt->queuecommand);
 	rtn = host->hostt->queuecommand(host, cmd);
 	if (rtn) {
 		atomic_dec(&cmd->device->iorequest_cnt);
