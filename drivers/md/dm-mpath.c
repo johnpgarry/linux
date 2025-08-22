@@ -548,6 +548,7 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	q = bdev_get_queue(bdev);
 	clone = blk_mq_alloc_request(q, rq->cmd_flags | REQ_NOMERGE,
 			BLK_MQ_REQ_NOWAIT);
+
 	if (IS_ERR(clone)) {
 		/* EBUSY, ENODEV or EWOULDBLOCK: requeue */
 		if (blk_queue_dying(q)) {
@@ -567,7 +568,18 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	}
 	clone->bio = clone->biotail = NULL;
 	clone->cmd_flags |= REQ_FAILFAST_TRANSPORT;
+//	pr_err("%s X1 rq=%pS\n", __func__, rq);
+//	pr_err("%s X2 rq->bio=%pS\n", __func__, rq->bio);
+//	pr_err("%s X3 clone=%pS\n", __func__, clone);
+	if ((rq->bio && rq->bio->directio) || rq->directio)
+		clone->directio = true;
 	*__clone = clone;
+
+	if ((rq && rq->bio && rq->bio->directio) || (rq && rq->directio))
+		pr_err("%s2 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) clone=%pS (bio=%pS) pgpath->pg->ps.type->start_io=%pS\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size,
+			clone, clone->bio,
+			pgpath->pg->ps.type->start_io);
 
 	if (pgpath->pg->ps.type->start_io)
 		pgpath->pg->ps.type->start_io(&pgpath->pg->ps,
@@ -603,6 +615,9 @@ static void multipath_release_clone(struct request *clone,
 
 static void __multipath_queue_bio(struct multipath *m, struct bio *bio)
 {
+	if (bio->directio)
+		pr_err("%s bio=%pS (bi_sector=%lld bi_size=%d) m=%pS\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, m);
 	/* Queue for the daemon to resubmit */
 	bio_list_add(&m->queued_bios, bio);
 	if (!test_bit(MPATHF_QUEUE_IO, &m->flags))
@@ -621,6 +636,10 @@ static void multipath_queue_bio(struct multipath *m, struct bio *bio)
 static struct pgpath *__map_bio(struct multipath *m, struct bio *bio)
 {
 	struct pgpath *pgpath;
+
+	if (bio->directio)
+		pr_err("%s bio=%pS (bi_sector=%lld bi_size=%d) m=%pS\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, m);
 
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
@@ -650,6 +669,9 @@ static int __multipath_map_bio(struct multipath *m, struct bio *bio,
 {
 	struct pgpath *pgpath = __map_bio(m, bio);
 
+	if (bio->directio)
+		pr_err("%s bio=%pS (bi_sector=%lld bi_size=%d) m=%pS\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, m);
 	if (IS_ERR(pgpath))
 		return DM_MAPIO_SUBMITTED;
 

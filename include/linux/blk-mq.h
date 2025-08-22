@@ -201,6 +201,8 @@ struct request {
 
 	u64 fifo_time;
 
+	bool directio;
+
 	/*
 	 * completion callback.
 	 */
@@ -268,8 +270,8 @@ static inline struct request *rq_list_pop(struct rq_list *rl)
 		if (!rl->head)
 			rl->tail = NULL;
 		rq->rq_next = NULL;
+		rq->directio = false;
 	}
-
 	return rq;
 }
 

@@ -429,6 +429,7 @@ static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 	rq->nr_integrity_segments = 0;
 	rq->end_io = NULL;
 	rq->end_io_data = NULL;
+	rq->directio = false;
 
 	blk_crypto_rq_set_defaults(rq);
 	INIT_LIST_HEAD(&rq->queuelist);
@@ -661,6 +662,7 @@ struct request *blk_mq_alloc_request(struct request_queue *q, blk_opf_t opf,
 	rq->__data_len = 0;
 	rq->__sector = (sector_t) -1;
 	rq->bio = rq->biotail = NULL;
+	rq->directio = false;
 	return rq;
 out_queue_exit:
 	blk_queue_exit(q);
@@ -741,6 +743,7 @@ struct request *blk_mq_alloc_request_hctx(struct request_queue *q,
 	rq->__data_len = 0;
 	rq->__sector = (sector_t) -1;
 	rq->bio = rq->biotail = NULL;
+	rq->directio = false;
 	return rq;
 
 out_queue_exit:
@@ -2666,6 +2669,7 @@ static void blk_mq_bio_to_request(struct request *rq, struct bio *bio,
 	rq->__sector = bio->bi_iter.bi_sector;
 	rq->__data_len = bio->bi_iter.bi_size;
 	rq->nr_phys_segments = nr_segs;
+	rq->directio = bio->directio;
 	if (bio_integrity(bio))
 		rq->nr_integrity_segments = blk_rq_count_integrity_sg(rq->q,
 								      bio);
@@ -3358,6 +3362,7 @@ int blk_rq_prep_clone(struct request *rq, struct request *rq_src,
 			rq->biotail = bio;
 		} else {
 			rq->bio = rq->biotail = bio;
+			rq->directio = bio->directio;
 		}
 	}
 
