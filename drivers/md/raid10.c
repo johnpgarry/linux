@@ -4006,7 +4006,7 @@ static int raid10_set_queue_limits(struct mddev *mddev)
 	struct queue_limits lim;
 	int err;
 
-	md_init_stacking_limits(&lim);
+	md_init_stacking_limits(&lim, mddev->chunk_sectors);
 	lim.max_write_zeroes_sectors = 0;
 	lim.max_hw_wzeroes_unmap_sectors = 0;
 	lim.io_min = mddev->chunk_sectors << 9;

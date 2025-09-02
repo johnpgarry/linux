@@ -3752,7 +3752,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 		}
 
 		sd_config_discard(sdkp, &lim, sd_discard_mode(sdkp));
-
+		lim.chunk_sectors = 128;
 		sd_print_capacity(sdkp, old_capacity);
 
 		sd_read_write_protect_flag(sdkp, buffer);

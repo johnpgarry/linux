@@ -221,6 +221,7 @@ void bio_uninit(struct bio *bio)
 	if (bio_integrity(bio))
 		bio_integrity_free(bio);
 
+	bio->directio = false;
 	bio_crypt_free_ctx(bio);
 }
 EXPORT_SYMBOL(bio_uninit);
@@ -283,6 +284,7 @@ void bio_init(struct bio *bio, struct block_device *bdev, struct bio_vec *table,
 	bio->bi_max_vecs = max_vecs;
 	bio->bi_io_vec = table;
 	bio->bi_pool = NULL;
+	bio->directio = false;
 }
 EXPORT_SYMBOL(bio_init);
 
@@ -863,6 +865,10 @@ struct bio *bio_alloc_clone(struct block_device *bdev, struct bio *bio_src,
 {
 	struct bio *bio;
 
+	if (bio_src->directio)
+		pr_err("%s bio=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS)\n",
+			__func__, bio_src, bio_src->bi_iter.bi_sector, bio_src->bi_iter.bi_size, bio_src->bi_io_vec);
+
 	bio = bio_alloc_bioset(bdev, 0, bio_src->bi_opf, gfp, bs);
 	if (!bio)
 		return NULL;
@@ -872,7 +878,12 @@ struct bio *bio_alloc_clone(struct block_device *bdev, struct bio *bio_src,
 		return NULL;
 	}
 	bio->bi_io_vec = bio_src->bi_io_vec;
+	bio->directio = bio_src->directio;
 
+	if (bio_src->directio)
+		pr_err("%s2 bio_src=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS) bio=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS)\n",
+			__func__, bio_src, bio_src->bi_iter.bi_sector, bio_src->bi_iter.bi_size, bio_src->bi_io_vec,
+					bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, bio->bi_io_vec);
 	return bio;
 }
 EXPORT_SYMBOL(bio_alloc_clone);
@@ -912,10 +923,15 @@ EXPORT_SYMBOL(bio_init_clone);
  */
 static inline bool bio_full(struct bio *bio, unsigned len)
 {
+	if (bio->directio)
+		pr_err_once("%s bio=%pS len=%d bio->bi_iter.bi_sector=%lld, bi_size=%d\n",
+			__func__, bio, len, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
+
 	if (bio->bi_vcnt >= bio->bi_max_vecs)
 		return true;
 	if (bio->bi_iter.bi_size > UINT_MAX - len)
 		return true;
+
 	return false;
 }
 
@@ -1204,7 +1220,7 @@ static unsigned int get_contig_folio_len(unsigned int *num_pages,
  * For a multi-segment *iter, this function only adds pages from the next
  * non-empty segment of the iov iterator.
  */
-static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
+static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter, bool *boundary_limit)
 {
 	iov_iter_extraction_t extraction_flags = 0;
 	unsigned short nr_pages = bio->bi_max_vecs - bio->bi_vcnt;
@@ -1215,6 +1231,20 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	unsigned int num_pages, i = 0;
 	size_t offset, folio_offset, left, len;
 	int ret = 0;
+	struct block_device *bi_bdev = bio->bi_bdev;
+	size_t maxsize = UINT_MAX - bio->bi_iter.bi_size;
+	unsigned int chunk_bytes;
+
+	if (bi_bdev)
+		chunk_bytes = bdev_get_queue(bi_bdev)->limits.chunk_sectors << SECTOR_SHIFT;
+	else
+		chunk_bytes = 0;
+
+	maxsize = min(maxsize, chunk_bytes);
+
+	if (bio->directio)
+		pr_err("%s bio=%pS iov_iter_count(iter)=%zd bio->bi_iter.bi_sector=%lld, bi_size=%d chunk_bytes=%d\n",
+			__func__, bio, iov_iter_count(iter), bio->bi_iter.bi_sector, bio->bi_iter.bi_size, chunk_bytes);
 
 	/*
 	 * Move page array up in the allocated memory for the bio vecs as far as
@@ -1224,7 +1254,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	BUILD_BUG_ON(PAGE_PTRS_PER_BVEC < 2);
 	pages += entries_left * (PAGE_PTRS_PER_BVEC - 1);
 
-	if (bio->bi_bdev && blk_queue_pci_p2pdma(bio->bi_bdev->bd_disk->queue))
+	if (bi_bdev && blk_queue_pci_p2pdma(bio->bi_bdev->bd_disk->queue))
 		extraction_flags |= ITER_ALLOW_P2PDMA;
 
 	/*
@@ -1235,8 +1265,12 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	 * the iov data will be picked up in the next bio iteration.
 	 */
 	size = iov_iter_extract_pages(iter, &pages,
-				      UINT_MAX - bio->bi_iter.bi_size,
+				      maxsize,
 				      nr_pages, extraction_flags, &offset);
+
+	if (bio->directio)
+		pr_err("%s2 bio=%pS iov_iter_count(iter)=%zd bio->bi_iter.bi_sector=%lld, bi_size=%d chunk_bytes=%d size=%zd\n",
+			__func__, bio, iov_iter_count(iter), bio->bi_iter.bi_sector, bio->bi_iter.bi_size, chunk_bytes, size);
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
 
@@ -1247,6 +1281,17 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 		iov_iter_revert(iter, trim);
 		size -= trim;
 	}
+
+	if (chunk_bytes) {
+		size_t trim2 = size & (chunk_bytes - 1);
+
+		pr_err("%s3 bio=%pS iov_iter_count(iter)=%zd bio->bi_iter.bi_sector=%lld, bi_size=%d chunk_bytes=%d size=%zd trim2=%zd\n",
+			__func__, bio, iov_iter_count(iter), bio->bi_iter.bi_sector, bio->bi_iter.bi_size, chunk_bytes, size, trim2);
+
+		if (size == chunk_bytes)
+			*boundary_limit = true;
+	}
+
 
 	if (unlikely(!size)) {
 		ret = -EFAULT;
@@ -1320,6 +1365,11 @@ out:
 int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 {
 	int ret = 0;
+	bool boundary_limit = false;
+
+	if (bio->directio)
+		pr_err("%s bio=%pS bio->bi_iter.bi_sector=%lld, bi_size=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 
 	if (WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED)))
 		return -EIO;
@@ -1333,8 +1383,8 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	if (iov_iter_extract_will_pin(iter))
 		bio_set_flag(bio, BIO_PAGE_PINNED);
 	do {
-		ret = __bio_iov_iter_get_pages(bio, iter);
-	} while (!ret && iov_iter_count(iter) && !bio_full(bio, 0));
+		ret = __bio_iov_iter_get_pages(bio, iter, &boundary_limit);
+	} while (!ret && iov_iter_count(iter) && !bio_full(bio, 0) && !boundary_limit);
 
 	return bio->bi_vcnt ? 0 : ret;
 }

@@ -75,8 +75,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bio.bi_write_hint = file_inode(iocb->ki_filp)->i_write_hint;
 	bio.bi_write_stream = iocb->ki_write_stream;
 	bio.bi_ioprio = iocb->ki_ioprio;
-	if (iocb->ki_flags & IOCB_ATOMIC)
-		bio.bi_opf |= REQ_ATOMIC;
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		bio.directio = true;
+		pr_err("%s iocb=%pS iter=%pS bio=%pS\n", __func__, iocb, iter, &bio);
+	}
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
 	if (unlikely(ret))
@@ -177,6 +179,10 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	loff_t pos = iocb->ki_pos;
 	int ret = 0;
 
+	if (iocb->ki_flags & IOCB_ATOMIC)
+		pr_err("%s nr_pages=%d iov_iter_count(iter)=%zd iocb->ki_pos=%lld iov_iter_is_bvec=%d iter_is_iovec=%d iter_type=%d\n",
+			__func__, nr_pages, iov_iter_count(iter), iocb->ki_pos, iov_iter_is_bvec(iter), iter_is_iovec(iter), iter->iter_type);
+
 	if (iocb->ki_flags & IOCB_ALLOC_CACHE)
 		opf |= REQ_ALLOC_CACHE;
 	bio = bio_alloc_bioset(bdev, nr_pages, opf, GFP_KERNEL,
@@ -187,6 +193,7 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	 * Grab an extra reference to ensure the dio structure which is embedded
 	 * into the first bio stays around.
 	 */
+
 	bio_get(bio);
 
 	is_sync = is_sync_kiocb(iocb);
@@ -205,6 +212,11 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	blk_start_plug(&plug);
 
 	for (;;) {
+
+
+		if (iocb->ki_flags & IOCB_ATOMIC)
+			bio->directio = true;
+
 		bio->bi_iter.bi_sector = pos >> SECTOR_SHIFT;
 		bio->bi_write_hint = file_inode(iocb->ki_filp)->i_write_hint;
 		bio->bi_write_stream = iocb->ki_write_stream;
@@ -370,8 +382,11 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 			goto out_bio_put;
 	}
 
-	if (iocb->ki_flags & IOCB_ATOMIC)
-		bio->bi_opf |= REQ_ATOMIC;
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s iocb=%pS iter=%pS bio=%pS\n", __func__, iocb, iter, bio);
+		bio->directio = true;
+	//	bio->bi_opf |= REQ_ATOMIC;
+	}
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		bio->bi_opf |= REQ_NOWAIT;
@@ -394,6 +409,7 @@ static ssize_t blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 {
 	struct block_device *bdev = I_BDEV(iocb->ki_filp->f_mapping->host);
 	unsigned int nr_pages;
+	struct request_queue *q = bdev_get_queue(bdev);
 
 	if (!iov_iter_count(iter))
 		return 0;
@@ -422,13 +438,16 @@ static ssize_t blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	}
 
 	nr_pages = bio_iov_vecs_to_alloc(iter, BIO_MAX_VECS + 1);
-	if (likely(nr_pages <= BIO_MAX_VECS)) {
+	if (iocb->ki_flags & IOCB_ATOMIC)
+		pr_err("%s nr_pages=%d iov_iter_count(iter)=%zd iocb->ki_pos=%lld\n",
+			__func__, nr_pages, iov_iter_count(iter), iocb->ki_pos);
+	if (likely(nr_pages <= BIO_MAX_VECS) && !q->limits.chunk_sectors) {
 		if (is_sync_kiocb(iocb))
 			return __blkdev_direct_IO_simple(iocb, iter, bdev,
 							nr_pages);
 		return __blkdev_direct_IO_async(iocb, iter, bdev, nr_pages);
 	} else if (iocb->ki_flags & IOCB_ATOMIC) {
-		return -EINVAL;
+	//	return -EINVAL;
 	}
 	return __blkdev_direct_IO(iocb, iter, bdev, bio_max_segs(nr_pages));
 }
@@ -685,8 +704,7 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 	if (!bdev)
 		return -ENXIO;
 
-	if (bdev_can_atomic_write(bdev))
-		filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
+	filp->f_mode |= FMODE_CAN_ATOMIC_WRITE;
 
 	ret = bdev_open(bdev, mode, filp->private_data, NULL, filp);
 	if (ret)
@@ -706,6 +724,7 @@ blkdev_direct_write(struct kiocb *iocb, struct iov_iter *from)
 	size_t count = iov_iter_count(from);
 	ssize_t written;
 
+	pr_err("%s iocb=%pS from=%pS count=%zd\n", __func__, iocb, from, count);
 	written = kiocb_invalidate_pages(iocb, count);
 	if (written) {
 		if (written == -EBUSY)
@@ -747,6 +766,7 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	size_t shorted = 0;
 	ssize_t ret;
 
+	pr_err("%s iocb=%pS from=%pS size=%lld\n", __func__, iocb, from, size);
 	if (bdev_read_only(bdev))
 		return -EPERM;
 

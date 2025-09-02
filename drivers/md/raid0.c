@@ -379,10 +379,7 @@ static int raid0_set_limits(struct mddev *mddev)
 	struct queue_limits lim;
 	int err;
 
-	md_init_stacking_limits(&lim);
-	lim.max_hw_sectors = mddev->chunk_sectors;
-	lim.max_write_zeroes_sectors = mddev->chunk_sectors;
-	lim.max_hw_wzeroes_unmap_sectors = mddev->chunk_sectors;
+	md_init_stacking_limits(&lim, mddev->chunk_sectors);
 	lim.io_min = mddev->chunk_sectors << 9;
 	lim.io_opt = lim.io_min * mddev->raid_disks;
 	lim.chunk_sectors = mddev->chunk_sectors;
@@ -615,12 +612,17 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 	if (sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, sectors, GFP_NOIO,
 					      &mddev->bio_set);
-
+		if (bio->directio)
+			pr_err("%s bio=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS)\n",
+				 __func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, bio->bi_io_vec);
 		if (IS_ERR(split)) {
 			bio->bi_status = errno_to_blk_status(PTR_ERR(split));
 			bio_endio(bio);
 			return true;
 		}
+		if (bio->directio)
+			pr_err("%s2 split=%pS (bi_sector=%lld bi_size=%d bi_io_vec=%pS)\n",
+				 __func__, split, split->bi_iter.bi_sector, split->bi_iter.bi_size, split->bi_io_vec);
 		bio_chain(split, bio);
 		raid0_map_submit_bio(mddev, bio);
 		bio = split;

@@ -5952,9 +5952,16 @@ static void mddev_delayed_delete(struct work_struct *ws)
 	kobject_put(&mddev->kobj);
 }
 
-void md_init_stacking_limits(struct queue_limits *lim)
+void md_init_stacking_limits(struct queue_limits *lim, unsigned int chunk_sectors)
 {
 	blk_set_stacking_limits(lim);
+
+	if (chunk_sectors) {
+		lim->max_hw_sectors = chunk_sectors;
+		lim->max_write_zeroes_sectors = chunk_sectors;
+		lim->max_hw_wzeroes_unmap_sectors = chunk_sectors;
+	}
+
 	lim->features = BLK_FEAT_WRITE_CACHE | BLK_FEAT_FUA |
 			BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT;
 }

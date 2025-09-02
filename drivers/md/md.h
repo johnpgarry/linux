@@ -925,7 +925,7 @@ extern int strict_strtoul_scaled(const char *cp, unsigned long *res, int scale);
 
 extern int mddev_init(struct mddev *mddev);
 extern void mddev_destroy(struct mddev *mddev);
-void md_init_stacking_limits(struct queue_limits *lim);
+void md_init_stacking_limits(struct queue_limits *lim, unsigned int chunk_sectors);
 struct mddev *md_alloc(dev_t dev, char *name);
 void mddev_put(struct mddev *mddev);
 extern int md_run(struct mddev *mddev);
