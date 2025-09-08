@@ -939,6 +939,8 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 {
 	unsigned int logical_block_size = sdkp->device->sector_size,
 		physical_block_size_sectors, max_atomic, unit_min, unit_max;
+	static unsigned count;
+
 
 	if ((!sdkp->max_atomic && !sdkp->max_atomic_with_boundary) ||
 	    sdkp->protection_type == T10_PI_TYPE2_PROTECTION)
@@ -987,8 +989,16 @@ static void sd_config_atomic(struct scsi_disk *sdkp, struct queue_limits *lim)
 			return;
 	}
 
+	count++;
+
+	if (count == 3)
+		sdkp->special_atomic_boundary = 1;
+
 	lim->atomic_write_hw_max = max_atomic * logical_block_size;
-	lim->atomic_write_hw_boundary = 0;
+	if (sdkp->special_atomic_boundary)
+		lim->atomic_write_hw_boundary = lim->atomic_write_hw_max * 4;
+	else
+		lim->atomic_write_hw_boundary = lim->atomic_write_hw_max * 2;
 	lim->atomic_write_hw_unit_min = unit_min * logical_block_size;
 	lim->atomic_write_hw_unit_max = unit_max * logical_block_size;
 	lim->features |= BLK_FEAT_ATOMIC_WRITES;
