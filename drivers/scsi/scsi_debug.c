@@ -9485,7 +9485,7 @@ static int sdebug_driver_probe(struct device *dev)
 		return error;
 	}
 	hpnt->can_queue = sdebug_max_queue;
-	hpnt->cmd_per_lun = sdebug_max_queue;
+	hpnt->cmd_per_lun = sdebug_max_queue / 8;
 	if (!sdebug_clustering)
 		hpnt->dma_boundary = PAGE_SIZE - 1;
 
