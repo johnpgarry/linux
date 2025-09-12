@@ -3351,6 +3351,23 @@ static int ufshcd_issue_dev_cmd(struct ufs_hba *hba, struct scsi_cmnd *cmd,
 	return err;
 }
 
+struct ufshcd_exec_dev_cmd_args {
+	struct scsi_exec_args args;
+	struct ufs_hba *hba;
+	enum dev_cmd_type cmd_type;
+};
+
+static int ufshcd_init_dev_cmd(struct scsi_cmnd *cmd,
+			       const struct scsi_exec_args *args)
+{
+	const struct ufshcd_exec_dev_cmd_args *uea =
+		container_of(args, typeof(*uea), args);
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	unsigned int tag = rq->tag;
+
+	return ufshcd_compose_dev_cmd(uea->hba, cmd, uea->cmd_type, tag);
+}
+
 /**
  * ufshcd_exec_dev_cmd - API for sending device management requests
  * @hba: UFS hba
@@ -3365,6 +3382,10 @@ static int ufshcd_issue_dev_cmd(struct ufs_hba *hba, struct scsi_cmnd *cmd,
 static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 		enum dev_cmd_type cmd_type, int timeout)
 {
+	const struct ufshcd_exec_dev_cmd_args args = {
+		.hba = hba,
+		.cmd_type = cmd_type
+	};
 	const u32 tag = hba->reserved_slot;
 	struct scsi_cmnd *cmd = ufshcd_tag_to_cmd(hba, tag);
 	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
@@ -3373,7 +3394,7 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 	/* Protects use of hba->reserved_slot. */
 	lockdep_assert_held(&hba->dev_cmd.lock);
 
-	err = ufshcd_compose_dev_cmd(hba, cmd, cmd_type, tag);
+	err = ufshcd_init_dev_cmd(cmd, &args.args);
 	if (unlikely(err))
 		return err;
 
@@ -7329,6 +7350,88 @@ static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 	return err;
 }
 
+struct ufshcd_exec_devman_upiu_cmd_args {
+	struct scsi_exec_args args;
+	struct ufs_hba *hba;
+	struct utp_upiu_req *req_upiu;
+	struct utp_upiu_req *rsp_upiu;
+	u8 *desc_buff;
+	int *buff_len;
+	enum dev_cmd_type cmd_type;
+	enum query_opcode desc_op;
+	int *err;
+};
+
+static int ufshcd_init_upiu_cmd(struct scsi_cmnd *cmd,
+				const struct scsi_exec_args *args)
+{
+	const struct ufshcd_exec_devman_upiu_cmd_args *uea =
+		container_of(args, typeof(*uea), args);
+	struct utp_upiu_req *req_upiu = uea->req_upiu;
+	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
+	enum dev_cmd_type cmd_type = uea->cmd_type;
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	enum query_opcode desc_op = uea->desc_op;
+	struct ufs_hba *hba = uea->hba;
+	u8 *desc_buff = uea->desc_buff;
+	unsigned int tag = rq->tag;
+	u8 upiu_flags;
+
+	ufshcd_setup_dev_cmd(hba, cmd, cmd_type, 0, tag);
+
+	ufshcd_prepare_req_desc_hdr(hba, lrbp, &upiu_flags, DMA_NONE, 0);
+
+	/* Set the task tag in the request UPIU. */
+	req_upiu->header.task_tag = tag;
+
+	/* Copy the UPIU request into the LRB. */
+	memcpy(lrbp->ucd_req_ptr, req_upiu, sizeof(*lrbp->ucd_req_ptr));
+	if (desc_buff && desc_op == UPIU_QUERY_OPCODE_WRITE_DESC) {
+		/*
+		 * For the WRITE DESCRIPTOR operation, the data segment follows
+		 * right after the UPIU transaction specific fields.
+		 */
+		memcpy(lrbp->ucd_req_ptr + 1, desc_buff, *uea->buff_len);
+		*uea->buff_len = 0;
+	}
+
+	memset(lrbp->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
+
+	return 0;
+}
+
+static void ufshcd_copy_upiu_cmd_result(struct scsi_cmnd *cmd,
+					const struct scsi_exec_args *args)
+{
+	const struct ufshcd_exec_devman_upiu_cmd_args *uea =
+		container_of(args, typeof(*uea), args);
+	struct utp_upiu_req *rsp_upiu = uea->rsp_upiu;
+	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
+	enum query_opcode desc_op = uea->desc_op;
+	u8 *desc_buff = uea->desc_buff;
+	struct ufs_hba *hba = uea->hba;
+
+	/* Copy the UPIU response. */
+	memcpy(rsp_upiu, lrbp->ucd_rsp_ptr, sizeof(*rsp_upiu));
+
+	if (desc_buff && desc_op == UPIU_QUERY_OPCODE_READ_DESC) {
+		u8 *descp = (u8 *)lrbp->ucd_rsp_ptr + sizeof(*rsp_upiu);
+		u16 resp_len = be16_to_cpu(
+			lrbp->ucd_rsp_ptr->header.data_segment_length);
+
+		if (resp_len <= *uea->buff_len) {
+			memcpy(desc_buff, descp, resp_len);
+			*uea->buff_len = resp_len;
+		} else {
+			dev_warn(hba->dev,
+				"%s: rsp size %d is bigger than buffer size %d",
+				__func__, resp_len, *uea->buff_len);
+			*uea->buff_len = 0;
+			*uea->err = -EINVAL;
+		}
+	}
+}
+
 /**
  * ufshcd_issue_devman_upiu_cmd - API for sending "utrd" type requests
  * @hba:	per-adapter instance
@@ -7355,59 +7458,33 @@ static int ufshcd_issue_devman_upiu_cmd(struct ufs_hba *hba,
 					enum dev_cmd_type cmd_type,
 					enum query_opcode desc_op)
 {
+	int err, copy_result_err = 0;
+	const struct ufshcd_exec_devman_upiu_cmd_args args = {
+		.hba = hba,
+		.req_upiu = req_upiu,
+		.rsp_upiu = rsp_upiu,
+		.desc_buff = desc_buff,
+		.buff_len = buff_len,
+		.cmd_type = cmd_type,
+		.desc_op = desc_op,
+		.err = &copy_result_err,
+	};
 	const u32 tag = hba->reserved_slot;
 	struct scsi_cmnd *cmd = ufshcd_tag_to_cmd(hba, tag);
-	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
-	int err = 0;
-	u8 upiu_flags;
 
 	/* Protects use of hba->reserved_slot. */
 	lockdep_assert_held(&hba->dev_cmd.lock);
 
-	ufshcd_setup_dev_cmd(hba, cmd, cmd_type, 0, tag);
-
-	ufshcd_prepare_req_desc_hdr(hba, lrbp, &upiu_flags, DMA_NONE, 0);
-
-	/* update the task tag in the request upiu */
-	req_upiu->header.task_tag = tag;
-
-	/* just copy the upiu request as it is */
-	memcpy(lrbp->ucd_req_ptr, req_upiu, sizeof(*lrbp->ucd_req_ptr));
-	if (desc_buff && desc_op == UPIU_QUERY_OPCODE_WRITE_DESC) {
-		/* The Data Segment Area is optional depending upon the query
-		 * function value. for WRITE DESCRIPTOR, the data segment
-		 * follows right after the tsf.
-		 */
-		memcpy(lrbp->ucd_req_ptr + 1, desc_buff, *buff_len);
-		*buff_len = 0;
-	}
-
-	memset(lrbp->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
+	err = ufshcd_init_upiu_cmd(cmd, &args.args);
+	WARN_ON_ONCE(err);
 
 	err = ufshcd_issue_dev_cmd(hba, cmd, tag, dev_cmd_timeout);
 	if (err)
 		return err;
 
-	/* just copy the upiu response as it is */
-	memcpy(rsp_upiu, lrbp->ucd_rsp_ptr, sizeof(*rsp_upiu));
-	if (desc_buff && desc_op == UPIU_QUERY_OPCODE_READ_DESC) {
-		u8 *descp = (u8 *)lrbp->ucd_rsp_ptr + sizeof(*rsp_upiu);
-		u16 resp_len = be16_to_cpu(lrbp->ucd_rsp_ptr->header
-					   .data_segment_length);
+	ufshcd_copy_upiu_cmd_result(cmd, &args.args);
 
-		if (*buff_len >= resp_len) {
-			memcpy(desc_buff, descp, resp_len);
-			*buff_len = resp_len;
-		} else {
-			dev_warn(hba->dev,
-				 "%s: rsp size %d is bigger than buffer size %d",
-				 __func__, resp_len, *buff_len);
-			*buff_len = 0;
-			err = -EINVAL;
-		}
-	}
-
-	return err;
+	return copy_result_err;
 }
 
 /**
@@ -7481,36 +7558,34 @@ int ufshcd_exec_raw_upiu_cmd(struct ufs_hba *hba,
 	return err;
 }
 
-/**
- * ufshcd_advanced_rpmb_req_handler - handle advanced RPMB request
- * @hba:	per adapter instance
- * @req_upiu:	upiu request
- * @rsp_upiu:	upiu reply
- * @req_ehs:	EHS field which contains Advanced RPMB Request Message
- * @rsp_ehs:	EHS field which returns Advanced RPMB Response Message
- * @sg_cnt:	The number of sg lists actually used
- * @sg_list:	Pointer to SG list when DATA IN/OUT UPIU is required in ARPMB operation
- * @dir:	DMA direction
- *
- * Return: zero on success, non-zero on failure.
- */
-int ufshcd_advanced_rpmb_req_handler(struct ufs_hba *hba, struct utp_upiu_req *req_upiu,
-			 struct utp_upiu_req *rsp_upiu, struct ufs_ehs *req_ehs,
-			 struct ufs_ehs *rsp_ehs, int sg_cnt, struct scatterlist *sg_list,
-			 enum dma_data_direction dir)
-{
-	const u32 tag = hba->reserved_slot;
-	struct scsi_cmnd *cmd = ufshcd_tag_to_cmd(hba, tag);
-	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
-	int err = 0;
-	int result;
-	u8 upiu_flags;
-	u8 *ehs_data;
-	u16 ehs_len;
-	int ehs = (hba->capabilities & MASK_EHSLUTRD_SUPPORTED) ? 2 : 0;
+struct ufshcd_rpmb_args {
+	struct scsi_exec_args args;
+	struct ufs_hba *hba;
+	struct utp_upiu_req *req_upiu;
+	struct utp_upiu_req *rsp_upiu;
+	struct ufs_ehs *req_ehs;
+	struct ufs_ehs *rsp_ehs;
+	int sg_cnt;
+	struct scatterlist *sg_list;
+	enum dma_data_direction dir;
+	int *upiu_result;
+};
 
-	/* Protects use of hba->reserved_slot. */
-	ufshcd_dev_man_lock(hba);
+static int ufshcd_init_rpmb(struct scsi_cmnd *cmd,
+			    const struct scsi_exec_args *args)
+{
+	const struct ufshcd_rpmb_args *ura =
+		container_of(args, typeof(*ura), args);
+	struct ufs_hba *hba = ura->hba;
+	int ehs = (hba->capabilities & MASK_EHSLUTRD_SUPPORTED) ? 2 : 0;
+	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
+	struct utp_upiu_req *req_upiu = ura->req_upiu;
+	struct scatterlist *sg_list = ura->sg_list;
+	struct ufs_ehs *req_ehs = ura->req_ehs;
+	enum dma_data_direction dir = ura->dir;
+	u32 tag = scsi_cmd_to_rq(cmd)->tag;
+	int sg_cnt = ura->sg_cnt;
+	u8 upiu_flags;
 
 	ufshcd_setup_dev_cmd(hba, cmd, DEV_CMD_TYPE_RPMB, UFS_UPIU_RPMB_WLUN,
 			     tag);
@@ -7530,37 +7605,96 @@ int ufshcd_advanced_rpmb_req_handler(struct ufs_hba *hba, struct utp_upiu_req *r
 
 	memset(lrbp->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
 
+	return 0;
+}
+
+static void ufshcd_copy_rpmb_result(struct scsi_cmnd *cmd,
+				    const struct scsi_exec_args *args)
+{
+	const struct ufshcd_rpmb_args *ura =
+		container_of(args, typeof(*ura), args);
+	struct utp_upiu_req *rsp_upiu = ura->rsp_upiu;
+	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
+	struct ufs_ehs *rsp_ehs = ura->rsp_ehs;
+	u8 *ehs_data;
+	u16 ehs_len;
+
+	/* Copy the upiu response. */
+	memcpy(rsp_upiu, lrbp->ucd_rsp_ptr, sizeof(*rsp_upiu));
+	/* Copy the UPIU response and status fields. */
+	*ura->upiu_result = (lrbp->ucd_rsp_ptr->header.response << 8) |
+		lrbp->ucd_rsp_ptr->header.status;
+
+	ehs_len = lrbp->ucd_rsp_ptr->header.ehs_length;
+	/*
+	 * Since the bLength in the EHS indicates the total size of the EHS
+	 * Header and EHS Data in 32 Byte units, the value of the bLength
+	 * Request/Response for Advanced RPMB Message is 02h.
+	 */
+	if (ehs_len == 2 && rsp_ehs) {
+		/*
+		 * ucd_rsp_ptr points to a buffer with a length of 512 bytes
+		 * (ALIGNED_UPIU_SIZE = 512), and the EHS data just starts from
+		 * byte32.
+		 */
+		ehs_data = (u8 *)lrbp->ucd_rsp_ptr + EHS_OFFSET_IN_RESPONSE;
+		memcpy(rsp_ehs, ehs_data, ehs_len * 32);
+	}
+}
+
+/**
+ * ufshcd_advanced_rpmb_req_handler - handle advanced RPMB request
+ * @hba:	per adapter instance
+ * @req_upiu:	upiu request
+ * @rsp_upiu:	upiu reply
+ * @req_ehs:	EHS field which contains Advanced RPMB Request Message
+ * @rsp_ehs:	EHS field which returns Advanced RPMB Response Message
+ * @sg_cnt:	The number of sg lists actually used
+ * @sg_list:	Pointer to SG list when DATA IN/OUT UPIU is required in ARPMB operation
+ * @dir:	DMA direction
+ *
+ * Return: zero on success, non-zero on failure. This function can return a
+ * negative error code, a positive OCS error or a two byte integer with the
+ * most significant byte representing the UTP response value and the least
+ * significant byte representing the RPMB status value. See also section
+ * "12.4.3.7 RPMB Operation Result" in the UFS standard.
+ */
+int ufshcd_advanced_rpmb_req_handler(struct ufs_hba *hba, struct utp_upiu_req *req_upiu,
+			 struct utp_upiu_req *rsp_upiu, struct ufs_ehs *req_ehs,
+			 struct ufs_ehs *rsp_ehs, int sg_cnt, struct scatterlist *sg_list,
+			 enum dma_data_direction dir)
+{
+	int err, upiu_result = 0;
+	const struct ufshcd_rpmb_args args = {
+		.hba = hba,
+		.req_upiu = req_upiu,
+		.rsp_upiu = rsp_upiu,
+		.req_ehs = req_ehs,
+		.rsp_ehs = rsp_ehs,
+		.sg_cnt = sg_cnt,
+		.sg_list = sg_list,
+		.dir = dir,
+		.upiu_result = &upiu_result,
+	};
+	const u32 tag = hba->reserved_slot;
+	struct scsi_cmnd *cmd = ufshcd_tag_to_cmd(hba, tag);
+
+	/* Protects use of hba->reserved_slot. */
+	ufshcd_dev_man_lock(hba);
+
+	err = ufshcd_init_rpmb(cmd, &args.args);
+	WARN_ON_ONCE(err);
+
 	err = ufshcd_issue_dev_cmd(hba, cmd, tag, ADVANCED_RPMB_REQ_TIMEOUT);
 	if (err)
-		return err;
+		goto unlock;
 
-	err = ufshcd_dev_cmd_completion(hba, lrbp);
-	if (!err) {
-		/* Just copy the upiu response as it is */
-		memcpy(rsp_upiu, lrbp->ucd_rsp_ptr, sizeof(*rsp_upiu));
-		/* Get the response UPIU result */
-		result = (lrbp->ucd_rsp_ptr->header.response << 8) |
-			lrbp->ucd_rsp_ptr->header.status;
+	ufshcd_copy_rpmb_result(cmd, &args.args);
 
-		ehs_len = lrbp->ucd_rsp_ptr->header.ehs_length;
-		/*
-		 * Since the bLength in EHS indicates the total size of the EHS Header and EHS Data
-		 * in 32 Byte units, the value of the bLength Request/Response for Advanced RPMB
-		 * Message is 02h
-		 */
-		if (ehs_len == 2 && rsp_ehs) {
-			/*
-			 * ucd_rsp_ptr points to a buffer with a length of 512 bytes
-			 * (ALIGNED_UPIU_SIZE = 512), and the EHS data just starts from byte32
-			 */
-			ehs_data = (u8 *)lrbp->ucd_rsp_ptr + EHS_OFFSET_IN_RESPONSE;
-			memcpy(rsp_ehs, ehs_data, ehs_len * 32);
-		}
-	}
-
+unlock:
 	ufshcd_dev_man_unlock(hba);
 
-	return err ? : result;
+	return err ?: upiu_result;
 }
 
 static bool ufshcd_clear_lu_cmds(struct request *req, void *priv)
