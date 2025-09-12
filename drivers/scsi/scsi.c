@@ -216,6 +216,8 @@ int scsi_device_max_queue_depth(struct scsi_device *sdev)
  */
 int scsi_change_queue_depth(struct scsi_device *sdev, int depth)
 {
+	WARN_ON_ONCE(!sdev->budget_map.map);
+
 	depth = min_t(int, depth, scsi_device_max_queue_depth(sdev));
 
 	if (depth > 0) {
