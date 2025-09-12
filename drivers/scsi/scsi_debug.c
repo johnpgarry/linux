@@ -9197,6 +9197,19 @@ out_handle:
 	return ret;
 }
 
+/*
+ * The only purpose of this function is to make the SCSI core allocate a
+ * pseudo SCSI device.
+ */
+static int scsi_debug_queue_reserved_command(struct Scsi_Host *shost,
+					     struct scsi_cmnd *scp)
+{
+	WARN_ON_ONCE(true);
+	scp->result = DID_ERROR << 16;
+	scsi_done(scp);
+	return 0;
+}
+
 static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 				   struct scsi_cmnd *scp)
 {
@@ -9416,6 +9429,7 @@ static const struct scsi_host_template sdebug_driver_template = {
 	.sdev_destroy =		scsi_debug_sdev_destroy,
 	.ioctl =		scsi_debug_ioctl,
 	.queuecommand =		scsi_debug_queuecommand,
+	.queue_reserved_command = scsi_debug_queue_reserved_command,
 	.change_queue_depth =	sdebug_change_qdepth,
 	.map_queues =		sdebug_map_queues,
 	.mq_poll =		sdebug_blk_mq_poll,
