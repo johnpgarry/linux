@@ -1078,7 +1078,7 @@ static int mirror_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	struct mirror_set *ms;
 	struct dm_dirty_log *dl;
 	char dummy;
-
+	pr_err("%s ti=%pS\n", __func__, ti);
 	dl = create_dirty_log(ti, argc, argv, &args_used);
 	if (!dl)
 		return -EINVAL;
