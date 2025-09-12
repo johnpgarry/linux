@@ -308,7 +308,10 @@ int scsi_execute_cmd(struct scsi_device *sdev, const unsigned char *cmd,
 		return -EINVAL;
 
 retry:
-	req = scsi_alloc_request(sdev->request_queue, opf, args->req_flags);
+	req = args->specify_hctx ?
+		scsi_alloc_request_hctx(sdev->request_queue, opf,
+					args->req_flags, args->hctx_idx) :
+		scsi_alloc_request(sdev->request_queue, opf, args->req_flags);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 
@@ -318,8 +321,12 @@ retry:
 			goto out;
 	}
 	scmd = blk_mq_rq_to_pdu(req);
-	scmd->cmd_len = COMMAND_SIZE(cmd[0]);
-	memcpy(scmd->cmnd, cmd, scmd->cmd_len);
+	if (cmd) {
+		scmd->cmd_len = COMMAND_SIZE(cmd[0]);
+		memcpy(scmd->cmnd, cmd, scmd->cmd_len);
+	}
+	if (args->init_cmd)
+		args->init_cmd(scmd, args);
 	scmd->allowed = ml_retries;
 	scmd->flags |= args->scmd_flags;
 	req->timeout = timeout;
@@ -353,6 +360,9 @@ retry:
 				     args->sshdr);
 
 	ret = scmd->result;
+	if (ret == 0 && args->copy_result)
+		args->copy_result(scmd, args);
+
  out:
 	blk_mq_free_request(req);
 
@@ -1246,6 +1256,18 @@ struct request *scsi_alloc_request(struct request_queue *q, blk_opf_t opf,
 	return rq;
 }
 EXPORT_SYMBOL_GPL(scsi_alloc_request);
+
+struct request *scsi_alloc_request_hctx(struct request_queue *q, blk_opf_t opf,
+			blk_mq_req_flags_t flags, unsigned int hctx_idx)
+{
+	struct request *rq;
+
+	rq = blk_mq_alloc_request_hctx(q, opf, flags, hctx_idx);
+	if (!IS_ERR(rq))
+		scsi_initialize_rq(rq);
+	return rq;
+}
+EXPORT_SYMBOL_GPL(scsi_alloc_request_hctx);
 
 /*
  * Only called when the request isn't completed by SCSI, and not freed by

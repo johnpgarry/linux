@@ -541,15 +541,36 @@ struct scsi_failures {
 	struct scsi_failure *failure_definitions;
 };
 
-/* Optional arguments to scsi_execute_cmd */
+/**
+ * struct scsi_exec_args - Optional arguments to scsi_execute_cmd()
+ * @init_cmd: called before the command is executed.
+ * @copy_result: called after the command has been executed.
+ * @sense: sense buffer.
+ * @sense_len: sense buffer len
+ * @sshdr: decoded sense header
+ * @req_flags: BLK_MQ_REQ flags
+ * @scmd_flags: SCMD flags.
+ * @resid: residual length.
+ * @failures: which failures to retry.
+ * @specify_hctx: call scsi_alloc_request_hctx() if %true or
+	scsi_alloc_request() otherwise.
+ * @hctx_idx: Passed as fourth argument for scsi_alloc_request_hctx() if
+	@specify_hctx is %true.
+ */
 struct scsi_exec_args {
-	unsigned char *sense;		/* sense buffer */
-	unsigned int sense_len;		/* sense buffer len */
-	struct scsi_sense_hdr *sshdr;	/* decoded sense header */
-	blk_mq_req_flags_t req_flags;	/* BLK_MQ_REQ flags */
-	int scmd_flags;			/* SCMD flags */
-	int *resid;			/* residual length */
-	struct scsi_failures *failures;	/* failures to retry */
+	int (*init_cmd)(struct scsi_cmnd *cmd,
+			const struct scsi_exec_args *args);
+	void (*copy_result)(struct scsi_cmnd *cmd,
+			    const struct scsi_exec_args *args);
+	unsigned char *sense;
+	unsigned int sense_len;
+	struct scsi_sense_hdr *sshdr;
+	blk_mq_req_flags_t req_flags;
+	int scmd_flags;
+	int *resid;
+	struct scsi_failures *failures;
+	bool specify_hctx;
+	int hctx_idx;
 };
 
 int scsi_execute_cmd(struct scsi_device *sdev, const unsigned char *cmd,
