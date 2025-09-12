@@ -257,6 +257,8 @@ EXPORT_SYMBOL(scsi_change_queue_depth);
  */
 int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 {
+	if (scsi_device_is_pseudo_dev(sdev))
+		return 0;
 
 	/*
 	 * Don't let QUEUE_FULLs on the same
@@ -828,8 +830,11 @@ struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
 	spin_lock_irqsave(shost->host_lock, flags);
 	while (list->next != &shost->__devices) {
 		next = list_entry(list->next, struct scsi_device, siblings);
-		/* skip devices that we can't get a reference to */
-		if (!scsi_device_get(next))
+		/*
+		 * Skip pseudo devices and also devices for which
+		 * scsi_device_get() fails.
+		 */
+		if (!scsi_device_is_pseudo_dev(next) && !scsi_device_get(next))
 			break;
 		next = NULL;
 		list = list->next;

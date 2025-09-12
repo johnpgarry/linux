@@ -749,6 +749,9 @@ static void scsi_handle_queue_ramp_up(struct scsi_device *sdev)
 	const struct scsi_host_template *sht = sdev->host->hostt;
 	struct scsi_device *tmp_sdev;
 
+	if (scsi_device_is_pseudo_dev(sdev))
+		return;
+
 	if (!sht->track_queue_depth ||
 	    sdev->queue_depth >= sdev->max_queue_depth)
 		return;
