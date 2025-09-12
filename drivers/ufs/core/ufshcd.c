@@ -2352,7 +2352,7 @@ static void ufshcd_update_monitor(struct ufs_hba *hba, struct scsi_cmnd *cmd)
  */
 static bool ufshcd_is_scsi_cmd(struct scsi_cmnd *cmd)
 {
-	return blk_mq_request_started(scsi_cmd_to_rq(cmd));
+	return !blk_mq_is_reserved_rq(scsi_cmd_to_rq(cmd));
 }
 
 /**
@@ -2483,7 +2483,6 @@ static inline int ufshcd_hba_capabilities(struct ufs_hba *hba)
 	hba->nutrs = (hba->capabilities & MASK_TRANSFER_REQUESTS_SLOTS_SDB) + 1;
 	hba->nutmrs =
 	((hba->capabilities & MASK_TASK_MANAGEMENT_REQUEST_SLOTS) >> 16) + 1;
-	hba->reserved_slot = 0;
 
 	hba->nortt = FIELD_GET(MASK_NUMBER_OUTSTANDING_RTT, hba->capabilities) + 1;
 
@@ -3111,6 +3110,20 @@ out:
 	return err;
 }
 
+static int ufshcd_queue_reserved_command(struct Scsi_Host *host,
+					 struct scsi_cmnd *cmd)
+{
+	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	struct ufs_hba *hba = shost_priv(host);
+	struct ufs_hw_queue *hwq =
+		hba->mcq_enabled ? ufshcd_mcq_req_to_hwq(hba, rq) : NULL;
+
+	ufshcd_add_query_upiu_trace(hba, UFS_QUERY_SEND, lrbp->ucd_req_ptr);
+	ufshcd_send_command(hba, cmd, hwq);
+	return 0;
+}
+
 static void ufshcd_setup_dev_cmd(struct ufs_hba *hba, struct scsi_cmnd *cmd,
 				 enum dev_cmd_type cmd_type, u8 lun, int tag)
 {
@@ -3240,84 +3253,6 @@ ufshcd_dev_cmd_completion(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	return err;
 }
 
-/*
- * Return: 0 upon success; < 0 upon failure.
- */
-static int ufshcd_wait_for_dev_cmd(struct ufs_hba *hba,
-		struct ufshcd_lrb *lrbp, int max_timeout)
-{
-	struct scsi_cmnd *cmd = (struct scsi_cmnd *)lrbp - 1;
-	const int tag = scsi_cmd_to_rq(cmd)->tag;
-	unsigned long time_left = msecs_to_jiffies(max_timeout);
-	unsigned long flags;
-	bool pending;
-	int err;
-
-retry:
-	time_left = wait_for_completion_timeout(&hba->dev_cmd.complete,
-						time_left);
-
-	if (likely(time_left)) {
-		err = ufshcd_get_tr_ocs(lrbp, NULL);
-	} else {
-		err = -ETIMEDOUT;
-		dev_dbg(hba->dev, "%s: dev_cmd request timedout, tag %d\n",
-			__func__, tag);
-
-		/* MCQ mode */
-		if (hba->mcq_enabled) {
-			/* successfully cleared the command, retry if needed */
-			if (ufshcd_clear_cmd(hba, tag) == 0)
-				err = -EAGAIN;
-			return err;
-		}
-
-		/* SDB mode */
-		if (ufshcd_clear_cmd(hba, tag) == 0) {
-			/* successfully cleared the command, retry if needed */
-			err = -EAGAIN;
-			/*
-			 * Since clearing the command succeeded we also need to
-			 * clear the task tag bit from the outstanding_reqs
-			 * variable.
-			 */
-			spin_lock_irqsave(&hba->outstanding_lock, flags);
-			pending = test_bit(tag, &hba->outstanding_reqs);
-			if (pending)
-				__clear_bit(tag, &hba->outstanding_reqs);
-			spin_unlock_irqrestore(&hba->outstanding_lock, flags);
-
-			if (!pending) {
-				/*
-				 * The completion handler ran while we tried to
-				 * clear the command.
-				 */
-				time_left = 1;
-				goto retry;
-			}
-		} else {
-			dev_err(hba->dev, "%s: failed to clear tag %d\n",
-				__func__, tag);
-
-			spin_lock_irqsave(&hba->outstanding_lock, flags);
-			pending = test_bit(tag, &hba->outstanding_reqs);
-			spin_unlock_irqrestore(&hba->outstanding_lock, flags);
-
-			if (!pending) {
-				/*
-				 * The completion handler ran while we tried to
-				 * clear the command.
-				 */
-				time_left = 1;
-				goto retry;
-			}
-		}
-	}
-
-	WARN_ONCE(err > 0, "Incorrect return value %d > 0\n", err);
-	return err;
-}
-
 static void ufshcd_dev_man_lock(struct ufs_hba *hba)
 {
 	ufshcd_hold(hba);
@@ -3330,25 +3265,6 @@ static void ufshcd_dev_man_unlock(struct ufs_hba *hba)
 	up_read(&hba->clk_scaling_lock);
 	mutex_unlock(&hba->dev_cmd.lock);
 	ufshcd_release(hba);
-}
-
-/*
- * Return: 0 upon success; < 0 upon failure.
- */
-static int ufshcd_issue_dev_cmd(struct ufs_hba *hba, struct scsi_cmnd *cmd,
-				const u32 tag, int timeout)
-{
-	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
-	int err;
-
-	ufshcd_add_query_upiu_trace(hba, UFS_QUERY_SEND, lrbp->ucd_req_ptr);
-	ufshcd_send_command(hba, cmd, hba->dev_cmd_queue);
-	err = ufshcd_wait_for_dev_cmd(hba, lrbp, timeout);
-
-	ufshcd_add_query_upiu_trace(hba, err ? UFS_QUERY_ERR : UFS_QUERY_COMP,
-				    (struct utp_upiu_req *)lrbp->ucd_rsp_ptr);
-
-	return err;
 }
 
 struct ufshcd_exec_dev_cmd_args {
@@ -3368,13 +3284,24 @@ static int ufshcd_init_dev_cmd(struct scsi_cmnd *cmd,
 	return ufshcd_compose_dev_cmd(uea->hba, cmd, uea->cmd_type, tag);
 }
 
+static void ufshcd_copy_dev_cmd_result(struct scsi_cmnd *cmd,
+				       const struct scsi_exec_args *args)
+{
+	const struct ufshcd_exec_dev_cmd_args *uea =
+		container_of(args, typeof(*uea), args);
+	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
+
+	ufshcd_dev_cmd_completion(uea->hba, lrbp);
+}
+
 /**
  * ufshcd_exec_dev_cmd - API for sending device management requests
  * @hba: UFS hba
  * @cmd_type: specifies the type (NOP, Query...)
  * @timeout: timeout in milliseconds
  *
- * Return: 0 upon success; < 0 upon failure.
+ * Return: 0 upon success; < 0 upon timeout; > 0 in case the UFS device
+ * reported an OCS error.
  *
  * NOTE: Since there is only one available tag for device management commands,
  * it is expected you hold the hba->dev_cmd.lock mutex.
@@ -3383,26 +3310,21 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 		enum dev_cmd_type cmd_type, int timeout)
 {
 	const struct ufshcd_exec_dev_cmd_args args = {
+		.args = {
+			.init_cmd = ufshcd_init_dev_cmd,
+			.copy_result = ufshcd_copy_dev_cmd_result,
+			.req_flags = BLK_MQ_REQ_RESERVED | BLK_MQ_REQ_NOWAIT,
+			.specify_hctx = true,
+		},
 		.hba = hba,
 		.cmd_type = cmd_type
 	};
-	const u32 tag = hba->reserved_slot;
-	struct scsi_cmnd *cmd = ufshcd_tag_to_cmd(hba, tag);
-	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
-	int err;
 
-	/* Protects use of hba->reserved_slot. */
+	/* Protects use of hba->dev_cmd. */
 	lockdep_assert_held(&hba->dev_cmd.lock);
 
-	err = ufshcd_init_dev_cmd(cmd, &args.args);
-	if (unlikely(err))
-		return err;
-
-	err = ufshcd_issue_dev_cmd(hba, cmd, tag, timeout);
-	if (err)
-		return err;
-
-	return ufshcd_dev_cmd_completion(hba, lrbp);
+	return scsi_execute_cmd(hba->host->pseudo_sdev, NULL, REQ_OP_DRV_OUT,
+				NULL, 0, timeout, 0, &args.args);
 }
 
 /**
@@ -5667,6 +5589,10 @@ void ufshcd_compl_one_cqe(struct ufs_hba *hba, int task_tag,
 	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
 	enum utp_ocs ocs;
 
+	if (WARN_ONCE(!cmd, "cqe->command_desc_base_addr = %#llx\n",
+		      le64_to_cpu(cqe->command_desc_base_addr)))
+		return;
+
 	if (hba->monitor.enabled) {
 		lrbp->compl_time_stamp = ktime_get();
 		lrbp->compl_time_stamp_local_clock = local_clock();
@@ -5677,15 +5603,20 @@ void ufshcd_compl_one_cqe(struct ufs_hba *hba, int task_tag,
 		ufshcd_add_command_trace(hba, cmd, UFS_CMD_COMP);
 		cmd->result = ufshcd_transfer_rsp_status(hba, cmd, cqe);
 		ufshcd_release_scsi_cmd(hba, cmd);
-		/* Do not touch lrbp after scsi done */
-		scsi_done(cmd);
 	} else {
 		if (cqe) {
 			ocs = le32_to_cpu(cqe->status) & MASK_OCS;
 			lrbp->utr_descriptor_ptr->header.ocs = ocs;
+		} else {
+			ocs = lrbp->utr_descriptor_ptr->header.ocs;
 		}
-		complete(&hba->dev_cmd.complete);
+		cmd->result = ocs;
+		ufshcd_add_query_upiu_trace(hba,
+			ocs == OCS_SUCCESS ? UFS_QUERY_COMP : UFS_QUERY_ERR,
+			(struct utp_upiu_req *)lrbp->ucd_rsp_ptr);
 	}
+	/* Do not touch lrbp after scsi_done() has been called. */
+	scsi_done(cmd);
 }
 
 /**
@@ -7460,6 +7391,12 @@ static int ufshcd_issue_devman_upiu_cmd(struct ufs_hba *hba,
 {
 	int err, copy_result_err = 0;
 	const struct ufshcd_exec_devman_upiu_cmd_args args = {
+		.args = {
+			.init_cmd = ufshcd_init_upiu_cmd,
+			.copy_result = ufshcd_copy_upiu_cmd_result,
+			.req_flags = BLK_MQ_REQ_RESERVED | BLK_MQ_REQ_NOWAIT,
+			.specify_hctx = true,
+		},
 		.hba = hba,
 		.req_upiu = req_upiu,
 		.rsp_upiu = rsp_upiu,
@@ -7469,22 +7406,13 @@ static int ufshcd_issue_devman_upiu_cmd(struct ufs_hba *hba,
 		.desc_op = desc_op,
 		.err = &copy_result_err,
 	};
-	const u32 tag = hba->reserved_slot;
-	struct scsi_cmnd *cmd = ufshcd_tag_to_cmd(hba, tag);
 
-	/* Protects use of hba->reserved_slot. */
+	/* Protects use of hba->dev_cmd. */
 	lockdep_assert_held(&hba->dev_cmd.lock);
 
-	err = ufshcd_init_upiu_cmd(cmd, &args.args);
-	WARN_ON_ONCE(err);
-
-	err = ufshcd_issue_dev_cmd(hba, cmd, tag, dev_cmd_timeout);
-	if (err)
-		return err;
-
-	ufshcd_copy_upiu_cmd_result(cmd, &args.args);
-
-	return copy_result_err;
+	err = scsi_execute_cmd(hba->host->pseudo_sdev, NULL, REQ_OP_DRV_OUT,
+			       NULL, 0, dev_cmd_timeout, 0, &args.args);
+	return err ?: copy_result_err;
 }
 
 /**
@@ -7666,6 +7594,12 @@ int ufshcd_advanced_rpmb_req_handler(struct ufs_hba *hba, struct utp_upiu_req *r
 {
 	int err, upiu_result = 0;
 	const struct ufshcd_rpmb_args args = {
+		.args = {
+			.init_cmd = ufshcd_init_rpmb,
+			.copy_result = ufshcd_copy_rpmb_result,
+			.req_flags = BLK_MQ_REQ_RESERVED | BLK_MQ_REQ_NOWAIT,
+			.specify_hctx = true,
+		},
 		.hba = hba,
 		.req_upiu = req_upiu,
 		.rsp_upiu = rsp_upiu,
@@ -7676,22 +7610,12 @@ int ufshcd_advanced_rpmb_req_handler(struct ufs_hba *hba, struct utp_upiu_req *r
 		.dir = dir,
 		.upiu_result = &upiu_result,
 	};
-	const u32 tag = hba->reserved_slot;
-	struct scsi_cmnd *cmd = ufshcd_tag_to_cmd(hba, tag);
 
-	/* Protects use of hba->reserved_slot. */
 	ufshcd_dev_man_lock(hba);
 
-	err = ufshcd_init_rpmb(cmd, &args.args);
-	WARN_ON_ONCE(err);
+	err = scsi_execute_cmd(hba->host->pseudo_sdev, NULL, REQ_OP_DRV_OUT,
+			NULL, 0, ADVANCED_RPMB_REQ_TIMEOUT, 0, &args.args);
 
-	err = ufshcd_issue_dev_cmd(hba, cmd, tag, ADVANCED_RPMB_REQ_TIMEOUT);
-	if (err)
-		goto unlock;
-
-	ufshcd_copy_rpmb_result(cmd, &args.args);
-
-unlock:
 	ufshcd_dev_man_unlock(hba);
 
 	return err ?: upiu_result;
@@ -7862,7 +7786,8 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 {
 	struct Scsi_Host *host = cmd->device->host;
 	struct ufs_hba *hba = shost_priv(host);
-	int tag = scsi_cmd_to_rq(cmd)->tag;
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	int tag = rq->tag;
 	struct ufshcd_lrb *lrbp = scsi_cmd_priv(cmd);
 	unsigned long flags;
 	int err = FAILED;
@@ -7892,7 +7817,8 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 	 * to reduce repeated printouts. For other aborted requests only print
 	 * basic details.
 	 */
-	scsi_print_command(cmd);
+	if (ufshcd_is_scsi_cmd(cmd))
+		scsi_print_command(cmd);
 	if (!hba->req_abort_count) {
 		ufshcd_update_evt_hist(hba, UFS_EVT_ABORT, tag);
 		ufshcd_print_evt_hist(hba);
@@ -7944,7 +7870,10 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 		goto release;
 	}
 
-	err = ufshcd_try_to_abort_task(hba, tag);
+	if (blk_mq_is_reserved_rq(rq))
+		err = ufshcd_clear_cmd(hba, tag);
+	else
+		err = ufshcd_try_to_abort_task(hba, tag);
 	if (err) {
 		dev_err(hba->dev, "%s: failed with err %d\n", __func__, err);
 		ufshcd_set_req_abort_skip(hba, hba->outstanding_reqs);
@@ -9072,7 +9001,6 @@ static int ufshcd_alloc_mcq(struct ufs_hba *hba)
 
 	hba->host->can_queue = hba->nutrs - UFSHCD_NUM_RESERVED;
 	hba->host->nr_reserved_cmds = UFSHCD_NUM_RESERVED;
-	hba->reserved_slot = 0;
 
 	return 0;
 err:
@@ -9318,6 +9246,7 @@ static const struct scsi_host_template ufshcd_driver_template = {
 	.cmd_size		= sizeof(struct ufshcd_lrb),
 	.init_cmd_priv		= ufshcd_init_cmd_priv,
 	.queuecommand		= ufshcd_queuecommand,
+	.queue_reserved_command	= ufshcd_queue_reserved_command,
 	.mq_poll		= ufshcd_poll,
 	.sdev_init		= ufshcd_sdev_init,
 	.sdev_configure		= ufshcd_sdev_configure,
@@ -10859,8 +10788,6 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	hba->spm_lvl = ufs_get_desired_pm_lvl_for_dev_link_state(
 						UFS_SLEEP_PWR_MODE,
 						UIC_LINK_HIBERN8_STATE);
-
-	init_completion(&hba->dev_cmd.complete);
 
 	err = ufshcd_hba_init(hba);
 	if (err)
