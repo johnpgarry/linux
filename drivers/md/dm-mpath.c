@@ -343,6 +343,8 @@ static int __pg_init_all_paths(struct multipath *m)
 		/* Skip failed paths */
 		if (!pgpath->is_active)
 			continue;
+		pr_err("%s calling queue_delayed_work for &pgpath->activate_path pgpath=%pS m=%pS\n",
+			__func__, pgpath, m);
 		if (queue_delayed_work(kmpath_handlerd, &pgpath->activate_path,
 				       pg_init_delay))
 			atomic_inc(&m->pg_init_in_progress);
@@ -388,16 +390,24 @@ static struct pgpath *choose_path_in_pg(struct multipath *m,
 	struct dm_path *path;
 	struct pgpath *pgpath;
 
+	pr_err("%s m=%pS pg=%pS nr_bytes=%zd calling pg->ps.type->select_path=%pS\n",
+		__func__, m, pg, nr_bytes, pg->ps.type->select_path);
 	path = pg->ps.type->select_path(&pg->ps, nr_bytes);
 	if (!path)
 		return ERR_PTR(-ENXIO);
 
+	pr_err("%s2 m=%pS pg=%pS nr_bytes=%zd path=%pS\n",
+		__func__, m, pg, nr_bytes, path);
 	pgpath = path_to_pgpath(path);
+	pr_err("%s3 m=%pS pg=%pS nr_bytes=%zd path=%pS pgpath=%pS m->current_pg=%pS m->current_pgpath=%pS\n",
+		__func__, m, pg, nr_bytes, path, pgpath, m->current_pg, m->current_pgpath);
 
 	if (unlikely(READ_ONCE(m->current_pg) != pg)) {
 		/* Only update current_pgpath if pg changed */
 		spin_lock_irqsave(&m->lock, flags);
 		m->current_pgpath = pgpath;
+		pr_err("%s4 m=%pS pg=%pS nr_bytes=%zd path=%pS pgpath=%pS m->current_pg=%pS set m->current_pgpath=%pS\n",
+			__func__, m, pg, nr_bytes, path, pgpath, m->current_pg, m->current_pgpath);
 		__switch_pg(m, pg);
 		spin_unlock_irqrestore(&m->lock, flags);
 	}
@@ -412,7 +422,8 @@ static struct pgpath *choose_pgpath(struct multipath *m, size_t nr_bytes)
 	struct pgpath *pgpath;
 	unsigned int bypassed = 1;
 
-	pr_err("%s m=%pS nr_bytes=%zd\n", __func__, m, nr_bytes);
+	pr_err("%s m=%pS (nr_valid_paths=%d) nr_bytes=%zd\n",
+		__func__, m, atomic_read(&m->nr_valid_paths), nr_bytes);
 	if (!atomic_read(&m->nr_valid_paths)) {
 		spin_lock_irqsave(&m->lock, flags);
 		clear_bit(MPATHF_QUEUE_IO, &m->flags);
@@ -522,12 +533,12 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	struct request_queue *q;
 	struct request *clone;
 
-	if (rq && rq->bio && rq->bio->directio)
-		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d)\n",
-			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
 
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
+	if (rq && rq->bio && rq->bio->directio)
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) pgpath=%pS\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
 		pgpath = choose_pgpath(m, nr_bytes);
 
@@ -547,6 +558,9 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 
 	bdev = pgpath->path.dev->bdev;
 	q = bdev_get_queue(bdev);
+	if (rq && rq->bio && rq->bio->directio)
+		pr_err("%s2 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) pgpath=%pS bdev=%pS q=%pS\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, pgpath, bdev, q);
 	clone = blk_mq_alloc_request(q, rq->cmd_flags | REQ_NOMERGE,
 			BLK_MQ_REQ_NOWAIT);
 
@@ -577,7 +591,7 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	*__clone = clone;
 
 	if ((rq && rq->bio && rq->bio->directio) || (rq && rq->directio))
-		pr_err("%s2 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) clone=%pS (bio=%pS) pgpath->pg->ps.type->start_io=%pS\n",
+		pr_err("%s4 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) clone=%pS (bio=%pS) pgpath->pg->ps.type->start_io=%pS\n",
 			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size,
 			clone, clone->bio,
 			pgpath->pg->ps.type->start_io);
@@ -972,6 +986,8 @@ static struct pgpath *parse_path(struct dm_arg_set *as, struct path_selector *ps
 	struct request_queue *q;
 	const char *attached_handler_name = NULL;
 
+	pr_err("%s as=%pS m=%pS ps=%pS ti=%pS\n",
+		__func__, as, m, ps, ti);
 	/* we need at least a path arg */
 	if (as->argc < 1) {
 		ti->error = "no device given";
@@ -990,9 +1006,13 @@ static struct pgpath *parse_path(struct dm_arg_set *as, struct path_selector *ps
 	}
 
 	q = bdev_get_queue(p->path.dev->bdev);
+	pr_err("%s2 as=%pS m=%pS ps=%pS ti=%pS q=%pS p->path.dev->bdev=%pS attached_handler_name=%s m->hw_handler_name=%s\n",
+		__func__, as, m, ps, ti, q, p->path.dev->bdev, attached_handler_name, m->hw_handler_name);
 	attached_handler_name = scsi_dh_attached_handler_name(q, GFP_KERNEL);
 	if (attached_handler_name || m->hw_handler_name) {
 		INIT_DELAYED_WORK(&p->activate_path, activate_path_work);
+		pr_err("%s3 as=%pS m=%pS ps=%pS ti=%pS q=%pS p->path.dev->bdev=%pS calling setup_scsi_dh\n",
+			__func__, as, m, ps, ti, q, p->path.dev->bdev);
 		r = setup_scsi_dh(p->path.dev->bdev, m, &attached_handler_name, &ti->error);
 		kfree(attached_handler_name);
 		if (r) {
@@ -1423,6 +1443,8 @@ static int reinstate_path(struct pgpath *pgpath)
 		m->current_pgpath = NULL;
 		run_queue = 1;
 	} else if (m->hw_handler_name && (m->current_pg == pgpath->pg)) {
+		pr_err("%s calling queue_work for &pgpath->activate_path\n",
+			__func__);
 		if (queue_work(kmpath_handlerd, &pgpath->activate_path.work))
 			atomic_inc(&m->pg_init_in_progress);
 	}
@@ -1659,10 +1681,14 @@ static void activate_or_offline_path(struct pgpath *pgpath)
 {
 	struct request_queue *q = bdev_get_queue(pgpath->path.dev->bdev);
 
-	if (pgpath->is_active && !blk_queue_dying(q))
+	if (pgpath->is_active && !blk_queue_dying(q)) {
+		pr_err("%s q=%pS pgpath=%pS calling scsi_dh_activate\n", __func__, q, pgpath);
 		scsi_dh_activate(q, pg_init_done, pgpath);
-	else
+	}
+	else {
+		pr_err("%s1 q=%pS pgpath=%pS calling pg_init_done SCSI_DH_DEV_OFFLINED\n", __func__, q, pgpath);
 		pg_init_done(pgpath, SCSI_DH_DEV_OFFLINED);
+	}
 }
 
 static void activate_path_work(struct work_struct *work)
@@ -1670,6 +1696,7 @@ static void activate_path_work(struct work_struct *work)
 	struct pgpath *pgpath =
 		container_of(work, struct pgpath, activate_path.work);
 
+	pr_err("%s calling activate_or_offline_path pgpath=%pS\n", __func__, pgpath);
 	activate_or_offline_path(pgpath);
 }
 
@@ -2247,11 +2274,12 @@ static int multipath_iterate_devices(struct dm_target *ti,
 	struct pgpath *p;
 	int ret = 0;
 
-	pr_err("%s m=%pS\n", __func__, m);
+	pr_err("%s m=%pS fn=%pS\n", __func__, m, fn);
 
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(p, &pg->pgpaths, list) {
-			pr_err("%s2 m=%pS p=%pS pg=%pS\n", __func__, m, p, pg);
+			pr_err("%s2 m=%pS p=%pS pg=%pS fn=%pS begin=%lld len=%lld\n",
+				__func__, m, p, pg, fn, ti->begin, ti->len);
 			ret = fn(ti, p->path.dev, ti->begin, ti->len, data);
 			if (ret)
 				goto out;

@@ -260,7 +260,7 @@ int scsi_dh_activate(struct request_queue *q, activate_complete fn, void *data)
 	struct scsi_device *sdev;
 	int err = SCSI_DH_NOSYS;
 
-	WARN_ON_ONCE(1);
+	//WARN_ON_ONCE(1);
 	sdev = scsi_device_from_queue(q);
 	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS q=%pS\n", __func__, sdev, q);
 	if (!sdev) {

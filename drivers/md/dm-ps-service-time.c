@@ -282,12 +282,20 @@ static struct dm_path *st_select_path(struct path_selector *ps, size_t nr_bytes)
 	unsigned long flags;
 
 	spin_lock_irqsave(&s->lock, flags);
+	pr_err("%s s=%pS ps=%pS nr_bytes=%zd list_empty(&s->valid_paths)=%d\n",
+		__func__, s, ps, nr_bytes, list_empty(&s->valid_paths));
 	if (list_empty(&s->valid_paths))
 		goto out;
 
-	list_for_each_entry(pi, &s->valid_paths, list)
-		if (!best || (st_compare_load(pi, best, nr_bytes) < 0))
+	list_for_each_entry(pi, &s->valid_paths, list) {
+		pr_err("%s2 looping pi=%pS (repeat_count=%d relative_throughput=%d in_flight_size=%d) s=%pS ps=%pS nr_bytes=%zd \n",
+			__func__, pi, pi->repeat_count, pi->relative_throughput, atomic_read(&pi->in_flight_size), s, ps, nr_bytes);
+		if (!best || (st_compare_load(pi, best, nr_bytes) < 0)) {
+			pr_err("%s2 updating best pi=%pS (repeat_count=%d relative_throughput=%d in_flight_size=%d) s=%pS ps=%pS nr_bytes=%zd \n",
+			__func__, pi, pi->repeat_count, pi->relative_throughput, atomic_read(&pi->in_flight_size), s, ps, nr_bytes);
 			best = pi;
+		}
+	}
 
 	if (!best)
 		goto out;
@@ -298,6 +306,8 @@ static struct dm_path *st_select_path(struct path_selector *ps, size_t nr_bytes)
 	ret = best->path;
 out:
 	spin_unlock_irqrestore(&s->lock, flags);
+	pr_err("%s10 ret=%pS\n",
+			__func__, ret);
 	return ret;
 }
 

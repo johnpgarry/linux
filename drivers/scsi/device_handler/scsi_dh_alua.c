@@ -242,6 +242,9 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 	pg->group_id = group_id;
 	pg->tpgs = tpgs;
 	pg->state = SCSI_ACCESS_STATE_OPTIMAL;
+	sdev_printk(KERN_ERR, sdev,
+							"%s2 sdev=%pS pg=%pS pg->state=%d OPTIMAL=%d\n",
+					 __func__, sdev, pg, pg->state, SCSI_ACCESS_STATE_OPTIMAL);
 	pg->valid_states = TPGS_SUPPORT_ALL;
 	if (optimize_stpg)
 		pg->flags |= ALUA_OPTIMIZE_STPG;
@@ -439,6 +442,7 @@ static void alua_handle_state_transition(struct scsi_device *sdev)
 
 	rcu_read_lock();
 	pg = rcu_dereference(h->pg);
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS pg=%pS\n", __func__, sdev, pg);
 	if (pg)
 		pg->state = SCSI_ACCESS_STATE_TRANSITIONING;
 	rcu_read_unlock();
@@ -569,6 +573,9 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	state_old = pg->state;
 	pref_old = pg->pref;
 	valid_states_old = pg->valid_states;
+	sdev_printk(KERN_ERR, sdev,
+				    "%s: sdev=%pS pg=%pS\n",
+				    __func__, sdev, pg);
 
 	if (!pg->expiry) {
 		unsigned long transition_tmo = ALUA_FAILOVER_TIMEOUT * HZ;
@@ -713,6 +720,10 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 					struct alua_dh_data *h;
 
 					tmp_pg->state = desc[0] & 0x0f;
+
+					sdev_printk(KERN_ERR, sdev,
+								    "%s2 sdev=%pS pg=%pS tmp_pg=%pS tmp_pg->state=%d\n",
+								    __func__, sdev, pg, tmp_pg, tmp_pg->state);
 					tmp_pg->pref = desc[0] >> 7;
 					rcu_read_lock();
 					list_for_each_entry_rcu(h,
@@ -734,8 +745,12 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  skip_rtpg:
 	spin_lock_irqsave(&pg->lock, flags);
-	if (transitioning_sense)
+	if (transitioning_sense) {
 		pg->state = SCSI_ACCESS_STATE_TRANSITIONING;
+		sdev_printk(KERN_ERR, sdev,
+						"%s3 sdev=%pS pg=%pS pg->state=%d TRANSITIONING=%d\n",
+				 __func__, sdev, pg, pg->state, SCSI_ACCESS_STATE_TRANSITIONING);
+	}
 
 	if (group_id_old != pg->group_id || state_old != pg->state ||
 		pref_old != pg->pref || valid_states_old != pg->valid_states)
@@ -763,6 +778,9 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			/* Transitioning time exceeded, set port to standby */
 			err = SCSI_DH_IO;
 			pg->state = SCSI_ACCESS_STATE_STANDBY;
+			sdev_printk(KERN_ERR, sdev,
+							"%s4 sdev=%pS pg=%pS pg->state=%d STANDBY=%d\n",
+					 __func__, sdev, pg, pg->state, SCSI_ACCESS_STATE_STANDBY);
 			pg->expiry = 0;
 			rcu_read_lock();
 			list_for_each_entry_rcu(h, &pg->dh_list, node) {
@@ -1165,7 +1183,7 @@ static int alua_activate(struct scsi_device *sdev,
 	struct alua_port_group *pg;
 
 
-	WARN_ON_ONCE(1);
+	//WARN_ON_ONCE(1);
 	sdev_printk(KERN_ERR, sdev, "%s fn=%pS\n", __func__, fn);
 	qdata = kzalloc(sizeof(*qdata), GFP_KERNEL);
 	if (!qdata) {
@@ -1238,8 +1256,11 @@ static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 
 	rcu_read_lock();
 	pg = rcu_dereference(h->pg);
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS req=%pS pg=%pS\n", __func__, sdev, req, pg);
 	if (pg)
 		state = pg->state;
+	sdev_printk(KERN_ERR, sdev, "%s2 sdev=%pS req=%pS pg=%pS state=%d OPTIMAL=%d\n",
+		__func__, sdev, req, pg, state, SCSI_ACCESS_STATE_OPTIMAL);
 	rcu_read_unlock();
 
 	switch (state) {

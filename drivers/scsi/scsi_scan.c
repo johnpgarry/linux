@@ -344,6 +344,9 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 		kfree(sdev);
 		goto out;
 	}
+	sdev_printk(KERN_ERR, sdev,
+				"%s called blk_mq_alloc_queue q=%pS sdev=%pS\n",
+				__func__, q, sdev);
 	kref_get(&sdev->host->tagset_refcnt);
 	sdev->request_queue = q;
 
