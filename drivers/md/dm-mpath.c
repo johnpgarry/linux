@@ -412,6 +412,7 @@ static struct pgpath *choose_pgpath(struct multipath *m, size_t nr_bytes)
 	struct pgpath *pgpath;
 	unsigned int bypassed = 1;
 
+	pr_err("%s m=%pS nr_bytes=%zd\n", __func__, m, nr_bytes);
 	if (!atomic_read(&m->nr_valid_paths)) {
 		spin_lock_irqsave(&m->lock, flags);
 		clear_bit(MPATHF_QUEUE_IO, &m->flags);
@@ -2185,15 +2186,25 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 	}
 
 	pgpath = READ_ONCE(m->current_pgpath);
+	pr_err("%s1 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS\n",
+		__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
 		pgpath = choose_pgpath(m, 0);
+	pr_err("%s2 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS\n",
+		__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath);
 
 	if (pgpath) {
+		pr_err("%s3 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d)\n",
+			__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath, pgpath->is_active);
 		if (!mpath_double_check_test_bit(MPATHF_QUEUE_IO, m)) {
 			*bdev = pgpath->path.dev->bdev;
+			pr_err("%s3 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d) *bdev=%pS mpath_double_check_test_bit unset\n",
+				__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath, pgpath->is_active, *bdev);
 			r = 0;
 		} else {
 			/* pg_init has not started or completed */
+			pr_err("%s3.1 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d) *bdev=%pS has not started or completed\n",
+				__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath, pgpath->is_active, *bdev);
 			r = -ENOTCONN;
 		}
 	} else {
@@ -2205,9 +2216,11 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 		spin_unlock_irq(&m->lock);
 	}
 
+	pr_err("%s4 r=%d\n", __func__, r);
 	if (r == -ENOTCONN) {
 		if (!READ_ONCE(m->current_pg)) {
 			/* Path status changed, redo selection */
+			pr_err("%s4.1 calling choose_pgpath r=%d\n", __func__, r);
 			(void) choose_pgpath(m, 0);
 		}
 		spin_lock_irq(&m->lock);

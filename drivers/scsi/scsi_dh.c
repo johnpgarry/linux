@@ -72,6 +72,8 @@ scsi_dh_find_driver(struct scsi_device *sdev)
 {
 	const struct scsi_dh_blist *b;
 
+	sdev_printk(KERN_ERR, sdev, "%s scsi_device_tpgs=%d (alua returned for true) sdev->vendor=%s, model=%s\n", __func__,
+		scsi_device_tpgs(sdev), sdev->vendor, sdev->model);
 	if (scsi_device_tpgs(sdev))
 		return "alua";
 
@@ -172,9 +174,14 @@ void scsi_dh_add_device(struct scsi_device *sdev)
 	struct scsi_device_handler *devinfo = NULL;
 	const char *drv;
 
+	sdev_printk(KERN_ERR, sdev, "%s calling scsi_dh_find_driver\n", __func__);
 	drv = scsi_dh_find_driver(sdev);
+	sdev_printk(KERN_ERR, sdev, "%s0 called scsi_dh_find_driver drv=%pS\n",
+		__func__, drv);
 	if (drv)
 		devinfo = __scsi_dh_lookup(drv);
+	sdev_printk(KERN_ERR, sdev, "%s1 called __scsi_dh_lookup devinfo=%pS\n",
+		__func__, drv);
 	/*
 	 * device_handler is optional, so ignore errors
 	 * from scsi_dh_handler_attach()
@@ -253,7 +260,9 @@ int scsi_dh_activate(struct request_queue *q, activate_complete fn, void *data)
 	struct scsi_device *sdev;
 	int err = SCSI_DH_NOSYS;
 
+	WARN_ON_ONCE(1);
 	sdev = scsi_device_from_queue(q);
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS q=%pS\n", __func__, sdev, q);
 	if (!sdev) {
 		if (fn)
 			fn(data, err);
@@ -271,6 +280,7 @@ int scsi_dh_activate(struct request_queue *q, activate_complete fn, void *data)
 	if (sdev->sdev_state == SDEV_OFFLINE)
 		goto out_fn;
 
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS q=%pS sdev->handler->activate=%pS\n", __func__, sdev, q, sdev->handler->activate);
 	if (sdev->handler->activate)
 		err = sdev->handler->activate(sdev, fn, data);
 

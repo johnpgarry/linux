@@ -3427,10 +3427,12 @@ int scsi_vpd_tpg_id(struct scsi_device *sdev, int *rel_id)
 		case 0x4:
 			/* Relative target port */
 			rel_port = get_unaligned_be16(&d[6]);
+			sdev_printk(KERN_ERR, sdev, "%s Relative target port rel_port=%d\n", __func__, rel_port);
 			break;
 		case 0x5:
 			/* Target port group */
 			group_id = get_unaligned_be16(&d[6]);
+			sdev_printk(KERN_ERR, sdev, "%s2 Target port group group_id=%d\n", __func__, group_id);
 			break;
 		default:
 			break;
