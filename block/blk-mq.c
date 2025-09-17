@@ -3362,9 +3362,13 @@ int blk_rq_prep_clone(struct request *rq, struct request *rq_src,
 			rq->biotail = bio;
 		} else {
 			rq->bio = rq->biotail = bio;
-			rq->directio = bio->directio;
+			if (bio->directio)
+				rq->directio = bio->directio;
 		}
 	}
+
+	if (rq_src->directio)
+		rq->directio = rq_src->directio;
 
 	/* Copy attributes of the original request to the clone request. */
 	rq->__sector = blk_rq_pos(rq_src);

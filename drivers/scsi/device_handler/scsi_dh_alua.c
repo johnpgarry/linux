@@ -1256,11 +1256,11 @@ static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 
 	rcu_read_lock();
 	pg = rcu_dereference(h->pg);
-	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS req=%pS pg=%pS\n", __func__, sdev, req, pg);
+//	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS req=%pS pg=%pS\n", __func__, sdev, req, pg);
 	if (pg)
 		state = pg->state;
-	sdev_printk(KERN_ERR, sdev, "%s2 sdev=%pS req=%pS pg=%pS state=%d OPTIMAL=%d\n",
-		__func__, sdev, req, pg, state, SCSI_ACCESS_STATE_OPTIMAL);
+//	sdev_printk(KERN_ERR, sdev, "%s2 sdev=%pS req=%pS pg=%pS state=%d OPTIMAL=%d\n",
+//		__func__, sdev, req, pg, state, SCSI_ACCESS_STATE_OPTIMAL);
 	rcu_read_unlock();
 
 	switch (state) {

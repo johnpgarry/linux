@@ -390,24 +390,24 @@ static struct pgpath *choose_path_in_pg(struct multipath *m,
 	struct dm_path *path;
 	struct pgpath *pgpath;
 
-	pr_err("%s m=%pS pg=%pS nr_bytes=%zd calling pg->ps.type->select_path=%pS\n",
-		__func__, m, pg, nr_bytes, pg->ps.type->select_path);
+//	pr_err("%s m=%pS pg=%pS nr_bytes=%zd calling pg->ps.type->select_path=%pS\n",
+//		__func__, m, pg, nr_bytes, pg->ps.type->select_path);
 	path = pg->ps.type->select_path(&pg->ps, nr_bytes);
 	if (!path)
 		return ERR_PTR(-ENXIO);
 
-	pr_err("%s2 m=%pS pg=%pS nr_bytes=%zd path=%pS\n",
-		__func__, m, pg, nr_bytes, path);
+//	pr_err("%s2 m=%pS pg=%pS nr_bytes=%zd path=%pS\n",
+//		__func__, m, pg, nr_bytes, path);
 	pgpath = path_to_pgpath(path);
-	pr_err("%s3 m=%pS pg=%pS nr_bytes=%zd path=%pS pgpath=%pS m->current_pg=%pS m->current_pgpath=%pS\n",
-		__func__, m, pg, nr_bytes, path, pgpath, m->current_pg, m->current_pgpath);
+//	pr_err("%s3 m=%pS pg=%pS nr_bytes=%zd path=%pS pgpath=%pS m->current_pg=%pS m->current_pgpath=%pS\n",
+//		__func__, m, pg, nr_bytes, path, pgpath, m->current_pg, m->current_pgpath);
 
 	if (unlikely(READ_ONCE(m->current_pg) != pg)) {
 		/* Only update current_pgpath if pg changed */
 		spin_lock_irqsave(&m->lock, flags);
 		m->current_pgpath = pgpath;
-		pr_err("%s4 m=%pS pg=%pS nr_bytes=%zd path=%pS pgpath=%pS m->current_pg=%pS set m->current_pgpath=%pS\n",
-			__func__, m, pg, nr_bytes, path, pgpath, m->current_pg, m->current_pgpath);
+//		pr_err("%s4 m=%pS pg=%pS nr_bytes=%zd path=%pS pgpath=%pS m->current_pg=%pS set m->current_pgpath=%pS\n",
+//			__func__, m, pg, nr_bytes, path, pgpath, m->current_pg, m->current_pgpath);
 		__switch_pg(m, pg);
 		spin_unlock_irqrestore(&m->lock, flags);
 	}
@@ -422,8 +422,8 @@ static struct pgpath *choose_pgpath(struct multipath *m, size_t nr_bytes)
 	struct pgpath *pgpath;
 	unsigned int bypassed = 1;
 
-	pr_err("%s m=%pS (nr_valid_paths=%d) nr_bytes=%zd\n",
-		__func__, m, atomic_read(&m->nr_valid_paths), nr_bytes);
+//	pr_err("%s m=%pS (nr_valid_paths=%d) nr_bytes=%zd\n",
+//		__func__, m, atomic_read(&m->nr_valid_paths), nr_bytes);
 	if (!atomic_read(&m->nr_valid_paths)) {
 		spin_lock_irqsave(&m->lock, flags);
 		clear_bit(MPATHF_QUEUE_IO, &m->flags);
@@ -1706,6 +1706,18 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 	struct dm_mpath_io *mpio = get_mpio(map_context);
 	struct pgpath *pgpath = mpio->pgpath;
 	int r = DM_ENDIO_DONE;
+	bool print = false;
+
+	if (clone->bio && clone->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s clone=%pS (bio=%pS bi_sector=%lld bi_size=%d) ti=%pS error=%d\n",
+			__func__, clone, clone->bio, clone->bio->bi_iter.bi_sector, clone->bio->bi_iter.bi_size, ti, error);
+		print = true;
+	} else if (clone->directio) {
+		pr_err("%s clone=%pS (bio=%pS) ti=%pS error=%d\n",
+			__func__, clone, clone->bio, ti, error);
+		print = true;
+	}
 
 	/*
 	 * We don't queue any clone request inside the multipath target
@@ -1741,6 +1753,9 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 	if (pgpath) {
 		struct path_selector *ps = &pgpath->pg->ps;
 
+		if (print)
+			pr_err("%s2 clone=%pS (bio=%pS) ti=%pS error=%d ps->type->end_io=%pS\n",
+						__func__, clone, clone->bio, ti, error, ps->type->end_io);
 		if (ps->type->end_io)
 			ps->type->end_io(ps, &pgpath->path, mpio->nr_bytes,
 					 clone->io_start_time_ns);
@@ -1757,6 +1772,13 @@ static int multipath_end_io_bio(struct dm_target *ti, struct bio *clone,
 	struct pgpath *pgpath = mpio->pgpath;
 	unsigned long flags;
 	int r = DM_ENDIO_DONE;
+	bool print = false;
+
+	if (clone->directio) {
+		pr_err("%s clone=%pS ti=%pS error=%pS\n",
+			__func__, clone, ti, error);
+		print = true;
+	}
 
 	if (!*error || !blk_path_error(*error))
 		goto done;

@@ -206,10 +206,26 @@ static void dm_done(struct request *clone, blk_status_t error, bool mapped)
 	int r = DM_ENDIO_DONE;
 	struct dm_rq_target_io *tio = clone->end_io_data;
 	dm_request_endio_fn rq_end_io = NULL;
+	bool print = false;
+
+	if (clone->bio && clone->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s clone=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS tio->ti=%pS\n",
+			__func__, clone, clone->bio, clone->bio->bi_iter.bi_sector, clone->bio->bi_iter.bi_size, tio, tio->ti);
+		print = true;
+	} else if (clone->directio) {
+		pr_err("%s clone=%pS (bio=%pS) tio=%pS tio->ti=%pS\n",
+			__func__, clone, clone->bio, tio, tio->ti);
+		print = true;
+	}
+	
 
 	if (tio->ti) {
 		rq_end_io = tio->ti->type->rq_end_io;
 
+		if (print)
+			pr_err("%s2 mapped=%d rq_end_io=%pS\n",
+				__func__, mapped, rq_end_io);
 		if (mapped && rq_end_io)
 			r = rq_end_io(tio->ti, clone, error, &tio->info);
 	}
@@ -223,6 +239,9 @@ static void dm_done(struct request *clone, blk_status_t error, bool mapped)
 			blk_queue_disable_write_zeroes(tio->md->queue);
 	}
 
+	if (print)
+		pr_err("%s3 clone=%pS r=%d DM_ENDIO_INCOMPLETE=%d\n",
+			__func__, clone, r, DM_ENDIO_INCOMPLETE);
 	switch (r) {
 	case DM_ENDIO_DONE:
 		/* The target wants to complete the I/O */
@@ -262,6 +281,14 @@ static void dm_softirq_done(struct request *rq)
 		rq_completed(md);
 		return;
 	}
+	if (clone->bio && clone->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s clone=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS\n",
+			__func__, clone, clone->bio, clone->bio->bi_iter.bi_sector, clone->bio->bi_iter.bi_size, tio);
+	} else if (clone->directio) {
+		pr_err("%s clone=%pS (bio=%pS) tio=%pS\n",
+			__func__, rq, rq->bio, tio);
+	}
 
 	if (rq->rq_flags & RQF_FAILED)
 		mapped = false;
@@ -277,6 +304,21 @@ static void dm_complete_request(struct request *rq, blk_status_t error)
 {
 	struct dm_rq_target_io *tio = tio_from_request(rq);
 
+	if (rq->bio && (rq->bio->directio || rq->directio))
+		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d)\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size);
+	else if (rq->directio)
+		pr_err("%s2 rq=%pS\n",
+			__func__, rq);
+
+	if (rq->bio && rq->bio->directio) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s3 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS\n",
+			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, tio);
+	} else if (rq->directio) {
+		pr_err("%s4 rq=%pS (bio=%pS) tio=%pS\n",
+			__func__, rq, rq->bio, tio);
+	}
 	tio->error = error;
 	if (likely(!blk_should_fake_timeout(rq->q)))
 		blk_mq_complete_request(rq);
@@ -298,6 +340,13 @@ static enum rq_end_io_ret end_clone_request(struct request *clone,
 					    blk_status_t error)
 {
 	struct dm_rq_target_io *tio = clone->end_io_data;
+
+	if (clone && clone->bio && (clone->bio->directio || clone->directio)) {
+		pr_err("%s1 clone=%pS (bio=%pS bi_sector=%lld bi_size=%d) calling dm_complete_request tio->orig=%pS\n",
+			__func__, clone, clone->bio, clone->bio->bi_iter.bi_sector, clone->bio->bi_iter.bi_size, tio->orig);
+	} else if (clone->directio)
+		pr_err("%s1 clone=%pS calling dm_complete_request tio->orig=%pS\n",
+			__func__, clone, tio->orig);
 
 	dm_complete_request(tio->orig, error);
 	return RQ_END_IO_NONE;
@@ -348,6 +397,8 @@ static int setup_clone(struct request *clone, struct request *rq,
 	clone->end_io_data = tio;
 
 	tio->clone = clone;
+	if (rq->directio)
+		clone->directio = rq->directio;
 
 	return 0;
 }
@@ -533,7 +584,7 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS\n",
 			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, tio);
 	} else if (rq->directio) {
-		pr_err("%s0 rq=%pS (bio=%pS) tio=%pS\n",
+		pr_err("%s rq=%pS (bio=%pS) tio=%pS\n",
 			__func__, rq, rq->bio, tio);
 	}
 
@@ -565,7 +616,7 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	if (rq->bio && rq->bio->directio) {
 	//	WARN_ON_ONCE(1);
-		pr_err("%s rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS calling dm_start_request\n",
+		pr_err("%s0 rq=%pS (bio=%pS bi_sector=%lld bi_size=%d) tio=%pS calling dm_start_request\n",
 			__func__, rq, rq->bio, rq->bio->bi_iter.bi_sector, rq->bio->bi_iter.bi_size, tio);
 	} else if (rq->directio) {
 		pr_err("%s0 rq=%pS (bio=%pS) tio=%pS  calling dm_start_request\n",
