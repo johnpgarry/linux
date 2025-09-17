@@ -1044,6 +1044,10 @@ sbc_parse_cdb(struct se_cmd *cmd, struct exec_cmd_ops *ops)
 			return ret;
 	}
 
+	if (cmd->t_task_lba == 9960)
+		pr_err("%s cdb[0]=%d sectors=%d cmd->t_task_lba=%lld cmd->execute_cmd=%pS\n",
+			__func__, cdb[0], sectors, cmd->t_task_lba, cmd->execute_cmd);
+
 	/* reject any command that we don't have a handler for */
 	if (!cmd->execute_cmd)
 		return TCM_UNSUPPORTED_SCSI_OPCODE;
