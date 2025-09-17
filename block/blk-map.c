@@ -670,11 +670,16 @@ int blk_rq_map_kern(struct request *rq, void *kbuf, unsigned int len,
 	if (!len || !kbuf)
 		return -EINVAL;
 
-	if (!blk_rq_aligned(rq->q, addr, len) || object_is_on_stack(kbuf))
+	if (!blk_rq_aligned(rq->q, addr, len) || object_is_on_stack(kbuf)) {
+	//	pr_err("%s calling bio_copy_kern\n", __func__);
 		bio = bio_copy_kern(kbuf, len, req_op(rq), gfp_mask);
-	else
+	}
+	else {
+	//	pr_err("%s calling bio_map_kern\n", __func__);
 		bio = bio_map_kern(kbuf, len, req_op(rq), gfp_mask);
+	}
 
+	//pr_err("%s2 bio=%pS\n", __func__, bio);
 	if (IS_ERR(bio))
 		return PTR_ERR(bio);
 

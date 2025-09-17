@@ -12,9 +12,6 @@
  *  For documentation see http://sg.danny.cz/sg/scsi_debug.html
  */
 
-
-#define pr_fmt(fmt) KBUILD_MODNAME ":%s: " fmt, __func__
-
 #include <linux/module.h>
 #include <linux/align.h>
 #include <linux/kernel.h>
@@ -6728,6 +6725,128 @@ static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 
 	return false;
 }
+#if 0
+
+
+	const struct ufshcd_rpmb_args args = {
+		.args = {
+			.init_cmd = ufshcd_init_rpmb,
+			.copy_result = ufshcd_copy_rpmb_result,
+			.req_flags = BLK_MQ_REQ_RESERVED | BLK_MQ_REQ_NOWAIT,
+			.specify_hctx = true,
+		},
+		.hba = hba,
+		.req_upiu = req_upiu,
+		.rsp_upiu = rsp_upiu,
+		.req_ehs = req_ehs,
+		.rsp_ehs = rsp_ehs,
+		.sg_cnt = sg_cnt,
+		.sg_list = sg_list,
+		.dir = dir,
+		.upiu_result = &upiu_result,
+	};
+
+	ufshcd_dev_man_lock(hba);
+
+	err = scsi_execute_cmd(hba->host->pseudo_sdev, NULL, REQ_OP_DRV_OUT,
+			NULL, 0, ADVANCED_RPMB_REQ_TIMEOUT, 0, &args.args);
+
+
+int scsi_execute_cmd(struct scsi_device *sdev, const unsigned char *cmd,
+		     blk_opf_t opf, void *buffer, unsigned int bufflen,
+		     int timeout, int ml_retries,
+		     const struct scsi_exec_args *args)
+{
+
+#endif
+
+
+struct scsi_debug_abort_cmd {
+	unsigned int tag;
+	unsigned int hwq;
+};
+
+#ifdef cdfdf
+
+	bio_for_each_segment_all(bvec, bio, iter_all) {
+		ssize_t ret;
+
+		ret = copy_page_from_iter(bvec->bv_page,
+					  bvec->bv_offset,
+					  bvec->bv_len,
+					  iter);
+
+		if (!iov_iter_count(iter))
+			break;
+
+		if (ret < bvec->bv_len)
+			return -EFAULT;
+	}
+
+#endif
+
+
+enum {
+	SCSI_DEBUG_ABORT_CMD,
+
+};
+
+struct scsi_debug_reserved_data {
+	unsigned int type;
+
+	union {
+		struct scsi_debug_abort_cmd abort_cmd;
+	};
+};
+
+/*
+ * The only purpose of this function is to make the SCSI core allocate a
+ * pseudo SCSI device.
+ */
+static int scsi_debug_queue_reserved_command(struct Scsi_Host *shost,
+					     struct scsi_cmnd *scp)
+{
+	struct request *rq = scsi_cmd_to_rq(scp);
+	struct bio *bio = rq->bio;
+	__maybe_unused struct bio_vec *bvec;
+	__maybe_unused struct bvec_iter_all iter_all;
+	__maybe_unused struct iov_iter i;
+
+	struct scsi_debug_reserved_data *data = bio_data(bio);
+
+
+
+	pr_err("%s scp=%pS rq=%pS bio=%pS bi_size=%d bi_vcnt=%d data=%pS\n",
+		__func__, scp, rq, bio, bio->bi_iter.bi_size, bio->bi_vcnt, data);
+	
+	if (data)
+		pr_err("%s2 scp=%pS rq=%pS bio=%pS bi_size=%d bi_vcnt=%d data=%pS type=0x%x\n",
+			__func__, scp, rq, bio, bio->bi_iter.bi_size, bio->bi_vcnt, data, data->type);
+
+	switch (data->type) {
+	case SCSI_DEBUG_ABORT_CMD:
+		struct scsi_debug_abort_cmd *abort_cmd = &data->abort_cmd;
+		struct request *abort_rq;
+		struct Scsi_Cmnd *abort_scmd;
+		struct blk_mq_tag_set *tag_set = &shost->tag_set;
+		struct blk_mq_tags *tags;
+
+		pr_err("%s3 SCSI_DEBUG_ABORT_CMD scp=%pS rq=%pS bio=%pS bi_size=%d bi_vcnt=%d data=%pS tag=%d hwq=%d\n",
+			__func__, scp, rq, bio, bio->bi_iter.bi_size, bio->bi_vcnt, data, abort_cmd->tag, abort_cmd->hwq);
+		tags = tag_set->tags[abort_cmd->hwq];
+		pr_err("%s4 SCSI_DEBUG_ABORT_CMD tags=%pS\n", __func__, tags);
+		abort_rq = blk_mq_tag_to_rq(tags, abort_cmd->tag);
+		pr_err("%s5 SCSI_DEBUG_ABORT_CMD abort_rq=%pS\n", __func__, abort_rq);
+		abort_scmd = blk_mq_rq_to_pdu(rq);
+		pr_err("%s6 SCSI_DEBUG_ABORT_CMD abort_cmd=%pS\n", __func__, abort_cmd);
+		break;
+		default:
+	}
+
+	scp->result = DID_ERROR << 16;
+	scsi_done(scp);
+	return 0;
+}
 
 /*
  * Called from scsi_debug_abort() only, which is for timed-out cmd.
@@ -6735,12 +6854,40 @@ static bool scsi_debug_stop_cmnd(struct scsi_cmnd *cmnd)
 static bool scsi_debug_abort_cmnd(struct scsi_cmnd *cmnd)
 {
 	struct sdebug_scsi_cmd *sdsc = scsi_cmd_priv(cmnd);
+	struct request *rq = scsi_cmd_to_rq(cmnd);
+	u32 unique_tag = blk_mq_unique_tag(rq);
+	u16 hwq = blk_mq_unique_tag_to_hwq(unique_tag);
+	u16 tag = blk_mq_unique_tag_to_tag(unique_tag);
+	struct scsi_device *sdev = cmnd->device;
+	struct Scsi_Host *shost = sdev->host;
 	unsigned long flags;
 	bool res;
+	int err;
+	struct scsi_exec_args args = {
+		.req_flags = BLK_MQ_REQ_RESERVED | BLK_MQ_REQ_NOWAIT,
+	};
+
+	struct scsi_debug_reserved_data data = {
+		.type = SCSI_DEBUG_ABORT_CMD,
+		.abort_cmd = {
+			.tag = tag,
+			.hwq = hwq,
+		},
+	};
+
+
+	pr_err("%s SCpnt=%pS sdev=%pS calling scsi_execute_cmd hwq=%d tag=%d sizeof(data)=%zd\n",
+		__func__, cmnd, sdev, hwq, tag, sizeof(data));
+
+	err = scsi_execute_cmd(shost->pseudo_sdev, NULL, REQ_OP_DRV_OUT,
+			&data, sizeof(data), 3000, 0, &args);
+	pr_err("%s2 SCpnt=%pS sdev=%pS called scsi_execute_cmd err=%d\n", __func__, cmnd, sdev, err);
+
 
 	spin_lock_irqsave(&sdsc->lock, flags);
 	res = scsi_debug_stop_cmnd(cmnd);
 	spin_unlock_irqrestore(&sdsc->lock, flags);
+
 
 	return res;
 }
@@ -6803,6 +6950,10 @@ static int scsi_debug_abort(struct scsi_cmnd *SCpnt)
 	bool aborted = scsi_debug_abort_cmnd(SCpnt);
 	u8 *cmd = SCpnt->cmnd;
 	u8 opcode = cmd[0];
+
+	pr_err("%s SCpnt=%pS calling scsi_debug_abort_cmnd\n", __func__, SCpnt);
+
+	aborted = scsi_debug_abort_cmnd(SCpnt);
 
 	++num_aborts;
 
@@ -9197,18 +9348,6 @@ out_handle:
 	return ret;
 }
 
-/*
- * The only purpose of this function is to make the SCSI core allocate a
- * pseudo SCSI device.
- */
-static int scsi_debug_queue_reserved_command(struct Scsi_Host *shost,
-					     struct scsi_cmnd *scp)
-{
-	WARN_ON_ONCE(true);
-	scp->result = DID_ERROR << 16;
-	scsi_done(scp);
-	return 0;
-}
 
 static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 				   struct scsi_cmnd *scp)
@@ -9372,8 +9511,10 @@ static int scsi_debug_queuecommand(struct Scsi_Host *shost,
 	if (sdebug_fake_rw && (F_FAKE_RW & flags))
 		goto fini;
 	if (unlikely(sdebug_every_nth)) {
-		if (fake_timeout(scp))
+		if (fake_timeout(scp)) {
+			pr_err("%s fake timeout for scp=%pS\n", __func__, scp);
 			return 0;	/* ignore command: make trouble */
+		}
 	}
 	if (likely(oip->pfp))
 		pfp = oip->pfp;	/* calls a resp_* function */
@@ -9451,6 +9592,7 @@ static const struct scsi_host_template sdebug_driver_template = {
 	.init_cmd_priv = sdebug_init_cmd_priv,
 	.target_alloc =		sdebug_target_alloc,
 	.target_destroy =	sdebug_target_destroy,
+	.nr_reserved_cmds = 1,
 };
 
 static int sdebug_driver_probe(struct device *dev)
@@ -9468,6 +9610,8 @@ static int sdebug_driver_probe(struct device *dev)
 		error = -ENODEV;
 		return error;
 	}
+	pr_err("%s after scsi_host_alloc hpnt->can_queue=%d hpnt->nr_reserved_cmds=%d\n",
+		__func__, hpnt->can_queue, hpnt->nr_reserved_cmds);
 	hpnt->can_queue = sdebug_max_queue;
 	hpnt->cmd_per_lun = sdebug_max_queue;
 	if (!sdebug_clustering)

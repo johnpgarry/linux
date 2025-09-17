@@ -231,6 +231,8 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 		goto fail;
 	}
 
+	pr_err("%s shost->nr_reserved_cmds=%d sht->queue_reserved_command=%pS\n",
+		__func__, sht->nr_reserved_cmds, sht->queue_reserved_command);
 	if (shost->nr_reserved_cmds && !sht->queue_reserved_command) {
 		shost_printk(KERN_ERR, shost,
 			     "nr_reserved_cmds set but no method to queue\n");
