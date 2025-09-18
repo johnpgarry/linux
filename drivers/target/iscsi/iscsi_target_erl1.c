@@ -868,6 +868,8 @@ int iscsit_execute_ooo_cmdsns(struct iscsit_session *sess)
 
 		iscsit_remove_ooo_cmdsn(sess, ooo_cmdsn);
 
+		if (special_lba(cmd))
+			pr_err("%s calling iscsit_execute_cmd cmd=%pS\n", __func__, cmd);
 		if (iscsit_execute_cmd(cmd, 1) < 0)
 			return -1;
 	}
@@ -920,7 +922,11 @@ int iscsit_execute_cmd(struct iscsit_cmd *cmd, int ooo)
 		if (cmd->immediate_data) {
 			if (cmd->cmd_flags & ICF_GOT_LAST_DATAOUT) {
 				spin_unlock_bh(&cmd->istate_lock);
+				if (special_lba(cmd))
+					pr_err("%s1 calling target_execute_cmd cmd=%pS\n", __func__, cmd);
 				target_execute_cmd(&cmd->se_cmd);
+				if (special_lba(cmd))
+					pr_err("%s1.1 called target_execute_cmd cmd=%pS\n", __func__, cmd);
 				return 0;
 			}
 			spin_unlock_bh(&cmd->istate_lock);

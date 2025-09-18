@@ -253,6 +253,8 @@ static int iscsit_task_reassign_complete_write(
 			pr_debug("WRITE ITT: 0x%08x: t_state: %d"
 				" never sent to transport\n",
 				cmd->init_task_tag, cmd->se_cmd.t_state);
+			if (special_lba(cmd))
+				pr_err("%s calling target_execute_cmd cmd=%pS se_cmd=%pS\n", __func__, cmd, &cmd->se_cmd);
 			target_execute_cmd(se_cmd);
 			return 0;
 		}

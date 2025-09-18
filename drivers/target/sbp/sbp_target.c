@@ -1713,7 +1713,8 @@ static int sbp_write_pending(struct se_cmd *se_cmd)
 		sbp_send_status(req);
 		return ret;
 	}
-
+	if (_special_lba(se_cmd))
+			pr_err("%s calling target_execute_cmd se_cmd=%pS\n", __func__, se_cmd);
 	target_execute_cmd(se_cmd);
 	return 0;
 }

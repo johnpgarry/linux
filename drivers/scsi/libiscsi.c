@@ -150,7 +150,7 @@ void iscsi_prep_data_out_pdu(struct iscsi_task *task, struct iscsi_r2t_info *r2t
 	unsigned int left = r2t->data_length - r2t->sent;
 
 	task->hdr_len = sizeof(struct iscsi_data);
-
+	pr_err_ratelimited("%s\n", __func__);
 	memset(hdr, 0, sizeof(struct iscsi_data));
 	hdr->ttt = r2t->ttt;
 	hdr->datasn = cpu_to_be32(r2t->datasn);
@@ -176,7 +176,7 @@ EXPORT_SYMBOL_GPL(iscsi_prep_data_out_pdu);
 static int iscsi_add_hdr(struct iscsi_task *task, unsigned len)
 {
 	unsigned exp_len = task->hdr_len + len;
-
+	pr_err_ratelimited("%s\n", __func__);
 	if (exp_len > task->hdr_max) {
 		WARN_ON(1);
 		return -EINVAL;
@@ -197,7 +197,7 @@ static int iscsi_prep_ecdb_ahs(struct iscsi_task *task)
 	unsigned short ahslength;
 	struct iscsi_ecdb_ahdr *ecdb_ahdr;
 	int rc;
-
+	pr_err_ratelimited("%s\n", __func__);
 	ecdb_ahdr = iscsi_next_hdr(task);
 	rlen = cmd->cmd_len - ISCSI_CDB_SIZE;
 
@@ -245,7 +245,7 @@ static int iscsi_check_tmf_restrictions(struct iscsi_task *task, int opcode)
 	struct iscsi_session *session = task->conn->session;
 	struct iscsi_tm *tmf = &session->tmhdr;
 	u64 hdr_lun;
-
+	pr_err_ratelimited("%s\n", __func__);
 	if (session->tmf_state == TMF_INITIAL)
 		return 0;
 
@@ -320,7 +320,7 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_task *task)
 	unsigned hdrlength, cmd_len, transfer_length;
 	itt_t itt;
 	int rc;
-
+	pr_err_ratelimited("%s\n", __func__);
 	rc = iscsi_check_tmf_restrictions(task, ISCSI_OP_SCSI_CMD);
 	if (rc)
 		return rc;
@@ -457,7 +457,7 @@ static void iscsi_free_task(struct iscsi_task *task)
 	struct iscsi_session *session = conn->session;
 	struct scsi_cmnd *sc = task->sc;
 	int oldstate = task->state;
-
+	pr_err_ratelimited("%s\n", __func__);
 	ISCSI_DBG_SESSION(session, "freeing task itt 0x%x state %d sc %p\n",
 			  task->itt, task->state, task->sc);
 
@@ -525,7 +525,7 @@ EXPORT_SYMBOL_GPL(iscsi_put_task);
 static void iscsi_complete_task(struct iscsi_task *task, int state)
 {
 	struct iscsi_conn *conn = task->conn;
-
+	pr_err_ratelimited("%s\n", __func__);
 	ISCSI_DBG_SESSION(conn->session,
 			  "complete task itt 0x%x state %d sc %p\n",
 			  task->itt, task->state, task->sc);
@@ -575,7 +575,7 @@ static bool cleanup_queued_task(struct iscsi_task *task)
 {
 	struct iscsi_conn *conn = task->conn;
 	bool early_complete = false;
-
+	pr_err_ratelimited("%s\n", __func__);
 	/*
 	 * We might have raced where we handled a R2T early and got a response
 	 * but have not yet taken the task off the requeue list, then a TMF or
@@ -617,7 +617,7 @@ static void __fail_scsi_task(struct iscsi_task *task, int err)
 	struct iscsi_conn *conn = task->conn;
 	struct scsi_cmnd *sc;
 	int state;
-
+	pr_err_ratelimited("%s\n", __func__);
 	if (cleanup_queued_task(task))
 		return;
 
@@ -656,7 +656,7 @@ static int iscsi_prep_mgmt_task(struct iscsi_conn *conn,
 	struct iscsi_hdr *hdr = task->hdr;
 	struct iscsi_nopout *nop = (struct iscsi_nopout *)hdr;
 	uint8_t opcode = hdr->opcode & ISCSI_OPCODE_MASK;
-
+	pr_err_ratelimited("%s\n", __func__);
 	if (conn->session->state == ISCSI_STATE_LOGGING_OUT)
 		return -ENOTCONN;
 
@@ -710,7 +710,7 @@ iscsi_alloc_mgmt_task(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	uint8_t opcode = hdr->opcode & ISCSI_OPCODE_MASK;
 	struct iscsi_task *task;
 	itt_t itt;
-
+	pr_err_ratelimited("%s\n", __func__);
 	if (session->state == ISCSI_STATE_TERMINATE ||
 	    !test_bit(ISCSI_CONN_FLAG_BOUND, &conn->flags))
 		return NULL;
@@ -807,7 +807,7 @@ static int iscsi_send_mgmt_task(struct iscsi_task *task)
 	struct iscsi_session *session = conn->session;
 	struct iscsi_host *ihost = shost_priv(conn->session->host);
 	int rc = 0;
-
+	pr_err_ratelimited("%s\n", __func__);
 	if (!ihost->workq) {
 		rc = iscsi_prep_mgmt_task(conn, task);
 		if (rc)
@@ -829,7 +829,7 @@ static int __iscsi_conn_send_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 {
 	struct iscsi_task *task;
 	int rc;
-
+	pr_err_ratelimited("%s\n", __func__);
 	task = iscsi_alloc_mgmt_task(conn, hdr, data, data_size);
 	if (!task)
 		return -ENOMEM;
@@ -873,7 +873,7 @@ static void iscsi_scsi_cmd_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	struct iscsi_scsi_rsp *rhdr = (struct iscsi_scsi_rsp *)hdr;
 	struct iscsi_session *session = conn->session;
 	struct scsi_cmnd *sc = task->sc;
-
+	pr_err_ratelimited("%s\n", __func__);
 	iscsi_update_cmdsn(session, (struct iscsi_nopin*)rhdr);
 	conn->exp_statsn = be32_to_cpu(rhdr->statsn) + 1;
 
@@ -970,7 +970,7 @@ iscsi_data_in_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 
 	if (!(rhdr->flags & ISCSI_FLAG_DATA_STATUS))
 		return;
-
+	pr_err_ratelimited("%s\n", __func__);
 	iscsi_update_cmdsn(conn->session, (struct iscsi_nopin *)hdr);
 	sc->result = (DID_OK << 16) | rhdr->cmd_status;
 	conn->exp_statsn = be32_to_cpu(rhdr->statsn) + 1;
@@ -1022,7 +1022,7 @@ static int iscsi_send_nopout(struct iscsi_conn *conn, struct iscsi_nopin *rhdr)
 		if (READ_ONCE(conn->ping_task))
 			return -EINVAL;
 	}
-
+	pr_err_ratelimited("%s\n", __func__);
 	memset(&hdr, 0, sizeof(struct iscsi_nopout));
 	hdr.opcode = ISCSI_OP_NOOP_OUT | ISCSI_OP_IMMEDIATE;
 	hdr.flags = ISCSI_FLAG_CMD_FINAL;
@@ -1092,7 +1092,7 @@ static int iscsi_handle_reject(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	struct iscsi_reject *reject = (struct iscsi_reject *)hdr;
 	struct iscsi_hdr rejected_pdu;
 	int opcode, rc = 0;
-
+	pr_err_ratelimited("%s\n", __func__);
 	conn->exp_statsn = be32_to_cpu(reject->statsn) + 1;
 
 	if (ntoh24(reject->dlength) > datalen ||
@@ -1216,7 +1216,7 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	int opcode = hdr->opcode & ISCSI_OPCODE_MASK, rc = 0;
 	struct iscsi_task *task;
 	uint32_t itt;
-
+	pr_err_ratelimited("%s\n", __func__);
 	conn->last_recv = jiffies;
 	rc = iscsi_verify_itt(conn, hdr->itt);
 	if (rc)
@@ -1354,7 +1354,7 @@ int iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		       char *data, int datalen)
 {
 	int rc;
-
+	pr_err_ratelimited("%s\n", __func__);
 	spin_lock(&conn->session->back_lock);
 	rc = __iscsi_complete_pdu(conn, hdr, data, datalen);
 	spin_unlock(&conn->session->back_lock);
@@ -1413,7 +1413,7 @@ struct iscsi_task *iscsi_itt_to_ctask(struct iscsi_conn *conn, itt_t itt)
 	task = iscsi_itt_to_task(conn, itt);
 	if (!task || !task->sc)
 		return NULL;
-
+	pr_err_ratelimited("%s\n", __func__);
 	if (iscsi_cmd(task->sc)->age != conn->session->age) {
 		iscsi_session_printk(KERN_ERR, conn->session,
 				  "task's session age %d, expected %d\n",
@@ -1436,7 +1436,7 @@ void iscsi_session_failure(struct iscsi_session *session,
 		spin_unlock_bh(&session->frwd_lock);
 		return;
 	}
-
+	pr_err_ratelimited("%s\n", __func__);
 	iscsi_get_conn(conn->cls_conn);
 	spin_unlock_bh(&session->frwd_lock);
 	/*
@@ -1755,6 +1755,19 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	struct iscsi_session *session;
 	struct iscsi_conn *conn;
 	struct iscsi_task *task = NULL;
+	struct request *rq = scsi_cmd_to_rq(sc);
+	unsigned char *cmnd = &sc->cmnd[0];
+	struct bio *bio = rq->bio;
+
+	if (blk_rq_pos(rq) == 9960) {
+		pr_err("%s rq=%pS pos=9960 bytes=%d cmnd[0]=%d\n",
+			__func__, rq, blk_rq_bytes(rq), *cmnd);
+	}
+
+
+	pr_err_ratelimited("%s2 rq=%pS pos=%lld bytes=%d cmnd[0]=%d bio=%pS write=%d\n",
+			__func__, rq, blk_rq_pos(rq), blk_rq_bytes(rq), *cmnd,
+			bio, bio ? bio_data_dir(bio) : -1);
 
 	sc->result = 0;
 	iscsi_cmd(sc)->task = NULL;

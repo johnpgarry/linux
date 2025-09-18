@@ -39,7 +39,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/target.h>
-
+extern bool _special_lba(const struct se_cmd *se_cmd);
 static struct workqueue_struct *target_completion_wq;
 static struct workqueue_struct *target_submission_wq;
 static struct kmem_cache *se_sess_cache;
@@ -1436,7 +1436,9 @@ target_cmd_size_check(struct se_cmd *cmd, unsigned int size)
 			}
 		}
 	}
-
+	if (cmd->special)
+			pr_err("%s8 cmd=%pS size=%d cmd->data_length=%d cmd->residual_count=%d\n",
+				__func__, cmd, size, cmd->data_length, cmd->residual_count);
 	return target_check_max_data_sg_nents(cmd, dev, size);
 
 }
@@ -2140,6 +2142,9 @@ void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
 {
 	sense_reason_t ret;
 
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS\n", __func__, cmd);
+
 	if (!cmd->execute_cmd) {
 		ret = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		goto err;
@@ -2296,6 +2301,10 @@ void target_execute_cmd(struct se_cmd *cmd)
 	if (target_handle_task_attr(cmd))
 		return;
 
+	
+	if (_special_lba(cmd))
+		pr_err("%s calling __target_execute_cmd cmd=%pS\n", __func__, cmd);
+
 	__target_execute_cmd(cmd, true);
 }
 EXPORT_SYMBOL(target_execute_cmd);
@@ -2332,6 +2341,8 @@ void target_do_delayed_work(struct work_struct *work)
 		list_del(&cmd->se_delayed_node);
 		spin_unlock(&dev->delayed_cmd_lock);
 
+		if (_special_lba(cmd))
+			pr_err("%s calling __target_execute_cmd cmd=%pS\n", __func__, cmd);
 		__target_execute_cmd(cmd, true);
 		spin_lock(&dev->delayed_cmd_lock);
 	}
@@ -2847,6 +2858,9 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	 */
 	target_add_to_state_list(cmd);
 	if (cmd->data_direction != DMA_TO_DEVICE || cmd->data_length == 0) {
+		if (_special_lba(cmd))
+			pr_err("%s calling target_execute_cmd cmd=%pS cmd->data_length=%d cmd->data_direction=%d\n",
+				__func__, cmd, cmd->data_length, cmd->data_direction);
 		target_execute_cmd(cmd);
 		return 0;
 	}
@@ -2870,6 +2884,9 @@ transport_generic_new_cmd(struct se_cmd *cmd)
 	cmd->transport_state &= ~CMD_T_ACTIVE;
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 
+	if (_special_lba(cmd))
+		pr_err("%s2 calling write_pending=%pS cmd=%pS cmd->data_length=%d cmd->data_direction=%d\n",
+			__func__, cmd->se_tfo->write_pending, cmd, cmd->data_length, cmd->data_direction);
 	ret = cmd->se_tfo->write_pending(cmd);
 	if (ret)
 		goto queue_full;

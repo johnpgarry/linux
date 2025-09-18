@@ -102,6 +102,8 @@ extern int iscsit_build_r2ts_for_cmd(struct iscsit_conn *, struct iscsit_cmd *,
 				     bool);
 extern int iscsit_immediate_queue(struct iscsit_conn *, struct iscsit_cmd *, int);
 extern int iscsit_response_queue(struct iscsit_conn *, struct iscsit_cmd *, int);
+extern bool _special_lba(const struct se_cmd *se_cmd);
+extern bool special_lba(const struct iscsit_cmd *cmd);
 /*
  * From iscsi_target_device.c
  */

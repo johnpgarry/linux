@@ -60,6 +60,25 @@ struct kmem_cache *lio_dr_cache;
 struct kmem_cache *lio_ooo_cache;
 struct kmem_cache *lio_r2t_cache;
 
+
+
+bool _special_lba(const struct se_cmd *se_cmd)
+{
+	if ((se_cmd->t_task_lba >= 9960) && (se_cmd->t_task_lba <= (9960 + (SZ_64K / SECTOR_SIZE)))) {
+		return true;
+	}
+	return false;
+}
+EXPORT_SYMBOL_GPL(_special_lba);
+
+bool special_lba(const struct iscsit_cmd *cmd)
+{
+	const struct se_cmd *se_cmd = &cmd->se_cmd;
+
+	return _special_lba(se_cmd);
+}
+EXPORT_SYMBOL_GPL(special_lba);
+
 static int iscsit_handle_immediate_data(struct iscsit_cmd *,
 			struct iscsi_scsi_req *, u32);
 
@@ -994,15 +1013,24 @@ int iscsit_setup_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 {
 	int data_direction, payload_length;
 	struct iscsi_ecdb_ahdr *ecdb_ahdr;
-	struct iscsi_scsi_req *hdr;
 	int iscsi_task_attr;
 	unsigned char *cdb;
 	int sam_task_attr;
-
 	atomic_long_inc(&conn->sess->cmd_pdus);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
+	struct iscsi_scsi_req *hdr;
 
 	hdr			= (struct iscsi_scsi_req *) buf;
 	payload_length		= ntoh24(hdr->dlength);
+
+	if (special_lba(cmd) || (hdr->cdb[4] == 0x26))
+		pr_err("%s hdr->hlength=%d payload_length=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d\n",
+			__func__, hdr->hlength, payload_length,
+			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+			se_cmd->t_task_lba,
+			se_cmd->data_length,
+			se_cmd->residual_count);
 
 	/* FIXME; Add checks for AdditionalHeaderSegment */
 
@@ -1212,15 +1240,49 @@ int iscsit_setup_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 		goto attach_cmd;
 
 	cmd->sense_reason = target_cmd_parse_cdb(&cmd->se_cmd);
+	if (special_lba(cmd)) {
+		pr_err("%s1 called target_cmd_parse_cdb hdr->hlength=%d payload_length=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld (0x%llx), data_length=%d, residual_count=%d\n",
+			__func__, hdr->hlength, payload_length,
+			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+			se_cmd->t_task_lba, se_cmd->t_task_lba,
+			se_cmd->data_length,
+			se_cmd->residual_count);
+		pr_err("%s1.1 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
+			__func__,
+			hdr->cdb[0], hdr->cdb[1], hdr->cdb[2], hdr->cdb[3],
+			hdr->cdb[4], hdr->cdb[5], hdr->cdb[6], hdr->cdb[7],
+			hdr->cdb[8], hdr->cdb[9], hdr->cdb[10], hdr->cdb[11],
+			hdr->cdb[12], hdr->cdb[13], hdr->cdb[14], hdr->cdb[15]);
+	}
 	if (cmd->sense_reason)
 		goto attach_cmd;
 
 	if (iscsit_build_pdu_and_seq_lists(cmd, payload_length) < 0) {
+		if (special_lba(cmd))
+			pr_err("%s9 hdr->hlength=%d payload_length=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d\n",
+			__func__, hdr->hlength, payload_length,
+			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+			se_cmd->t_task_lba,
+			se_cmd->data_length,
+			se_cmd->residual_count);
 		return iscsit_add_reject_cmd(cmd,
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES, buf);
 	}
 
 attach_cmd:
+
+	if (special_lba(cmd))
+			pr_err("%s10 attach_cmd hdr->hlength=%d payload_length=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d execute_cmd=%pS\n",
+		__func__, hdr->hlength, payload_length,
+		!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+		!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+		se_cmd->t_task_lba,
+		se_cmd->data_length,
+		se_cmd->residual_count,
+		se_cmd->execute_cmd);
+
 	spin_lock_bh(&conn->cmd_lock);
 	list_add_tail(&cmd->i_conn_node, &conn->conn_cmd_list);
 	spin_unlock_bh(&conn->cmd_lock);
@@ -1242,6 +1304,18 @@ int iscsit_process_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 			    struct iscsi_scsi_req *hdr)
 {
 	int cmdsn_ret = 0;
+
+	struct se_cmd *se_cmd = &cmd->se_cmd;
+
+
+	if (special_lba(cmd))
+			pr_err("%s hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d\n",
+			__func__, hdr->hlength,
+			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+			se_cmd->t_task_lba,
+			se_cmd->data_length,
+			se_cmd->residual_count);
 	/*
 	 * Check the CmdSN against ExpCmdSN/MaxCmdSN here if
 	 * the Immediate Bit is not set, and no Immediate
@@ -1253,6 +1327,14 @@ int iscsit_process_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 	 * be acknowledged. (See below)
 	 */
 	if (!cmd->immediate_data) {
+		if (special_lba(cmd))
+				pr_err("%s1 hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d calling iscsit_sequence_cmd\n",
+				__func__, hdr->hlength,
+				!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+				!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+				se_cmd->t_task_lba,
+				se_cmd->data_length,
+				se_cmd->residual_count);
 		cmdsn_ret = iscsit_sequence_cmd(conn, cmd,
 					(unsigned char *)hdr, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
@@ -1289,7 +1371,25 @@ int iscsit_process_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 	 * Call directly into transport_generic_new_cmd() to perform
 	 * the backend memory allocation.
 	 */
+
+	if (special_lba(cmd))
+			pr_err("%s2 hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d calling transport_generic_new_cmd\n",
+			__func__, hdr->hlength,
+			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+			se_cmd->t_task_lba,
+			se_cmd->data_length,
+			se_cmd->residual_count);
 	cmd->sense_reason = transport_generic_new_cmd(&cmd->se_cmd);
+	if (special_lba(cmd))
+			pr_err("%s2.1 hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d called transport_generic_new_cmd cmd->sense_reason=%d\n",
+			__func__, hdr->hlength,
+			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+			se_cmd->t_task_lba,
+			se_cmd->data_length,
+			se_cmd->residual_count,
+			cmd->sense_reason);
 	if (cmd->sense_reason)
 		return 1;
 
@@ -1303,6 +1403,20 @@ iscsit_get_immediate_data(struct iscsit_cmd *cmd, struct iscsi_scsi_req *hdr,
 {
 	int cmdsn_ret = 0, immed_ret = IMMEDIATE_DATA_NORMAL_OPERATION;
 	int rc;
+
+	
+	struct se_cmd *se_cmd = &cmd->se_cmd;
+
+	int payload_length = ntoh24(hdr->dlength);
+
+	if (special_lba(cmd))
+			pr_err("%s hdr->hlength=%d payload_length=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d\n",
+			__func__, hdr->hlength, payload_length,
+			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+			se_cmd->t_task_lba,
+			se_cmd->data_length,
+			se_cmd->residual_count);
 
 	/*
 	 * Special case for Unsupported SAM WRITE Opcodes and ImmediateData=Yes.
@@ -1329,8 +1443,24 @@ iscsit_get_immediate_data(struct iscsit_cmd *cmd, struct iscsi_scsi_req *hdr,
 		 * DataCRC, check against ExpCmdSN/MaxCmdSN if
 		 * Immediate Bit is not set.
 		 */
+		if (special_lba(cmd))
+				pr_err("%s2 hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d calling iscsit_sequence_cmd\n",
+				__func__, hdr->hlength,
+				!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+				!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+				se_cmd->t_task_lba,
+				se_cmd->data_length,
+				se_cmd->residual_count);
 		cmdsn_ret = iscsit_sequence_cmd(cmd->conn, cmd,
 					(unsigned char *)hdr, hdr->cmdsn);
+		if (special_lba(cmd))
+				pr_err("%s2.1 hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d called iscsit_sequence_cmd\n",
+				__func__, hdr->hlength,
+				!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
+				!!(hdr->flags & ISCSI_FLAG_CMD_READ),
+				se_cmd->t_task_lba,
+				se_cmd->data_length,
+				se_cmd->residual_count);
 		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
 			return -1;
 
@@ -1368,7 +1498,11 @@ iscsit_handle_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 	struct iscsi_scsi_req *hdr = (struct iscsi_scsi_req *)buf;
 	int rc, immed_data;
 	bool dump_payload = false;
+	int ret;
 
+	struct iscsi_scsi_req *hdr2 = (struct iscsi_scsi_req *) buf;
+	if (hdr2->cdb[4] == 0x26)
+			pr_err("%s calling iscsit_setup_scsi_cmd cmd=%pS\n", __func__, cmd);
 	rc = iscsit_setup_scsi_cmd(conn, cmd, buf);
 	if (rc < 0)
 		return 0;
@@ -1382,6 +1516,8 @@ iscsit_handle_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 	}
 	immed_data = cmd->immediate_data;
 
+	if (hdr2->cdb[4] == 0x26)
+			pr_err("%s2 calling iscsit_setup_scsi_cmd cmd=%pS\n", __func__, cmd);
 	rc = iscsit_process_scsi_cmd(conn, cmd, hdr);
 	if (rc < 0)
 		return rc;
@@ -1390,8 +1526,12 @@ iscsit_handle_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 
 	if (!immed_data)
 		return 0;
-
-	return iscsit_get_immediate_data(cmd, hdr, dump_payload);
+	if (special_lba(cmd))
+			pr_err("%s3 cmd=%pS calling iscsit_get_immediate_data\n", __func__, cmd);
+	ret = iscsit_get_immediate_data(cmd, hdr, dump_payload);
+	if (special_lba(cmd))
+			pr_err("%s3.1 cmd=%pS called iscsit_get_immediate_data ret=%d\n", __func__, cmd, ret);
+	return ret;
 }
 
 static u32 iscsit_crc_sglist(const struct iscsit_cmd *cmd, u32 data_length,
@@ -1401,6 +1541,8 @@ static u32 iscsit_crc_sglist(const struct iscsit_cmd *cmd, u32 data_length,
 	unsigned int page_off = cmd->first_data_sg_off;
 	u32 crc = ~0;
 
+	if (special_lba(cmd))
+			pr_err("%s\n", __func__);
 	while (data_length) {
 		u32 cur_len = min_t(u32, data_length, sg->length - page_off);
 		const void *virt;
@@ -1549,6 +1691,8 @@ iscsit_check_dataout_hdr(struct iscsit_conn *conn, void *buf,
 	int rc;
 	bool success = false;
 
+//	if (special_lba(cmd))
+//			pr_err("%s\n", __func__);
 	if (!payload_length) {
 		pr_warn_ratelimited("DataOUT payload is ZERO, ignoring.\n");
 		return 0;
@@ -1669,6 +1813,8 @@ iscsit_check_dataout_payload(struct iscsit_cmd *cmd, struct iscsi_data *hdr,
 		iscsit_stop_dataout_timer(cmd);
 		if (ooo_cmdsn)
 			return 0;
+		if (special_lba(cmd))
+			pr_err("%s calling target_execute_cmd cmd=%pS se_cmd=%pS\n", __func__, cmd, &cmd->se_cmd);
 		target_execute_cmd(&cmd->se_cmd);
 		return 0;
 	} else /* DATAOUT_CANNOT_RECOVER */
@@ -1792,6 +1938,8 @@ int iscsit_process_nop_out(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 			return 0;
 		}
 
+		if (special_lba(cmd))
+				pr_err("%s calling iscsit_sequence_cmd cmd=%pS\n", __func__, cmd);
 		cmdsn_ret = iscsit_sequence_cmd(conn, cmd,
 				(unsigned char *)hdr, hdr->cmdsn);
                 if (cmdsn_ret == CMDSN_LOWER_THAN_EXP)
@@ -2100,6 +2248,8 @@ attach:
 	spin_unlock_bh(&conn->cmd_lock);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
+		if (special_lba(cmd))
+				pr_err("%s1 calling iscsit_sequence_cmd cmd=%pS\n", __func__, cmd);
 		int cmdsn_ret = iscsit_sequence_cmd(conn, cmd, buf, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_HIGHER_THAN_EXP) {
 			out_of_order_cmdsn = 1;
@@ -2218,6 +2368,8 @@ empty_sendtargets:
 	iscsit_ack_from_expstatsn(conn, be32_to_cpu(hdr->exp_statsn));
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
+		if (special_lba(cmd))
+				pr_err("%s1 calling iscsit_sequence_cmd cmd=%pS\n", __func__, cmd);
 		cmdsn_ret = iscsit_sequence_cmd(conn, cmd,
 				(unsigned char *)hdr, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
@@ -2226,6 +2378,8 @@ empty_sendtargets:
 		return 0;
 	}
 
+	if (special_lba(cmd))
+		pr_err("%s calling iscsit_execute_cmd cmd=%pS\n", __func__, cmd);
 	return iscsit_execute_cmd(cmd, 0);
 
 reject:
@@ -2493,7 +2647,11 @@ iscsit_handle_logout_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 	 * Non-Immediate Logout Commands are executed in CmdSN order.
 	 */
 	if (cmd->immediate_cmd) {
-		int ret = iscsit_execute_cmd(cmd, 0);
+		int ret;
+
+		if (special_lba(cmd))
+			pr_err("%s calling iscsit_execute_cmd cmd=%pS\n", __func__, cmd);
+		ret = iscsit_execute_cmd(cmd, 0);
 
 		if (ret < 0)
 			return ret;
@@ -3922,6 +4080,7 @@ static int iscsi_target_rx_opcode(struct iscsit_conn *conn, unsigned char *buf)
 	struct iscsi_hdr *hdr = (struct iscsi_hdr *)buf;
 	struct iscsit_cmd *cmd;
 	int ret = 0;
+	struct iscsi_scsi_req *hdr2 = (struct iscsi_scsi_req *) buf;
 
 	switch (hdr->opcode & ISCSI_OPCODE_MASK) {
 	case ISCSI_OP_SCSI_CMD:
@@ -3929,7 +4088,11 @@ static int iscsi_target_rx_opcode(struct iscsit_conn *conn, unsigned char *buf)
 		if (!cmd)
 			goto reject;
 
+		if (hdr2->cdb[4] == 0x26)
+			pr_err("%s calling iscsit_handle_scsi_cmd cmd=%pS\n", __func__, cmd);
 		ret = iscsit_handle_scsi_cmd(conn, cmd, buf);
+		if (hdr2->cdb[4] == 0x26)
+			pr_err("%s1 called iscsit_handle_scsi_cmd cmd=%pS ret=%d\n", __func__, cmd, ret);
 		break;
 	case ISCSI_OP_SCSI_DATA_OUT:
 		ret = iscsit_handle_data_out(conn, buf);
