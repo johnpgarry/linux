@@ -1070,8 +1070,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes);
 		special = true;
 
-		if (special_count == 0)
-			blk_stat = BLK_STS_IOERR;
+	//	if (special_count == 0)
+	//		blk_stat = BLK_STS_IOERR;
 		special_count++;
 	}
 	/*
