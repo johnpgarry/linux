@@ -142,6 +142,7 @@ target_emulate_report_target_port_groups(struct se_cmd *cmd)
 	u32 rd_len = 0, off;
 	int ext_hdr = (cmd->t_task_cdb[1] & 0x20);
 
+	pr_err("%s cmd=%pS\n", __func__, cmd);
 	/*
 	 * Skip over RESERVED area to first Target port group descriptor
 	 * depending on the PARAMETER DATA FORMAT type..
@@ -167,6 +168,14 @@ target_emulate_report_target_port_groups(struct se_cmd *cmd)
 		/* Skip empty port groups */
 		if (!tg_pt_gp->tg_pt_gp_members)
 			continue;
+		pr_err("%s1 cmd=%pS tg_pt_gp=%pS members=%d valid_id=%d nonop_delay_msecs=%d trans_delay_msecs=%d implicit_trans_secs=%d alua_access_state=%d\n",
+			__func__, cmd, tg_pt_gp,
+			tg_pt_gp->tg_pt_gp_members,
+			tg_pt_gp->tg_pt_gp_valid_id,
+			tg_pt_gp->tg_pt_gp_alua_access_type,
+			tg_pt_gp->tg_pt_gp_trans_delay_msecs,
+			tg_pt_gp->tg_pt_gp_implicit_trans_secs,
+			tg_pt_gp->tg_pt_gp_alua_access_state);
 		/*
 		 * Check if the Target port group and Target port descriptor list
 		 * based on tg_pt_gp_members count will fit into the response payload.
@@ -225,7 +234,10 @@ target_emulate_report_target_port_groups(struct se_cmd *cmd)
 			/*
 			 * Set RELATIVE TARGET PORT IDENTIFIER
 			 */
-			put_unaligned_be16(lun->lun_tpg->tpg_rtpi, &buf[off]);
+			put_unaligned_be16(lun->lun_tpg->tpg_rtpi, &buf[off]);		
+		pr_err("%s2 cmd=%pS tg_pt_gp=%pS lun->lun_tpg->tpg_rtpi=%d lun=%pS\n",
+				__func__, cmd, tg_pt_gp,
+				lun->lun_tpg->tpg_rtpi, lun);
 			off += 2;
 			rd_len += 4;
 		}

@@ -1692,7 +1692,7 @@ static ssize_t target_wwn_vpd_unit_serial_store(struct config_item *item,
 			"%s", strstrip(buf));
 	dev->dev_flags |= DF_EMULATED_VPD_UNIT_SERIAL;
 
-	pr_debug("Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
+	pr_err("grace Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
 			" %s\n", dev->t10_wwn.unit_serial);
 
 	return count;

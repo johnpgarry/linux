@@ -276,6 +276,8 @@ fd_execute_rw_aio(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	ssize_t len = 0;
 	int ret = 0, i;
 
+	if (cmd->special)
+		pr_err("%s cmd=%pS cmd->t_task_lba=%lld\n", __func__, cmd, cmd->t_task_lba);
 	aio_cmd = kmalloc(struct_size(aio_cmd, bvecs, sgl_nents), GFP_KERNEL);
 	if (!aio_cmd)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -594,6 +596,8 @@ fd_execute_rw_buffered(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nent
 	 * Call vectorized fileio functions to map struct scatterlist
 	 * physical memory addresses to struct iovec virtual memory.
 	 */
+	if (cmd->special)
+		pr_err("%s cmd=%pS cmd->t_task_lba=%lld cmd->data_length=%d\n", __func__, cmd, cmd->t_task_lba, cmd->data_length);
 	if (data_direction == DMA_FROM_DEVICE) {
 		if (cmd->prot_type && dev->dev_attrib.pi_prot_type) {
 			ret = fd_do_rw(cmd, pfile, dev->prot_length,
@@ -630,6 +634,8 @@ fd_execute_rw_buffered(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nent
 
 		ret = fd_do_rw(cmd, file, dev->dev_attrib.block_size,
 			       sgl, sgl_nents, cmd->data_length, 1);
+		if (cmd->special)
+			pr_err("%s3 ret=%d cmd=%pS cmd->t_task_lba=%lld cmd->data_length=%d\n", __func__, ret, cmd, cmd->t_task_lba, cmd->data_length);
 		/*
 		 * Perform implicit vfs_fsync_range() for fd_do_writev() ops
 		 * for SCSI WRITEs with Forced Unit Access (FUA) set.
@@ -682,6 +688,8 @@ fd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 
+	if (cmd->special)
+		pr_err("%s cmd=%pS cmd->t_task_lba=%lld cmd->data_length=%d\n", __func__, cmd, cmd->t_task_lba, cmd->data_length);
 	if (fd_dev->fbd_flags & FDBD_HAS_ASYNC_IO)
 		return fd_execute_rw_aio(cmd, sgl, sgl_nents, data_direction);
 	return fd_execute_rw_buffered(cmd, sgl, sgl_nents, data_direction);

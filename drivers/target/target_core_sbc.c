@@ -343,6 +343,9 @@ sbc_execute_rw(struct se_cmd *cmd)
 {
 	struct exec_cmd_ops *ops = cmd->protocol_data;
 
+	if (cmd->special)
+		pr_err("%s cmd=%pS ops->execute_rw=%pS\n",
+			__func__, cmd, ops->execute_rw);
 	return ops->execute_rw(cmd, cmd->t_data_sg, cmd->t_data_nents,
 			       cmd->data_direction);
 }
@@ -1044,9 +1047,11 @@ sbc_parse_cdb(struct se_cmd *cmd, struct exec_cmd_ops *ops)
 			return ret;
 	}
 
-	if (cmd->t_task_lba == 9960)
+	if (cmd->t_task_lba == 9960) {
 		pr_err("%s cdb[0]=%d sectors=%d cmd->t_task_lba=%lld cmd->execute_cmd=%pS\n",
 			__func__, cdb[0], sectors, cmd->t_task_lba, cmd->execute_cmd);
+		cmd->special = true;
+	}
 
 	/* reject any command that we don't have a handler for */
 	if (!cmd->execute_cmd)
@@ -1068,6 +1073,11 @@ check_lba:
 			size = sbc_get_size(cmd, sectors);
 	}
 
+	if (cmd->t_task_lba == 9960) {
+		pr_err("%s2 cdb[0]=%d sectors=%d cmd->t_task_lba=%lld cmd->execute_cmd=%pS calling target_cmd_size_check size=%d\n",
+			__func__, cdb[0], sectors, cmd->t_task_lba, cmd->execute_cmd, size);
+		cmd->special = true;
+	}
 	return target_cmd_size_check(cmd, size);
 }
 EXPORT_SYMBOL(sbc_parse_cdb);

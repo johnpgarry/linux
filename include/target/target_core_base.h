@@ -564,6 +564,8 @@ struct se_cmd {
 	 * initialized on. Drivers can override.
 	 */
 	int			cpuid;
+
+	bool special;
 };
 
 struct se_ua {

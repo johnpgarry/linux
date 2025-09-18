@@ -1387,6 +1387,8 @@ target_cmd_size_check(struct se_cmd *cmd, unsigned int size)
 {
 	struct se_device *dev = cmd->se_dev;
 
+	if (cmd->special)
+		pr_err("%s cmd=%pS size=%d cmd->data_length=%d\n", __func__, cmd, size, cmd->data_length);
 	if (cmd->unknown_data_length) {
 		cmd->data_length = size;
 	} else if (size != cmd->data_length) {

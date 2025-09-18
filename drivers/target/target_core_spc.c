@@ -2209,6 +2209,7 @@ spc_emulate_report_supp_op_codes(struct se_cmd *cmd)
 	sense_reason_t ret = 0;
 	int i;
 
+	pr_err("%s cmd=%pS\n", __func__, cmd);
 	if (!cmd->se_dev->dev_attrib.emulate_rsoc)
 		return TCM_UNSUPPORTED_SCSI_OPCODE;
 
