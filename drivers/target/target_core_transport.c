@@ -1421,7 +1421,7 @@ target_cmd_size_check(struct se_cmd *cmd, unsigned int size)
 			if (cmd->se_cmd_flags & SCF_SCSI_DATA_CDB) {
 				pr_err_ratelimited("Rejecting underflow/overflow"
 						   " for WRITE data CDB\n");
-				return TCM_INVALID_FIELD_IN_COMMAND_IU;
+			//	return TCM_INVALID_FIELD_IN_COMMAND_IU;
 			}
 			/*
 			 * Some fabric drivers like iscsi-target still expect to
@@ -1432,7 +1432,7 @@ target_cmd_size_check(struct se_cmd *cmd, unsigned int size)
 			if (size > cmd->data_length) {
 				pr_err_ratelimited("Rejecting overflow for"
 						   " WRITE control CDB\n");
-				return TCM_INVALID_CDB_FIELD;
+			//	return TCM_INVALID_CDB_FIELD;
 			}
 		}
 	}

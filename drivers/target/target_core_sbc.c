@@ -1076,9 +1076,10 @@ check_lba:
 	if (cmd->t_task_lba == 9960) {
 		pr_err("%s2 cdb[0]=%d sectors=%d cmd->t_task_lba=%lld cmd->execute_cmd=%pS checking special lba size=%d cdb[0]=0x%x WRITE_10=0x%x READ_10=0x%x\n",
 			__func__, cdb[0], sectors, cmd->t_task_lba, cmd->execute_cmd, size, cdb[0], WRITE_10, READ_10);
-	//	cmd->special = true;
-	//	size -= 1024;
+		cmd->special = true;
+		size -= 1024;
 		pr_err("%s2.1 cdb[0]=%d sectors=%d cmd->t_task_lba=%lld cmd->execute_cmd=%pS calling target_cmd_size_check size=%d\n",
+
 			__func__, cdb[0], sectors, cmd->t_task_lba, cmd->execute_cmd, size);
 	//	WARN_ON(1);
 	}
