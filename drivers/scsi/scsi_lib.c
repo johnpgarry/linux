@@ -1060,14 +1060,19 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	blk_status_t blk_stat = BLK_STS_OK;
 	struct request *rq = scsi_cmd_to_rq(cmd);
 	bool special = false;
+	static int special_count;
 
 	if (unlikely(result))	/* a nz result may or may not be an error */
 		result = scsi_io_completion_nz_result(cmd, result, &blk_stat);
 
 	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
-		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld (bytes=%lld) blk_stat=%d result=%d sc->underflow=%d\n",
-			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_rq_pos(rq) * 512, blk_stat, result, cmd->underflow);
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld lk_stat=%d result=%d sc->underflow=%d good_bytes=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes);
 		special = true;
+
+		if (special_count == 0)
+			blk_stat = BLK_STS_IOERR;
+		special_count++;
 	}
 	/*
 	 * Next deal with any sectors which we were able to correctly
@@ -1093,20 +1098,25 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	}
 
 	/* Kill remainder if no retries. */
-	if (unlikely(blk_stat && scsi_noretry_cmd(cmd))) {
+	if (unlikely(blk_stat && (scsi_noretry_cmd(cmd) || special))) {
+		if (special)
+			pr_err("%s3 cmd=%pS rq=%pS pos=%lld bytes=%d good_bytes=%d blk_stat=%d called scsi_end_request -> update\n",
+			__func__, cmd, rq, blk_rq_pos(req), blk_rq_bytes(req), good_bytes, blk_stat);
 		if (scsi_end_request(req, blk_stat, blk_rq_bytes(req)))
-			WARN_ONCE(true,
-			    "Bytes remaining after failed, no-retry command");
+			pr_err_once("Bytes remaining after failed, no-retry command");
+		if (special)
+			pr_err("%s3.1 cmd=%pS rq=%pS pos=%lld bytes=%d good_bytes=%d blk_stat=%d returning\n",
+			__func__, cmd, rq, blk_rq_pos(req), blk_rq_bytes(req), good_bytes, blk_stat);
 		return;
 	}
 
 	if (special && 0) {
-		pr_err("%s3 cmd=%pS rq=%pS bytes=%d pos=%lld good_bytes=%d calling scsi_end_request blk_stat=%d using BLK_STS_IOERR\n",
+		pr_err("%s4 cmd=%pS rq=%pS bytes=%d pos=%lld good_bytes=%d calling scsi_end_request blk_stat=%d\n",
 			__func__, cmd, rq, blk_rq_bytes(req), blk_rq_pos(req), good_bytes, blk_stat);
 		if (scsi_end_request(req, BLK_STS_IOERR, blk_rq_bytes(req)))
 			WARN_ONCE(true,
-			    "Bytes remaining after failed, no-retry command");
-		pr_err("%s3.1 cmd=%pS rq=%pS bytes=%d pos=%lld good_bytes=%d called scsi_end_request blk_stat=%d\n",
+			    "Bytes remaining after failed, special command");
+		pr_err("%s4.1 cmd=%pS rq=%pS bytes=%d pos=%lld good_bytes=%d called scsi_end_request blk_stat=%d\n",
 			__func__, cmd, rq, blk_rq_bytes(req), blk_rq_pos(req), good_bytes, blk_stat);
 		return;
 	}
