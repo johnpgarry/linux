@@ -1075,6 +1075,8 @@ check_lba:
 
 	if (cmd->t_task_lba == 9960) {
 		pr_err("%s2 cdb[0]=%d sectors=%d cmd->t_task_lba=%lld cmd->execute_cmd=%pS calling target_cmd_size_check size=%d\n",
+	//	cmd->special = true;
+	//	size -= 1024;
 			__func__, cdb[0], sectors, cmd->t_task_lba, cmd->execute_cmd, size);
 		cmd->special = true;
 	}
