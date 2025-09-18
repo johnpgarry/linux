@@ -1733,10 +1733,15 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 	if (error && blk_path_error(error)) {
 		struct multipath *m = ti->private;
 
+
 		if (error == BLK_STS_RESOURCE)
 			r = DM_ENDIO_DELAY_REQUEUE;
 		else
 			r = DM_ENDIO_REQUEUE;
+
+		if (print)
+			pr_err("%s2 clone=%pS (bio=%pS) ti=%pS error=%d r=%d DELAY_REQUEUE=%d REQUEUE=%d pgpath=%pS\n",
+			__func__, clone, clone->bio, ti, error, r, DM_ENDIO_DELAY_REQUEUE, DM_ENDIO_REQUEUE, pgpath);
 
 		if (pgpath)
 			fail_path(pgpath);
@@ -1747,6 +1752,9 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 				dm_report_EIO(m);
 			/* complete with the original error */
 			r = DM_ENDIO_DONE;
+			if (print)
+				pr_err("%s2 complete with the original error clone=%pS (bio=%pS) ti=%pS error=%d r=%d DONE=%d REQUEUE=%d\n",
+				__func__, clone, clone->bio, ti, error, r, DM_ENDIO_DONE, DM_ENDIO_REQUEUE);
 		}
 	}
 
@@ -1754,13 +1762,20 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 		struct path_selector *ps = &pgpath->pg->ps;
 
 		if (print)
-			pr_err("%s2 clone=%pS (bio=%pS) ti=%pS error=%d ps->type->end_io=%pS\n",
+			pr_err("%s3 clone=%pS (bio=%pS) ti=%pS error=%d ps->type->end_io=%pS\n",
 						__func__, clone, clone->bio, ti, error, ps->type->end_io);
-		if (ps->type->end_io)
+		if (ps->type->end_io) {
+			if (print)
+				pr_err("%s3 clone=%pS (bio=%pS) ti=%pS error=%d calling ps->type->end_io=%pS\n",
+							__func__, clone, clone->bio, ti, error, ps->type->end_io);
 			ps->type->end_io(ps, &pgpath->path, mpio->nr_bytes,
 					 clone->io_start_time_ns);
+		}
 	}
 
+	if (print)
+		pr_err("%s10 clone=%pS (bio=%pS) ti=%pS error=%d r=%d\n",
+				__func__, clone, clone->bio, ti, error, r);
 	return r;
 }
 
@@ -2223,7 +2238,7 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 	struct pgpath *pgpath;
 	int r;
 
-	pr_err("%s cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x\n", __func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd));
+	pr_err_once("%s cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x\n", __func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd));
 	if (_IOC_TYPE(cmd) == DM_IOCTL) {
 		*forward = false;
 		switch (cmd) {
@@ -2235,24 +2250,24 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 	}
 
 	pgpath = READ_ONCE(m->current_pgpath);
-	pr_err("%s1 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS\n",
+	pr_err_once("%s1 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS\n",
 		__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
 		pgpath = choose_pgpath(m, 0);
-	pr_err("%s2 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS\n",
+	pr_err_once("%s2 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS\n",
 		__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath);
 
 	if (pgpath) {
-		pr_err("%s3 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d)\n",
+		pr_err_once("%s3 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d)\n",
 			__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath, pgpath->is_active);
 		if (!mpath_double_check_test_bit(MPATHF_QUEUE_IO, m)) {
 			*bdev = pgpath->path.dev->bdev;
-			pr_err("%s3 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d) *bdev=%pS mpath_double_check_test_bit unset\n",
+			pr_err_once("%s3 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d) *bdev=%pS mpath_double_check_test_bit unset\n",
 				__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath, pgpath->is_active, *bdev);
 			r = 0;
 		} else {
 			/* pg_init has not started or completed */
-			pr_err("%s3.1 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d) *bdev=%pS has not started or completed\n",
+			pr_err_once("%s3.1 cmd=0x%x _IOC_TYPE(cmd)=%d/0x%x pgpath=%pS (is_active=%d) *bdev=%pS has not started or completed\n",
 				__func__, cmd, _IOC_TYPE(cmd), _IOC_TYPE(cmd), pgpath, pgpath->is_active, *bdev);
 			r = -ENOTCONN;
 		}
@@ -2265,11 +2280,11 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 		spin_unlock_irq(&m->lock);
 	}
 
-	pr_err("%s4 r=%d\n", __func__, r);
+	pr_err_once("%s4 r=%d\n", __func__, r);
 	if (r == -ENOTCONN) {
 		if (!READ_ONCE(m->current_pg)) {
 			/* Path status changed, redo selection */
-			pr_err("%s4.1 calling choose_pgpath r=%d\n", __func__, r);
+			pr_err_once("%s4.1 calling choose_pgpath r=%d\n", __func__, r);
 			(void) choose_pgpath(m, 0);
 		}
 		spin_lock_irq(&m->lock);
@@ -2296,11 +2311,11 @@ static int multipath_iterate_devices(struct dm_target *ti,
 	struct pgpath *p;
 	int ret = 0;
 
-	pr_err("%s m=%pS fn=%pS\n", __func__, m, fn);
+	pr_err_once("%s m=%pS fn=%pS\n", __func__, m, fn);
 
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(p, &pg->pgpaths, list) {
-			pr_err("%s2 m=%pS p=%pS pg=%pS fn=%pS begin=%lld len=%lld\n",
+			pr_err_once("%s2 m=%pS p=%pS pg=%pS fn=%pS begin=%lld len=%lld\n",
 				__func__, m, p, pg, fn, ti->begin, ti->len);
 			ret = fn(ti, p->path.dev, ti->begin, ti->len, data);
 			if (ret)

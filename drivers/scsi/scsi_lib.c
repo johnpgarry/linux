@@ -1058,10 +1058,17 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	int result = cmd->result;
 	struct request *req = scsi_cmd_to_rq(cmd);
 	blk_status_t blk_stat = BLK_STS_OK;
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	bool special = false;
 
 	if (unlikely(result))	/* a nz result may or may not be an error */
 		result = scsi_io_completion_nz_result(cmd, result, &blk_stat);
 
+	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld (bytes=%lld) blk_stat=%d result=%d sc->underflow=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_rq_pos(rq) * 512, blk_stat, result, cmd->underflow);
+		special = true;
+	}
 	/*
 	 * Next deal with any sectors which we were able to correctly
 	 * handle.
@@ -1075,8 +1082,14 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	 * to retry code. Fast path should return in this block.
 	 */
 	if (likely(blk_rq_bytes(req) > 0 || blk_stat == BLK_STS_OK)) {
+		if (special)
+			pr_err("%s2 cmd=%pS rq=%pS pos=%lld bytes=%d good_bytes=%d blk_stat=%d calling scsi_end_request -> update\n",
+				__func__, cmd, rq, blk_rq_pos(req), blk_rq_bytes(req), good_bytes, blk_stat);
 		if (likely(!scsi_end_request(req, blk_stat, good_bytes)))
 			return; /* no bytes remaining */
+		if (special)
+			pr_err("%s2.1 cmd=%pS rq=%pS pos=%lld bytes=%d good_bytes=%d blk_stat=%d called scsi_end_request -> update\n",
+			__func__, cmd, rq, blk_rq_pos(req), blk_rq_bytes(req), good_bytes, blk_stat);
 	}
 
 	/* Kill remainder if no retries. */
@@ -1084,6 +1097,17 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		if (scsi_end_request(req, blk_stat, blk_rq_bytes(req)))
 			WARN_ONCE(true,
 			    "Bytes remaining after failed, no-retry command");
+		return;
+	}
+
+	if (special && 0) {
+		pr_err("%s3 cmd=%pS rq=%pS bytes=%d pos=%lld good_bytes=%d calling scsi_end_request blk_stat=%d using BLK_STS_IOERR\n",
+			__func__, cmd, rq, blk_rq_bytes(req), blk_rq_pos(req), good_bytes, blk_stat);
+		if (scsi_end_request(req, BLK_STS_IOERR, blk_rq_bytes(req)))
+			WARN_ONCE(true,
+			    "Bytes remaining after failed, no-retry command");
+		pr_err("%s3.1 cmd=%pS rq=%pS bytes=%d pos=%lld good_bytes=%d called scsi_end_request blk_stat=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(req), blk_rq_pos(req), good_bytes, blk_stat);
 		return;
 	}
 
@@ -1547,9 +1571,11 @@ static void scsi_complete(struct request *rq)
 		scsi_finish_command(cmd);
 		break;
 	case NEEDS_RETRY:
+		pr_err("%s NEEDS_RETRY rq=%pS\n", __func__, rq);
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_EH_RETRY);
 		break;
 	case ADD_TO_MLQUEUE:
+		pr_err("%s ADD_TO_MLQUEUE rq=%pS\n", __func__, rq);
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 		break;
 	default:

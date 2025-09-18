@@ -933,6 +933,7 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 	bool quiet = req->rq_flags & RQF_QUIET;
 	int total_bytes;
+	bool special = false;
 
 	trace_block_rq_complete(req, error, nr_bytes);
 
@@ -953,6 +954,8 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	if (unlikely(error && !blk_rq_is_passthrough(req) && !quiet) &&
 	    !test_bit(GD_DEAD, &req->q->disk->state)) {
 		blk_print_req_error(req, error);
+		pr_err("%s req=%pS nr_bytes=%d\n", __func__, req, nr_bytes);
+		special = true;
 		trace_block_rq_error(req, error, nr_bytes);
 	}
 
@@ -962,6 +965,11 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	while (req->bio) {
 		struct bio *bio = req->bio;
 		unsigned bio_bytes = min(bio->bi_iter.bi_size, nr_bytes);
+
+
+		if (special)
+			pr_err("%2s req=%pS nr_bytes=%d bio_bytes=%d bio->bi_iter.bi_size=%d req bytes=%d pos=%lld\n",
+				__func__, req, nr_bytes, bio_bytes, bio->bi_iter.bi_size, blk_rq_bytes(req), blk_rq_pos(req));
 
 		if (unlikely(error))
 			bio->bi_status = error;
@@ -999,6 +1007,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 			break;
 	}
 
+	if (special)
+		pr_err("%s3 after looping bios req=%pS nr_bytes=%d total_bytes=%d req bytes=%d pos=%lld\n",
+			__func__, req, nr_bytes, total_bytes, blk_rq_bytes(req), blk_rq_pos(req));
 	/*
 	 * completely done
 	 */
@@ -1008,6 +1019,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 		 * can find how many bytes remain in the request
 		 * later.
 		 */
+		if (special)
+			pr_err("%s4 !req->bio looping bios req=%pS nr_bytes=%d total_bytes=%d req bytes=%d pos=%lld\n",
+				__func__, req, nr_bytes, total_bytes, blk_rq_bytes(req), blk_rq_pos(req));
 		req->__data_len = 0;
 		return false;
 	}
@@ -1038,6 +1052,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 		req->nr_phys_segments = blk_recalc_rq_segments(req);
 	}
 
+	if (special)
+		pr_err("%s10 req=%pS nr_bytes=%d total_bytes=%d req bytes=%d pos=%lld\n",
+			__func__, req, nr_bytes, total_bytes, blk_rq_bytes(req), blk_rq_pos(req));
 	return true;
 }
 EXPORT_SYMBOL_GPL(blk_update_request);
