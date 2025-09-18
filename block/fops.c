@@ -714,7 +714,7 @@ blkdev_direct_write(struct kiocb *iocb, struct iov_iter *from)
 	size_t count = iov_iter_count(from);
 	ssize_t written;
 
-	pr_err("%s iocb=%pS from=%pS count=%zd\n", __func__, iocb, from, count);
+	pr_err_once("%s iocb=%pS from=%pS count=%zd\n", __func__, iocb, from, count);
 	written = kiocb_invalidate_pages(iocb, count);
 	if (written) {
 		if (written == -EBUSY)
@@ -756,7 +756,7 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	size_t shorted = 0;
 	ssize_t ret;
 
-	pr_err("%s iocb=%pS from=%pS size=%lld\n", __func__, iocb, from, size);
+	pr_err_once("%s iocb=%pS from=%pS size=%lld\n", __func__, iocb, from, size);
 	if (bdev_read_only(bdev))
 		return -EPERM;
 

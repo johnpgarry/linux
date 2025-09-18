@@ -954,7 +954,8 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	if (unlikely(error && !blk_rq_is_passthrough(req) && !quiet) &&
 	    !test_bit(GD_DEAD, &req->q->disk->state)) {
 		blk_print_req_error(req, error);
-		pr_err("%s req=%pS nr_bytes=%d\n", __func__, req, nr_bytes);
+		pr_err("%s req=%pS nr_bytes=%d error=%d %s\n", __func__, req, nr_bytes, error,
+			blk_status_to_str(error));
 		special = true;
 		trace_block_rq_error(req, error, nr_bytes);
 	}
@@ -968,7 +969,7 @@ bool blk_update_request(struct request *req, blk_status_t error,
 
 
 		if (special)
-			pr_err("%2s req=%pS nr_bytes=%d bio_bytes=%d bio->bi_iter.bi_size=%d req bytes=%d pos=%lld\n",
+			pr_err("%s2 looping req->bio req=%pS nr_bytes=%d bio_bytes=%d bio->bi_iter.bi_size=%d req bytes=%d pos=%lld\n",
 				__func__, req, nr_bytes, bio_bytes, bio->bi_iter.bi_size, blk_rq_bytes(req), blk_rq_pos(req));
 
 		if (unlikely(error))
@@ -1020,9 +1021,12 @@ bool blk_update_request(struct request *req, blk_status_t error,
 		 * later.
 		 */
 		if (special)
-			pr_err("%s4 !req->bio looping bios req=%pS nr_bytes=%d total_bytes=%d req bytes=%d pos=%lld\n",
+			pr_err("%s4 !req->bio req=%pS nr_bytes=%d total_bytes=%d req bytes=%d pos=%lld\n",
 				__func__, req, nr_bytes, total_bytes, blk_rq_bytes(req), blk_rq_pos(req));
 		req->__data_len = 0;
+		if (special)
+			pr_err("%s4.1 !req->bio req=%pS nr_bytes=%d total_bytes=%d req bytes=%d pos=%lld, return false\n",
+				__func__, req, nr_bytes, total_bytes, blk_rq_bytes(req), blk_rq_pos(req));
 		return false;
 	}
 

@@ -1074,6 +1074,13 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	//		blk_stat = BLK_STS_IOERR;
 		special_count++;
 	}
+
+	if (blk_rq_bytes(req) > good_bytes) {
+		pr_err("%s0 cmd=%pS rq=%pS bytes=%d pos=%lld lk_stat=%d result=%d sc->underflow=%d good_bytes=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes);
+		special = true;
+
+	}
 	/*
 	 * Next deal with any sectors which we were able to correctly
 	 * handle.
@@ -1581,11 +1588,13 @@ static void scsi_complete(struct request *rq)
 		scsi_finish_command(cmd);
 		break;
 	case NEEDS_RETRY:
-		pr_err("%s NEEDS_RETRY rq=%pS\n", __func__, rq);
+		pr_err("%s NEEDS_RETRY rq=%pS bytes=%d pos=%lld calling scsi_queue_insert(SCSI_MLQUEUE_EH_RETRY)\n", __func__, rq,
+			blk_rq_bytes(rq), blk_rq_pos(rq));
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_EH_RETRY);
 		break;
 	case ADD_TO_MLQUEUE:
-		pr_err("%s ADD_TO_MLQUEUE rq=%pS\n", __func__, rq);
+		pr_err("%s2 ADD_TO_MLQUEUE rq=%pS bytes=%d pos=%lld calling scsi_queue_insert(SCSI_MLQUEUE_DEVICE_BUSY)\n", __func__, rq,
+			blk_rq_bytes(rq), blk_rq_pos(rq));
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 		break;
 	default:

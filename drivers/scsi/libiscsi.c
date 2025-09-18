@@ -463,6 +463,7 @@ static void iscsi_free_task(struct iscsi_task *task)
 	struct iscsi_session *session = conn->session;
 	struct scsi_cmnd *sc = task->sc;
 	int oldstate = task->state;
+	struct request *req = scsi_cmd_to_rq(sc);
 
 	ISCSI_DBG_SESSION(session, "freeing task itt 0x%x state %d sc %p\n",
 			  task->itt, task->state, task->sc);
@@ -485,8 +486,14 @@ static void iscsi_free_task(struct iscsi_task *task)
 		 * queue command may call this to free the task, so
 		 * it will decide how to return sc to scsi-ml.
 		 */
-		if (oldstate != ISCSI_TASK_REQUEUE_SCSIQ)
+		if (oldstate != ISCSI_TASK_REQUEUE_SCSIQ) {
+			if (blk_rq_pos(req) >= 9960 && blk_rq_pos(req) <= 10088)
+				pr_err("%s req=%pS bio=%pS bi_sector=%lld bi_size=%d calling scsi_done sc=%pS underflow=%d resid_len=%d result=%d\n",
+					__func__, req, req->bio, req->bio->bi_iter.bi_sector,
+					req->bio->bi_iter.bi_size,
+					sc, sc->underflow, sc->resid_len, sc->result);
 			scsi_done(sc);
+		}
 	}
 }
 
@@ -623,6 +630,7 @@ static void __fail_scsi_task(struct iscsi_task *task, int err)
 	struct iscsi_conn *conn = task->conn;
 	struct scsi_cmnd *sc;
 	int state;
+	struct request *req;
 
 	if (cleanup_queued_task(task))
 		return;
@@ -642,6 +650,9 @@ static void __fail_scsi_task(struct iscsi_task *task, int err)
 
 	sc = task->sc;
 	sc->result = err << 16;
+	req = scsi_cmd_to_rq(sc);
+	pr_err("%s calling scsi_set_resid res_count=scsi_bufflen(sc) req=%pS bytes=%d pos=%lld\n",
+				__func__, req, blk_rq_bytes(req), blk_rq_pos(req));
 	scsi_set_resid(sc, scsi_bufflen(sc));
 	iscsi_complete_task(task, state);
 }
@@ -879,6 +890,7 @@ static void iscsi_scsi_cmd_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	struct iscsi_scsi_rsp *rhdr = (struct iscsi_scsi_rsp *)hdr;
 	struct iscsi_session *session = conn->session;
 	struct scsi_cmnd *sc = task->sc;
+	struct request *req = scsi_cmd_to_rq(sc);
 
 	iscsi_update_cmdsn(session, (struct iscsi_nopin*)rhdr);
 	conn->exp_statsn = be32_to_cpu(rhdr->statsn) + 1;
@@ -945,11 +957,14 @@ invalid_datalen:
 
 		if (res_count > 0 &&
 		    (rhdr->flags & ISCSI_FLAG_CMD_OVERFLOW ||
-		     res_count <= scsi_bufflen(sc)))
+		     res_count <= scsi_bufflen(sc))) {
 			/* write side for bidi or uni-io set_resid */
-			scsi_set_resid(sc, res_count);
-		else
+			pr_err("%s calling scsi_set_resid res_count=%d req=%pS bytes=%d pos=%lld\n",
+				__func__, res_count, req, blk_rq_bytes(req), blk_rq_pos(req));
+			scsi_set_resid(sc, res_count); 
+		} else {
 			sc->result = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
+		}
 	}
 out:
 	ISCSI_DBG_SESSION(session, "cmd rsp done [sc %p res %d itt 0x%x]\n",
@@ -973,6 +988,7 @@ iscsi_data_in_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 {
 	struct iscsi_data_rsp *rhdr = (struct iscsi_data_rsp *)hdr;
 	struct scsi_cmnd *sc = task->sc;
+	struct request *req = scsi_cmd_to_rq(sc);
 
 	if (!(rhdr->flags & ISCSI_FLAG_DATA_STATUS))
 		return;
@@ -986,10 +1002,13 @@ iscsi_data_in_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 
 		if (res_count > 0 &&
 		    (rhdr->flags & ISCSI_FLAG_CMD_OVERFLOW ||
-		     res_count <= sc->sdb.length))
+		     res_count <= sc->sdb.length)) {
+			pr_err("%s calling scsi_set_resid res_count=%d req=%pS bytes=%d pos=%lld\n",
+				__func__, res_count, req, blk_rq_bytes(req), blk_rq_pos(req));
 			scsi_set_resid(sc, res_count);
-		else
+		} else {
 			sc->result = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
+		}
 	}
 
 	ISCSI_DBG_SESSION(conn->session, "data in with status done "
@@ -1765,6 +1784,11 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 
 	if ((req->bio && req->bio->directio) || (req->directio))
 		pr_err("%s req=%pS bio=%pS bi_sector=%lld bi_size=%d\n",
+			__func__, req, req->bio, req->bio->bi_iter.bi_sector,
+			req->bio->bi_iter.bi_size);
+
+	if (blk_rq_pos(req) >= 9960 && blk_rq_pos(req) < 10960)
+		pr_err("%s2 req=%pS bio=%pS bi_sector=%lld bi_size=%d\n",
 			__func__, req, req->bio, req->bio->bi_iter.bi_sector,
 			req->bio->bi_iter.bi_size);
 
