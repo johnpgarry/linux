@@ -840,6 +840,9 @@ static void target_handle_abort(struct se_cmd *cmd)
 	if (tas) {
 		if (!(cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)) {
 			cmd->scsi_status = SAM_STAT_TASK_ABORTED;
+
+			if (_special_lba(cmd))
+				pr_err("%s cmd=%pS setting scsi_status=SAM_STAT_TASK_ABORTED=%d\n", __func__, cmd, SAM_STAT_TASK_ABORTED);
 			pr_debug("Setting SAM_STAT_TASK_ABORTED status for CDB: 0x%02x, ITT: 0x%08llx\n",
 				 cmd->t_task_cdb[0], cmd->tag);
 			trace_target_cmd_complete(cmd);
@@ -913,6 +916,9 @@ void target_complete_cmd_with_sense(struct se_cmd *cmd, u8 scsi_status,
 	if (target_cmd_interrupted(cmd))
 		return;
 
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS setting scsi_status=%d sense_reason=%d\n", __func__, cmd, scsi_status, sense_reason);
+
 	cmd->scsi_status = scsi_status;
 	cmd->sense_reason = sense_reason;
 
@@ -947,6 +953,9 @@ EXPORT_SYMBOL(target_complete_cmd_with_sense);
 
 void target_complete_cmd(struct se_cmd *cmd, u8 scsi_status)
 {
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS setting scsi_status=%d sets UNIT_COMMUNICATION_FAILURE if set cmd->residual_count=%d\n",
+			__func__, cmd, scsi_status, cmd->residual_count);
 	target_complete_cmd_with_sense(cmd, scsi_status, scsi_status ?
 			      TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE :
 			      TCM_NO_SENSE);
@@ -2055,6 +2064,9 @@ void transport_generic_request_failure(struct se_cmd *cmd,
 		queue_work(target_completion_wq, &cmd->work);
 		return;
 	}
+	if (_special_lba(cmd))
+			pr_err("%s cmd=%pS setting scsi_status from sense_reason=%d\n",
+				__func__, cmd, sense_reason);
 
 	switch (sense_reason) {
 	case TCM_NON_EXISTENT_LUN:
@@ -3521,18 +3533,26 @@ static void translate_sense_reason(struct se_cmd *cmd, sense_reason_t reason)
 	int r = (__force int)reason;
 	u8 key, asc, ascq;
 	bool desc_format = target_sense_desc_format(cmd->se_dev);
+	if (_special_lba(cmd))
+			pr_err("%s cmd=%pS possibly setting scsi_status\n",
+				__func__, cmd);
 
 	if (r < ARRAY_SIZE(sense_detail_table) && sense_detail_table[r].key)
 		sd = &sense_detail_table[r];
 	else
 		sd = &sense_detail_table[(__force int)
 				       TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE];
+	if (_special_lba(cmd))
+			pr_err("%s cmd=%pS possibly setting scsi_status\n",
+				__func__, cmd);
 
 	key = sd->key;
 	if (reason == TCM_CHECK_CONDITION_UNIT_ATTENTION) {
 		if (!core_scsi3_ua_for_check_condition(cmd, &key, &asc,
 						       &ascq)) {
 			cmd->scsi_status = SAM_STAT_BUSY;
+
+
 			return;
 		}
 	} else {
@@ -3584,7 +3604,9 @@ EXPORT_SYMBOL(transport_send_check_condition_and_sense);
 int target_send_busy(struct se_cmd *cmd)
 {
 	WARN_ON_ONCE(cmd->se_cmd_flags & SCF_SCSI_TMR_CDB);
-
+	if (_special_lba(cmd))
+			pr_err("%s cmd=%pS possibly setting scsi_status to SAM_STAT_BUSY\n",
+				__func__, cmd);
 	cmd->scsi_status = SAM_STAT_BUSY;
 	trace_target_cmd_complete(cmd);
 	return cmd->se_tfo->queue_status(cmd);

@@ -24,6 +24,8 @@
 #include "target_core_ua.h"
 #include "target_core_alua.h"
 
+extern bool _special_lba(const struct se_cmd *se_cmd);
+
 static sense_reason_t
 sbc_check_prot(struct se_device *, struct se_cmd *, unsigned char, u32, bool);
 static sense_reason_t sbc_execute_unmap(struct se_cmd *cmd);
@@ -66,7 +68,9 @@ sbc_emulate_readcapacity(struct se_cmd *cmd)
 		memcpy(rbuf, buf, min_t(u32, sizeof(buf), cmd->data_length));
 		transport_kunmap_data_sg(cmd);
 	}
-
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd_with_length set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd_with_length(cmd, SAM_STAT_GOOD, 8);
 	return 0;
 }
@@ -129,7 +133,9 @@ sbc_emulate_readcapacity_16(struct se_cmd *cmd)
 		memcpy(rbuf, buf, min_t(u32, sizeof(buf), cmd->data_length));
 		transport_kunmap_data_sg(cmd);
 	}
-
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd_with_length set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd_with_length(cmd, SAM_STAT_GOOD, 32);
 	return 0;
 }
@@ -161,7 +167,9 @@ sbc_emulate_startstop(struct se_cmd *cmd)
 	 */
 	if (!(cdb[4] & 1) || (cdb[4] & 2) || (cdb[4] & 4))
 		return TCM_INVALID_CDB_FIELD;
-
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd(cmd, SAM_STAT_GOOD);
 	return 0;
 }
@@ -201,7 +209,9 @@ sbc_execute_write_same_unmap(struct se_cmd *cmd)
 		if (ret)
 			return ret;
 	}
-
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd(cmd, SAM_STAT_GOOD);
 	return 0;
 }
@@ -209,6 +219,9 @@ sbc_execute_write_same_unmap(struct se_cmd *cmd)
 static sense_reason_t
 sbc_emulate_noop(struct se_cmd *cmd)
 {
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd(cmd, SAM_STAT_GOOD);
 	return 0;
 }
@@ -1110,6 +1123,9 @@ sbc_execute_unmap(struct se_cmd *cmd)
 		return TCM_INVALID_CDB_FIELD;
 
 	if (cmd->data_length == 0) {
+		if (_special_lba(cmd))
+			pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 		target_complete_cmd(cmd, SAM_STAT_GOOD);
 		return 0;
 	}
@@ -1172,8 +1188,12 @@ sbc_execute_unmap(struct se_cmd *cmd)
 
 err:
 	transport_kunmap_data_sg(cmd);
-	if (!ret)
+	if (!ret) {
+		if (_special_lba(cmd))
+			pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 		target_complete_cmd(cmd, SAM_STAT_GOOD);
+	}
 	return ret;
 }
 

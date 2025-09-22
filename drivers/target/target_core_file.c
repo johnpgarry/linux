@@ -29,6 +29,7 @@
 
 #include "target_core_file.h"
 
+extern bool _special_lba(const struct se_cmd *se_cmd);
 static inline struct fd_dev *FD_DEV(struct se_device *dev)
 {
 	return container_of(dev, struct fd_dev, dev);
@@ -254,6 +255,10 @@ static void cmd_rw_aio_complete(struct kiocb *iocb, long ret)
 
 	cmd = container_of(iocb, struct target_core_file_cmd, iocb);
 
+	if (cmd->cmd && _special_lba(cmd->cmd))
+		pr_err("%s cmd->cmd=%pS calling target_complete_cmd set cmd->residual_count=%d ret=%ld cmd->len=%ld\n",
+			__func__, cmd->cmd, cmd->cmd->residual_count, ret, cmd->len);
+
 	if (ret != cmd->len)
 		target_complete_cmd(cmd->cmd, SAM_STAT_CHECK_CONDITION);
 	else
@@ -394,8 +399,12 @@ fd_execute_sync_cache(struct se_cmd *cmd)
 	 * If the Immediate bit is set, queue up the GOOD response
 	 * for this SYNCHRONIZE_CACHE op
 	 */
-	if (immed)
+	if (immed) {
+		if (_special_lba(cmd))
+			pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 		target_complete_cmd(cmd, SAM_STAT_GOOD);
+	}
 
 	/*
 	 * Determine if we will be flushing the entire device.
@@ -417,6 +426,10 @@ fd_execute_sync_cache(struct se_cmd *cmd)
 
 	if (immed)
 		return 0;
+
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 
 	if (ret)
 		target_complete_cmd(cmd, SAM_STAT_CHECK_CONDITION);
@@ -477,6 +490,9 @@ fd_execute_write_same(struct se_cmd *cmd)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd(cmd, SAM_STAT_GOOD);
 	return 0;
 }
@@ -666,6 +682,9 @@ fd_execute_rw_buffered(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nent
 	if (ret < 0)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
+	if (_special_lba(cmd))
+		pr_err("%s9 cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd(cmd, SAM_STAT_GOOD);
 	return 0;
 }

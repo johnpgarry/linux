@@ -1309,8 +1309,11 @@ int iscsit_process_scsi_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 
 
 	if (special_lba(cmd))
-			pr_err("%s hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d\n",
-			__func__, hdr->hlength,
+			pr_err("%s cmd=%pS se_cmd=%pS hdr->hlength=%d WRITE=%d READ=%d se_cmd->t_task_lba=%lld, data_length=%d, residual_count=%d\n",
+			__func__,
+			cmd,
+			se_cmd,
+			hdr->hlength,
 			!!(hdr->flags & ISCSI_FLAG_CMD_WRITE),
 			!!(hdr->flags & ISCSI_FLAG_CMD_READ),
 			se_cmd->t_task_lba,
@@ -3362,9 +3365,13 @@ void iscsit_build_rsp_pdu(struct iscsit_cmd *cmd, struct iscsit_conn *conn,
 	if (cmd->se_cmd.se_cmd_flags & SCF_OVERFLOW_BIT) {
 		hdr->flags |= ISCSI_FLAG_CMD_OVERFLOW;
 		hdr->residual_count = cpu_to_be32(cmd->se_cmd.residual_count);
+		pr_err("%s SCF_OVERFLOW_BIT residual_count=%d cmd->se_cmd.scsi_status=%d cmd=%pS cmd->se_cmd=%pS\n",
+			__func__, hdr->residual_count, cmd->se_cmd.scsi_status, cmd, &cmd->se_cmd);
 	} else if (cmd->se_cmd.se_cmd_flags & SCF_UNDERFLOW_BIT) {
 		hdr->flags |= ISCSI_FLAG_CMD_UNDERFLOW;
 		hdr->residual_count = cpu_to_be32(cmd->se_cmd.residual_count);
+		pr_err("%s2 SCF_UNDERFLOW_BIT residual_count=%d cmd->se_cmd.scsi_status=%d cmd=%pS cmd->se_cmd=%pS\n",
+			__func__, hdr->residual_count, cmd->se_cmd.scsi_status, cmd, &cmd->se_cmd);
 	}
 	hdr->response		= cmd->iscsi_response;
 	hdr->cmd_status		= cmd->se_cmd.scsi_status;
@@ -3390,6 +3397,8 @@ static int iscsit_send_response(struct iscsit_cmd *cmd, struct iscsit_conn *conn
 	u32 padding = 0, data_buf_len = 0;
 
 	iscsit_build_rsp_pdu(cmd, conn, inc_stat_sn, hdr);
+
+
 
 	/*
 	 * Attach SENSE DATA payload to iSCSI Response PDU

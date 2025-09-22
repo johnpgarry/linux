@@ -25,6 +25,8 @@
 #include "target_core_ua.h"
 #include "target_core_xcopy.h"
 
+extern bool _special_lba(const struct se_cmd *se_cmd);
+
 static void spc_fill_alua_data(struct se_lun *lun, unsigned char *buf)
 {
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
@@ -781,8 +783,12 @@ out:
 	}
 	kfree(buf);
 
-	if (!ret)
+	if (!ret) {
+		if (_special_lba(cmd))
+			pr_err("%s cmd=%pS calling target_complete_cmd_with_length set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 		target_complete_cmd_with_length(cmd, SAM_STAT_GOOD, len);
+	}
 	return ret;
 }
 
@@ -1136,6 +1142,9 @@ set_length:
 		transport_kunmap_data_sg(cmd);
 	}
 
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd_with_length set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd_with_length(cmd, SAM_STAT_GOOD, length);
 	return 0;
 }
@@ -1154,6 +1163,9 @@ static sense_reason_t spc_emulate_modeselect(struct se_cmd *cmd)
 	int i;
 
 	if (!cmd->data_length) {
+		if (_special_lba(cmd))
+			pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 		target_complete_cmd(cmd, SAM_STAT_GOOD);
 		return 0;
 	}
@@ -1196,8 +1208,12 @@ check_contents:
 out:
 	transport_kunmap_data_sg(cmd);
 
-	if (!ret)
+	if (!ret) {
+		if (_special_lba(cmd))
+			pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 		target_complete_cmd(cmd, SAM_STAT_GOOD);
+	}
 	return ret;
 }
 
@@ -1230,6 +1246,9 @@ static sense_reason_t spc_emulate_request_sense(struct se_cmd *cmd)
 	memcpy(rbuf, buf, min_t(u32, sizeof(buf), cmd->data_length));
 	transport_kunmap_data_sg(cmd);
 
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd(cmd, SAM_STAT_GOOD);
 	return 0;
 }
@@ -1297,6 +1316,9 @@ done:
 		transport_kunmap_data_sg(cmd);
 	}
 
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS calling target_complete_cmd_with_length set cmd->residual_count=%d\n",
+			__func__, cmd, cmd->residual_count);
 	target_complete_cmd_with_length(cmd, SAM_STAT_GOOD, 8 + lun_count * 8);
 	return 0;
 }
@@ -2262,8 +2284,12 @@ out:
 	kfree(buf);
 	transport_kunmap_data_sg(cmd);
 
-	if (!ret)
+	if (!ret) {
+		if (_special_lba(cmd))
+			pr_err("%s cmd=%pS calling target_complete_cmd_with_length set cmd->residual_count=%d\n",
+				__func__, cmd, cmd->residual_count);
 		target_complete_cmd_with_length(cmd, SAM_STAT_GOOD, response_length);
+	}
 	return ret;
 }
 
