@@ -1066,7 +1066,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		result = scsi_io_completion_nz_result(cmd, result, &blk_stat);
 
 	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
-		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld lk_stat=%d result=%d sc->underflow=%d good_bytes=%d\n",
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld blk_stat=%d result=%d sc->underflow=%d good_bytes=%d\n",
 			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes);
 		special = true;
 
@@ -1076,7 +1076,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	}
 
 	if (blk_rq_bytes(req) > good_bytes) {
-		pr_err("%s0 cmd=%pS rq=%pS bytes=%d pos=%lld lk_stat=%d result=%d sc->underflow=%d good_bytes=%d\n",
+		pr_err("%s0 cmd=%pS rq=%pS bytes=%d pos=%lld blk_stat=%d result=%d sc->underflow=%d good_bytes=%d\n",
 			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes);
 		special = true;
 

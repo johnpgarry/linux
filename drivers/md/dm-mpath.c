@@ -1598,6 +1598,9 @@ static void pg_init_done(void *data, int errors)
 	unsigned long flags;
 	bool delay_retry = false;
 
+	if (errors != SCSI_DH_OK)
+		pr_err("%s errors=%d\n", __func__, errors);
+
 	/* device or driver problems */
 	switch (errors) {
 	case SCSI_DH_OK:
@@ -1717,6 +1720,10 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 		pr_err("%s clone=%pS (bio=%pS) ti=%pS error=%d\n",
 			__func__, clone, clone->bio, ti, error);
 		print = true;
+	} else if (error) {
+		pr_err("%s clone=%pS (bio=%pS) ti=%pS error=%d\n",
+			__func__, clone, clone->bio, ti, error);
+		print = true;	
 	}
 
 	/*
@@ -1739,8 +1746,8 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 		else
 			r = DM_ENDIO_REQUEUE;
 
-		if (print)
-			pr_err("%s2 clone=%pS (bio=%pS) ti=%pS error=%d r=%d DELAY_REQUEUE=%d REQUEUE=%d pgpath=%pS\n",
+		//if (print)
+		pr_err("%s2 blk_path_error received clone=%pS (bio=%pS) ti=%pS error=%d r=%d DELAY_REQUEUE=%d REQUEUE=%d pgpath=%pS\n",
 			__func__, clone, clone->bio, ti, error, r, DM_ENDIO_DELAY_REQUEUE, DM_ENDIO_REQUEUE, pgpath);
 
 		if (pgpath)
@@ -1806,9 +1813,13 @@ static int multipath_end_io_bio(struct dm_target *ti, struct bio *clone,
 		if (!test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags)) {
 			if (__must_push_back(m)) {
 				r = DM_ENDIO_REQUEUE;
+				pr_err("%s2 clone=%pS ti=%pS error=%pS DM_ENDIO_REQUEUE\n",
+					__func__, clone, ti, error);
 			} else {
 				dm_report_EIO(m);
 				*error = BLK_STS_IOERR;
+				pr_err("%s3 clone=%pS ti=%pS error=%pS BLK_STS_IOERR\n",
+					__func__, clone, ti, error);
 			}
 			spin_unlock_irqrestore(&m->lock, flags);
 			goto done;

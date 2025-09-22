@@ -252,7 +252,7 @@ static void dm_done(struct request *clone, blk_status_t error, bool mapped)
 			blk_queue_disable_write_zeroes(tio->md->queue);
 	}
 
-	if (print)
+	if (print || (r == DM_ENDIO_REQUEUE) || (r == DM_ENDIO_INCOMPLETE) || (r == DM_ENDIO_REQUEUE) || (r == DM_ENDIO_DELAY_REQUEUE))
 		pr_err("%s3 clone=%pS bytes=%d pos=%lld r=%d REQUEUE=%d INCOMPLETE=%d\n",
 			__func__, clone, blk_rq_bytes(clone), blk_rq_pos(clone),
 			r, DM_ENDIO_REQUEUE, DM_ENDIO_INCOMPLETE);

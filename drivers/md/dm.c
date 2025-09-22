@@ -1112,6 +1112,7 @@ static void clone_endio(struct bio *bio)
 
 		switch (r) {
 		case DM_ENDIO_REQUEUE:
+			pr_err("%s DM_ENDIO_REQUEUE bio=%pS\n", __func__, bio);
 			if (static_branch_unlikely(&zoned_enabled)) {
 				/*
 				 * Requeuing writes to a sequential zone of a zoned
@@ -1128,6 +1129,7 @@ static void clone_endio(struct bio *bio)
 		case DM_ENDIO_DONE:
 			break;
 		case DM_ENDIO_INCOMPLETE:
+			pr_err("%s2 DM_ENDIO_INCOMPLETE bio=%pS\n", __func__, bio);
 			/* The target will handle the io */
 			return;
 		default:
