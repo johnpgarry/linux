@@ -36,7 +36,7 @@
 
 #define IBLOCK_MAX_BIO_PER_TASK	 32	/* max # of bios to submit at a time */
 #define IBLOCK_BIO_POOL_SIZE	128
-
+extern bool _special_lba(const struct se_cmd *se_cmd);
 static inline struct iblock_dev *IBLOCK_DEV(struct se_device *dev)
 {
 	return container_of(dev, struct iblock_dev, dev);
@@ -325,7 +325,10 @@ static void iblock_complete_cmd(struct se_cmd *cmd, blk_status_t blk_status)
 		status = SAM_STAT_CHECK_CONDITION;
 	else
 		status = SAM_STAT_GOOD;
-
+	if (_special_lba(cmd))
+		pr_err("%s cmd=%pS data_length=%d residual_count=%d calling target_complete_cmd blk_status=%d status=%d SAM_STAT_GOOD=%d SAM_STAT_CHECK_CONDITION=%d\n",
+			__func__, cmd, cmd->data_length, cmd->residual_count,
+			blk_status, status, SAM_STAT_GOOD, SAM_STAT_CHECK_CONDITION);
 	target_complete_cmd(cmd, status);
 	kfree(ibr);
 }
@@ -337,7 +340,7 @@ static void iblock_bio_done(struct bio *bio)
 	blk_status_t blk_status = bio->bi_status;
 
 	if (bio->bi_status) {
-		pr_err("bio error: %p,  err: %d\n", bio, bio->bi_status);
+		pr_err("%s bio error: %p,  err: %d\n", __func__, bio, bio->bi_status);
 		/*
 		 * Bump the ib_bio_err_cnt and release bio.
 		 */

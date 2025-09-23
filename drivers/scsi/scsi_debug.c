@@ -13,7 +13,6 @@
  */
 
 
-#define pr_fmt(fmt) KBUILD_MODNAME ":%s: " fmt, __func__
 
 #include <linux/module.h>
 #include <linux/align.h>
@@ -145,7 +144,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_NDELAY   0		/* if > 0 unit is a nanosecond */
 #define DEF_NO_LUN_0   0
 #define DEF_NUM_PARTS   0
-#define DEF_OPTS   0
+#define DEF_OPTS   SDEBUG_OPT_MEDIUM_ERR
 #define DEF_OPT_BLKS 1024
 #define DEF_PHYSBLK_EXP 0
 #define DEF_OPT_XFERLEN_EXP 0
@@ -258,7 +257,7 @@ struct tape_block {
 
 /* when 1==SDEBUG_OPT_MEDIUM_ERR, a medium error is simulated at this
  * sector on read commands: */
-#define OPT_MEDIUM_ERR_ADDR   0x1234 /* that's sector 4660 in decimal */
+#define OPT_MEDIUM_ERR_ADDR   9962 /* that's sector 4660 in decimal */
 #define OPT_MEDIUM_ERR_NUM    10     /* number of consecutive medium errs */
 
 /* SDEBUG_CANQUEUE is the maximum number of commands that can be queued
@@ -4247,6 +4246,9 @@ static int do_device_access(struct sdeb_store_info *sip, struct scsi_cmnd *scp,
 	u8 *fsp;
 	int i, total = 0;
 
+	if (do_write)
+		pr_err("%s write lba=%lld num=%d\n", __func__, lba, num);
+
 	/*
 	 * Even though reads are inherently atomic (in this driver), we expect
 	 * the atomic flag only for writes.
@@ -4632,19 +4634,25 @@ static int resp_read_dt0(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 	ret = check_device_access_params(scp, lba, num, false);
 	if (ret)
 		return ret;
+
 	if (unlikely((SDEBUG_OPT_MEDIUM_ERR & sdebug_opts) &&
 		     (lba <= (sdebug_medium_error_start + sdebug_medium_error_count - 1)) &&
 		     ((lba + num) > sdebug_medium_error_start))) {
 		/* claim unrecoverable read error */
+		pr_err("%s SDEBUG_OPT_MEDIUM_ERR lba=%lld num=%d ret=%d scp=%pS\n",
+			__func__, lba, num, ret, scp);
 		mk_sense_buffer(scp, MEDIUM_ERROR, UNRECOVERED_READ_ERR, 0);
 		/* set info field and valid bit for fixed descriptor */
 		if (0x70 == (scp->sense_buffer[0] & 0x7f)) {
 			scp->sense_buffer[0] |= 0x80;	/* Valid bit */
 			ret = (lba < OPT_MEDIUM_ERR_ADDR)
 			      ? OPT_MEDIUM_ERR_ADDR : (int)lba;
+			pr_err("%s2 SDEBUG_OPT_MEDIUM_ERR lba=%lld num=%d ret=%d setting sense valid bit ret=%d scp=%pS\n",
+				__func__, lba, num, ret, ret, scp);
 			put_unaligned_be32(ret, scp->sense_buffer + 3);
 		}
-		scsi_set_resid(scp, scsi_bufflen(scp));
+		//scsi_set_resid(scp, scsi_bufflen(scp));
+		scsi_set_resid(scp, scsi_bufflen(scp) - 1024);
 		return check_condition_result;
 	}
 

@@ -931,6 +931,10 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	bool quiet = req->rq_flags & RQF_QUIET;
 	int total_bytes;
 
+	if (nr_bytes != blk_rq_bytes(req))
+		pr_err("%s req=%pS nr_bytes=%d blk_rq_bytes(req)=%d\n",
+			__func__, req, nr_bytes, blk_rq_bytes(req));
+
 	trace_block_rq_complete(req, error, nr_bytes);
 
 	if (!req->bio)

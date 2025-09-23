@@ -298,7 +298,7 @@ int iscsit_sequence_cmd(struct iscsit_conn *conn, struct iscsit_cmd *cmd,
 			pr_err("%s1 calling iscsit_execute_cmd cmd=%pS\n", __func__, cmd);
 		ret = iscsit_execute_cmd(cmd, 0);
 		if (special_lba(cmd))
-			pr_err("%s1.1 called iscsit_execute_cmd cmd=%pS ret=%d\n", __func__, cmd, ret);
+			pr_err("%s1.1 called iscsit_execute_cmd cmd=%pS ret=%d \n", __func__, cmd, ret);
 		if ((ret >= 0) && !list_empty(&conn->sess->sess_ooo_cmdsn_list))
 			iscsit_execute_ooo_cmdsns(conn->sess);
 		else if (ret < 0) {
