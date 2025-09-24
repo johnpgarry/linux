@@ -271,6 +271,8 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 		dh_data->prefrence = pg->pref;
 		dh_data->is_active = 1;
 		dh_data->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
+		pr_err("%s sdev=%pS dh_data=%pS dh_data->device_id_str=%s\n",
+			__func__, sdev, dh_data, dh_data->device_id_str);
 		dh_data->device_id_len = pg->device_id_len;
 
 		sdev->host->mpath_alua_grpid = pg->group_id;
