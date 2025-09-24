@@ -1788,9 +1788,10 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 			req->bio->bi_iter.bi_size);
 
 	if (blk_rq_pos(req) >= 9960 && blk_rq_pos(req) < 10960)
-		pr_err("%s2 req=%pS bio=%pS bi_sector=%lld bi_size=%d\n",
+		pr_err("%s2 req=%pS bio=%pS bi_sector=%lld bi_size=%d device=%pS\n",
 			__func__, req, req->bio, req->bio->bi_iter.bi_sector,
-			req->bio->bi_iter.bi_size);
+			req->bio->bi_iter.bi_size,
+			sc->device);
 
 	sc->result = 0;
 	iscsi_cmd(sc)->task = NULL;

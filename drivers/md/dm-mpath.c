@@ -1711,17 +1711,25 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 	int r = DM_ENDIO_DONE;
 	bool print = false;
 
+	bool special = false;
+
+	if (clone && blk_rq_pos(clone) >= 9960 &&  blk_rq_pos(clone) <= 9990) {
+		pr_err("%s clone=%pS bytes=%d pos=%lld error=%d\n",
+			__func__, clone, blk_rq_bytes(clone), blk_rq_pos(clone), error);
+		print = special = true;
+	}
+
 	if (clone->bio && clone->bio->directio) {
 	//	WARN_ON_ONCE(1);
-		pr_err("%s clone=%pS (bio=%pS bi_sector=%lld bi_size=%d) ti=%pS error=%d\n",
+		pr_err("%s0 clone=%pS (bio=%pS bi_sector=%lld bi_size=%d) ti=%pS error=%d\n",
 			__func__, clone, clone->bio, clone->bio->bi_iter.bi_sector, clone->bio->bi_iter.bi_size, ti, error);
 		print = true;
 	} else if (clone->directio) {
-		pr_err("%s clone=%pS (bio=%pS) ti=%pS error=%d\n",
+		pr_err("%s0 clone=%pS (bio=%pS) ti=%pS error=%d\n",
 			__func__, clone, clone->bio, ti, error);
 		print = true;
 	} else if (error) {
-		pr_err("%s clone=%pS (bio=%pS) ti=%pS error=%d\n",
+		pr_err("%s0 clone=%pS (bio=%pS) ti=%pS error=%d\n",
 			__func__, clone, clone->bio, ti, error);
 		print = true;	
 	}
@@ -1769,8 +1777,9 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 		struct path_selector *ps = &pgpath->pg->ps;
 
 		if (print)
-			pr_err("%s3 clone=%pS (bio=%pS) ti=%pS error=%d ps->type->end_io=%pS\n",
-						__func__, clone, clone->bio, ti, error, ps->type->end_io);
+			pr_err("%s3 clone=%pS (pos=%lld bytes=%d) (bio=%pS) ti=%pS error=%d ps->type->end_io=%pS\n",
+						__func__, clone, blk_rq_pos(clone), blk_rq_bytes(clone),
+						clone->bio, ti, error, ps->type->end_io);
 		if (ps->type->end_io) {
 			if (print)
 				pr_err("%s3 clone=%pS (bio=%pS) ti=%pS error=%d calling ps->type->end_io=%pS\n",

@@ -162,6 +162,16 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_driver *drv;
 	unsigned int good_bytes;
+	struct request *rq = scsi_cmd_to_rq(cmd);
+
+	bool special = false;
+
+	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld cmd->result=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), cmd->result);
+		special = true;
+	}
+
 
 	scsi_device_unbusy(sdev, cmd);
 
@@ -179,22 +189,37 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 	SCSI_LOG_MLCOMPLETE(4, sdev_printk(KERN_INFO, sdev,
 				"Notifying upper driver of completion "
 				"(result %x)\n", cmd->result));
-
 	good_bytes = scsi_bufflen(cmd);
+	if (special)
+		pr_err("%s cmd=%pS scsi_bufflen(scp)=%d resid=%d cmd->result=0x%x good_bytes=%d\n",
+			__func__, cmd, scsi_bufflen(cmd), scsi_get_resid(cmd), cmd->result, good_bytes);
 	if (!blk_rq_is_passthrough(scsi_cmd_to_rq(cmd))) {
 		int old_good_bytes = good_bytes;
 		drv = scsi_cmd_to_driver(cmd);
+		if (special)
+			pr_err("%s1 cmd=%pS scsi_bufflen(scp)=%d resid=%d cmd->result=0x%x good_bytes=%d calling drv->done=%pS\n",
+				__func__, cmd, scsi_bufflen(cmd), scsi_get_resid(cmd), cmd->result, good_bytes, drv->done);
 		if (drv->done)
 			good_bytes = drv->done(cmd);
+		if (special)
+			pr_err("%s1.1 cmd=%pS scsi_bufflen(scp)=%d resid=%d cmd->result=0x%x good_bytes=%d called drv->done=%pS\n",
+				__func__, cmd, scsi_bufflen(cmd), scsi_get_resid(cmd), cmd->result, good_bytes, drv->done);
 		/*
 		 * USB may not give sense identifying bad sector and
 		 * simply return a residue instead, so subtract off the
 		 * residue if drv->done() error processing indicates no
 		 * change to the completion length.
 		 */
+		if (special)
+			pr_err("%s2 cmd=%pS scsi_bufflen(scp)=%d resid=%d cmd->result=0x%x good_bytes=%d old_good_bytes=%d\n",
+				__func__, cmd, scsi_bufflen(cmd), scsi_get_resid(cmd), cmd->result,
+				good_bytes, old_good_bytes);
 		if (good_bytes == old_good_bytes)
 			good_bytes -= scsi_get_resid(cmd);
 	}
+	if (special)
+		pr_err("%s9 cmd=%pS scsi_bufflen(scp)=%d resid=%d cmd->result=0x%x good_bytes=%d calling scsi_io_completion\n",
+			__func__, cmd, scsi_bufflen(cmd), scsi_get_resid(cmd), cmd->result, good_bytes);
 	scsi_io_completion(cmd, good_bytes);
 }
 

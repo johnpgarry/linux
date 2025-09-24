@@ -954,7 +954,8 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	if (unlikely(error && !blk_rq_is_passthrough(req) && !quiet) &&
 	    !test_bit(GD_DEAD, &req->q->disk->state)) {
 		blk_print_req_error(req, error);
-		pr_err("%s req=%pS nr_bytes=%d error=%d %s\n", __func__, req, nr_bytes, error,
+		pr_err("%s req=%pS (pos=%lld bytes=%d) nr_bytes=%d (arg) error=%d %s\n",
+			__func__, req, blk_rq_pos(req), blk_rq_bytes(req), nr_bytes, error,
 			blk_status_to_str(error));
 		special = true;
 		trace_block_rq_error(req, error, nr_bytes);
@@ -1172,8 +1173,23 @@ EXPORT_SYMBOL(__blk_mq_end_request);
 
 void blk_mq_end_request(struct request *rq, blk_status_t error)
 {
+	bool special = false;
+
+
+	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+		pr_err("%s rq=%pS bytes=%d pos=%lld calling blk_update_request with blk_rq_bytes(rq) error=%d\n",
+			__func__, rq, blk_rq_bytes(rq), blk_rq_pos(rq), error);
+		special = true;
+	}
+
+
 	if (blk_update_request(rq, error, blk_rq_bytes(rq)))
 		BUG();
+	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+		pr_err("%s1 rq=%pS bytes=%d pos=%lld calling __blk_mq_end_request with blk_rq_bytes(rq) error=%d\n",
+			__func__, rq, blk_rq_bytes(rq), blk_rq_pos(rq), error);
+		special = true;
+	}
 	__blk_mq_end_request(rq, error);
 }
 EXPORT_SYMBOL(blk_mq_end_request);
@@ -2153,6 +2169,8 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 			blk_mq_handle_dev_resource(rq, list);
 			goto out;
 		default:
+			pr_err("%s rq=%pS pos=%lld bytes=%d ret=%d calling blk_mq_end_request after calling queue_rq=%pS\n",
+					__func__, rq, blk_rq_pos(rq), blk_rq_bytes(rq), ret, q->mq_ops->queue_rq);
 			blk_mq_end_request(rq, ret);
 		}
 	} while (!list_empty(list));

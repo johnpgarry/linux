@@ -633,6 +633,13 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = cmd->device;
 	struct request_queue *q = sdev->request_queue;
+	bool special = false;
+
+	if (blk_rq_pos(req) >= 9960 &&  blk_rq_pos(req) <= 9990) {
+		pr_err("%s cmd=%pS req=%pS bytes=%d pos=%lld cmd->result=%d calling blk_update_request with bytes=%d error=%d\n",
+			__func__, cmd, req, blk_rq_bytes(req), blk_rq_pos(req), cmd->result, bytes, error);
+		special = true;
+	}
 
 	if (blk_update_request(req, error, bytes))
 		return true;
@@ -667,6 +674,11 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	 */
 	percpu_ref_get(&q->q_usage_counter);
 
+	if (blk_rq_pos(req) >= 9960 &&  blk_rq_pos(req) <= 9990) {
+		pr_err("%s3 cmd=%pS req=%pS bytes=%d pos=%lld cmd->result=%d calling __blk_mq_end_request error=%d\n",
+			__func__, cmd, req, blk_rq_bytes(req), blk_rq_pos(req), cmd->result, error);
+		special = true;
+	}
 	__blk_mq_end_request(req, error);
 
 	scsi_run_queue_async(sdev);
@@ -791,6 +803,14 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 	bool sense_valid;
 	bool sense_current = true;      /* false implies "deferred sense" */
 	blk_status_t blk_stat;
+	struct request *rq = scsi_cmd_to_rq(cmd);
+	bool special = false;
+
+	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld result=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result);
+		special = true;
+	}
 
 	sense_valid = scsi_command_normalize_sense(cmd, &sshdr);
 	if (sense_valid)
@@ -798,12 +818,22 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 
 	blk_stat = scsi_result_to_blk_status(result);
 
+	if (special) {
+		pr_err("%s1 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+
+	}
+
 	if (host_byte(result) == DID_RESET) {
 		/* Third party bus reset or reset for error recovery
 		 * reasons.  Just retry the command and see what
 		 * happens.
 		 */
 		action = ACTION_RETRY;
+		if (special) {
+			pr_err("%s2 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d host_byte(result) == DID_RESET so set action = ACTION_RETRY\n",
+				__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+		}
 	} else if (sense_valid && sense_current) {
 		switch (sshdr.sense_key) {
 		case UNIT_ATTENTION:
@@ -813,6 +843,10 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 				 */
 				cmd->device->changed = 1;
 				action = ACTION_FAIL;
+				if (special) {
+					pr_err("%s3 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d UNIT_ATTENTION ACTION_FAIL\n",
+						__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+				}
 			} else {
 				/* Must have been a power glitch, or a
 				 * bus reset.  Could not have been a
@@ -820,9 +854,17 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 				 * command and see what happens.
 				 */
 				action = ACTION_RETRY;
+				if (special) {
+					pr_err("%s4 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d UNIT_ATTENTION ACTION_RETRY\n",
+						__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+				}
 			}
 			break;
 		case ILLEGAL_REQUEST:
+			if (special) {
+				pr_err("%s4.1 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d ILLEGAL_REQUEST\n",
+					__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			/* If we had an ILLEGAL REQUEST returned, then
 			 * we may have performed an unsupported
 			 * command.  The only thing this should be
@@ -849,11 +891,19 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 				action = ACTION_FAIL;
 			break;
 		case ABORTED_COMMAND:
+			if (special) {
+				pr_err("%s4.2 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d ABORTED_COMMAND\n",
+					__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			action = ACTION_FAIL;
 			if (sshdr.asc == 0x10) /* DIF */
 				blk_stat = BLK_STS_PROTECTION;
 			break;
 		case NOT_READY:
+			if (special) {
+				pr_err("%s4.3 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d NOT_READY\n",
+					__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			/* If the device is in the process of becoming
 			 * ready, or has a temporary blockage, retry.
 			 */
@@ -891,10 +941,18 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 				action = ACTION_FAIL;
 			break;
 		case VOLUME_OVERFLOW:
+			if (special) {
+				pr_err("%s4.4 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d VOLUME_OVERFLOW\n",
+					__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			/* See SSC3rXX or current. */
 			action = ACTION_FAIL;
 			break;
 		case DATA_PROTECT:
+			if (special) {
+				pr_err("%s4.5 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d DATA_PROTECT\n",
+					__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			action = ACTION_FAIL;
 			if ((sshdr.asc == 0x0C && sshdr.ascq == 0x12) ||
 			    (sshdr.asc == 0x55 &&
@@ -904,17 +962,34 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 			}
 			break;
 		case COMPLETED:
+			if (special) {
+				pr_err("%s4.6 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d COMPLETED\n",
+					__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			fallthrough;
 		default:
+			if (special) {
+				pr_err("%s4.7 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d default\n",
+					__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			action = ACTION_FAIL;
 			break;
 		}
-	} else
+	} else {
 		action = ACTION_FAIL;
+		if (special) {
+			pr_err("%s5 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d no result or sense action = ACTION_FAIL\n",
+				__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+		}
+	}
 
 	if (action != ACTION_FAIL && scsi_cmd_runtime_exceeced(cmd))
 		action = ACTION_FAIL;
 
+	if (special) {
+			pr_err("%s6 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d BLK_STS_MEDIUM=%d action=%d ACTION_FAIL=%d\n",
+						__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat, BLK_STS_MEDIUM, action, ACTION_FAIL);
+	}
 	switch (action) {
 	case ACTION_FAIL:
 		/* Give up and fail the remainder of the request */
@@ -939,8 +1014,18 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 				scsi_print_command(cmd);
 			}
 		}
-		if (!scsi_end_request(req, blk_stat, scsi_rq_err_bytes(req)))
+		if (special) {
+			pr_err("%s7 ACTION_FAIL cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d calling scsi_end_request with scsi_rq_err_bytes(req)=%d\n",
+						__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat, scsi_rq_err_bytes(req));
+		}
+		if (!scsi_end_request(req, blk_stat, scsi_rq_err_bytes(req))) {
+
+			if (special) {
+				pr_err("%s7.1 ACTION_FAIL cmd=%pS rq=%pS bytes=%d pos=%lld result=%d blk_stat=%d called scsi_end_request and returning\n",
+							__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result, blk_stat);
+			}
 			return;
+		}
 		fallthrough;
 	case ACTION_REPREP:
 		scsi_mq_requeue_cmd(cmd, 0);
@@ -1062,12 +1147,22 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	bool special = false;
 	static int special_count;
 
+	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld blk_stat=%d result=%d sc->underflow=%d good_bytes=%d cmd->result=0x%x blk_rq_is_passthrough(req)=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes, cmd->result,
+			blk_rq_is_passthrough(req));
+		special = true;
+
+	//	if (special_count == 0)
+	//		blk_stat = BLK_STS_IOERR;
+		special_count++;
+	}
 	if (unlikely(result))	/* a nz result may or may not be an error */
 		result = scsi_io_completion_nz_result(cmd, result, &blk_stat);
 
 	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
-		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld blk_stat=%d result=%d sc->underflow=%d good_bytes=%d\n",
-			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes);
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld blk_stat=%d result=%d sc->underflow=%d good_bytes=%d cmd->result=0x%x\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), blk_stat, result, cmd->underflow, good_bytes, cmd->result);
 		special = true;
 
 	//	if (special_count == 0)
@@ -1105,7 +1200,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	}
 
 	/* Kill remainder if no retries. */
-	if (unlikely(blk_stat && (scsi_noretry_cmd(cmd) || special))) {
+	if (unlikely(blk_stat && scsi_noretry_cmd(cmd))) {
 		if (special)
 			pr_err("%s3 cmd=%pS rq=%pS pos=%lld bytes=%d good_bytes=%d blk_stat=%d called scsi_end_request -> update\n",
 			__func__, cmd, rq, blk_rq_pos(req), blk_rq_bytes(req), good_bytes, blk_stat);
@@ -1126,6 +1221,12 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		pr_err("%s4.1 cmd=%pS rq=%pS bytes=%d pos=%lld good_bytes=%d called scsi_end_request blk_stat=%d\n",
 			__func__, cmd, rq, blk_rq_bytes(req), blk_rq_pos(req), good_bytes, blk_stat);
 		return;
+	}
+
+	if (special) {
+		req->special_request = 1;
+		pr_err("%s5 cmd=%pS rq=%pS bytes=%d pos=%lld result=%d calling scsi_mq_requeue_cmd if result==0, scsi_io_completion_action otherwise\n",
+			__func__, cmd, rq, blk_rq_bytes(req), blk_rq_pos(req), result);
 	}
 
 	/*
@@ -1570,6 +1671,13 @@ static void scsi_complete(struct request *rq)
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
 	enum scsi_disposition disposition;
+	bool special = false;
+
+	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld cmd->result=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), cmd->result);
+		special = true;
+	}
 
 	INIT_LIST_HEAD(&cmd->eh_entry);
 
@@ -1577,11 +1685,17 @@ static void scsi_complete(struct request *rq)
 	if (cmd->result)
 		atomic_inc(&cmd->device->ioerr_cnt);
 
+	if (special)
+		pr_err("%s1 cmd=%pS scsi_bufflen(scp)=%d resid=%d cmd->result=0x%x calling scsi_decide_disposition\n",
+			__func__, cmd, scsi_bufflen(cmd), scsi_get_resid(cmd), cmd->result);
 	disposition = scsi_decide_disposition(cmd);
 	if (disposition != SUCCESS && scsi_cmd_runtime_exceeced(cmd))
 		disposition = SUCCESS;
 
 	scsi_log_completion(cmd, disposition);
+	if (special)
+		pr_err("%s1.1 cmd=%pS scsi_bufflen(scp)=%d resid=%d cmd->result=0x%x called scsi_decide_disposition disposition=%d\n",
+			__func__, cmd, scsi_bufflen(cmd), scsi_get_resid(cmd), cmd->result, disposition);
 
 	switch (disposition) {
 	case SUCCESS:
@@ -1872,6 +1986,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 			req->bio->bi_iter.bi_size);
 
 	WARN_ON_ONCE(cmd->budget_token < 0);
+
 
 	/*
 	 * If the device is not in running state we will reject some or all

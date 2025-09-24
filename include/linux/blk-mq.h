@@ -202,6 +202,8 @@ struct request {
 	u64 fifo_time;
 
 	bool directio;
+	bool special_request;
+
 
 	/*
 	 * completion callback.

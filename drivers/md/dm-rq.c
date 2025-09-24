@@ -193,8 +193,8 @@ static void dm_requeue_original_request(struct dm_rq_target_io *tio, bool delay_
 	struct request *rq = tio->orig;
 	unsigned long delay_ms = delay_requeue ? 100 : 0;
 
-	pr_err("%s rq=%pS bytes=%d pos=%lld\n",
-			__func__, rq, blk_rq_bytes(rq), blk_rq_pos(rq));
+	pr_err("%s rq=%pS bytes=%d pos=%lld tio->clone=%pS\n",
+			__func__, rq, blk_rq_bytes(rq), blk_rq_pos(rq), tio->clone);
 
 	rq_end_stats(md, rq);
 	if (tio->clone) {
@@ -210,6 +210,8 @@ static void dm_requeue_original_request(struct dm_rq_target_io *tio, bool delay_
 		tio->ti->type->release_clone_rq(tio->clone, NULL);
 	}
 
+	pr_err("%s9 rq=%pS bytes=%d pos=%lld tio->clone=%pS calling dm_mq_delay_requeue_request\n",
+			__func__, rq, blk_rq_bytes(rq), blk_rq_pos(rq), tio->clone);
 	dm_mq_delay_requeue_request(rq, delay_ms);
 	rq_completed(md);
 }
@@ -220,6 +222,14 @@ static void dm_done(struct request *clone, blk_status_t error, bool mapped)
 	struct dm_rq_target_io *tio = clone->end_io_data;
 	dm_request_endio_fn rq_end_io = NULL;
 	bool print = false;
+
+	bool special = false;
+
+	if (clone && blk_rq_pos(clone) >= 9960 &&  blk_rq_pos(clone) <= 9990) {
+		pr_err("%s clone=%pS bytes=%d pos=%lld mapped=%d\n",
+			__func__, clone, blk_rq_bytes(clone), blk_rq_pos(clone), mapped);
+		print = special = true;
+	}
 
 	if (clone->bio && clone->bio->directio) {
 	//	WARN_ON_ONCE(1);
@@ -253,9 +263,9 @@ static void dm_done(struct request *clone, blk_status_t error, bool mapped)
 	}
 
 	if (print || (r == DM_ENDIO_REQUEUE) || (r == DM_ENDIO_INCOMPLETE) || (r == DM_ENDIO_REQUEUE) || (r == DM_ENDIO_DELAY_REQUEUE))
-		pr_err("%s3 clone=%pS bytes=%d pos=%lld r=%d REQUEUE=%d INCOMPLETE=%d\n",
+		pr_err("%s3 clone=%pS bytes=%d pos=%lld r=%d REQUEUE=%d INCOMPLETE=%d DM_ENDIO_DONE=%d error=%d\n",
 			__func__, clone, blk_rq_bytes(clone), blk_rq_pos(clone),
-			r, DM_ENDIO_REQUEUE, DM_ENDIO_INCOMPLETE);
+			r, DM_ENDIO_REQUEUE, DM_ENDIO_INCOMPLETE, DM_ENDIO_DONE, error);
 	switch (r) {
 	case DM_ENDIO_DONE:
 		/* The target wants to complete the I/O */
