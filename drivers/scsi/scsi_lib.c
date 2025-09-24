@@ -115,6 +115,11 @@ static void scsi_mq_requeue_cmd(struct scsi_cmnd *cmd, unsigned long msecs)
 {
 	struct request *rq = scsi_cmd_to_rq(cmd);
 
+	if ((blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) || rq->special_request) {
+		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld msecs=%ld\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), msecs);
+	}
+
 	if (rq->rq_flags & RQF_DONTPREP) {
 		rq->rq_flags &= ~RQF_DONTPREP;
 		scsi_mq_uninit_cmd(cmd);
@@ -806,7 +811,7 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 	struct request *rq = scsi_cmd_to_rq(cmd);
 	bool special = false;
 
-	if (blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) {
+	if ((blk_rq_pos(rq) >= 9960 &&  blk_rq_pos(rq) <= 9990) || req->special_request) {
 		pr_err("%s cmd=%pS rq=%pS bytes=%d pos=%lld result=%d\n",
 			__func__, cmd, rq, blk_rq_bytes(rq), blk_rq_pos(rq), result);
 		special = true;
