@@ -715,7 +715,7 @@ EXPORT_SYMBOL_GPL(scsi_mpath_unique_id);
 int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
 	struct scsi_mpath_dh_data *dh_data = sdev->mpath_pg_data;
-	char device_id_str[20];
+	char device_id_str[40];
 	int ret = -EINVAL;
 
 	ret = scsi_vpd_lun_id(sdev, device_id_str, dh_data->device_id_len);
