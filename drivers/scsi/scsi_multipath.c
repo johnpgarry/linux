@@ -28,9 +28,38 @@ static const char *scsi_iopolicy_names[] = {
 
 static int iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
 
-static const struct class scsi_class = {
-	.name = "scsi",
+static const struct class scsi_mp_disk_class = {
+	.name = "scsi_mp_disk",
 };
+
+struct scsi_mp_disk {
+	int			instance;
+	struct device		dev;
+	/*
+	 * Because we unregister the device on the last put we need
+	 * a separate refcount.
+	 */
+	struct kref		ref;
+	struct list_head	entry;
+	#ifdef dsdsd
+	struct mutex		lock;
+	struct list_head	ctrls;
+	struct list_head	nsheads;
+	char			subnqn[NVMF_NQN_SIZE];
+	char			serial[20];
+	char			model[40];
+	char			firmware_rev[8];
+	u8			cmic;
+	enum nvme_subsys_type	subtype;
+	u16			vendor_id;
+	u16			awupf; /* 0's based value. */
+	struct ida		ns_ida;
+#ifdef CONFIG_NVME_MULTIPATH
+	enum nvme_iopolicy	iopolicy;
+#endif
+	#endif
+};
+
 
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
@@ -747,6 +776,11 @@ int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 	return 0;
 }
 
+static void scsi_mp_disk_release(struct device *dev)
+{
+	pr_err("%s dev=%pS\n", __func__, dev);
+}
+
 /*
  * Allocate Disk for Multipath Device
  */
@@ -754,6 +788,8 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
 	struct queue_limits lim;
+	struct scsi_mp_disk *mp_disk;
+	int ret;
 
 	pr_err("%s dev=%pS\n", __func__, sdev);
 	/*
@@ -781,6 +817,18 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 		return 0;
 	}
 
+	mp_disk = kzalloc(sizeof(*mp_disk), GFP_KERNEL);
+	if (!mp_disk)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&mp_disk->entry);
+
+	mp_disk->dev.class = &scsi_mp_disk_class;
+	mp_disk->dev.release = scsi_mp_disk_release;
+	//mp_disk->dev.groups = nvme_subsys_attrs_groups;
+	dev_set_name(&mp_disk->dev, "scsi_mp_disk%d", 0);
+	device_initialize(&mp_disk->dev);
+
 	blk_set_stacking_limits(&lim);
 
 	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
@@ -796,6 +844,9 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	sdev->mpath_disk->fops = &scsi_mpath_ops;
 
 	list_add_tail(&shost->mpath_sdev, &sdev->mpath_entry);
+
+	ret = device_add(&mp_disk->dev);
+	pr_err("%s3 called device_add ret=%d\n", __func__, ret);
 
 	return 0;
 }
@@ -914,3 +965,21 @@ int scsi_mpath_update_state(struct scsi_device *sdev)
 
 	return sdev->mpath_state;
 }
+
+static int __init init_scsi_mp(void)
+{
+	return class_register(&scsi_mp_disk_class);
+}
+
+/**
+ *	exit_sd - exit point for this driver (when it is a module).
+ *
+ *	Note: this function unregisters this driver from the scsi mid-level.
+ **/
+static void __exit exit_scsi_mp(void)
+{
+	pr_err("%s\n", __func__);
+}
+
+module_init(init_scsi_mp);
+module_exit(exit_scsi_mp);
