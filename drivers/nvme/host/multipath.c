@@ -1295,7 +1295,8 @@ void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 
 void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 {
-	pr_err("%s ns=%pS anagrpid=0x%x\n", __func__, ns, anagrpid);
+	pr_err("%s ns=%pS anagrpid=0x%x nvme_ctrl_use_ana=%d\n",
+		__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl));
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
 		struct nvme_ana_group_desc desc = {
 			.grpid = anagrpid,
@@ -1389,11 +1390,13 @@ int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	size_t ana_log_size;
 	int error = 0;
 
-	pr_err("%s ctrl=%pS\n", __func__, ctrl);
+	pr_err("%s ctrl=%pS NVME_CTRL_CMIC_ANA=%d\n",
+		__func__, ctrl, !!(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA));
 	/* check if multipath is enabled and we have the capability */
 	if (!multipath || !ctrl->subsys ||
 	    !(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA))
 		return 0;
+	pr_err("%s2 ctrl=%pS multipath is enabled and we have the capability\n", __func__, ctrl);
 
 	/* initialize this in the identify path to cover controller resets */
 	atomic_set(&ctrl->nr_active, 0);
@@ -1420,6 +1423,8 @@ int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 		dev_err(ctrl->device, "disabling ANA support.\n");
 		goto out_uninit;
 	}
+	pr_err("%s2 ctrl=%pS ana_log_size=%zd ctrl->ana_log_size=%zd\n",
+		__func__, ctrl, ana_log_size, ctrl->ana_log_size);
 	if (ana_log_size > ctrl->ana_log_size) {
 		nvme_mpath_stop(ctrl);
 		nvme_mpath_uninit(ctrl);
