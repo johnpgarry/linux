@@ -432,7 +432,9 @@ void scsi_mpath_set_live(struct scsi_device *sdev)
 		return;
 
 	if (!test_and_set_bit(SCSI_MPATH_DISK_LIVE, &sdev->mpath_flags)) {
-		ret = device_add_disk(&sdev->sdev_dev, sdev->mpath_disk, NULL);
+		struct scsi_mp_disk *scsi_mp_disk = sdev->scsi_mp_disk;
+		pr_err("%s calling device_add_disk\n", __func__);
+		ret = device_add_disk(&scsi_mp_disk->dev, sdev->mpath_disk, NULL);
 		if (ret) {
 			clear_bit(SCSI_MPATH_DISK_LIVE, &sdev->mpath_flags);
 			return;
@@ -871,10 +873,18 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	sdev->mpath_disk->private_data = shost;
 	sdev->mpath_disk->fops = &scsi_mpath_ops;
 
+	sdev->scsi_mp_disk = mp_disk;
+
 	list_add_tail(&shost->mpath_sdev, &sdev->mpath_entry);
 
 	ret = device_add(&mp_disk->dev);
 	pr_err("%s3 called device_add ret=%d\n", __func__, ret);
+	if (ret)
+		return ret;
+	ret = 0;//device_add_disk(&mp_disk->dev, sdev->mpath_disk, NULL);
+	pr_err("%s3 called device_add_disk ret=%d\n", __func__, ret);
+	if (ret)
+		return ret;
 
 	return 0;
 }

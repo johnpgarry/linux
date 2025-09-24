@@ -310,6 +310,7 @@ struct scsi_device {
 	struct scsi_mpath_dh_data	*mpath_pg_data; /* Place holder for Port group data */
 	struct work_struct		activate_mpath; /* Activate path work */
 	atomic_t			nr_mpath;	/* Number of Active mpath */
+	void *scsi_mp_disk;
 
 #define SCSI_MPATH_DISK_LIVE            0
 #define SCSI_MPATH_DISK_IO_PENDING      1

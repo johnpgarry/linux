@@ -4075,7 +4075,7 @@ static int sd_probe(struct device *dev)
 		sdp->mpath_disk->major = sd_major((index & 0xf0) >> 4);
 		sdp->mpath_disk->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
 		sdp->mpath_disk->minors = SD_MINORS;
-
+		pr_err("%s major=%d first_minor=%d\n", __func__, sdp->mpath_disk->major, sdp->mpath_disk->first_minor);
 		scsi_mpath_add_disk(sdp);
 
 		if (!test_bit(SCSI_MPATH_DISK_LIVE, &sdp->mpath_flags)) {
