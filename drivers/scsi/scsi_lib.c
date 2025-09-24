@@ -1987,6 +1987,12 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	WARN_ON_ONCE(cmd->budget_token < 0);
 
+	if (req->special_request) {
+		pr_err("%s req=%pS special do not handle it pos=%lld bytes=%d sdev=%pS setting BLK_STS_MEDIUM\n",
+			__func__, req, blk_rq_pos(req), blk_rq_bytes(req), sdev);
+		ret = BLK_STS_MEDIUM;
+		goto out_put_budget;
+	}
 
 	/*
 	 * If the device is not in running state we will reject some or all
