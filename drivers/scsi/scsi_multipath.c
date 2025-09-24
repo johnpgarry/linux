@@ -702,6 +702,7 @@ int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16],
 {
 	struct scsi_mpath_dh_data *dh_data = sdev->mpath_pg_data;
 
+	pr_err("%s sdev=%pS\n", __func__, sdev);
 	if (type != BLK_UID_NAA)
 		return -EINVAL;
 
@@ -726,11 +727,14 @@ int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 //	pr_err("%s3 sdev=%pS dh_data=%pS device_id_str=%s\n",
 //		__func__, sdev, dh_data, dh_data->device_id_str);
 
-	ret = scsi_vpd_lun_id(sdev, device_id_str, dh_data->device_id_len);
+	ret = scsi_vpd_lun_id(sdev, device_id_str, sizeof(device_id_str));
 	if (ret < 0)
 		return ret;
-//	pr_err("%s4 sdev=%pS dh_data=%pS device_id_len=%d device_id_str=%s\n",
-//		__func__, sdev, dh_data, dh_data->device_id_len, device_id_str);
+	pr_err("%s4 sdev=%pS dh_data=%pS \n", __func__, sdev, dh_data);
+	pr_err("%s4.1 device_id_len=%d device_id_str=%s (len=%zd) device_id_str=%s (len=%zd)\n",
+		__func__,
+		dh_data->device_id_len, device_id_str, strlen(dh_data->device_id_str),
+		device_id_str, strlen(device_id_str));
 
 	if (strncmp(dh_data->device_id_str, device_id_str,
 	    dh_data->device_id_len) == 0)
