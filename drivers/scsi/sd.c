@@ -4004,9 +4004,10 @@ static int sd_probe(struct device *dev)
 		    sdp->host->host_no, index);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd=%pS sdp->mpath_disk->disk_name=%s\n",
 			gd->disk_name, sdp->mpath_disk->disk_name);
+		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd=%pS scsi_is_sdev_multipath GENHD_FL_HIDDEN\n", gd->disk_name);
 		gd->flags |= GENHD_FL_HIDDEN;
 	} else {
-		sdev_printk(KERN_INFO, sdp, "sd_probe5 gd=%pS !scsi_is_sdev_multipath GENHD_FL_HIDDEN\n", gd->disk_name);
+		sdev_printk(KERN_INFO, sdp, "sd_probe5 gd=%pS !scsi_is_sdev_multipath\n", gd->disk_name);
 	}
 
 	sdkp->device = sdp;

@@ -28,6 +28,10 @@ static const char *scsi_iopolicy_names[] = {
 
 static int iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
 
+static const struct class scsi_class = {
+	.name = "scsi",
+};
+
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
  * In Future, if more apropriate IO-policy is introduced will be added
@@ -784,6 +788,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	lim.dma_alignment = 3;
 
 	sdev->mpath_disk = blk_alloc_disk(&lim, sdev->mpath_numa_node);
+	pr_err("%s2 dev=%pS sdev->mpath_disk=%pS\n", __func__, sdev, sdev->mpath_disk);
 	if (IS_ERR(sdev->mpath_disk))
 		return PTR_ERR(sdev->mpath_disk);
 

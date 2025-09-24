@@ -107,6 +107,24 @@ struct scsi_vpd {
  */
 #define REQ_SCSI_MPATH		REQ_DRV
 
+struct scsi_mpath_disk {
+	int				is_shared; 	/* Set Multipath flag  */
+	int				mpath_first_path; /* Indicate if this was first path */
+	int				mpath_numa_node; /* NUMA node for Path  */
+	enum scsi_mpath_access_state	mpath_state;	/* Multipath State */
+	enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
+	struct list_head		mpath_entry;	/* list of all mpath_sdevs */
+	struct scsi_mpath_dh_data	*mpath_pg_data; /* Place holder for Port group data */
+	struct work_struct		activate_mpath; /* Activate path work */
+	atomic_t			nr_mpath;	/* Number of Active mpath */
+
+#define SCSI_MPATH_DISK_LIVE            0
+#define SCSI_MPATH_DISK_IO_PENDING      1
+#define SCSI_MPATH_IO_STATS             2
+
+	unsigned long           mpath_flags;		/* flag for multipath devices*/
+};
+
 struct scsi_device {
 	struct Scsi_Host *host;
 	struct request_queue *request_queue;
