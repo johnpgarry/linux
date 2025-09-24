@@ -60,6 +60,34 @@ struct scsi_mp_disk {
 	#endif
 };
 
+static ssize_t scsi_mp_disk_attr_model_show(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+//	struct scsi_mp_disk *scsi_mp_disk =
+//		container_of(dev, struct scsi_mp_disk, dev);
+
+	return sysfs_emit(buf, "%d\n", 123);
+}
+
+struct device_attribute scsi_mp_disk_attr_model = \
+		__ATTR(model, S_IRUGO, scsi_mp_disk_attr_model_show, NULL);
+
+
+static struct attribute *scsi_mp_disk_attrs[] = {
+	&scsi_mp_disk_attr_model.attr,
+	NULL,
+};
+
+static const struct attribute_group scsi_mp_disk_attrs_group = {
+	.attrs = scsi_mp_disk_attrs,
+};
+
+const struct attribute_group *scsi_mp_disk_attrs_groups[] = {
+	&scsi_mp_disk_attrs_group,
+	NULL
+};
+
 
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
@@ -825,7 +853,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 
 	mp_disk->dev.class = &scsi_mp_disk_class;
 	mp_disk->dev.release = scsi_mp_disk_release;
-	//mp_disk->dev.groups = nvme_subsys_attrs_groups;
+	mp_disk->dev.groups = scsi_mp_disk_attrs_groups;
 	dev_set_name(&mp_disk->dev, "scsi_mp_disk%d", 0);
 	device_initialize(&mp_disk->dev);
 
