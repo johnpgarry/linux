@@ -9,7 +9,7 @@
 #include <trace/events/block.h>
 #include "nvme.h"
 
-bool multipath = false;
+bool multipath = true;
 static bool multipath_always_on;
 
 static int multipath_param_set(const char *val, const struct kernel_param *kp)
