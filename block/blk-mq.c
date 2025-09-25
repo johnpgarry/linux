@@ -943,8 +943,8 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	trace_block_rq_complete(req, error, nr_bytes);
 
 	if (req->cmd_flags & REQ_DRV)
-		pr_err("%s req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d __REQ_DRV=%d __RQF_FLUSH_SEQ=%d\n",
-				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error, __REQ_DRV, __RQF_FLUSH_SEQ);
+		pr_err("%s req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d __REQ_DRV=%d __RQF_FLUSH_SEQ=%d is_flush=%d\n",
+				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error, __REQ_DRV, __RQF_FLUSH_SEQ, is_flush);
 
 	if (!req->bio)
 		return false;
