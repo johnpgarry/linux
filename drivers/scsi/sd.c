@@ -3998,7 +3998,7 @@ static int sd_probe(struct device *dev)
 		goto out_free_index;
 	}
 
-	sdev_printk(KERN_INFO, sdp, "%s3 gd=%pS sdp->mpath_disk=%pS\n", __func__, gd->disk_name, sdp->mpath_disk);
+	sdev_printk(KERN_INFO, sdp, "%s3 gd=%pS sdp->mpath_disk=%pS index=%d\n", __func__, gd->disk_name, sdp->mpath_disk, index);
 	if (scsi_is_sdev_multipath(sdp)) {
 		snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "mpath%dsd%d",
 		    sdp->host->host_no, index);
@@ -4041,6 +4041,9 @@ static int sd_probe(struct device *dev)
 	gd->major = sd_major((index & 0xf0) >> 4);
 	gd->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
 	gd->minors = SD_MINORS;
+	 sdev_printk(KERN_INFO, sdp,
+					"sd_probe6 gd->major=%d gd->first_minor=%d\n",
+					gd->major, gd->first_minor);
 
 	gd->fops = &sd_fops;
 	gd->private_data = sdkp;
@@ -4072,10 +4075,13 @@ static int sd_probe(struct device *dev)
 	}
 
 	if (scsi_is_sdev_multipath(sdp)) {
-		sdp->mpath_disk->major = sd_major((index & 0xf0) >> 4);
-		sdp->mpath_disk->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
+		int mindex = ida_alloc(&sd_index_ida, GFP_KERNEL);
+
+		sdp->mpath_disk->major = sd_major((mindex & 0xf0) >> 4);
+		sdp->mpath_disk->first_minor = ((mindex & 0xf) << 4) | (mindex & 0xfff00);
 		sdp->mpath_disk->minors = SD_MINORS;
-		pr_err("%s major=%d first_minor=%d\n", __func__, sdp->mpath_disk->major, sdp->mpath_disk->first_minor);
+		pr_err("%s7 major=%d first_minor=%d index=%d mindex=%d\n",
+			__func__, sdp->mpath_disk->major, sdp->mpath_disk->first_minor, index, mindex);
 		scsi_mpath_add_disk(sdp);
 
 		if (!test_bit(SCSI_MPATH_DISK_LIVE, &sdp->mpath_flags)) {
