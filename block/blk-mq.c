@@ -995,7 +995,7 @@ bool blk_update_request(struct request *req, blk_status_t error,
 		/* Don't actually finish bio if it's part of flush sequence */
 		if (!bio->bi_iter.bi_size) {
 			blk_zone_update_request_bio(req, bio);
-			if (!is_flush)
+		//	if (!is_flush)
 				bio_endio(bio);
 		}
 
