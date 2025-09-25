@@ -1861,7 +1861,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	int reason;
 
 
-	pr_err("%s req=%pS part=%pS pos=%lld bytes=%d bio=%pS sdev=%pS\n",
+	pr_err_once("%s req=%pS part=%pS pos=%lld bytes=%d bio=%pS sdev=%pS\n",
 		__func__, req, req->part, blk_rq_pos(req), blk_rq_bytes(req), req->bio, sdev);
 	WARN_ON_ONCE(cmd->budget_token < 0);
 
