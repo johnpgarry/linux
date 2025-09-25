@@ -4238,7 +4238,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	mutex_unlock(&ctrl->namespaces_lock);
 	synchronize_srcu(&ctrl->srcu);
 	nvme_get_ctrl(ctrl);
-	pr_err("%s4 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS calling device_add_disk \n", __func__, ns, ns->disk, ctrl, ctrl->device, info);
+	pr_err("%s4 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS calling device_add_disk\n", __func__, ns, ns->disk, ctrl, ctrl->device, info);
 	if (device_add_disk(ctrl->device, ns->disk, nvme_ns_attr_groups))
 		goto out_cleanup_ns_from_list;
 	pr_err("%s4.1 ns=%pS (disk=%pS) ctrl=%pS (device=%pS) info=%pS called device_add_disk nvme_ns_head_multipath(ns->head)=%d\n",
