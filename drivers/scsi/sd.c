@@ -3823,7 +3823,9 @@ static void sd_revalidate_disk(struct gendisk *disk)
 		struct queue_limits *mpath_lim = &sdp->mpath_disk->queue->limits;
 
 		//blk_mq_freeze_queue(sdp->mpath_disk->queue);
+		pr_err("%s8 calling queue_limits_start_update\n", __func__);
 		lim = queue_limits_start_update(sdp->mpath_disk->queue);
+		pr_err("%s8.1 called queue_limits_start_update calling queue_limits_stack_bdev\n", __func__);
 		lim.logical_block_size = mpath_lim->logical_block_size;
 		lim.physical_block_size = mpath_lim->physical_block_size;
 		lim.io_min = mpath_lim->io_min;
@@ -3833,13 +3835,17 @@ static void sd_revalidate_disk(struct gendisk *disk)
 
 		sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
 
+		pr_err("%s8.2 calling set_capacity_and_notify\n", __func__);
 		set_capacity_and_notify(sdp->mpath_disk,
 		    logical_to_sectors(sdp, sdkp->capacity));
 
+		pr_err("%s8.3 calling queue_limits_commit_update\n", __func__);
 		err = queue_limits_commit_update(sdp->mpath_disk->queue, &lim);
 
+		pr_err("%s8.4 calling scsi_mpath_revalidate_path err=%d\n", __func__, err);
 		scsi_mpath_revalidate_path(sdp->mpath_disk,
 		    logical_to_sectors(sdp, sdkp->capacity));
+		pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
 
 		//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
 		if (err)
@@ -4004,10 +4010,10 @@ static int sd_probe(struct device *dev)
 		    sdp->host->host_no, index);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd=%pS sdp->mpath_disk->disk_name=%s\n",
 			gd->disk_name, sdp->mpath_disk->disk_name);
-		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd=%pS scsi_is_sdev_multipath GENHD_FL_HIDDEN\n", gd->disk_name);
-		gd->flags |= GENHD_FL_HIDDEN;
+		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd=%pS scsi_is_sdev_multipath\n", gd->disk_name);
 	} else {
 		sdev_printk(KERN_INFO, sdp, "sd_probe5 gd=%pS !scsi_is_sdev_multipath\n", gd->disk_name);
+	//	gd->flags |= GENHD_FL_HIDDEN;
 	}
 
 	sdkp->device = sdp;
