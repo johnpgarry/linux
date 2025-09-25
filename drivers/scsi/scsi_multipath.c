@@ -707,6 +707,10 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 	struct scsi_mpath *mpath_dev = shost->mpath_dev;
 	struct scsi_device *sdev;
 	int srcu_idx;
+	bool special = false;
+
+	if (bio->bi_iter.bi_size == 16384)
+		special = true;
 
 	/*
 	 * The scsi device might be going away and the bio might be
@@ -714,16 +718,26 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 	 * need to use bio_split pool from the original queue to
 	 * allocate the bvecs from.
 	 */
+	if (special)
+		pr_err("%s bio=%pS mpath_dev=%pS\n", __func__, bio, mpath_dev);
 	bio = bio_split_to_limits(bio);
+	if (special)
+		pr_err("%s1 bio=%pS mpath_dev=%pS called bio_split_to_limits\n", __func__, bio, mpath_dev);
 	if (!bio)
 		return;
 
 	srcu_idx = srcu_read_lock(&mpath_dev->srcu);
 	sdev = scsi_find_path(shost);
+	if (special)
+		pr_err("%s2 bio=%pS mpath_dev=%pS sdev=%pS\n", __func__, bio, mpath_dev, sdev);
 	if (likely(sdev)) {
 		bio_set_dev(bio, bio->bi_bdev->bd_disk->part0);
 		bio->bi_opf |= REQ_SCSI_MPATH;
+		if (special)
+			pr_err("%s3 bio=%pS mpath_dev=%pS sdev=%pS calling submit_bio_noacct\n", __func__, bio, mpath_dev, sdev);
 		submit_bio_noacct(bio);
+		if (special)
+			pr_err("%s4 bio=%pS mpath_dev=%pS sdev=%pS called submit_bio_noacct\n", __func__, bio, mpath_dev, sdev);
 	} else if (scsi_available_mpath(shost)) {
 		sdev_printk(KERN_NOTICE, NULL,
 		    "No Usable Path - Requeing I/O \n");
