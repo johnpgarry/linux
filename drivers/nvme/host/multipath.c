@@ -810,7 +810,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	struct nvme_ns_head *head = ns->head;
 	int rc;
 
-	pr_err("%s ns=%pS head=%pS\n", __func__, ns, head);
+	pr_err("%s ns=%pS head=%pS head->disk=%pS\n", __func__, ns, head, head->disk);
 	if (!head->disk)
 		return;
 
@@ -819,7 +819,11 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	 * paths simultaneously calling device_add_disk() on the same namespace
 	 * head.
 	 */
+	pr_err("%s1 ns=%pS head=%pS head->disk=%pS NVME_NSHEAD_DISK_LIVE=%d\n",
+		__func__, ns, head, head->disk, test_bit(NVME_NSHEAD_DISK_LIVE, &head->flags));
 	if (!test_and_set_bit(NVME_NSHEAD_DISK_LIVE, &head->flags)) {
+		pr_err("%s2 ns=%pS head=%pS head->disk=%pS calling device_add_disk\n",
+			__func__, ns, head, head->disk);
 		rc = device_add_disk(&head->subsys->dev, head->disk,
 				     nvme_ns_attr_groups);
 		if (rc) {
@@ -912,9 +916,10 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	 * controller is ready.
 	 */
 	if (nvme_state_is_live(ns->ana_state) &&
-	    nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE)
+	    nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE) {
+		pr_err("%s calling nvme_mpath_set_live\n", __func__);
 		nvme_mpath_set_live(ns);
-	else {
+	} else {
 		/*
 		 * Add sysfs link from multipath head gendisk node to path
 		 * device gendisk node.
@@ -1319,6 +1324,9 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 		}
 	} else {
 		ns->ana_state = NVME_ANA_OPTIMIZED;
+
+		pr_err("%s2 ns=%pS calling nvme_mpath_set_live\n",
+			__func__, ns);
 		nvme_mpath_set_live(ns);
 	}
 

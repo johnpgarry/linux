@@ -508,8 +508,10 @@ static void activate_mpath(void *data, int err)
 	if (retry)
 		set_bit(SCSI_MPATH_DISK_IO_PENDING, &sdev->mpath_flags);
 
-        if (scsi_mpath_state_is_live(sdev->mpath_state))
-		scsi_mpath_set_live(sdev);
+        if (scsi_mpath_state_is_live(sdev->mpath_state)) {
+			pr_err("%s calling scsi_mpath_set_live\n", __func__);
+			scsi_mpath_set_live(sdev);
+        }
 }
 
 void scsi_activate_path(struct scsi_device *sdev)
@@ -517,6 +519,7 @@ void scsi_activate_path(struct scsi_device *sdev)
 	struct request_queue *q = sdev->mpath_disk->queue;
 	struct scsi_mpath_dh_data *mpath_dh = sdev->mpath_pg_data;
 
+	pr_err("%s mpath_dh=%pS\n", __func__, mpath_dh);
 	if (!mpath_dh)
 		return;
 
@@ -525,10 +528,13 @@ void scsi_activate_path(struct scsi_device *sdev)
                 return;
 	}
 
-	if (!blk_queue_dying(q))
+	if (!blk_queue_dying(q)) {
+		pr_err("%s1 mpath_dh=%pS calling scsi_dh_activate\n", __func__, mpath_dh);
 		scsi_dh_activate(q, activate_mpath, sdev);
-	else
+	} else {
+		pr_err("%s2 mpath_dh=%pS calling scsi_dh_activate\n", __func__, mpath_dh);
 		activate_mpath(sdev, SCSI_DH_OK);
+	}
 }
 
 static void scsi_activate_mpath_work(struct work_struct *work)
@@ -549,6 +555,7 @@ int scsi_mpath_add_disk(struct scsi_device *sdev)
 		sdev->handler->rescan(sdev);
 	} else {
 		sdev->mpath_state = SCSI_MPATH_OPTIMAL;
+		pr_err("%s calling scsi_mpath_set_live\n", __func__);
 		scsi_mpath_set_live(sdev);
 	}
 
@@ -897,7 +904,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 
 	list_add_tail(&shost->mpath_sdev, &sdev->mpath_entry);
 
-	ret = device_add(&mp_disk->dev);
+	ret = device_add(&mp_disk->dev); // see nvme_init_subsystem()
 	pr_err("%s3 called device_add ret=%d\n", __func__, ret);
 	if (ret)
 		return ret;
