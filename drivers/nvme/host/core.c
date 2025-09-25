@@ -5243,7 +5243,7 @@ EXPORT_SYMBOL_GPL(nvme_init_ctrl);
 int nvme_add_ctrl(struct nvme_ctrl *ctrl)
 {
 	int ret;
-
+	pr_err("%s ctrl=%pS uses nvme_dev_fops\n", __func__, ctrl);
 	ret = dev_set_name(ctrl->device, "nvme%d", ctrl->instance);
 	if (ret)
 		return ret;

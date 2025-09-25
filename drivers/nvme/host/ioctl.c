@@ -215,6 +215,9 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
 	if (io.flags)
 		return -EINVAL;
 
+	pr_err("%s ns=%pS io.opcode=%d nvme_cmd_write=%d nvme_cmd_read=%d\n",
+		__func__, ns, io.opcode, nvme_cmd_write, nvme_cmd_read);
+
 	switch (io.opcode) {
 	case nvme_cmd_write:
 	case nvme_cmd_read:
@@ -288,6 +291,7 @@ static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 	u64 result;
 	int status;
 
+	pr_err("%s\n", __func__);
 	if (copy_from_user(&cmd, ucmd, sizeof(cmd)))
 		return -EFAULT;
 	if (cmd.flags)
@@ -335,6 +339,7 @@ static int nvme_user_cmd64(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 	unsigned timeout = 0;
 	int status;
 
+	pr_err("%s\n", __func__);
 	if (copy_from_user(&cmd, ucmd, sizeof(cmd)))
 		return -EFAULT;
 	if (cmd.flags)
@@ -541,6 +546,7 @@ static bool is_ctrl_ioctl(unsigned int cmd)
 static int nvme_ctrl_ioctl(struct nvme_ctrl *ctrl, unsigned int cmd,
 		void __user *argp, bool open_for_write)
 {
+	pr_err("%s cmd=%d\n", __func__, cmd);
 	switch (cmd) {
 	case NVME_IOCTL_ADMIN_CMD:
 		return nvme_user_cmd(ctrl, NULL, argp, 0, open_for_write);
@@ -572,11 +578,14 @@ struct nvme_user_io32 {
 static int nvme_ns_ioctl(struct nvme_ns *ns, unsigned int cmd,
 		void __user *argp, unsigned int flags, bool open_for_write)
 {
+	pr_err("%s ns=%pS cmd=0x%x NVME_IOCTL_ID=0x%x\n", __func__, ns, cmd, NVME_IOCTL_ID);
 	switch (cmd) {
 	case NVME_IOCTL_ID:
+		pr_err("%s2 NVME_IOCTL_ID\n", __func__);
 		force_successful_syscall_return();
 		return ns->head->ns_id;
 	case NVME_IOCTL_IO_CMD:
+		pr_err("%s3 NVME_IOCTL_IO_CMD\n", __func__);
 		return nvme_user_cmd(ns->ctrl, ns, argp, flags, open_for_write);
 	/*
 	 * struct nvme_user_io can have different padding on some 32-bit ABIs.
@@ -587,11 +596,14 @@ static int nvme_ns_ioctl(struct nvme_ns *ns, unsigned int cmd,
 	case NVME_IOCTL_SUBMIT_IO32:
 #endif
 	case NVME_IOCTL_SUBMIT_IO:
+		pr_err("%s4 NVME_IOCTL_SUBMIT_IO\n", __func__);
 		return nvme_submit_io(ns, argp);
 	case NVME_IOCTL_IO64_CMD_VEC:
+		pr_err("%s5 NVME_IOCTL_IO64_CMD_VEC\n", __func__);
 		flags |= NVME_IOCTL_VEC;
 		fallthrough;
 	case NVME_IOCTL_IO64_CMD:
+		pr_err("%s6 NVME_IOCTL_IO64_CMD\n", __func__);
 		return nvme_user_cmd64(ns->ctrl, ns, argp, flags,
 				       open_for_write);
 	default:
@@ -706,7 +718,7 @@ int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
 	unsigned int flags = 0;
-
+	pr_err("%s is_ctrl_ioctl=%d\n", __func__, is_ctrl_ioctl(cmd));
 	if (bdev_is_partition(bdev))
 		flags |= NVME_IOCTL_PARTITION;
 
@@ -812,6 +824,7 @@ static int nvme_dev_user_cmd(struct nvme_ctrl *ctrl, void __user *argp,
 	}
 
 	ns = list_first_or_null_rcu(&ctrl->namespaces, struct nvme_ns, list);
+	pr_err("%s1 ctrl=%pS ns=%pS\n", __func__, ctrl, ns);
 	if (ns != list_last_entry(&ctrl->namespaces, struct nvme_ns, list)) {
 		dev_warn(ctrl->device,
 			"NVME_IOCTL_IO_CMD not supported when multiple namespaces present!\n");
@@ -843,12 +856,14 @@ long nvme_dev_ioctl(struct file *file, unsigned int cmd,
 	struct nvme_ctrl *ctrl = file->private_data;
 	void __user *argp = (void __user *)arg;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	switch (cmd) {
 	case NVME_IOCTL_ADMIN_CMD:
 		return nvme_user_cmd(ctrl, NULL, argp, 0, open_for_write);
 	case NVME_IOCTL_ADMIN64_CMD:
 		return nvme_user_cmd64(ctrl, NULL, argp, 0, open_for_write);
 	case NVME_IOCTL_IO_CMD:
+		pr_err("%s4 ctrl=%pS NVME_IOCTL_IO_CMD calling nvme_dev_user_cmd\n", __func__, ctrl);
 		return nvme_dev_user_cmd(ctrl, argp, open_for_write);
 	case NVME_IOCTL_RESET:
 		if (!capable(CAP_SYS_ADMIN))
