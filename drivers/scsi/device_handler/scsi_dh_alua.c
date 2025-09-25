@@ -207,6 +207,28 @@ static struct alua_port_group *alua_find_get_pg(char *id_str, size_t id_size,
 	return NULL;
 }
 
+static void configure_scsi_mpath(struct scsi_device *sdev, struct alua_port_group *pg)
+{
+	struct scsi_mpath_dh_data *dh_data = sdev->mpath_pg_data;
+
+	pr_err("%s sdev=%pS pg=%pS scsi_mpath_enabled=%d dh_data=%pS\n",
+		__func__, sdev, pg, scsi_mpath_enabled(sdev), dh_data);
+	if (!scsi_mpath_enabled(sdev))
+		return;
+
+	dh_data->group_id = pg->group_id;
+	dh_data->tpgs = pg->tpgs;
+	dh_data->state = pg->state;
+	dh_data->valid_states = pg->valid_states;
+	dh_data->prefrence = pg->pref;
+	dh_data->is_active = 1;
+	dh_data->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
+	pr_err("%s2 sdev=%pS dh_data=%pS dh_data->device_id_str=%s\n",
+		__func__, sdev, dh_data, dh_data->device_id_str);
+	dh_data->device_id_len = pg->device_id_len;
+	sdev->host->mpath_alua_grpid = pg->group_id;
+}
+
 /*
  * alua_alloc_pg - Allocate a new port_group structure
  * @sdev: scsi device
@@ -221,10 +243,11 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 {
 	struct alua_port_group *pg, *tmp_pg;
 
-	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	pg = kzalloc(sizeof(struct alua_port_group), GFP_KERNEL);
 	if (!pg)
 		return ERR_PTR(-ENOMEM);
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS group_id=%d tpgs=%d pg=%pS\n",
+		__func__, sdev, group_id, tpgs, pg);
 
 	pg->device_id_len = scsi_vpd_lun_id(sdev, pg->device_id_str,
 					    sizeof(pg->device_id_str));
@@ -258,25 +281,14 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 	if (tmp_pg) {
 		spin_unlock(&port_group_lock);
 		kfree(pg);
+		configure_scsi_mpath(sdev, tmp_pg);
+		sdev_printk(KERN_ERR, sdev, "%s1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS\n",
+			__func__, sdev, group_id, tpgs, tmp_pg);
 		return tmp_pg;
 	}
 
-	if (scsi_mpath_enabled(sdev)) {
-		struct scsi_mpath_dh_data *dh_data = sdev->mpath_pg_data;
-
-		dh_data->group_id = pg->group_id;
-		dh_data->tpgs = pg->tpgs;
-		dh_data->state = pg->state;
-		dh_data->valid_states = pg->valid_states;
-		dh_data->prefrence = pg->pref;
-		dh_data->is_active = 1;
-		dh_data->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
-		pr_err("%s sdev=%pS dh_data=%pS dh_data->device_id_str=%s\n",
-			__func__, sdev, dh_data, dh_data->device_id_str);
-		dh_data->device_id_len = pg->device_id_len;
-
-		sdev->host->mpath_alua_grpid = pg->group_id;
-	}
+	configure_scsi_mpath(sdev, pg);
+	
 
 	list_add(&pg->node, &port_group_list);
 	spin_unlock(&port_group_lock);

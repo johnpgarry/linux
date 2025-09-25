@@ -586,6 +586,8 @@ int scsi_multipath_init(struct scsi_device *sdev)
 		goto out_handler;
 	}
 
+	pr_err("%s sdev=%pS mpath_dev=%pS h=%pS shost=%pS\n",
+		__func__, sdev, mpath_dev, h, shost);
 	shost->mpath_dev = mpath_dev;
 
 	mutex_init(&mpath_dev->mpath_lock);
@@ -814,13 +816,13 @@ int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 	char device_id_str[40];
 	int ret = -EINVAL;
 
-//	pr_err("%s sdev=%pS\n", __func__, sdev);
+	pr_err("%s sdev=%pS\n", __func__, sdev);
 	dh_data = sdev->mpath_pg_data;
-//	pr_err("%s1 sdev=%pS dh_data=%pS\n", __func__, sdev, dh_data);
-//	pr_err("%s2 sdev=%pS dh_data=%pS device_id_len=%d\n",
-//		__func__, sdev, dh_data, dh_data->device_id_len);
-//	pr_err("%s3 sdev=%pS dh_data=%pS device_id_str=%s\n",
-//		__func__, sdev, dh_data, dh_data->device_id_str);
+	pr_err("%s1 sdev=%pS dh_data=%pS\n", __func__, sdev, dh_data);
+	pr_err("%s2 sdev=%pS dh_data=%pS device_id_len=%d\n",
+		__func__, sdev, dh_data, dh_data->device_id_len);
+	pr_err("%s3 sdev=%pS dh_data=%pS device_id_str=%s\n",
+		__func__, sdev, dh_data, dh_data->device_id_str);
 
 	ret = scsi_vpd_lun_id(sdev, device_id_str, sizeof(device_id_str));
 	if (ret < 0)
