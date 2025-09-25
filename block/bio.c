@@ -1336,6 +1336,7 @@ EXPORT_SYMBOL_GPL(bio_iov_iter_get_pages);
 
 static void submit_bio_wait_endio(struct bio *bio)
 {
+	pr_err("%s bio=%pS\n", __func__, bio);
 	complete(bio->bi_private);
 }
 
@@ -1601,6 +1602,7 @@ static inline bool bio_remaining_done(struct bio *bio)
  **/
 void bio_endio(struct bio *bio)
 {
+	pr_err("%s bio=%pS\n", __func__, bio);
 again:
 	if (!bio_remaining_done(bio))
 		return;
@@ -1641,6 +1643,7 @@ again:
 	}
 #endif
 
+	pr_err("%s2 bio=%pS bio->bi_end_io=%pS\n", __func__, bio, bio->bi_end_io);
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio);
 }

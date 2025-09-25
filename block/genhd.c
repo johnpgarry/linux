@@ -421,7 +421,6 @@ static void add_disk_final(struct gendisk *disk)
 		if (get_capacity(disk)) {
 			dev_err(ddev, "%s1.2 calling disk_scan_partitions disk->part0=%pS ddev=%pS ddev->devt=%d\n",
 				__func__, disk->part0, ddev, ddev->devt);
-		if (get_capacity(disk))
 			disk_scan_partitions(disk, BLK_OPEN_READ);
 			dev_err(ddev, "%s1.3 called disk_scan_partitions disk->part0=%pS ddev=%pS ddev->devt=%d\n",
 				__func__, disk->part0, ddev, ddev->devt);
@@ -652,6 +651,7 @@ EXPORT_SYMBOL_GPL(add_disk_fwnode);
 int __must_check device_add_disk(struct device *parent, struct gendisk *disk,
 				 const struct attribute_group **groups)
 {
+	dev_err(parent, "%s disk=%pS\n", __func__, disk);
 	return add_disk_fwnode(parent, disk, groups, NULL);
 }
 EXPORT_SYMBOL(device_add_disk);
