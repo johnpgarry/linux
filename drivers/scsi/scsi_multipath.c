@@ -41,6 +41,12 @@ struct scsi_mp_disk {
 	 */
 	struct kref		ref;
 	struct list_head	entry;
+	struct work_struct	partition_scan_work;
+	struct gendisk          	*gd;	/* Multipath disk */
+
+
+
+
 	#ifdef dsdsd
 	struct mutex		lock;
 	struct list_head	ctrls;
@@ -88,6 +94,23 @@ const struct attribute_group *scsi_mp_disk_attrs_groups[] = {
 	NULL
 };
 
+static void scsi_multipath_partition_scan_work(struct work_struct *work)
+{
+	struct scsi_mp_disk *scsi_mp_disk =
+		container_of(work, struct scsi_mp_disk, partition_scan_work);
+
+	pr_err("%s scsi_mp_disk=%pS GD_SUPPRESS_PART_SCAN=%d\n",
+		__func__, scsi_mp_disk, test_bit(GD_SUPPRESS_PART_SCAN, &scsi_mp_disk->gd->state));
+	if (WARN_ON_ONCE(!test_and_clear_bit(GD_SUPPRESS_PART_SCAN,
+					     &scsi_mp_disk->gd->state)))
+		return;
+
+	//mutex_lock(&head->disk->open_mutex);
+	pr_err("%s2 scsi_mp_disk=%pS GD_SUPPRESS_PART_SCAN=%d calling bdev_disk_changed\n",
+		__func__, scsi_mp_disk, test_bit(GD_SUPPRESS_PART_SCAN, &scsi_mp_disk->gd->state));
+	bdev_disk_changed(scsi_mp_disk->gd, false);
+	//mutex_unlock(&head->disk->open_mutex);
+}
 
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
@@ -440,6 +463,8 @@ void scsi_mpath_set_live(struct scsi_device *sdev)
 			clear_bit(SCSI_MPATH_DISK_LIVE, &sdev->mpath_flags);
 			return;
 		}
+		pr_err("%s2 calling kblockd_schedule_work partition_scan_work\n", __func__);
+		kblockd_schedule_work(&scsi_mp_disk->partition_scan_work);
 	}
 
 	pr_info("Attached SCSI %s disk\n", sdev->mpath_disk->disk_name);
@@ -887,6 +912,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&mp_disk->entry);
+	INIT_WORK(&mp_disk->partition_scan_work, scsi_multipath_partition_scan_work);
 
 	mp_disk->dev.class = &scsi_mp_disk_class;
 	mp_disk->dev.release = scsi_mp_disk_release;
@@ -901,7 +927,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	lim.max_zone_append_sectors = 0;
 	lim.dma_alignment = 3;
 
-	sdev->mpath_disk = blk_alloc_disk(&lim, sdev->mpath_numa_node);
+	sdev->mpath_disk = mp_disk->gd = blk_alloc_disk(&lim, sdev->mpath_numa_node);
 	pr_err("%s2 dev=%pS sdev->mpath_disk=%pS\n", __func__, sdev, sdev->mpath_disk);
 	if (IS_ERR(sdev->mpath_disk))
 		return PTR_ERR(sdev->mpath_disk);
@@ -934,7 +960,7 @@ void scsi_mpath_start_request(struct request *req)
 	    blk_rq_is_passthrough(req))
 		return;
 
-	req->rq_flags |= SCSI_MPATH_IO_STATS;
+	//req->rq_flags |= SCSI_MPATH_IO_STATS;
 	mpath_dev->mpath_start_time = bdev_start_io_acct(sdev->mpath_disk->part0,
 	    req_op(req), jiffies);
 }
@@ -947,7 +973,7 @@ void scsi_mpath_end_request(struct request *req)
 	struct scsi_mpath *mpath_dev = shost->mpath_dev;
 
 	pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, cmd, sdev);
-	if (!(req->rq_flags & SCSI_MPATH_IO_STATS))
+//	if (!(req->rq_flags & SCSI_MPATH_IO_STATS))
 		return;
 
 	pr_err("%s1 req=%pS bio=%pS cmd=%pS sdev=%pS calling bdev_end_io_acct\n", __func__, req, req->bio, cmd, sdev);
