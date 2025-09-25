@@ -435,6 +435,7 @@ void scsi_mpath_set_live(struct scsi_device *sdev)
 		struct scsi_mp_disk *scsi_mp_disk = sdev->scsi_mp_disk;
 		pr_err("%s calling device_add_disk\n", __func__);
 		ret = device_add_disk(&scsi_mp_disk->dev, sdev->mpath_disk, NULL);
+		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
 		if (ret) {
 			clear_bit(SCSI_MPATH_DISK_LIVE, &sdev->mpath_flags);
 			return;
@@ -662,8 +663,11 @@ EXPORT_SYMBOL_GPL(scsi_mpath_revalidate_path);
 
 static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 {
-	if (!scsi_get_device(disk->private_data))
+	pr_err("%s disk=%pS\n", __func__, disk);
+	if (!scsi_get_device(disk->private_data)) {
+		pr_err("%s1 disk=%pS ENXIO\n", __func__, disk);
 		return -ENXIO;
+	}
 
 	return 0;
 }
@@ -820,6 +824,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	struct queue_limits lim;
 	struct scsi_mp_disk *mp_disk;
 	int ret;
+	static int disk_count;
 
 	pr_err("%s dev=%pS\n", __func__, sdev);
 	/*
@@ -856,7 +861,8 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	mp_disk->dev.class = &scsi_mp_disk_class;
 	mp_disk->dev.release = scsi_mp_disk_release;
 	mp_disk->dev.groups = scsi_mp_disk_attrs_groups;
-	dev_set_name(&mp_disk->dev, "scsi_mp_disk%d", 0);
+	dev_set_name(&mp_disk->dev, "scsi_mp_disk%d", disk_count);
+	disk_count++;
 	device_initialize(&mp_disk->dev);
 
 	blk_set_stacking_limits(&lim);
@@ -879,10 +885,6 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 
 	ret = device_add(&mp_disk->dev);
 	pr_err("%s3 called device_add ret=%d\n", __func__, ret);
-	if (ret)
-		return ret;
-	ret = 0;//device_add_disk(&mp_disk->dev, sdev->mpath_disk, NULL);
-	pr_err("%s3 called device_add_disk ret=%d\n", __func__, ret);
 	if (ret)
 		return ret;
 
