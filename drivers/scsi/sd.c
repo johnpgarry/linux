@@ -3860,6 +3860,7 @@ static void sd_revalidate_disk(struct gendisk *disk)
 
 	/* for multipath device, Adjust queue limits for MPATH disk */
 	if (scsi_is_sdev_multipath(sdp)) {
+		struct queue_limits lim;
 		struct queue_limits *mpath_lim = &sdp->mpath_disk->queue->limits;
 
 		//blk_mq_freeze_queue(sdp->mpath_disk->queue);
@@ -3888,8 +3889,8 @@ static void sd_revalidate_disk(struct gendisk *disk)
 		pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
 
 		//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
-		if (err)
-			return err;
+		//if (err)
+		//	return err;
 	}
 	/*
 	 * For a zoned drive, revalidating the zones can be done only once
