@@ -643,6 +643,8 @@ static void __submit_bio(struct bio *bio)
 			bio->bi_status = BLK_STS_NOTSUPP;
 			bio_endio(bio);
 		} else {
+			pr_err("%s calling disk->fops->submit_bio=%pS bio=%pS bi_end_io=%pS\n",
+				__func__, disk->fops->submit_bio, bio, bio->bi_end_io);
 			disk->fops->submit_bio(bio);
 		}
 		blk_queue_exit(disk->queue);

@@ -694,6 +694,7 @@ int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 {
 	struct request *req = scsi_cmd_to_rq(scmd);
 
+	pr_err("%s scmd=%pS req=%pS\n", __func__, scmd, req);
 	if (req->cmd_flags & REQ_SCSI_MPATH) {
 		if (scsi_is_mpath_error(scmd) ||
 		    blk_queue_dying(req->q)) {
@@ -716,7 +717,8 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 	int srcu_idx;
 	bool special = false;
 
-	if (bio->bi_iter.bi_size == 16384)
+	//WARN_ON_ONCE(1);
+//	if (bio->bi_iter.bi_size == 16384)
 		special = true;
 
 	/*
@@ -726,7 +728,7 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 	 * allocate the bvecs from.
 	 */
 	if (special)
-		pr_err("%s bio=%pS mpath_dev=%pS\n", __func__, bio, mpath_dev);
+		pr_err("%s bio=%pS bi size=%d mpath_dev=%pS bio->bi_bdev=%pS\n", __func__, bio, bio->bi_iter.bi_size, mpath_dev, bio->bi_bdev);
 	bio = bio_split_to_limits(bio);
 	if (special)
 		pr_err("%s1 bio=%pS mpath_dev=%pS called bio_split_to_limits\n", __func__, bio, mpath_dev);
@@ -735,16 +737,21 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 
 	srcu_idx = srcu_read_lock(&mpath_dev->srcu);
 	sdev = scsi_find_path(shost);
-	if (special)
-		pr_err("%s2 bio=%pS mpath_dev=%pS sdev=%pS\n", __func__, bio, mpath_dev, sdev);
+	if (special) {
+		pr_err("%s2 bio=%pS bio->bi_bdev=%pS bio->bi_bdev->bd_disk=%pS bio->bi_bdev->bd_disk->part0=%pS mpath_dev=%pS\n",
+			__func__, bio, bio->bi_bdev, bio->bi_bdev->bd_disk, bio->bi_bdev->bd_disk->part0, mpath_dev);
+		pr_err("%s2.1 bio=%pS sdev=%pS request_queue=%pS request_queue->disk=%pS request_queue->disk->part0=%pS\n",
+			__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk, sdev->request_queue->disk->part0);
+	}
 	if (likely(sdev)) {
-		bio_set_dev(bio, bio->bi_bdev->bd_disk->part0);
+		bio_set_dev(bio, sdev->request_queue->disk->part0);
 		bio->bi_opf |= REQ_SCSI_MPATH;
 		if (special)
-			pr_err("%s3 bio=%pS mpath_dev=%pS sdev=%pS calling submit_bio_noacct\n", __func__, bio, mpath_dev, sdev);
+			pr_err("%s3 bio=%pS bio->bi_bdev=%pS called bio_set_dev mpath_dev=%pS sdev=%pS calling submit_bio_noacct\n", __func__, bio, bio->bi_bdev, mpath_dev, sdev);
 		submit_bio_noacct(bio);
 		if (special)
 			pr_err("%s4 bio=%pS mpath_dev=%pS sdev=%pS called submit_bio_noacct\n", __func__, bio, mpath_dev, sdev);
+	//	BUG();
 	} else if (scsi_available_mpath(shost)) {
 		sdev_printk(KERN_NOTICE, NULL,
 		    "No Usable Path - Requeing I/O \n");
@@ -936,9 +943,11 @@ void scsi_mpath_end_request(struct request *req)
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_mpath *mpath_dev = shost->mpath_dev;
 
+	pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, cmd, sdev);
 	if (!(req->rq_flags & SCSI_MPATH_IO_STATS))
 		return;
 
+	pr_err("%s1 req=%pS bio=%pS cmd=%pS sdev=%pS calling bdev_end_io_acct\n", __func__, req, req->bio, cmd, sdev);
 	bdev_end_io_acct(sdev->mpath_disk->part0, req_op(req),
 	    blk_rq_bytes(req) >> SECTOR_SHIFT,
 	    mpath_dev->mpath_start_time);

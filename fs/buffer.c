@@ -2769,6 +2769,8 @@ EXPORT_SYMBOL(generic_block_bmap);
 static void end_bio_bh_io_sync(struct bio *bio)
 {
 	struct buffer_head *bh = bio->bi_private;
+	WARN_ON_ONCE(1);
+	pr_err("%s bio=%pS\n", __func__, bio);
 
 	if (unlikely(bio_flagged(bio, BIO_QUIET)))
 		set_bit(BH_Quiet, &bh->b_state);
