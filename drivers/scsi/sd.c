@@ -3833,7 +3833,7 @@ static void sd_revalidate_disk(struct gendisk *disk)
 		queue_limits_stack_bdev(&lim, sdp->mpath_disk->part0, 0,
 		    sdp->mpath_disk->disk_name);
 
-		sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
+		//sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
 
 		pr_err("%s8.2 calling set_capacity_and_notify\n", __func__);
 		set_capacity_and_notify(sdp->mpath_disk,
