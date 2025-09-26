@@ -3209,6 +3209,7 @@ static int raid1_set_limits(struct mddev *mddev)
 	struct queue_limits lim;
 	int err;
 
+	pr_err("%s mddev=%pS\n", __func__, mddev);
 	md_init_stacking_limits(&lim);
 	lim.max_write_zeroes_sectors = 0;
 	lim.features |= BLK_FEAT_ATOMIC_WRITES;

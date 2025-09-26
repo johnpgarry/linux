@@ -1254,6 +1254,7 @@ static int super_90_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor
 	int ret;
 	bool spare_disk = true;
 
+	pr_err("%s rdev=%pS minor_version=%d\n", __func__, rdev, minor_version);
 	/*
 	 * Calculate the position of the superblock (512byte sectors),
 	 * it's at the end of the disk.
@@ -1495,6 +1496,7 @@ static void super_90_sync(struct mddev *mddev, struct md_rdev *rdev)
 	struct md_rdev *rdev2;
 	int next_spare = mddev->raid_disks;
 
+	pr_err("%s mddev=%pS rdev=%pS\n", __func__, mddev, rdev);
 	/* make rdev->sb match mddev data..
 	 *
 	 * 1/ zero out disks
@@ -1696,7 +1698,9 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 	sector_t sectors;
 	int bmask;
 	bool spare_disk = true;
+	bool bb;
 
+	pr_err("%s rdev=%pS minor_version=%d\n", __func__, rdev, minor_version);
 	/*
 	 * Calculate the position of the superblock in 512byte sectors.
 	 * It is always aligned to a 4K boundary and
@@ -1729,6 +1733,7 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 
 	sb = page_address(rdev->sb_page);
 
+	pr_err("%s2 rdev=%pS sb->magic=0x%x\n", __func__, rdev, sb->magic);
 	if (sb->magic != cpu_to_le32(MD_SB_MAGIC) ||
 	    sb->major_version != cpu_to_le32(1) ||
 	    le32_to_cpu(sb->max_dev) > (4096-256)/2 ||
@@ -1779,6 +1784,10 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 		if (!rdev->bb_page)
 			return -ENOMEM;
 	}
+
+	bb = le32_to_cpu(sb->feature_map) & MD_FEATURE_BAD_BLOCKS;
+	pr_err("%s2 rdev=%pS minor_version=%d MD_FEATURE_BAD_BLOCKS=%d sb->feature_map=0x%x\n",
+		__func__, rdev, minor_version, bb, sb->feature_map);
 	if ((le32_to_cpu(sb->feature_map) & MD_FEATURE_BAD_BLOCKS) &&
 	    rdev->badblocks.count == 0) {
 		/* need to load the bad block list.
@@ -2076,7 +2085,27 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 	struct md_rdev *rdev2;
 	int max_dev, i;
 	/* make rdev->sb match mddev and rdev data. */
+	static int count;
 
+	pr_err("%s mddev=%pS rdev=%pS count=%d\n", __func__, mddev, rdev, count);
+	count++;
+
+	if (count > 20005) {
+
+			struct queue_limits lim;
+
+			lim = queue_limits_start_update(mddev->gendisk->queue);
+			if (lim.features & BLK_FEAT_ATOMIC_WRITES) {
+				pr_err("%s BLK_FEAT_ATOMIC_WRITES set=1 count=%d\n", __func__, count);
+				lim.features &= ~BLK_FEAT_ATOMIC_WRITES;
+				if (queue_limits_commit_update_frozen(mddev->gendisk->queue, &lim))
+					pr_warn("could not disable atomic writes after finding bad blocks\n");
+			} else {
+				pr_err("%s BLK_FEAT_ATOMIC_WRITES set=0 count=%d\n", __func__, count);
+				queue_limits_cancel_update(mddev->gendisk->queue);
+			}
+
+	}
 	sb = page_address(rdev->sb_page);
 
 	sb->feature_map = 0;
@@ -2156,6 +2185,7 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 	if (mddev_is_clustered(mddev))
 		sb->feature_map |= cpu_to_le32(MD_FEATURE_CLUSTERED);
 
+	pr_err("%s rdev->badblocks.count=%d\n", __func__, rdev->badblocks.count);
 	if (rdev->badblocks.count == 0)
 		/* Nothing to do for bad blocks*/ ;
 	else if (sb->bblog_offset == 0)
@@ -2168,6 +2198,16 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 		sb->feature_map |= cpu_to_le32(MD_FEATURE_BAD_BLOCKS);
 		if (bb->changed) {
 			unsigned seq;
+			struct queue_limits lim;
+
+			lim = queue_limits_start_update(mddev->gendisk->queue);
+			if (lim.features & BLK_FEAT_ATOMIC_WRITES) {
+				lim.features &= ~BLK_FEAT_ATOMIC_WRITES;
+				if (queue_limits_commit_update_frozen(mddev->gendisk->queue, &lim))
+					pr_warn("could not disable atomic writes after finding bad blocks\n");
+			} else {
+				queue_limits_cancel_update(mddev->gendisk->queue);
+			}
 
 retry:
 			seq = read_seqbegin(&bb->lock);
@@ -2434,6 +2474,8 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 	char b[BDEVNAME_SIZE];
 	int err;
 
+
+	pr_err("%s rdev=%pS mddev=%pS\n", __func__, rdev, mddev);
 	/* prevent duplicates */
 	if (find_rdev(mddev, rdev->bdev->bd_dev))
 		return -EEXIST;
@@ -2673,6 +2715,10 @@ void md_update_sb(struct mddev *mddev, int force_change)
 	int nospares = 0;
 	int any_badblocks_changed = 0;
 	int ret = -1;
+	static int count;
+
+	pr_err("%s mddev=%pS force_change=%d mddev->gendisk->queue=%pS count=%d\n", __func__, mddev, force_change, mddev->gendisk->queue, count);
+	count++;
 
 	if (!md_is_rdwr(mddev)) {
 		if (force_change)
@@ -2686,6 +2732,8 @@ repeat:
 			force_change = 1;
 		if (test_and_clear_bit(MD_SB_CHANGE_CLEAN, &mddev->sb_flags))
 			nospares = 1;
+		pr_err("%s2 mddev=%pS force_change=%d mddev->cluster_ops->metadata_update_start=%pS\n",
+			__func__, rdev, force_change, mddev->cluster_ops->metadata_update_start);
 		ret = mddev->cluster_ops->metadata_update_start(mddev);
 		/* Has someone else has updated the sb */
 		if (!does_sb_need_changing(mddev)) {
@@ -2795,8 +2843,8 @@ repeat:
 	sync_sbs(mddev, nospares);
 	spin_unlock(&mddev->lock);
 
-	pr_debug("md: updating %s RAID superblock on device (in sync %d)\n",
-		 mdname(mddev), mddev->in_sync);
+	pr_err("md: updating %s RAID superblock on device (in sync %d) any_badblocks_changed=%d count=%d\n",
+		 mdname(mddev), mddev->in_sync, any_badblocks_changed, count);
 
 	mddev_add_trace_msg(mddev, "md md_update_sb");
 rewrite:
@@ -2812,7 +2860,7 @@ rewrite:
 			pr_debug("md: (write) %pg's sb offset: %llu\n",
 				 rdev->bdev,
 				 (unsigned long long)rdev->sb_start);
-			rdev->sb_events = mddev->events;
+						rdev->sb_events = mddev->events;
 			if (rdev->badblocks.size) {
 				md_super_write(mddev, rdev,
 					       rdev->badblocks.sector,
@@ -2840,6 +2888,23 @@ rewrite:
 	wake_up(&mddev->sb_wait);
 	if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery))
 		sysfs_notify_dirent_safe(mddev->sysfs_completed);
+
+	pr_err("%s3 count=%d\n", __func__, count);
+
+	if (count > 10) {
+		struct queue_limits lim;
+
+		lim = queue_limits_start_update(mddev->gendisk->queue);
+		if (lim.features & BLK_FEAT_ATOMIC_WRITES) {
+			pr_err("%s BLK_FEAT_ATOMIC_WRITES set=1 count=%d\n", __func__, count);
+			lim.features &= ~BLK_FEAT_ATOMIC_WRITES;
+			if (queue_limits_commit_update_frozen(mddev->gendisk->queue, &lim))
+				pr_warn("could not disable atomic writes after finding bad blocks\n");
+		} else {
+			pr_err("%s BLK_FEAT_ATOMIC_WRITES set=0 count=%d\n", __func__, count);
+			queue_limits_cancel_update(mddev->gendisk->queue);
+		} 
+	}
 
 	rdev_for_each(rdev, mddev) {
 		if (test_and_clear_bit(FaultRecorded, &rdev->flags))
@@ -3705,6 +3770,7 @@ static struct md_rdev *md_import_device(dev_t newdev, int super_format, int supe
 	sector_t size;
 	int err;
 
+	pr_err("%s newdev=%d super_format=%d super_minor=%d\n", __func__, newdev, super_format, super_minor);
 	rdev = kzalloc(sizeof(*rdev), GFP_KERNEL);
 	if (!rdev)
 		return ERR_PTR(-ENOMEM);
@@ -3737,6 +3803,7 @@ static struct md_rdev *md_import_device(dev_t newdev, int super_format, int supe
 		goto out_blkdev_put;
 	}
 
+	pr_err("%s2 super_format=%d super_minor=%d\n", __func__, super_format, super_minor);
 	if (super_format >= 0) {
 		err = super_types[super_format].
 			load_super(rdev, NULL, super_minor);
@@ -3773,6 +3840,7 @@ static int analyze_sbs(struct mddev *mddev)
 	int i;
 	struct md_rdev *rdev, *freshest, *tmp;
 
+	pr_err("%s mddev=%pS\n", __func__, mddev);
 	freshest = NULL;
 	rdev_for_each_safe(rdev, tmp, mddev)
 		switch (super_types[mddev->major_version].
@@ -4636,6 +4704,7 @@ new_dev_store(struct mddev *mddev, const char *buf, size_t len)
 	if (err)
 		return err;
 	if (mddev->persistent) {
+		pr_err("%s calling md_import_device\n", __func__);
 		rdev = md_import_device(dev, mddev->major_version,
 					mddev->minor_version);
 		if (!IS_ERR(rdev) && !list_empty(&mddev->disks)) {
@@ -6925,7 +6994,9 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 {
 	struct md_rdev *rdev;
 	dev_t dev = MKDEV(info->major,info->minor);
-
+	
+	pr_err("%s mddev=%pS dev=%d\n", __func__, mddev, dev);
+	WARN_ON_ONCE(1);
 	if (mddev_is_clustered(mddev) &&
 		!(info->state & ((1 << MD_DISK_CLUSTER_ADD) | (1 << MD_DISK_CANDIDATE)))) {
 		pr_warn("%s: Cannot add to clustered mddev.\n",
@@ -6939,6 +7010,7 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 	if (!mddev->raid_disks) {
 		int err;
 		/* expecting a device which has a superblock */
+		pr_err("%s1 calling md_import_device\n", __func__);
 		rdev = md_import_device(dev, mddev->major_version, mddev->minor_version);
 		if (IS_ERR(rdev)) {
 			pr_warn("md: md_import_device returned %ld\n",
@@ -6949,6 +7021,7 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 			struct md_rdev *rdev0
 				= list_entry(mddev->disks.next,
 					     struct md_rdev, same_set);
+		pr_err("%s2 calling %pS\n", __func__, super_types[mddev->major_version].load_super);
 			err = super_types[mddev->major_version]
 				.load_super(rdev, rdev0, mddev->minor_version);
 			if (err < 0) {
@@ -6977,9 +7050,11 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 				mdname(mddev));
 			return -EINVAL;
 		}
-		if (mddev->persistent)
+		if (mddev->persistent) {
+			pr_err("%s3 calling md_import_device\n", __func__);
 			rdev = md_import_device(dev, mddev->major_version,
 						mddev->minor_version);
+		}
 		else
 			rdev = md_import_device(dev, -1, -1);
 		if (IS_ERR(rdev)) {
@@ -7088,6 +7163,7 @@ int md_add_new_disk(struct mddev *mddev, struct mdu_disk_info_s *info)
 
 	if (!(info->state & (1<<MD_DISK_FAULTY))) {
 		int err;
+		pr_err("%s4 calling md_import_device\n", __func__);
 		rdev = md_import_device(dev, -1, 0);
 		if (IS_ERR(rdev)) {
 			pr_warn("md: error, md_import_device() returned %ld\n",
@@ -7183,6 +7259,7 @@ static int hot_add_disk(struct mddev *mddev, dev_t dev)
 		return -EINVAL;
 	}
 
+	pr_err("%s5 calling md_import_device\n", __func__);
 	rdev = md_import_device(dev, -1, 0);
 	if (IS_ERR(rdev)) {
 		pr_warn("md: error, md_import_device() returned %ld\n",
@@ -8711,6 +8788,8 @@ void md_write_start(struct mddev *mddev, struct bio *bi)
 {
 	int did_change = 0;
 
+	pr_err("%s mddev=%pS bi=%pS\n", __func__, mddev, bi);
+
 	if (bio_data_dir(bi) != WRITE)
 		return;
 
@@ -10189,6 +10268,7 @@ static int read_rdev(struct mddev *mddev, struct md_rdev *rdev)
 	struct page *swapout = rdev->sb_page;
 	struct mdp_superblock_1 *sb;
 
+	pr_err("%s mddev=%pS rdev=%pS\n", __func__, mddev, rdev);
 	/* Store the sb page of the rdev in the swapout temporary
 	 * variable in case we err in the future
 	 */
@@ -10234,7 +10314,7 @@ void md_reload_sb(struct mddev *mddev, int nr)
 {
 	struct md_rdev *rdev = NULL, *iter;
 	int err;
-
+	pr_err("%s mddev=%pS nr=%d\n", __func__, mddev, nr);
 	/* Find the rdev */
 	rdev_for_each_rcu(iter, mddev) {
 		if (iter->desc_nr == nr) {
@@ -10310,6 +10390,8 @@ void md_autostart_arrays(int part)
 		dev = node_detected_dev->dev;
 		kfree(node_detected_dev);
 		mutex_unlock(&detected_devices_mutex);
+
+		pr_err("%s calling md_import_device\n", __func__);
 		rdev = md_import_device(dev,0, 90);
 		mutex_lock(&detected_devices_mutex);
 		if (IS_ERR(rdev))

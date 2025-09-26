@@ -619,6 +619,8 @@ struct mddev {
 	/* The sequence number for sync thread */
 	atomic_t sync_seq;
 
+	bool supports_badblocks;
+
 	bool	has_superblocks:1;
 	bool	fail_last_dev:1;
 	bool	serialize_policy:1;
