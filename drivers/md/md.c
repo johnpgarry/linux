@@ -1225,6 +1225,7 @@ struct super_type  {
 						sector_t num_sectors);
 	int		    (*allow_new_offset)(struct md_rdev *rdev,
 						unsigned long long new_offset);
+	bool		    (*has_bb)(struct md_rdev *rdev);
 };
 
 /*
@@ -2079,6 +2080,21 @@ static int super_1_validate(struct mddev *mddev, struct md_rdev *freshest, struc
 	return 0;
 }
 
+static void md_disable_atomic_writes(struct mddev *mddev)
+{
+	struct queue_limits lim;
+
+	lim = queue_limits_start_update(mddev->gendisk->queue);
+	if (lim.features & BLK_FEAT_ATOMIC_WRITES) {
+		lim.features &= ~BLK_FEAT_ATOMIC_WRITES;
+	if
+	 (queue_limits_commit_update_frozen(mddev->gendisk->queue, &lim))
+		pr_warn("could not disable atomic writes after finding bad blocks\n");
+	} else {
+		queue_limits_cancel_update(mddev->gendisk->queue);
+	}
+}
+
 static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 {
 	struct mdp_superblock_1 *sb;
@@ -2090,22 +2106,7 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 	pr_err("%s mddev=%pS rdev=%pS count=%d\n", __func__, mddev, rdev, count);
 	count++;
 
-	if (count > 20005) {
 
-			struct queue_limits lim;
-
-			lim = queue_limits_start_update(mddev->gendisk->queue);
-			if (lim.features & BLK_FEAT_ATOMIC_WRITES) {
-				pr_err("%s BLK_FEAT_ATOMIC_WRITES set=1 count=%d\n", __func__, count);
-				lim.features &= ~BLK_FEAT_ATOMIC_WRITES;
-				if (queue_limits_commit_update_frozen(mddev->gendisk->queue, &lim))
-					pr_warn("could not disable atomic writes after finding bad blocks\n");
-			} else {
-				pr_err("%s BLK_FEAT_ATOMIC_WRITES set=0 count=%d\n", __func__, count);
-				queue_limits_cancel_update(mddev->gendisk->queue);
-			}
-
-	}
 	sb = page_address(rdev->sb_page);
 
 	sb->feature_map = 0;
@@ -2198,16 +2199,8 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 		sb->feature_map |= cpu_to_le32(MD_FEATURE_BAD_BLOCKS);
 		if (bb->changed) {
 			unsigned seq;
-			struct queue_limits lim;
 
-			lim = queue_limits_start_update(mddev->gendisk->queue);
-			if (lim.features & BLK_FEAT_ATOMIC_WRITES) {
-				lim.features &= ~BLK_FEAT_ATOMIC_WRITES;
-				if (queue_limits_commit_update_frozen(mddev->gendisk->queue, &lim))
-					pr_warn("could not disable atomic writes after finding bad blocks\n");
-			} else {
-				queue_limits_cancel_update(mddev->gendisk->queue);
-			}
+			md_disable_atomic_writes(mddev);
 
 retry:
 			seq = read_seqbegin(&bb->lock);
@@ -2384,6 +2377,15 @@ super_1_allow_new_offset(struct md_rdev *rdev,
 	return 1;
 }
 
+static bool super_1_has_bb(struct md_rdev *rdev)
+{
+	struct mdp_superblock_1 *sb = page_address(rdev->sb_page);
+	pr_err("%s rdev=%pS MD_FEATURE_BAD_BLOCKS=%d\n",
+		__func__, rdev,
+		!!(le32_to_cpu(sb->feature_map) & MD_FEATURE_BAD_BLOCKS));
+	return le32_to_cpu(sb->feature_map) & MD_FEATURE_BAD_BLOCKS;
+}
+
 static struct super_type super_types[] = {
 	[0] = {
 		.name	= "0.90.0",
@@ -2402,8 +2404,29 @@ static struct super_type super_types[] = {
 		.sync_super	    = super_1_sync,
 		.rdev_size_change   = super_1_rdev_size_change,
 		.allow_new_offset   = super_1_allow_new_offset,
+		.has_bb		    = super_1_has_bb,
 	},
 };
+
+static bool super_has_bb(struct mddev *mddev, struct md_rdev *rdev)
+{
+	if (!super_types[mddev->major_version].has_bb)
+		return false;
+	return super_types[mddev->major_version].has_bb(rdev);
+}
+
+bool md_atomic_writes_possible(struct mddev *mddev)
+{
+	struct md_rdev *rdev;
+
+	rdev_for_each(rdev, mddev) {
+		if (super_has_bb(mddev, rdev))
+			return false;
+	}
+	
+	return true;
+}
+EXPORT_SYMBOL_GPL(md_atomic_writes_possible);
 
 static void sync_super(struct mddev *mddev, struct md_rdev *rdev)
 {
