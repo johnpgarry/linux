@@ -565,6 +565,8 @@ struct se_cmd {
 	 * initialized on. Drivers can override.
 	 */
 	int			cpuid;
+
+	unsigned int sense_field_pointer;
 };
 
 struct se_ua {

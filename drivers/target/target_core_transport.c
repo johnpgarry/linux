@@ -3311,7 +3311,8 @@ struct sense_detail {
 	u8 key;
 	u8 asc;
 	u8 ascq;
-	bool add_sense_info;
+	unsigned int add_sense_info:1;
+	unsigned int add_sense_field_pointer:1;
 };
 
 static const struct sense_detail sense_detail_table[] = {
@@ -3347,6 +3348,7 @@ static const struct sense_detail sense_detail_table[] = {
 	[TCM_INVALID_CDB_FIELD] = {
 		.key = ILLEGAL_REQUEST,
 		.asc = 0x24, /* INVALID FIELD IN CDB */
+		.add_sense_field_pointer = true,
 	},
 	[TCM_INVALID_PARAMETER_LIST] = {
 		.key = ILLEGAL_REQUEST,
@@ -3530,6 +3532,14 @@ static void translate_sense_reason(struct se_cmd *cmd, sense_reason_t reason)
 		WARN_ON_ONCE(scsi_set_sense_information(buffer,
 							cmd->scsi_sense_length,
 							cmd->sense_info) < 0);
+	if (sd->add_sense_field_pointer && cmd->sense_field_pointer)
+		WARN_ON_ONCE(scsi_set_sense_field_pointer(buffer,
+							cmd->scsi_sense_length,
+							0, 0, 0) < 0);
+	pr_err("%s desc_format=%d 1===0x72 cmd->sense_field_pointer=%d add_sense_field_pointer=%d\n",
+		__func__, desc_format, cmd->sense_field_pointer, sd->add_sense_field_pointer);
+	/* int scsi_set_sense_field_pointer(u8 *buf, int buf_len, u16 fp, u8 bp, bool cd) */
+
 }
 
 int

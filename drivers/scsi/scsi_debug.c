@@ -6054,6 +6054,8 @@ static int resp_atomic_write(struct scsi_cmnd *scp,
 	boundary = get_unaligned_be16(cmd + 10);
 	len = get_unaligned_be16(cmd + 12);
 
+	pr_err("%s lba=%lld len=%d\n", __func__, lba, len);
+
 	lba_tmp = lba;
 	if (sdebug_atomic_wr_align &&
 	    do_div(lba_tmp, sdebug_atomic_wr_align)) {

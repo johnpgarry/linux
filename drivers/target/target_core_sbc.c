@@ -775,33 +775,53 @@ sbc_check_atomic(struct se_device *dev, struct se_cmd *cmd, unsigned char *cdb)
 	boundary = get_unaligned_be16(&cdb[10]);
 	transfer_len = get_unaligned_be16(&cdb[12]);
 
+
+	pr_err("%s transfer_len=%d attrib->atomic_max_len=%d\n", __func__, transfer_len, attrib->atomic_max_len);
 	/*
 	 * TODO:
 	 * For illegal requests, add method to set field pointer to appropiate
 	 * CDB field in sense buffer.
 	 */
 	if (!boundary) {
-		if (transfer_len > attrib->atomic_max_len)
+		if (transfer_len > attrib->atomic_max_len) {
+			pr_err("%s !boundary transfer_len > attrib->atomic_max_len\n", __func__);
+			cmd->sense_field_pointer = 15;
 			return TCM_INVALID_CDB_FIELD;
+		}
 	} else {
-		if (transfer_len > attrib->atomic_max_with_boundary)
+		if (transfer_len > attrib->atomic_max_with_boundary) {
+			pr_err("%s transfer_len > attrib->atomic_max_with_boundary\n", __func__);
+			cmd->sense_field_pointer = 16;
 			return TCM_INVALID_CDB_FIELD;
+		}
 
-		if (boundary > attrib->atomic_max_boundary)
+		if (boundary > attrib->atomic_max_boundary) {
+			pr_err("%s boundary > attrib->atomic_max_boundary\n", __func__);
+			cmd->sense_field_pointer = 17;
 			return TCM_INVALID_CDB_FIELD;
+		}
 	}
 
 	if (attrib->atomic_granularity) {
-		if (transfer_len % attrib->atomic_granularity)
+		if (transfer_len % attrib->atomic_granularity) {
+			pr_err("%s transfer_len per attrib->atomic_granularity\n", __func__);
+			cmd->sense_field_pointer = 18;
 			return TCM_INVALID_CDB_FIELD;
+		}
 
-		if (boundary && boundary % attrib->atomic_granularity)
+		if (boundary && boundary % attrib->atomic_granularity) {
+			pr_err("%s boundary && boundary per attrib->atomic_granularity\n", __func__);
+			cmd->sense_field_pointer = 19;
 			return TCM_INVALID_CDB_FIELD;
+		}
 	}
 
 	if (dev->dev_attrib.atomic_alignment &&
-	    lba % dev->dev_attrib.atomic_alignment)
+	    lba % dev->dev_attrib.atomic_alignment) {
+		pr_err("%s dev->dev_attrib.atomic_alignment && lba per dev->dev_attrib.atomic_alignment\n", __func__);
+		cmd->sense_field_pointer = 20;
 		return TCM_INVALID_CDB_FIELD;
+	}
 
 	return 0;
 }
