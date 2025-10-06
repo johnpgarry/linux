@@ -1313,6 +1313,8 @@ static blk_status_t sd_setup_atomic_cmnd(struct scsi_cmnd *cmd,
 	put_unaligned_be16(nr_blocks, &cmd->cmnd[12]);
 	cmd->cmnd[14] = 0;
 	cmd->cmnd[15] = 0;
+	
+	scmd_printk(KERN_ERR, cmd, "%s lba=%lld nr_blocks=%d\n", __func__, lba, nr_blocks);
 
 	return BLK_STS_OK;
 }
