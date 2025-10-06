@@ -6070,7 +6070,7 @@ static int resp_atomic_write(struct scsi_cmnd *scp,
 
 	if (boundary > 0) {
 		if (boundary > sdebug_atomic_wr_max_bndry) {
-			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 12, -1);
+			mk_sense_invalid_fld(scp, SDEB_IN_CDB, 10, -1);
 			return check_condition_result;
 		}
 
