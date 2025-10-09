@@ -382,6 +382,7 @@ int scsi_set_sense_field_pointer(u8 *buf, int buf_len, u16 fp, u8 bp, bool cd)
 			ucp[4] |= 0x40;
 		if (bp < 0x8)
 			ucp[4] |= 0x8 | bp;
+		pr_err("%s filling 0x7f == 0x72 ucp[5]\n", __func__);
 		put_unaligned_be16(fp, &ucp[5]);
 	} else if ((buf[0] & 0x7f) == 0x70) {
 		len = buf[7];
@@ -393,6 +394,7 @@ int scsi_set_sense_field_pointer(u8 *buf, int buf_len, u16 fp, u8 bp, bool cd)
 			buf[15] |= 0x40;
 		if (bp < 0x8)
 			buf[15] |= 0x8 | bp;
+		pr_err("%s filling 0x70 == 0x70 buf[16]\n", __func__);
 		put_unaligned_be16(fp, &buf[16]);
 	}
 
