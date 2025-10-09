@@ -607,7 +607,8 @@ try_atomic:
 	pr_err("%s dev->dev_attrib.atomic_max_len=%d io_max_blocks=%d\n",
 		__func__, dev->dev_attrib.atomic_max_len, io_max_blocks);
 	if (dev->dev_attrib.atomic_max_len < io_max_blocks)
-		put_unaligned_be32(dev->dev_attrib.atomic_max_len * 2, &buf[44]);
+		//put_unaligned_be32(dev->dev_attrib.atomic_max_len * 2, &buf[44]);
+		put_unaligned_be32(dev->dev_attrib.atomic_max_len, &buf[44]);
 	else
 		put_unaligned_be32(io_max_blocks, &buf[44]);
 
