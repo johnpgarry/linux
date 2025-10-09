@@ -237,6 +237,9 @@ static struct multipath *alloc_multipath(struct dm_target *ti)
 
 static int alloc_multipath_stage2(struct dm_target *ti, struct multipath *m)
 {
+	pr_err("%s m->queue_mode=%d NONE=%d REQUEST_BASED=%d BIO_BASED=%d\n",
+		__func__, m->queue_mode, DM_TYPE_NONE, DM_TYPE_REQUEST_BASED,
+		DM_TYPE_BIO_BASED);
 	if (m->queue_mode == DM_TYPE_NONE) {
 		m->queue_mode = DM_TYPE_REQUEST_BASED;
 	} else if (m->queue_mode == DM_TYPE_BIO_BASED) {
@@ -521,6 +524,7 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	struct request_queue *q;
 	struct request *clone;
 
+	pr_err("%s rq=%pS\n", __func__, rq);
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
@@ -665,6 +669,11 @@ static int __multipath_map_bio(struct multipath *m, struct bio *bio,
 	bio_set_dev(bio, pgpath->path.dev->bdev);
 	bio->bi_opf |= REQ_FAILFAST_TRANSPORT;
 
+
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s bio=%pS pgpath->pg->ps.type->start_io=%pS\n",
+			__func__, bio, pgpath->pg->ps.type->start_io);
+	}
 	if (pgpath->pg->ps.type->start_io)
 		pgpath->pg->ps.type->start_io(&pgpath->pg->ps,
 					      &pgpath->path,
@@ -677,6 +686,10 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
 	struct multipath *m = ti->private;
 	struct dm_mpath_io *mpio = NULL;
 
+	if (bio->bi_opf & REQ_ATOMIC) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s bio=%pS calling __multipath_map_bio\n", __func__, bio);
+	}
 	multipath_init_per_bio_data(bio, &mpio);
 	return __multipath_map_bio(m, bio, mpio);
 }
@@ -1114,7 +1127,7 @@ static int parse_features(struct dm_arg_set *as, struct multipath *m)
 	unsigned int argc;
 	struct dm_target *ti = m->ti;
 	const char *arg_name;
-
+	pr_err("%s m=%pS\n", __func__, m);
 	static const struct dm_arg _args[] = {
 		{0, 8, "invalid number of feature args"},
 		{1, 50, "pg_init_retries must be between 1 and 50"},
@@ -1132,6 +1145,7 @@ static int parse_features(struct dm_arg_set *as, struct multipath *m)
 		arg_name = dm_shift_arg(as);
 		argc--;
 
+		pr_err("%s1 m=%pS arg_name=%s\n", __func__, m, arg_name);
 		if (!strcasecmp(arg_name, "queue_if_no_path")) {
 			r = queue_if_no_path(m, true, false, __func__);
 			continue;

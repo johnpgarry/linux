@@ -1166,6 +1166,9 @@ static sector_t __max_io_len(struct dm_target *ti, sector_t sector,
 	 */
 	if (!max_granularity)
 		return len;
+	pr_err("%s queue_max_sectors=%d target_offset=%lld len=%lld max_granularity=%d\n",
+		__func__, queue_max_sectors(ti->table->md->queue),
+		target_offset, len, max_granularity);
 	return min_t(sector_t, len,
 		min(max_sectors ? : queue_max_sectors(ti->table->md->queue),
 		    blk_boundary_sectors_left(target_offset, max_granularity)));
@@ -1185,6 +1188,7 @@ int dm_set_target_max_io_len(struct dm_target *ti, sector_t len)
 		return -EINVAL;
 	}
 
+	pr_err("%s ti=%pS len=%lld\n", __func__, max_io_len, len);
 	ti->max_io_len = (uint32_t) len;
 
 	return 0;
@@ -1373,6 +1377,11 @@ void dm_submit_bio_remap(struct bio *clone, struct bio *tgt_clone)
 
 	trace_block_bio_remap(tgt_clone, disk_devt(io->md->disk),
 			      tio->old_sector);
+	if (clone->bi_opf & REQ_ATOMIC) {
+		pr_err("%s tgt_clone=%pS bi_sector=%lld bi_size=%d calling submit_bio_noacct\n",
+			__func__, tgt_clone, tgt_clone->bi_iter.bi_sector,
+			tgt_clone->bi_iter.bi_size);
+	}
 	submit_bio_noacct(tgt_clone);
 }
 EXPORT_SYMBOL_GPL(dm_submit_bio_remap);
@@ -1403,6 +1412,9 @@ static void __map_bio(struct bio *clone)
 
 	clone->bi_end_io = clone_endio;
 
+	if (clone->bi_opf & REQ_ATOMIC) {
+		pr_err("%s clone=%pS ti->type->map=%pS\n", __func__, clone, ti->type->map);
+	}
 	/*
 	 * Map the clone.
 	 */
@@ -1424,6 +1436,11 @@ static void __map_bio(struct bio *clone)
 	else
 		r = ti->type->map(ti, clone);
 
+	if (clone->bi_opf & REQ_ATOMIC) {
+		pr_err("%s2 clone=%pS called ti->type->map=%pS r=%d SUBMITTED=%d REMAPPED=%d\n",
+			__func__, clone, ti->type->map, r,
+			DM_MAPIO_SUBMITTED, DM_MAPIO_REMAPPED);
+	}
 	switch (r) {
 	case DM_MAPIO_SUBMITTED:
 		/* target has assumed ownership of this io */
@@ -1431,6 +1448,10 @@ static void __map_bio(struct bio *clone)
 			dm_start_io_acct(io, clone);
 		break;
 	case DM_MAPIO_REMAPPED:
+		if (clone->bi_opf & REQ_ATOMIC) {
+			pr_err("%s3.2 clone=%pS calling dm_submit_bio_remap\n",
+				__func__, clone);
+		}
 		dm_submit_bio_remap(clone, NULL);
 		break;
 	case DM_MAPIO_KILL:
@@ -1736,6 +1757,10 @@ static blk_status_t __split_and_process_bio(struct clone_info *ci)
 	 */
 	ci->submit_as_polled = !!(ci->bio->bi_opf & REQ_POLLED);
 
+	if (ci->bio && (ci->bio->bi_opf & REQ_ATOMIC)) {
+		pr_err("%s1 max_io_len(ti, ci->sector)=%lld ci->sector=%lld ci->sector_count=%d ti->max_io_len=%d\n",
+			__func__, max_io_len(ti, ci->sector), ci->sector, ci->sector_count, ti->max_io_len);
+	}
 	len = min_t(sector_t, max_io_len(ti, ci->sector), ci->sector_count);
 	if (ci->bio->bi_opf & REQ_ATOMIC && len != ci->sector_count)
 		return BLK_STS_IOERR;
@@ -1752,8 +1777,15 @@ static blk_status_t __split_and_process_bio(struct clone_info *ci)
 	} else {
 		clone = alloc_tio(ci, ti, 0, &len, GFP_NOIO);
 	}
+	if (clone->bi_opf & REQ_ATOMIC) {
+		pr_err("%s3 clone=%pS calling __map_bio\n", __func__, clone);
+	}
 	__map_bio(clone);
 
+	if (clone->bi_opf & REQ_ATOMIC) {
+		pr_err("%s4 clone=%pS called __map_bio ci->sector=%lld ci->sector_count=%d\n",
+			__func__, clone, ci->sector, ci->sector_count);
+	}
 	ci->sector += len;
 	ci->sector_count -= len;
 
@@ -1947,6 +1979,9 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 	blk_status_t error = BLK_STS_OK;
 	bool is_abnormal, need_split;
 
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s bio=%pS\n", __func__, bio);
+	}
 	is_abnormal = is_abnormal_io(bio);
 	if (static_branch_unlikely(&zoned_enabled)) {
 		need_split = is_abnormal || dm_zone_bio_needs_split(bio);
@@ -1962,6 +1997,9 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		 * emulation to ensure that the BIO does not cross zone
 		 * boundaries.
 		 */
+		if (bio->bi_opf & REQ_ATOMIC) {
+			pr_err("%s1 bio=%pS calling bio_split_to_limits\n", __func__, bio);
+		}
 		bio = bio_split_to_limits(bio);
 		if (!bio)
 			return;
@@ -2008,16 +2046,31 @@ static void dm_split_and_process_bio(struct mapped_device *md,
 		goto out;
 	}
 
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s2 bio=%pS calling __split_and_process_bio ci=%pS\n", __func__, bio, &ci);
+	}
 	error = __split_and_process_bio(&ci);
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s2.1 bio=%pS called __split_and_process_bio ci=%pS error=%d ci.sector_count=%d\n",
+			__func__, bio, &ci, error, ci.sector_count);
+	}
 	if (error || !ci.sector_count)
 		goto out;
 	/*
 	 * Remainder must be passed to submit_bio_noacct() so it gets handled
 	 * *after* bios already submitted have been completely processed.
 	 */
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s3 bio=%pS calling bio_trim ci=%pS calling bio_trim io->sectors=%d ci.sector_count=%d\n",
+			__func__, bio, &ci, io->sectors, ci.sector_count);
+	}
 	bio_trim(bio, io->sectors, ci.sector_count);
 	trace_block_split(bio, bio->bi_iter.bi_sector);
 	bio_inc_remaining(bio);
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s4 bio=%pS calling submit_bio_noacct ci=%pS calling bio_trim io->sectors=%d ci.sector_count=%d\n",
+			__func__, bio, &ci, io->sectors, ci.sector_count);
+	}
 	submit_bio_noacct(bio);
 out:
 	/*
@@ -2044,7 +2097,10 @@ static void dm_submit_bio(struct bio *bio)
 	struct mapped_device *md = bio->bi_bdev->bd_disk->private_data;
 	int srcu_idx;
 	struct dm_table *map;
-
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s bio=%pS bi_sector=%lld bi_size=%d\n",
+			__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
+	}
 	map = dm_get_live_table(md, &srcu_idx);
 	if (unlikely(!map)) {
 		DMERR_LIMIT("%s: mapping table unavailable, erroring io",
@@ -2064,6 +2120,9 @@ static void dm_submit_bio(struct bio *bio)
 		goto out;
 	}
 
+	if (bio->bi_opf & REQ_ATOMIC) {
+		pr_err("%s2 bio=%pS calling dm_split_and_process_bio\n", __func__, bio);
+	}
 	dm_split_and_process_bio(md, map, bio);
 out:
 	dm_put_live_table(md, srcu_idx);

@@ -75,8 +75,10 @@ static ssize_t __blkdev_direct_IO_simple(struct kiocb *iocb,
 	bio.bi_write_hint = file_inode(iocb->ki_filp)->i_write_hint;
 	bio.bi_write_stream = iocb->ki_write_stream;
 	bio.bi_ioprio = iocb->ki_ioprio;
-	if (iocb->ki_flags & IOCB_ATOMIC)
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s bio=%pS pos=%lld\n", __func__, &bio, pos);
 		bio.bi_opf |= REQ_ATOMIC;
+	}
 
 	ret = bio_iov_iter_get_pages(&bio, iter);
 	if (unlikely(ret))
@@ -370,8 +372,10 @@ static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
 			goto out_bio_put;
 	}
 
-	if (iocb->ki_flags & IOCB_ATOMIC)
+	if (iocb->ki_flags & IOCB_ATOMIC) {
+		pr_err("%s bio=%pS pos=%lld\n", __func__, bio, pos);
 		bio->bi_opf |= REQ_ATOMIC;
+	}
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		bio->bi_opf |= REQ_NOWAIT;
