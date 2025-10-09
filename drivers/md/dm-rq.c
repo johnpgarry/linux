@@ -368,18 +368,48 @@ static int map_request(struct dm_rq_target_io *tio)
 	struct request *clone = NULL;
 	blk_status_t ret;
 
+	if (rq->cmd_flags & REQ_ATOMIC)
+		pr_err("%s rq=%pS (REQ_ATOMIC) bio=%pS calling clone_and_map_rq=%pS\n",
+			__func__, rq, rq->bio, ti->type->clone_and_map_rq);
+	else if (rq->bio && (rq->bio->bi_opf & REQ_ATOMIC))
+		pr_err("%s0.1 rq=%pS bio=%pS (REQ_ATOMIC) calling clone_and_map_rq=%pS\n",
+			__func__, rq, rq->bio, ti->type->clone_and_map_rq);
+
 	r = ti->type->clone_and_map_rq(ti, rq, &tio->info, &clone);
+	if (rq->cmd_flags & REQ_ATOMIC)
+		pr_err("%s1 rq=%pS (REQ_ATOMIC) bio=%pS called clone_and_map_rq clone=%pS (REQ_ATOMIC=%d) bio=%pS r=%d REMAPPED=%d\n",
+			__func__, rq, rq->bio, clone,
+			!!(clone->cmd_flags & REQ_ATOMIC),
+			clone->bio, r,
+			DM_MAPIO_REMAPPED);
+	else if (rq->bio && (rq->bio->bi_opf & REQ_ATOMIC))
+		pr_err("%s1.1 rq=%pS (REQ_ATOMIC) bio=%pS called clone_and_map_rq clone=%pS (REQ_ATOMIC=%d) bio=%pS r=%d REMAPPED=%d\n",
+			__func__, rq, rq->bio, clone,
+			!!(clone->cmd_flags & REQ_ATOMIC),
+			clone->bio, r,
+			DM_MAPIO_REMAPPED);
 	switch (r) {
 	case DM_MAPIO_SUBMITTED:
 		/* The target has taken the I/O to submit by itself later */
 		break;
 	case DM_MAPIO_REMAPPED:
+		if (rq->cmd_flags & REQ_ATOMIC)
+			pr_err("%s1 rq=%pS (REQ_ATOMIC) bio=%pS calling setup_clone clone=%pS (REQ_ATOMIC=%d) bio=%pS\n",
+				__func__, rq, rq->bio, clone,
+				!!(clone->cmd_flags & REQ_ATOMIC),
+				clone->bio);
+
 		if (setup_clone(clone, rq, tio, GFP_ATOMIC)) {
 			/* -ENOMEM */
 			ti->type->release_clone_rq(clone, &tio->info);
 			return DM_MAPIO_REQUEUE;
 		}
 
+		if (rq->cmd_flags & REQ_ATOMIC)
+			pr_err("%s2.1 rq=%pS (REQ_ATOMIC) bio=%pS called setup_clone clone=%pS (REQ_ATOMIC=%d) bio=%pS (REQ_ATOMIC=%d)\n",
+				__func__, rq, rq->bio, clone,
+				!!(clone->cmd_flags & REQ_ATOMIC),
+				clone->bio, !!(clone->bio->bi_opf & REQ_ATOMIC));
 		/* The target has remapped the I/O so dispatch it */
 		trace_block_rq_remap(clone, disk_devt(dm_disk(md)),
 				     blk_rq_pos(rq));
@@ -482,6 +512,10 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct mapped_device *md = tio->md;
 	struct dm_target *ti = md->immutable_target;
 
+	if (rq->cmd_flags & REQ_ATOMIC)
+		pr_err("%s rq=%pS (REQ_ATOMIC) bio=%pS\n", __func__, rq, rq->bio);
+	else if (rq->bio && (rq->bio->bi_opf & REQ_ATOMIC))
+		pr_err("%s1 rq=%pS bio=%pS (REQ_ATOMIC)\n", __func__, rq, rq->bio);
 	/*
 	 * blk-mq's unquiesce may come from outside events, such as
 	 * elevator switch, updating nr_requests or others, and request may
@@ -518,6 +552,11 @@ static blk_status_t dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 	 */
 	tio->ti = ti;
 
+	if (rq->cmd_flags & REQ_ATOMIC)
+		pr_err("%s2 rq=%pS (REQ_ATOMIC) bio=%pS calling map_request\n", __func__, rq, rq->bio);
+	else if (rq->bio && (rq->bio->bi_opf & REQ_ATOMIC))
+		pr_err("%s2.1 rq=%pS bio=%pS (REQ_ATOMIC) calling map_request\n", __func__, rq, rq->bio);
+
 	/* Direct call is fine since .queue_rq allows allocations */
 	if (map_request(tio) == DM_MAPIO_REQUEUE) {
 		/* Undo dm_start_request() before requeuing */
@@ -544,6 +583,7 @@ int dm_mq_init_request_queue(struct mapped_device *md, struct dm_table *t)
 	if (!md->tag_set)
 		return -ENOMEM;
 
+	pr_err("%s md=%pS using dm_mq_ops\n", __func__, md);
 	md->tag_set->ops = &dm_mq_ops;
 	md->tag_set->queue_depth = dm_get_blk_mq_queue_depth();
 	md->tag_set->numa_node = md->numa_node_id;

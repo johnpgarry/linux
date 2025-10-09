@@ -1816,7 +1816,11 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	int reason;
 
 	WARN_ON_ONCE(cmd->budget_token < 0);
-
+	if (req->cmd_flags & REQ_ATOMIC)
+			pr_err("%s1 rq=%pS (REQ_ATOMIC) bio=%pS (REQ_ATOMIC=%d) queuecommand=%pS\n",
+				__func__, req, req->bio,
+				!!(req->bio->bi_opf & REQ_ATOMIC),
+				shost->hostt->queuecommand);
 	/*
 	 * If the device is not in running state we will reject some or all
 	 * commands.

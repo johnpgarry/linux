@@ -2328,7 +2328,7 @@ static struct mapped_device *alloc_dev(int minor)
 		DMERR("unable to allocate device, out of memory.");
 		return NULL;
 	}
-
+	pr_err("%s minor=%d md=%pS\n", __func__, minor, md);
 	if (!try_module_get(THIS_MODULE))
 		goto bad_module_get;
 
@@ -2387,6 +2387,7 @@ static struct mapped_device *alloc_dev(int minor)
 	md->disk->minors = 1;
 	md->disk->flags |= GENHD_FL_NO_PART;
 	md->disk->fops = &dm_blk_dops;
+	pr_err("%s2 minor=%d md=%pS fops=%pS dm_blk_dops\n", __func__, minor, md, md->disk->fops);
 	md->disk->private_data = md;
 	sprintf(md->disk->disk_name, "dm-%d", minor);
 
@@ -2622,7 +2623,12 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 
 	WARN_ON_ONCE(type == DM_TYPE_NONE);
 
+	pr_err("%s type=%d REQUEST_BASED=%d BIO_BASED=%d md=%pS\n",
+		__func__, type, DM_TYPE_REQUEST_BASED, DM_TYPE_BIO_BASED, md);
 	if (type == DM_TYPE_REQUEST_BASED) {
+
+		pr_err("%s2 for DM_TYPE_REQUEST_BASED md->disk->fops=%pS, setting to dm_rq_blk_dops=%pS md=%pS\n",
+			__func__, md->disk->fops, &dm_rq_blk_dops, md);
 		md->disk->fops = &dm_rq_blk_dops;
 		r = dm_mq_init_request_queue(md, t);
 		if (r) {

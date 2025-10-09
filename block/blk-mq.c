@@ -2117,6 +2117,9 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 		bd.rq = rq;
 		bd.last = list_empty(list);
 
+		if (rq->cmd_flags & REQ_ATOMIC)
+			pr_err("%s rq=%pS bio=%pS REQ_ATOMIC=%d calling q->mq_ops->queue_rq=%pS\n",
+				__func__, rq, rq->bio, !!(rq->bio->bi_opf & REQ_ATOMIC), q->mq_ops->queue_rq);
 		ret = q->mq_ops->queue_rq(hctx, &bd);
 		switch (ret) {
 		case BLK_STS_OK:
@@ -3123,6 +3126,14 @@ void blk_mq_submit_bio(struct bio *bio)
 	 */
 	rq = blk_mq_peek_cached_request(plug, q, bio->bi_opf);
 
+	if (bio->bi_opf & REQ_ATOMIC) {
+		if (rq)
+			pr_err("%s bio=%pS rq=%pS REQ_ATOMIC=%d\n",
+				__func__, bio, rq, !!(rq->cmd_flags & REQ_ATOMIC));
+		else
+			pr_err("%s2 bio=%pS rq=%pS\n",
+				__func__, bio, rq);
+	}
 	/*
 	 * A BIO that was released from a zone write plug has already been
 	 * through the preparation in this function, already holds a reference
@@ -3178,6 +3189,9 @@ void blk_mq_submit_bio(struct bio *bio)
 
 new_request:
 	if (rq) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s2 new_request: bio=%pS rq=%pS REQ_ATOMIC=%d calling blk_mq_use_cached_rq\n",
+				__func__, bio, rq, !!(rq->cmd_flags & REQ_ATOMIC));
 		blk_mq_use_cached_rq(rq, plug, bio);
 	} else {
 		rq = blk_mq_get_new_requests(q, plug, bio);
@@ -3186,6 +3200,9 @@ new_request:
 				bio_wouldblock_error(bio);
 			goto queue_exit;
 		}
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s3 new_request: bio=%pS *new* rq=%pS REQ_ATOMIC=%d\n",
+				__func__, bio, rq, !!(rq->cmd_flags & REQ_ATOMIC));
 	}
 
 	trace_block_getrq(bio);

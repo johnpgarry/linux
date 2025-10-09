@@ -524,7 +524,12 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	struct request_queue *q;
 	struct request *clone;
 
-	pr_err("%s rq=%pS\n", __func__, rq);
+	if (rq->cmd_flags & REQ_ATOMIC) {
+	//	WARN_ON_ONCE(1);
+		pr_err("%s rq=%pS (REQ_ATOMIC) bio=%pS (REQ_ATOMIC=%d)\n", __func__, rq, rq->bio, !!(rq->bio->bi_opf & REQ_ATOMIC));
+	} else if (rq->bio && (rq->bio->bi_opf & REQ_ATOMIC)) {
+		pr_err("%s2 rq=%pS bio=%pS (REQ_ATOMIC)\n", __func__, rq, rq->bio);
+	}
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
 	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))

@@ -631,11 +631,23 @@ static void __submit_bio(struct bio *bio)
 
 	blk_start_plug(&plug);
 
+	if (bio->bi_opf & REQ_ATOMIC)
+		pr_err("%s bio=%pS BD_HAS_SUBMIT_BIO=%d\n",
+			__func__, bio, bdev_test_flag(bio->bi_bdev, BD_HAS_SUBMIT_BIO));
+
 	if (!bdev_test_flag(bio->bi_bdev, BD_HAS_SUBMIT_BIO)) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s1 bio=%pS calling blk_mq_submit_bio\n",
+				__func__, bio);
+
 		blk_mq_submit_bio(bio);
 	} else if (likely(bio_queue_enter(bio) == 0)) {
 		struct gendisk *disk = bio->bi_bdev->bd_disk;
 	
+		if (bio->bi_opf & REQ_ATOMIC)
+			pr_err("%s2 bio=%pS disk->fops->submit_bio=%pS\n",
+				__func__, bio, disk->fops->submit_bio);
+
 		if ((bio->bi_opf & REQ_POLLED) &&
 		    !(disk->queue->limits.features & BLK_FEAT_POLL)) {
 			bio->bi_status = BLK_STS_NOTSUPP;
