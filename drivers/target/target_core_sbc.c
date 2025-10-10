@@ -776,7 +776,7 @@ sbc_check_atomic(struct se_device *dev, struct se_cmd *cmd, unsigned char *cdb)
 	transfer_len = get_unaligned_be16(&cdb[12]);
 
 
-	pr_err("%s transfer_len=%d attrib->atomic_max_len=%d\n", __func__, transfer_len, attrib->atomic_max_len);
+	//pr_err("%s transfer_len=%d attrib->atomic_max_len=%d\n", __func__, transfer_len, attrib->atomic_max_len);
 	/*
 	 * TODO:
 	 * For illegal requests, add method to set field pointer to appropiate
