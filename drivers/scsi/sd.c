@@ -2242,8 +2242,12 @@ static unsigned int sd_completed_bytes(struct scsi_cmnd *scmd)
 	/* Check if we have a 'bad_lba' information */
 	if (!scsi_get_sense_info_fld(scmd->sense_buffer,
 				     SCSI_SENSE_BUFFERSIZE,
-				     &bad_lba))
+				     &bad_lba)) {
+
+		pr_err("%s0 scmd=%pS bad_lba=%lld no info\n", __func__, scmd, bad_lba);
+			BUG();
 		return 0;
+	}
 
 	/*
 	 * If the bad lba was reported incorrectly, we have no idea where
@@ -2251,8 +2255,13 @@ static unsigned int sd_completed_bytes(struct scsi_cmnd *scmd)
 	 */
 	start_lba = sectors_to_logical(sdev, blk_rq_pos(req));
 	end_lba = start_lba + bytes_to_logical(sdev, scsi_bufflen(scmd));
-	if (bad_lba < start_lba || bad_lba >= end_lba)
+	pr_err("%s1 scmd=%pS start_lba=%lld end_lba=%lld bad_lba=%lld\n", __func__,
+		scmd, start_lba, end_lba, bad_lba);
+	if (bad_lba < start_lba || bad_lba >= end_lba) {
+		pr_err("%s1.1 returning 0 scmd=%pS start_lba=%lld end_lba=%lld bad_lba=%lld\n", __func__,
+			scmd, start_lba, end_lba, bad_lba);
 		return 0;
+	}
 
 	/*
 	 * resid is optional but mostly filled in.  When it's unused,
@@ -2265,6 +2274,9 @@ static unsigned int sd_completed_bytes(struct scsi_cmnd *scmd)
 	 */
 	good_bytes = logical_to_bytes(sdev, bad_lba - start_lba);
 
+	pr_err("%s9 scmd=%pS start_lba=%lld end_lba=%lld bad_lba=%lld returning min from (transferred=%d good_bytes=%d) scsi_bufflen(scmd)=%d  scsi_get_resid(scmd)=%d\n", __func__,
+			scmd, start_lba, end_lba, bad_lba, transferred, good_bytes,
+			scsi_bufflen(scmd),  scsi_get_resid(scmd));
 	return min(good_bytes, transferred);
 }
 
@@ -2329,18 +2341,29 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 	sdkp->medium_access_timed_out = 0;
 
 	if (!scsi_status_is_check_condition(result) &&
-	    (!sense_valid || sense_deferred))
+	    (!sense_valid || sense_deferred)) {
+		pr_err_once("%s0 good_bytes=%d SCpnt=%pS\n",
+			__func__, good_bytes, SCpnt);
 		goto out;
+	}
 
 	switch (sshdr.sense_key) {
 	case HARDWARE_ERROR:
 	case MEDIUM_ERROR:
+		pr_err("%s0 calling sd_completed_bytes HARDWARE_ERROR MEDIUM_ERROR good_bytes=%d SCpnt=%pS\n",
+			__func__, good_bytes, SCpnt);
 		good_bytes = sd_completed_bytes(SCpnt);
+		pr_err("%s0.1 good_bytes=%d called sd_completed_bytes HARDWARE_ERROR MEDIUM_ERROR SCpnt=%pS\n",
+			__func__, good_bytes, SCpnt);
 		break;
 	case RECOVERED_ERROR:
 		good_bytes = scsi_bufflen(SCpnt);
+		pr_err("%s2 good_bytes=%d RECOVERED_ERROR SCpnt=%pS\n",
+			__func__, good_bytes, SCpnt);
 		break;
 	case NO_SENSE:
+		pr_err("%s3 good_bytes=%d NO_SENSE SCpnt=%pS\n",
+			__func__, good_bytes, SCpnt);
 		/* This indicates a false check condition, so ignore it.  An
 		 * unknown amount of data was transferred so treat it as an
 		 * error.
@@ -2349,10 +2372,14 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 		memset(SCpnt->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
 		break;
 	case ABORTED_COMMAND:
+		pr_err("%s3 good_bytes=%d ABORTED_COMMAND SCpnt=%pS\n",
+			__func__, good_bytes, SCpnt);
 		if (sshdr.asc == 0x10)  /* DIF: Target detected corruption */
 			good_bytes = sd_completed_bytes(SCpnt);
 		break;
 	case ILLEGAL_REQUEST:
+		pr_err("%s4 good_bytes=%d ILLEGAL_REQUEST SCpnt=%pS\n",
+			__func__, good_bytes, SCpnt);
 		switch (sshdr.asc) {
 		case 0x10:	/* DIX: Host detected corruption */
 			good_bytes = sd_completed_bytes(SCpnt);
@@ -2376,6 +2403,8 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 		}
 		break;
 	default:
+		pr_err("%s5 default good_bytes=%d sshdr.sense_key=%d SCpnt=%pS\n",
+			__func__, good_bytes, sshdr.sense_key, SCpnt);
 		break;
 	}
 

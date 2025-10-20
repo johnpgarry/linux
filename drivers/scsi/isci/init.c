@@ -568,7 +568,7 @@ static struct isci_host *isci_host_alloc(struct pci_dev *pdev, int id)
 			   SHOST_DIF_TYPE2_PROTECTION |
 			   SHOST_DIF_TYPE3_PROTECTION);
 	scsi_host_set_guard(shost, SHOST_DIX_GUARD_CRC);
-
+	WARN_ON_ONCE(1);
 	err = scsi_add_host(shost, &pdev->dev);
 	if (err)
 		goto err_shost;

@@ -2930,6 +2930,7 @@ iscsi_if_create_session(struct iscsi_internal *priv, struct iscsi_endpoint *ep,
 	struct iscsi_cls_session *session;
 	struct Scsi_Host *shost;
 
+	pr_err("%s transport->create_session=%pS\n", __func__, transport->create_session);
 	session = transport->create_session(ep, cmds_max, queue_depth,
 					    initial_cmdsn);
 	if (!session)

@@ -2571,16 +2571,24 @@ bool scsi_get_sense_info_fld(const u8 *sense_buffer, int sb_len,
 			     u64 *info_out)
 {
 	const u8 * ucp;
-
+	pr_err("%s sb_len=%d\n", __func__, sb_len);
 	if (sb_len < 7)
 		return false;
+	pr_err("%s2 sb_len=%d sense_buffer[0] & 0x7f=0x%x\n",
+		__func__, sb_len, sense_buffer[0] & 0x7f);
+	
 	switch (sense_buffer[0] & 0x7f) {
 	case 0x70:
 	case 0x71:
+		pr_err("%s3 0x70/71 sb_len=%d sense_buffer[0] & 0x80=0x%x\n",
+			__func__, sb_len, sense_buffer[0] & 0x80);
 		if (sense_buffer[0] & 0x80) {
 			*info_out = get_unaligned_be32(&sense_buffer[3]);
+			pr_err("%s3.1 0x70/71 sb_len=%d sense_buffer[0] & 0x80=0x%x *info_out=0x%llx\n",
+				__func__, sb_len, sense_buffer[0] & 0x80, *info_out);
 			return true;
 		}
+		BUG();
 		return false;
 	case 0x72:
 	case 0x73:

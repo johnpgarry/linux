@@ -2919,7 +2919,7 @@ int iscsi_host_add(struct Scsi_Host *shost, struct device *pdev)
 
 	if (!shost->cmd_per_lun)
 		shost->cmd_per_lun = ISCSI_DEF_CMD_PER_LUN;
-
+	WARN_ON_ONCE(1);
 	return scsi_add_host(shost, pdev);
 }
 EXPORT_SYMBOL_GPL(iscsi_host_add);
