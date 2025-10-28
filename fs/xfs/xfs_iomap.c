@@ -1153,6 +1153,7 @@ xfs_atomic_write_cow_iomap_begin(
 	pr_err("%s0 cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d DELAYSTARTBLOCK=%d\n",
 		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
 		cmap.br_startblock == DELAYSTARTBLOCK);
+	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	if (cmap.br_startoff <= offset_fsb) {
 		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
 		goto found;
@@ -1160,6 +1161,7 @@ xfs_atomic_write_cow_iomap_begin(
 	pr_err("%s0.1 cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d DELAYSTARTBLOCK=%d\n",
 		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
 		cmap.br_startblock == DELAYSTARTBLOCK);
+	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 
 	end_fsb = cmap.br_startoff;
 	count_fsb = end_fsb - offset_fsb;
@@ -1187,11 +1189,13 @@ xfs_atomic_write_cow_iomap_begin(
 		pr_err("%s0.3 cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d DELAYSTARTBLOCK=%d\n",
 			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
 			cmap.br_startblock == DELAYSTARTBLOCK);
+		WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 		cmap.br_startoff = end_fsb;
 	}
 	pr_err("%s0.4 cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d DELAYSTARTBLOCK=%d\n",
 		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state,
 		cmap.br_startblock == DELAYSTARTBLOCK);
+	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	if (cmap.br_startoff <= offset_fsb) {
 		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
 		xfs_trans_cancel(tp);
@@ -1228,6 +1232,8 @@ xfs_atomic_write_cow_iomap_begin(
 found:
 	pr_err("%s2 found: offset=%lld length=%lld cmap.br_state=%d isnullstartblock=%d DELAYSTARTBLOCK=%d\n",
 		__func__, offset, length, cmap.br_state, isnullstartblock(cmap.br_startblock), cmap.br_startblock == DELAYSTARTBLOCK);
+
+	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	if (cmap.br_state != XFS_EXT_NORM) {
 		pr_err("%s2.1 found: offset=%lld length=%lld cmap.br_state=%d isnullstartblock=%d DELAYSTARTBLOCK=%d !XFS_EXT_NORM\n",
 			__func__, offset, length, cmap.br_state, isnullstartblock(cmap.br_startblock), cmap.br_startblock == DELAYSTARTBLOCK);
@@ -1244,6 +1250,7 @@ found:
 	trace_xfs_iomap_found(ip, offset, length - offset, XFS_COW_FORK, &cmap);
 	seq = xfs_iomap_inode_sequence(ip, IOMAP_F_SHARED);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
 
 out_unlock:
