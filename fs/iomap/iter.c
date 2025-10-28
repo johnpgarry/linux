@@ -26,14 +26,31 @@ int iomap_iter_advance(struct iomap_iter *iter, u64 *count)
 	*count = iomap_length(iter);
 	return 0;
 }
-
+#if 0
+struct iomap {
+	u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
+	struct block_device	*bdev;	/* block device for I/O */
+	struct dax_device	*dax_dev; /* dax_dev for dax operations */
+	void			*inline_data;
+	void			*private; /* filesystem private */
+	u64			validity_cookie; /* used with .iomap_valid() */
+#endif
 static inline void iomap_iter_done(struct iomap_iter *iter)
 {
+	struct iomap *iomap = &iter->iomap;
+
 	WARN_ON_ONCE(iter->iomap.offset > iter->pos);
 	WARN_ON_ONCE(iter->iomap.length == 0);
 	WARN_ON_ONCE(iter->iomap.offset + iter->iomap.length <= iter->pos);
 	WARN_ON_ONCE(iter->iomap.flags & IOMAP_F_STALE);
 
+	pr_err("%s addr=%lld offset=%lld length=%lld type=0x%x flags=%d %s\n",
+		__func__, iomap->addr, iomap->offset, iomap->length, iomap->type, iomap->flags,
+		iomap->type == IOMAP_DELALLOC ? "IOMAP_DELALLOC" : "");
 	iter->iter_start_pos = iter->pos;
 
 	trace_iomap_iter_dstmap(iter->inode, &iter->iomap);

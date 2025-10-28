@@ -406,6 +406,11 @@ xfs_reflink_convert_unwritten(
 	xfs_filblks_t		count_fsb = imap->br_blockcount;
 	int			error;
 
+
+	pr_err("%s imap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d convert_now=%d\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, convert_now);
+
+
 	/*
 	 * cmap might larger than imap due to cowextsize hint.
 	 */
@@ -1002,6 +1007,8 @@ xfs_reflink_end_atomic_cow(
 	struct xfs_mount		*mp = ip->i_mount;
 	struct xfs_trans		*tp;
 	unsigned int			resblks;
+
+	pr_err("%s offset=%lld count=%lld\n", __func__, offset, count);
 
 	trace_xfs_reflink_end_cow(ip, offset, count);
 

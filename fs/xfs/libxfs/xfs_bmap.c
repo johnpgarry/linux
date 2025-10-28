@@ -2027,7 +2027,7 @@ xfs_bmap_add_extent_unwritten_real(
 	struct xfs_bmbt_irec	old;
 
 	*logflagsp = 0;
-
+	pr_err("%s\n", __func__);
 	cur = *curp;
 	ifp = xfs_ifork_ptr(ip, whichfork);
 
@@ -4006,6 +4006,11 @@ xfs_bmapi_convert_unwritten(
 	struct xfs_ifork	*ifp = xfs_ifork_ptr(bma->ip, whichfork);
 	int			tmp_logflags = 0;
 	int			error;
+	struct xfs_bmbt_irec	*mygot = &bma->got;
+
+	pr_err("%s len=%lld bma->offset=%lld, length=%d, blkno=%lld, total=%d mygot->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, len, bma->offset, bma->length, bma->blkno, bma->total,
+		mygot->br_startoff, mygot->br_startblock, mygot->br_blockcount, mygot->br_state);
 
 	/* check if we need to do unwritten->real conversion */
 	if (mval->br_state == XFS_EXT_UNWRITTEN &&

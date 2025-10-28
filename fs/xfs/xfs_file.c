@@ -229,7 +229,7 @@ xfs_file_dio_read(
 {
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	ssize_t			ret;
-
+	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
 	trace_xfs_file_direct_read(iocb, to);
 
 	if (!iov_iter_count(to))
@@ -279,6 +279,7 @@ xfs_file_buffered_read(
 
 	trace_xfs_file_buffered_read(iocb, to);
 
+	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
 	ret = xfs_ilock_iocb(iocb, XFS_IOLOCK_SHARED);
 	if (ret)
 		return ret;
@@ -299,6 +300,7 @@ xfs_file_read_iter(
 
 	XFS_STATS_INC(mp, xs_read_calls);
 
+	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -749,8 +751,9 @@ xfs_file_dio_write_atomic(
 		dops = &xfs_atomic_write_cow_iomap_ops;
 	else
 		dops = &xfs_direct_write_iomap_ops;
-
+	
 retry:
+	pr_err("%s dops=%pS ki_pos=%lld ocount=%zd\n", __func__, dops, iocb->ki_pos, ocount);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -885,7 +888,7 @@ xfs_file_dio_write(
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
-
+	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
@@ -960,6 +963,7 @@ xfs_file_buffered_write(
 	bool			cleared_space = false;
 	unsigned int		iolock;
 
+	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
 write_retry:
 	iolock = XFS_IOLOCK_EXCL;
 	ret = xfs_ilock_iocb(iocb, iolock);
@@ -1090,7 +1094,7 @@ xfs_file_write_iter(
 
 	if (ocount == 0)
 		return 0;
-
+	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
@@ -1119,6 +1123,7 @@ xfs_file_write_iter(
 		ret = xfs_file_dio_write(iocb, from);
 		if (ret != -ENOTBLK)
 			return ret;
+		pr_err("%s1 ki_pos=%lld ocount=%zd ret=%zd from xfs_file_dio_write\n", __func__, iocb->ki_pos, iov_iter_count(from), ret);
 	}
 
 	if (xfs_is_zoned_inode(ip))
@@ -1368,21 +1373,33 @@ __xfs_file_fallocate(
 
 	switch (mode & FALLOC_FL_MODE_MASK) {
 	case FALLOC_FL_PUNCH_HOLE:
+		pr_err("%s FALLOC_FL_PUNCH_HOLE offset=%lld len=%lld\n", __func__,
+			offset, len);
 		error = xfs_free_file_space(ip, offset, len, ac);
 		break;
 	case FALLOC_FL_COLLAPSE_RANGE:
+		pr_err("%s FALLOC_FL_COLLAPSE_RANGE offset=%lld len=%lld\n", __func__,
+			offset, len);
 		error = xfs_falloc_collapse_range(file, offset, len, ac);
 		break;
 	case FALLOC_FL_INSERT_RANGE:
+		pr_err("%s FALLOC_FL_INSERT_RANGE offset=%lld len=%lld\n", __func__,
+			offset, len);
 		error = xfs_falloc_insert_range(file, offset, len);
 		break;
 	case FALLOC_FL_ZERO_RANGE:
+		pr_err("%s FALLOC_FL_ZERO_RANGE offset=%lld len=%lld\n", __func__,
+			offset, len);
 		error = xfs_falloc_zero_range(file, mode, offset, len, ac);
 		break;
 	case FALLOC_FL_UNSHARE_RANGE:
+		pr_err("%s FALLOC_FL_UNSHARE_RANGE offset=%lld len=%lld\n", __func__,
+			offset, len);
 		error = xfs_falloc_unshare_range(file, mode, offset, len);
 		break;
 	case FALLOC_FL_ALLOCATE_RANGE:
+		pr_err("%s FALLOC_FL_ALLOCATE_RANGE offset=%lld len=%lld\n", __func__,
+			offset, len);
 		error = xfs_falloc_allocate_range(file, mode, offset, len);
 		break;
 	default:
