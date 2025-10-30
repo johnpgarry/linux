@@ -11,7 +11,8 @@
 #include "trace.h"
 
 #include "../internal.h"
-
+extern unsigned int special_read_fail_address;
+extern unsigned int special_write_fail_address;
 /*
  * Structure allocated for each folio to track per-block uptodate, dirty state
  * and I/O completions.
@@ -572,7 +573,7 @@ static int iomap_read_folio_range(const struct iomap_iter *iter,
 	struct bio bio;
 	bool print = false;
 
-	if (srcmap->offset == 0x23000)
+	if (srcmap->offset == special_read_fail_address)
 		print = true;
 
 	if (print) {
@@ -857,13 +858,13 @@ static int iomap_write_begin(struct iomap_iter *iter,
 	int status = 0;
 	bool print = false;
 
-	if (iter->pos == 0x23000)
+	if (iter->pos == special_read_fail_address)
 		print = true;
-	if (iter->pos == 0x23800)
+	if (iter->pos == special_write_fail_address)
 		print = true;
 
 	if (print)
-		pr_err("%s iter->pos=0x%lld (0x%llx) len=%lld (0x%llx) srcmap=%pS offset=%lld (0x%llx) addr=%lld (0x%llx)\n",
+		pr_err("%s iter->pos=%lld (0x%llx) len=%lld (0x%llx) srcmap=%pS offset=%lld (0x%llx) addr=%lld (0x%llx)\n",
 			__func__, iter->pos, iter->pos, iter->len, iter->len, srcmap, srcmap->offset, srcmap->offset, srcmap->addr, srcmap->addr);
 
 	len = min_not_zero(len, *plen);
@@ -998,13 +999,13 @@ static int iomap_write_iter(struct iomap_iter *iter, struct iov_iter *i,
 	unsigned int bdp_flags = (iter->flags & IOMAP_NOWAIT) ? BDP_ASYNC : 0;
 	bool print = false;
 
-	if (iter->pos == 0x23000)
+	if (iter->pos == special_read_fail_address)
 		print = true;
-	if (iter->pos == 0x23800)
+	if (iter->pos == special_write_fail_address)
 		print = true;
 
 	if (print)
-		pr_err("%s iter->pos=%llx (0x%llx) len=%lld (0x%llx)\n",
+		pr_err("%s iter->pos=%lld (0x%llx) len=%lld (0x%llx)\n",
 			__func__, iter->pos, iter->pos, iter->len, iter->len);
 
 	do {
@@ -1043,7 +1044,7 @@ retry:
 			break;
 		}
 
-		if (print)
+		if ((iter->pos == special_read_fail_address) || (iter->pos == special_write_fail_address))
 			pr_err("%s2 iter->pos=%llx (0x%llx) len=%lld (0x%llx) calling iomap_write_begin\n",
 				__func__, iter->pos, iter->pos, iter->len, iter->len);
 		status = iomap_write_begin(iter, write_ops, &folio, &offset,

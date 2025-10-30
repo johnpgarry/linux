@@ -74,7 +74,8 @@ xfs_dir_fsync(
 	trace_xfs_dir_fsync(ip);
 	return xfs_log_force_inode(ip);
 }
-
+unsigned int special_read_fail_address = 0x50000;
+unsigned int special_write_fail_address = 0x45000;
 /*
  * All metadata updates are logged, which means that we just have to push the
  * journal to the required sequence number than holds the updates. We track
@@ -300,7 +301,7 @@ xfs_file_read_iter(
 	bool print = false;
 
 
-	if (iocb->ki_pos == 0x23000)
+	if (iocb->ki_pos == special_read_fail_address)
 		print = true;
 	if (iocb->ki_pos == 0x1f000)
 		print = true;
@@ -760,9 +761,11 @@ xfs_file_dio_write_atomic(
 		dops = &xfs_atomic_write_cow_iomap_ops;
 	else
 		dops = &xfs_direct_write_iomap_ops;
-	mdelay(500);
+	mdelay(100);
+	pr_err("%s dops=%pS ki_pos=%lld (0x%llx) ocount=%zd (%lx) bt_awu_max=%d\n",
+		__func__, dops, iocb->ki_pos, iocb->ki_pos, ocount, ocount, xfs_inode_buftarg(ip)->bt_awu_max);
 retry:
-	pr_err("%s dops=%pS ki_pos=%lld (0x%llx) ocount=%zd (%lx)\n",
+	pr_err("%s1 retry: dops=%pS ki_pos=%lld (0x%llx) ocount=%zd (%lx)\n",
 		__func__, dops, iocb->ki_pos, iocb->ki_pos, ocount, ocount);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
@@ -1104,9 +1107,9 @@ xfs_file_write_iter(
 	bool print = false;
 
 
-	if (iocb->ki_pos == 0x23000)
+	if (iocb->ki_pos == special_read_fail_address)
 		print = true;
-	if (iocb->ki_pos == 0x23800)
+	if (iocb->ki_pos == special_write_fail_address)
 		print = true;
 	if (iocb->ki_pos == 0x20000)
 		print = true;

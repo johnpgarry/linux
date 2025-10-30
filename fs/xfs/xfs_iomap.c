@@ -32,7 +32,7 @@
 #include "xfs_rtbitmap.h"
 #include "xfs_icache.h"
 #include "xfs_zone_alloc.h"
-
+extern unsigned int special_write_fail_address;
 #define XFS_ALLOC_ALIGN(mp, off) \
 	(((off) >> mp->m_allocsize_log) << mp->m_allocsize_log)
 
@@ -109,7 +109,7 @@ xfs_bmbt_to_iomap(
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
 	bool print = false;
 
-	if (imap->br_startblock == 742)
+	if (imap->br_startblock == 299)
 		print = true;
 
 
@@ -1128,7 +1128,7 @@ xfs_atomic_write_cow_iomap_begin(
 	int			error;
 	u64			seq;
 
-	
+
 
 	ASSERT(flags & IOMAP_WRITE);
 	ASSERT(flags & IOMAP_DIRECT);
@@ -1178,7 +1178,7 @@ retry:
 			isnullstartblock(cmap.br_startblock) ? "null" : "",
 			cmap.br_blockcount, cmap.br_state,
 			cmap.br_startblock == DELAYSTARTBLOCK);
-//		pr_err("%s0.0 *** goto found\n", __func__);
+
 //		WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
 		goto found;
 	}
@@ -1257,14 +1257,16 @@ retry:
 	 * this COW-based method). f (isnullstartblock(cmap->br_startblock) ||
 	    cmap->br_startblock == DELAYSTARTBLOCK)
 	 */
-	pr_err("%s1.0 cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+	pr_err("%s1.0 calling xfs_bmapi_write cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
 		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
-	pr_err("%s1.1 offset=%lld length=%lld calling xfs_bmapi_write isnullstartblock=%d DELAYSTARTBLOCK=%d offset_fsb=%lld count_fsb=%lld\n",
+	pr_err("%s1.1 calling xfs_bmapi_write offset=%lld length=%lld isnullstartblock=%d DELAYSTARTBLOCK=%d offset_fsb=%lld count_fsb=%lld\n",
 		__func__, offset, length, isnullstartblock(cmap.br_startblock), cmap.br_startblock == DELAYSTARTBLOCK,
 		offset_fsb, count_fsb);
 	error = xfs_bmapi_write(tp, ip, offset_fsb, count_fsb,
 			XFS_BMAPI_COWFORK | XFS_BMAPI_PREALLOC |
 			XFS_BMAPI_EXTSZALIGN, 0, &cmap, &nmaps);
+	pr_err("%s1.2 called xfs_bmapi_write cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+		__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
 	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
 	if (error) {
@@ -1284,8 +1286,8 @@ found:
 	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
 	if (cmap.br_state != XFS_EXT_NORM) {
-		pr_err("%s2.1 found: offset=%lld length=%lld cmap.br_state=%d isnullstartblock=%d DELAYSTARTBLOCK=%d !XFS_EXT_NORM calling xfs_reflink_convert_cow_locked\n",
-			__func__, offset, length, cmap.br_state, isnullstartblock(cmap.br_startblock), cmap.br_startblock == DELAYSTARTBLOCK);
+		pr_err("%s2.1 !XFS_EXT_NORM offset=%lld length=%lld cmap.br_state=%d isnullstartblock=%d DELAYSTARTBLOCK=%d !XFS_EXT_NORM calling xfs_reflink_convert_cow_locked offset_fsb=%lld count_fsb=%lld\n",
+			__func__, offset, length, cmap.br_state, isnullstartblock(cmap.br_startblock), cmap.br_startblock == DELAYSTARTBLOCK, offset_fsb, count_fsb);
 		error = xfs_reflink_convert_cow_locked(ip, offset_fsb,
 				count_fsb);
 		if (error)
@@ -1833,7 +1835,7 @@ xfs_buffered_write_iomap_begin(
 	u64			seq;
 	bool print = false;
 
-	if (offset == 0x23800)
+	if (offset == special_write_fail_address)
 		print = true;
 	if (print)
 		pr_err("%s offset=%lld (0x%llx) count=%lld (0x%llx) iomap=%pS srcmap=%pS\n",

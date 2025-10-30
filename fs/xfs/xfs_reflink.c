@@ -1039,6 +1039,7 @@ xfs_reflink_end_atomic_cow(
 	xfs_trans_ijoin(tp, ip, 0);
 
 	while (end_fsb > offset_fsb && !error) {
+		pr_err("%s end_fsb=%lld offset_fsb=%lld error=%d calling xfs_reflink_end_cow_extent_locked\n", __func__, end_fsb, offset_fsb, error);
 		error = xfs_reflink_end_cow_extent_locked(tp, ip, &offset_fsb,
 				end_fsb);
 	}

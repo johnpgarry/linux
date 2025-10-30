@@ -2027,9 +2027,15 @@ xfs_bmap_add_extent_unwritten_real(
 	struct xfs_bmbt_irec	old;
 
 	*logflagsp = 0;
-	pr_err("%s\n", __func__);
+	
 	cur = *curp;
 	ifp = xfs_ifork_ptr(ip, whichfork);
+
+	if (new)
+		pr_err("%s new->br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, new->br_startoff, new->br_startblock, new->br_blockcount, new->br_state);
+	else
+		pr_err("%s\n", __func__);
 
 	ASSERT(!isnullstartblock(new->br_startblock));
 

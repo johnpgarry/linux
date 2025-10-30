@@ -337,6 +337,8 @@ static int iomap_dio_bio_iter(struct iomap_iter *iter, struct iomap_dio *dio)
 	u64 copied = 0;
 	size_t orig_count;
 
+//	pr_err("%s pos=%lld (0x%lld) length=%lld (0x%lld)\n",
+//		__func__, pos, pos, length, length);
 	if ((pos | length) & (bdev_logical_block_size(iomap->bdev) - 1))
 		return -EINVAL;
 
@@ -729,7 +731,10 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+	//	pr_err("%s iter->iomap.type=%d calling iomap_dio_iter\n", __func__, iomi.iomap.type);
 		iomi.status = iomap_dio_iter(&iomi, dio);
+
+
 
 		/*
 		 * We can only poll for single bio I/Os.

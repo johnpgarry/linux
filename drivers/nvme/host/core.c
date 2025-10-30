@@ -2059,7 +2059,7 @@ static u32 nvme_configure_atomic_write(struct nvme_ns *ns,
 	lim->atomic_write_hw_boundary = boundary;
 	lim->atomic_write_hw_unit_min = bs;
 	lim->atomic_write_hw_unit_max = rounddown_pow_of_two(atomic_bs);
-	lim->features |= BLK_FEAT_ATOMIC_WRITES;
+	//lim->features |= BLK_FEAT_ATOMIC_WRITES;
 	return atomic_bs;
 }
 

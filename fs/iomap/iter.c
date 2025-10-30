@@ -39,12 +39,13 @@ struct iomap {
 	void			*private; /* filesystem private */
 	u64			validity_cookie; /* used with .iomap_valid() */
 #endif
+extern unsigned int special_read_fail_address;
 static inline void iomap_iter_done(struct iomap_iter *iter)
 {
 	struct iomap *iomap = &iter->iomap;
 	bool print = false;
 
-	if (iomap->offset == 0x23000)
+	if (iomap->offset == special_read_fail_address)
 		print = true;
 
 	WARN_ON_ONCE(iter->iomap.offset > iter->pos);
