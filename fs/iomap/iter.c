@@ -42,15 +42,35 @@ struct iomap {
 static inline void iomap_iter_done(struct iomap_iter *iter)
 {
 	struct iomap *iomap = &iter->iomap;
+	bool print = false;
+
+	if (iomap->offset == 0x23000)
+		print = true;
 
 	WARN_ON_ONCE(iter->iomap.offset > iter->pos);
 	WARN_ON_ONCE(iter->iomap.length == 0);
 	WARN_ON_ONCE(iter->iomap.offset + iter->iomap.length <= iter->pos);
 	WARN_ON_ONCE(iter->iomap.flags & IOMAP_F_STALE);
+#if 0
+F_NEW		(1U << 0)
+#define IOMAP_F_DIRTY		(1U << 1)
+#define IOMAP_F_SHARED		(1U << 2)
+#define IOMAP_F_MERGED		(1U << 3)
+//#ifdef CONFIG_BUFFER_HEAD
+#define IOMAP_F_BUFFER_HEAD	(1U << 4)
+//#else
+#define IOMAP_F_BUFFER_HEAD	0
+#endif
 
-	pr_err("%s addr=%lld offset=%lld length=%lld type=0x%x flags=%d %s\n",
-		__func__, iomap->addr, iomap->offset, iomap->length, iomap->type, iomap->flags,
-		iomap->type == IOMAP_DELALLOC ? "IOMAP_DELALLOC" : "");
+	if (print)
+		pr_err("%s iomap=%pS srcmap=%pS addr=%lld (0x%llx) offset=%lld (0x%llx) length=%lld type=0x%x flags=%d %s%s%s%s%s %s\n",
+			__func__, iomap, &iter->srcmap, iomap->addr, iomap->addr, iomap->offset, iomap->offset, iomap->length, iomap->type, iomap->flags,
+			iomap->flags & IOMAP_F_NEW ? "NEW|" : "",
+			iomap->flags & IOMAP_F_DIRTY ? "DIRTY|" : "",
+			iomap->flags & IOMAP_F_SHARED ? "SHARED|" : "",
+			iomap->flags & IOMAP_F_MERGED ? "MERGED|" : "",
+			iomap->flags & CONFIG_BUFFER_HEAD ? "BUFFER_HEAD|" : "",
+			iomap->type == IOMAP_DELALLOC ? "IOMAP_DELALLOC" : "");
 	iter->iter_start_pos = iter->pos;
 
 	trace_iomap_iter_dstmap(iter->inode, &iter->iomap);

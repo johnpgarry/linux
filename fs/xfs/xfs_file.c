@@ -229,7 +229,7 @@ xfs_file_dio_read(
 {
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	ssize_t			ret;
-	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
+	//pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
 	trace_xfs_file_direct_read(iocb, to);
 
 	if (!iov_iter_count(to))
@@ -297,10 +297,19 @@ xfs_file_read_iter(
 	struct inode		*inode = file_inode(iocb->ki_filp);
 	struct xfs_mount	*mp = XFS_I(inode)->i_mount;
 	ssize_t			ret = 0;
+	bool print = false;
+
+
+	if (iocb->ki_pos == 0x23000)
+		print = true;
+	if (iocb->ki_pos == 0x1f000)
+		print = true;
 
 	XFS_STATS_INC(mp, xs_read_calls);
 
-	//pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
+	if (print)
+		pr_err("%s ki_pos=%lld (0x%llx) ocount=%zd (0x%lx)\n",
+			__func__, iocb->ki_pos, iocb->ki_pos, iov_iter_count(to), iov_iter_count(to));
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -751,9 +760,10 @@ xfs_file_dio_write_atomic(
 		dops = &xfs_atomic_write_cow_iomap_ops;
 	else
 		dops = &xfs_direct_write_iomap_ops;
-	
+	mdelay(500);
 retry:
-	pr_err("%s dops=%pS ki_pos=%lld ocount=%zd\n", __func__, dops, iocb->ki_pos, ocount);
+	pr_err("%s dops=%pS ki_pos=%lld (0x%llx) ocount=%zd (%lx)\n",
+		__func__, dops, iocb->ki_pos, iocb->ki_pos, ocount, ocount);
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
 	if (ret)
 		return ret;
@@ -888,7 +898,7 @@ xfs_file_dio_write(
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	struct xfs_buftarg      *target = xfs_inode_buftarg(ip);
 	size_t			count = iov_iter_count(from);
-	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
+	//pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
 	/* direct I/O must be aligned to device logical sector size */
 	if ((iocb->ki_pos | count) & target->bt_logical_sectormask)
 		return -EINVAL;
@@ -963,7 +973,8 @@ xfs_file_buffered_write(
 	bool			cleared_space = false;
 	unsigned int		iolock;
 
-	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
+	pr_err("%s ki_pos=%lld (0x%llx) ocount=%zd (0x%lx\n",
+		__func__, iocb->ki_pos, iocb->ki_pos, iov_iter_count(from), iov_iter_count(from));
 write_retry:
 	iolock = XFS_IOLOCK_EXCL;
 	ret = xfs_ilock_iocb(iocb, iolock);
@@ -1090,11 +1101,26 @@ xfs_file_write_iter(
 	ssize_t			ret;
 	size_t			ocount = iov_iter_count(from);
 
+	bool print = false;
+
+
+	if (iocb->ki_pos == 0x23000)
+		print = true;
+	if (iocb->ki_pos == 0x23800)
+		print = true;
+	if (iocb->ki_pos == 0x20000)
+		print = true;
+	if (iocb->ki_pos == 0x1f000)
+		print = true;
+
+
 	XFS_STATS_INC(ip->i_mount, xs_write_calls);
 
 	if (ocount == 0)
 		return 0;
-	//pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
+	if (print)
+		pr_err("%s ki_pos=%lld (0x%llx) ocount=%zd (0x%lx)\n",
+			__func__, iocb->ki_pos, iocb->ki_pos, iov_iter_count(from), iov_iter_count(from));
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
@@ -1123,7 +1149,8 @@ xfs_file_write_iter(
 		ret = xfs_file_dio_write(iocb, from);
 		if (ret != -ENOTBLK)
 			return ret;
-		pr_err("%s1 ki_pos=%lld ocount=%zd ret=%zd from xfs_file_dio_write\n", __func__, iocb->ki_pos, iov_iter_count(from), ret);
+		pr_err("%s1 ki_pos=%lld (0x%llx) ocount=%zd (0x%lx) ret=%zd from xfs_file_dio_write\n",
+			__func__, iocb->ki_pos, iocb->ki_pos, iov_iter_count(from), iov_iter_count(from), ret);
 	}
 
 	if (xfs_is_zoned_inode(ip))

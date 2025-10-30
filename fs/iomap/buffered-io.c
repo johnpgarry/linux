@@ -551,15 +551,36 @@ void iomap_readahead(struct readahead_control *rac, const struct iomap_ops *ops)
 	}
 }
 EXPORT_SYMBOL_GPL(iomap_readahead);
-
+#if 0
+	u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
+	struct block_device	*bdev;	/* block device for I/O */
+	struct dax_device	*dax_dev; /* dax_dev for dax operations */
+	void			*inline_data;
+	void			*private; /* filesystem private */
+	u64			validity_cookie; /* used with .iomap_valid() */
+#endif
 static int iomap_read_folio_range(const struct iomap_iter *iter,
 		struct folio *folio, loff_t pos, size_t len)
 {
 	const struct iomap *srcmap = iomap_iter_srcmap(iter);
+	const struct iomap *iomap = &iter->iomap;
 	struct bio_vec bvec;
 	struct bio bio;
+	bool print = false;
 
-	//pr_err("")
+	if (srcmap->offset == 0x23000)
+		print = true;
+
+	if (print) {
+		pr_err("%s srcmap=%pS addr=%lld (0x%llx) offset=%lld (0x%llx) length=%lld (0x%llx) type=%d IOMAP_MAPPED=2\n",
+			__func__, srcmap, srcmap->addr, srcmap->addr, srcmap->offset, srcmap->offset, srcmap->length, srcmap->length, srcmap->type);
+		pr_err("%s2 iomap=%pS addr=%lld (0x%llx) offset=%lld (0x%llx) length=%lld (0x%llx) type=%d\n",
+			__func__, iomap, iomap->addr, iomap->addr, iomap->offset, iomap->offset, iomap->length, iomap->length, iomap->type);
+	}
 
 	bio_init(&bio, srcmap->bdev, &bvec, 1, REQ_OP_READ);
 	bio.bi_iter.bi_sector = iomap_sector(srcmap, pos);
@@ -690,7 +711,7 @@ iomap_write_failed(struct inode *inode, loff_t pos, unsigned len)
 
 static int __iomap_write_begin(const struct iomap_iter *iter,
 		const struct iomap_write_ops *write_ops, size_t len,
-		struct folio *folio)
+		struct folio *folio, bool print)
 {
 	struct iomap_folio_state *ifs;
 	loff_t pos = iter->pos;
@@ -700,6 +721,11 @@ static int __iomap_write_begin(const struct iomap_iter *iter,
 	unsigned int nr_blocks = i_blocks_per_folio(iter->inode, folio);
 	size_t from = offset_in_folio(folio, pos), to = from + len;
 	size_t poff, plen;
+	
+	if (print)
+		pr_err("%s folio=%pS len=%zd len=%zd (0x%lx) pos=%lld (0x%llx)\n",
+			__func__, folio, folio_size(folio), len, len, pos, pos);
+
 
 	/*
 	 * If the write or zeroing completely overlaps the current folio, then
@@ -720,6 +746,10 @@ static int __iomap_write_begin(const struct iomap_iter *iter,
 		return 0;
 
 	do {
+
+		if (print)
+			pr_err("%s2 folio=%pS len=%zd len=%zd (0x%lx) pos=%lld (0x%llx) loop and call iomap_adjust_read_range\n",
+				__func__, folio, folio_size(folio), len, len, pos, pos);
 		iomap_adjust_read_range(iter->inode, folio, &block_start,
 				block_end - block_start, &poff, &plen);
 		if (plen == 0)
@@ -743,9 +773,13 @@ static int __iomap_write_begin(const struct iomap_iter *iter,
 			if (write_ops && write_ops->read_folio_range)
 				status = write_ops->read_folio_range(iter,
 						folio, block_start, plen);
-			else
+			else {
+				if (print)
+					pr_err("%s3 folio=%pS len=%zd len=%zd (0x%lx) pos=%lld (0x%llx) calling iomap_read_folio_range\n",
+						__func__, folio, folio_size(folio), len, len, pos, pos);
 				status = iomap_read_folio_range(iter,
 						folio, block_start, plen);
+			}
 			if (status)
 				return status;
 		}
@@ -821,6 +855,16 @@ static int iomap_write_begin(struct iomap_iter *iter,
 	u64 len = min_t(u64, SIZE_MAX, iomap_length(iter));
 	struct folio *folio;
 	int status = 0;
+	bool print = false;
+
+	if (iter->pos == 0x23000)
+		print = true;
+	if (iter->pos == 0x23800)
+		print = true;
+
+	if (print)
+		pr_err("%s iter->pos=0x%lld (0x%llx) len=%lld (0x%llx) srcmap=%pS offset=%lld (0x%llx) addr=%lld (0x%llx)\n",
+			__func__, iter->pos, iter->pos, iter->len, iter->len, srcmap, srcmap->offset, srcmap->offset, srcmap->addr, srcmap->addr);
 
 	len = min_not_zero(len, *plen);
 	BUG_ON(pos + len > iter->iomap.offset + iter->iomap.length);
@@ -861,7 +905,7 @@ static int iomap_write_begin(struct iomap_iter *iter,
 	else if (srcmap->flags & IOMAP_F_BUFFER_HEAD)
 		status = __block_write_begin_int(folio, pos, len, NULL, srcmap);
 	else
-		status = __iomap_write_begin(iter, write_ops, len, folio);
+		status = __iomap_write_begin(iter, write_ops, len, folio, print);
 
 	if (unlikely(status))
 		goto out_unlock;
@@ -952,6 +996,16 @@ static int iomap_write_iter(struct iomap_iter *iter, struct iov_iter *i,
 	struct address_space *mapping = iter->inode->i_mapping;
 	size_t chunk = mapping_max_folio_size(mapping);
 	unsigned int bdp_flags = (iter->flags & IOMAP_NOWAIT) ? BDP_ASYNC : 0;
+	bool print = false;
+
+	if (iter->pos == 0x23000)
+		print = true;
+	if (iter->pos == 0x23800)
+		print = true;
+
+	if (print)
+		pr_err("%s iter->pos=%llx (0x%llx) len=%lld (0x%llx)\n",
+			__func__, iter->pos, iter->pos, iter->len, iter->len);
 
 	do {
 		struct folio *folio;
@@ -989,6 +1043,9 @@ retry:
 			break;
 		}
 
+		if (print)
+			pr_err("%s2 iter->pos=%llx (0x%llx) len=%lld (0x%llx) calling iomap_write_begin\n",
+				__func__, iter->pos, iter->pos, iter->len, iter->len);
 		status = iomap_write_begin(iter, write_ops, &folio, &offset,
 				&bytes);
 		if (unlikely(status)) {

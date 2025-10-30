@@ -407,8 +407,9 @@ xfs_reflink_convert_unwritten(
 	int			error;
 
 
-	pr_err("%s imap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d convert_now=%d\n",
-		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, convert_now);
+	pr_err("%s imap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d convert_now=%d cmap->startoff=%lld, startblock=%lld, blockcount=%lld, state=%d\n",
+		__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, convert_now,
+		cmap->br_startoff, cmap->br_startblock, cmap->br_blockcount, cmap->br_state);
 
 
 	/*
@@ -470,7 +471,11 @@ xfs_reflink_fill_cow_hole(
 
 	*lockmode = XFS_ILOCK_EXCL;
 
+	WARN(cmap->br_startblock >= 700 && cmap->br_startblock <= 742, "%s1 cmap->br_startblock=0x%lld\n", __func__, cmap->br_startblock);
+	WARN(cmap->br_startblock >= 290 && cmap->br_startblock <= 326, "%s1 cmap->br_startblock=0x%lld\n", __func__, cmap->br_startblock);
 	error = xfs_find_trim_cow_extent(ip, imap, cmap, shared, &found);
+	WARN(cmap->br_startblock >= 700 && cmap->br_startblock <= 742, "%s2 cmap->br_startblock=0x%lld\n", __func__, cmap->br_startblock);
+	WARN(cmap->br_startblock >= 290 && cmap->br_startblock <= 326, "%s2 cmap->br_startblock=0x%lld\n", __func__, cmap->br_startblock);
 	if (error || !*shared)
 		goto out_trans_cancel;
 
@@ -493,6 +498,7 @@ xfs_reflink_fill_cow_hole(
 		return error;
 
 convert:
+	pr_err("%s calling xfs_reflink_convert_unwritten\n", __func__);
 	return xfs_reflink_convert_unwritten(ip, imap, cmap, convert_now);
 
 out_trans_cancel:
@@ -587,9 +593,11 @@ xfs_reflink_allocate_cow(
 		return error;
 
 	/* CoW fork has a real extent */
-	if (found)
+	if (found) {
+		pr_err("%s calling xfs_reflink_convert_unwritten\n", __func__);
 		return xfs_reflink_convert_unwritten(ip, imap, cmap,
 				convert_now);
+	}
 
 	/*
 	 * CoW fork does not have an extent and data extent is shared.

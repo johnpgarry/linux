@@ -107,6 +107,16 @@ xfs_bmbt_to_iomap(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
+	bool print = false;
+
+	if (imap->br_startblock == 742)
+		print = true;
+
+
+	if (print)
+		pr_err("%s iomap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
+
 
 	if (unlikely(!xfs_valid_startblock(ip, imap->br_startblock))) {
 		xfs_bmap_mark_sick(ip, XFS_DATA_FORK);
@@ -132,6 +142,10 @@ xfs_bmbt_to_iomap(
 		else
 			iomap->type = IOMAP_MAPPED;
 
+
+		if (print)
+			pr_err("%s3 iomap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d iomap->addr=%lld (0x%llx)\n",
+				__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, iomap->addr, iomap->addr);
 		/*
 		 * Mark iomaps starting at the first sector of a RTG as merge
 		 * boundary so that each I/O completions is contained to a
@@ -1114,6 +1128,8 @@ xfs_atomic_write_cow_iomap_begin(
 	int			error;
 	u64			seq;
 
+	
+
 	ASSERT(flags & IOMAP_WRITE);
 	ASSERT(flags & IOMAP_DIRECT);
 
@@ -1133,6 +1149,7 @@ xfs_atomic_write_cow_iomap_begin(
 
 	trace_xfs_iomap_atomic_write_cow(ip, offset, length);
 
+retry:
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 	if (!ip->i_cowfp) {
@@ -1151,6 +1168,8 @@ xfs_atomic_write_cow_iomap_begin(
 	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 //	WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
 	if (cmap.br_startoff <= offset_fsb) {
+		if (isnullstartblock(cmap.br_startblock))
+			goto convert;
 		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
 		WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 		pr_err("%s0.0 *** goto found cmap.br_startoff=%lld, br_startblock=%lld %s%s, br_blockcount=%lld, br_state=%d DELAYSTARTBLOCK=%d after xfs_trim_extent\n",
@@ -1214,10 +1233,12 @@ xfs_atomic_write_cow_iomap_begin(
 	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	//WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
 	if (cmap.br_startoff <= offset_fsb) {
-		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
 		WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 		WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
 		xfs_trans_cancel(tp);
+		if (isnullstartblock(cmap.br_startblock))
+			goto convert;
+		xfs_trim_extent(&cmap, offset_fsb, count_fsb);
 		pr_err("%s0.5 *** goto found cmap.br_startoff=%lld, br_startblock=%lld %s%s, br_blockcount=%lld, br_state=%d DELAYSTARTBLOCK=%d\n",
 			__func__, cmap.br_startoff, cmap.br_startblock,
 			cmap.br_startblock == DELAYSTARTBLOCK ? "delay" : "",
@@ -1283,6 +1304,25 @@ found:
 	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
 	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
+
+convert:
+	BUG();
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	pr_err("%s4 convert: cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d calling xfs_bmapi_convert_delalloc\n",
+			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
+	error = xfs_bmapi_convert_delalloc(ip, XFS_COW_FORK, offset, iomap,
+			NULL);
+	pr_err("%s4.1 convert: cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d error=%d called xfs_bmapi_convert_delalloc\n",
+			__func__, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state, error );
+	if (error)
+		return error;
+
+	/*
+	 * Try the lookup again, because the delalloc conversion might have
+	 * turned the COW mapping into unwritten, but we need it to be in
+	 * written state.
+	 */
+	goto retry;
 
 out_unlock:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -1910,6 +1950,8 @@ xfs_buffered_write_iomap_begin(
 				cmap.br_blockcount, cmap.br_state,
 				cmap.br_startblock == DELAYSTARTBLOCK);
 		if (!cow_eof && cmap.br_startoff <= offset_fsb) {
+			if (print)
+				pr_err("%s3.1 goto found_cow\n", __func__);
 			trace_xfs_reflink_cow_found(ip, &cmap);
 			goto found_cow;
 		}
@@ -2069,7 +2111,7 @@ convert_delay:
 
 found_cow:
 	if (print)
-		pr_err("%s3.11 found_cow:\n", __func__);
+		pr_err("%s3.11 found_cow: imap.br_startoff=%lld offset_fsb=%lld\n", __func__, imap.br_startoff, offset_fsb);
 	if (imap.br_startoff <= offset_fsb) {
 		error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0,
 				xfs_iomap_inode_sequence(ip, 0));
@@ -2083,6 +2125,9 @@ found_cow:
 	iomap_flags |= IOMAP_F_SHARED;
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
+	if (print)
+		pr_err("%s3.12 found_cow: calling xfs_bmbt_to_iomap cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n", __func__,
+			 cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
 	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, iomap_flags, seq);
 
 out_unlock:
