@@ -278,11 +278,24 @@ static void iomap_adjust_read_range(struct inode *inode, struct folio *folio,
 	*offp = poff;
 	*lenp = plen;
 }
-
+#if 0
+u64			addr; /* disk offset of mapping, bytes */
+	loff_t			offset;	/* file offset of mapping, bytes */
+	u64			length;	/* length of mapping, bytes */
+	u16			type;	/* type of mapping */
+	u16			flags;	/* flags for mapping */
+#endif
 static inline bool iomap_block_needs_zeroing(const struct iomap_iter *iter,
 		loff_t pos)
 {
 	const struct iomap *srcmap = iomap_iter_srcmap(iter);
+	const struct iomap *iomap = &iter->iomap;
+	const struct iomap *srcmapr = &iter->srcmap;
+
+	pr_err("%s iomap=%pS srcmap=%pS addr=%lld (0x%llx) offset=%lld (0x%llx) length=%lld (0x%llx) type=%d flags=0x%x\n",
+		__func__, iomap, srcmap, iomap->addr, iomap->addr, iomap->offset, iomap->offset, iomap->length, iomap->length, iomap->type, iomap->flags);
+	pr_err("%s srcmapr=%pS addr=%lld (0x%llx) offset=%lld (0x%llx) length=%lld (0x%llx) type=%d flags=0x%x\n",
+		__func__, srcmapr, srcmapr->addr, srcmapr->addr, srcmapr->offset, srcmapr->offset, srcmapr->length, srcmapr->length, srcmapr->type, srcmapr->flags);
 
 	return srcmap->type != IOMAP_MAPPED ||
 		(srcmap->flags & IOMAP_F_NEW) ||
@@ -565,13 +578,12 @@ EXPORT_SYMBOL_GPL(iomap_readahead);
 	u64			validity_cookie; /* used with .iomap_valid() */
 #endif
 static int iomap_read_folio_range(const struct iomap_iter *iter,
-		struct folio *folio, loff_t pos, size_t len)
+		struct folio *folio, loff_t pos, size_t len, bool print)
 {
 	const struct iomap *srcmap = iomap_iter_srcmap(iter);
 	const struct iomap *iomap = &iter->iomap;
 	struct bio_vec bvec;
 	struct bio bio;
-	bool print = false;
 
 	if (srcmap->offset == special_read_fail_address)
 		print = true;
@@ -779,7 +791,7 @@ static int __iomap_write_begin(const struct iomap_iter *iter,
 					pr_err("%s3 folio=%pS len=%zd len=%zd (0x%lx) pos=%lld (0x%llx) calling iomap_read_folio_range\n",
 						__func__, folio, folio_size(folio), len, len, pos, pos);
 				status = iomap_read_folio_range(iter,
-						folio, block_start, plen);
+						folio, block_start, plen, print);
 			}
 			if (status)
 				return status;
@@ -849,19 +861,13 @@ static int iomap_write_begin_inline(const struct iomap_iter *iter,
  */
 static int iomap_write_begin(struct iomap_iter *iter,
 		const struct iomap_write_ops *write_ops, struct folio **foliop,
-		size_t *poffset, u64 *plen)
+		size_t *poffset, u64 *plen, bool print)
 {
 	const struct iomap *srcmap = iomap_iter_srcmap(iter);
 	loff_t pos = iter->pos;
 	u64 len = min_t(u64, SIZE_MAX, iomap_length(iter));
 	struct folio *folio;
 	int status = 0;
-	bool print = false;
-
-	if (iter->pos == special_read_fail_address)
-		print = true;
-	if (iter->pos == special_write_fail_address)
-		print = true;
 
 	if (print)
 		pr_err("%s iter->pos=%lld (0x%llx) len=%lld (0x%llx) srcmap=%pS offset=%lld (0x%llx) addr=%lld (0x%llx)\n",
@@ -1001,6 +1007,8 @@ static int iomap_write_iter(struct iomap_iter *iter, struct iov_iter *i,
 
 	if (iter->pos == special_read_fail_address)
 		print = true;
+	if ((iter->pos >= special_write_fail_address) && (iter->pos <= special_write_fail_address + 0xf800 + 0x1000))
+		print = true;
 	if (iter->pos == special_write_fail_address)
 		print = true;
 
@@ -1044,11 +1052,11 @@ retry:
 			break;
 		}
 
-		if ((iter->pos == special_read_fail_address) || (iter->pos == special_write_fail_address))
+		if ((iter->pos == special_read_fail_address) || (iter->pos == special_write_fail_address) || print)
 			pr_err("%s2 iter->pos=%llx (0x%llx) len=%lld (0x%llx) calling iomap_write_begin\n",
 				__func__, iter->pos, iter->pos, iter->len, iter->len);
 		status = iomap_write_begin(iter, write_ops, &folio, &offset,
-				&bytes);
+				&bytes, print);
 		if (unlikely(status)) {
 			iomap_write_failed(iter->inode, iter->pos, bytes);
 			break;
@@ -1379,7 +1387,7 @@ static int iomap_unshare_iter(struct iomap_iter *iter,
 
 		bytes = min_t(u64, SIZE_MAX, bytes);
 		status = iomap_write_begin(iter, write_ops, &folio, &offset,
-				&bytes);
+				&bytes, true);
 		if (unlikely(status))
 			return status;
 		if (iomap->flags & IOMAP_F_STALE)
@@ -1452,7 +1460,7 @@ static int iomap_zero_iter(struct iomap_iter *iter, bool *did_zero,
 
 		bytes = min_t(u64, SIZE_MAX, bytes);
 		status = iomap_write_begin(iter, write_ops, &folio, &offset,
-				&bytes);
+				&bytes, true);
 		if (status)
 			return status;
 		if (iter->iomap.flags & IOMAP_F_STALE)

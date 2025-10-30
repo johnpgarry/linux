@@ -103,19 +103,20 @@ xfs_bmbt_to_iomap(
 	struct xfs_bmbt_irec	*imap,
 	unsigned int		mapping_flags,
 	u16			iomap_flags,
-	u64			sequence_cookie)
+	u64			sequence_cookie,
+	bool print)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_buftarg	*target = xfs_inode_buftarg(ip);
-	bool print = false;
+
 
 	if (imap->br_startblock == 299)
 		print = true;
 
 
 	if (print)
-		pr_err("%s iomap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
-			__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state);
+		pr_err("%s iomap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d XFS_EXT_UNWRITTEN=%d\n",
+			__func__, imap->br_startoff, imap->br_startblock, imap->br_blockcount, imap->br_state, XFS_EXT_UNWRITTEN);
 
 
 	if (unlikely(!xfs_valid_startblock(ip, imap->br_startblock))) {
@@ -995,7 +996,7 @@ relock:
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
 	trace_xfs_iomap_found(ip, offset, length, XFS_DATA_FORK, &imap);
-	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
+	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq, false);
 
 allocate_blocks:
 	error = -EAGAIN;
@@ -1027,20 +1028,20 @@ allocate_blocks:
 
 	trace_xfs_iomap_alloc(ip, offset, length, XFS_DATA_FORK, &imap);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags,
-				 iomap_flags | IOMAP_F_NEW, seq);
+				 iomap_flags | IOMAP_F_NEW, seq, false);
 
 out_found_cow:
 	length = XFS_FSB_TO_B(mp, cmap.br_startoff + cmap.br_blockcount);
 	trace_xfs_iomap_found(ip, offset, length - offset, XFS_COW_FORK, &cmap);
 	if (imap.br_startblock != HOLESTARTBLOCK) {
 		seq = xfs_iomap_inode_sequence(ip, 0);
-		error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0, seq);
+		error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0, seq, false);
 		if (error)
 			goto out_unlock;
 	}
 	seq = xfs_iomap_inode_sequence(ip, IOMAP_F_SHARED);
 	xfs_iunlock(ip, lockmode);
-	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
+	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq, false);
 
 out_unlock:
 	if (lockmode)
@@ -1305,7 +1306,7 @@ found:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	WARN_ON_ONCE(cmap.br_startblock == DELAYSTARTBLOCK);
 	WARN_ON_ONCE(isnullstartblock(cmap.br_startblock));
-	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq);
+	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, IOMAP_F_SHARED, seq, true);
 
 convert:
 	BUG();
@@ -1728,7 +1729,7 @@ xfs_zoned_buffered_write_iomap_begin(
 			xfs_trim_extent(&smap, offset_fsb,
 					end_fsb - offset_fsb);
 			error = xfs_bmbt_to_iomap(ip, srcmap, &smap, flags, 0,
-					xfs_iomap_inode_sequence(ip, 0));
+					xfs_iomap_inode_sequence(ip, 0), false);
 			if (error)
 				goto out_unlock;
 		}
@@ -1805,7 +1806,7 @@ xfs_zoned_buffered_write_iomap_begin(
 			XFS_COW_FORK, &got);
 done:
 	error = xfs_bmbt_to_iomap(ip, iomap, &got, flags, iomap_flags,
-			xfs_iomap_inode_sequence(ip, IOMAP_F_SHARED));
+			xfs_iomap_inode_sequence(ip, IOMAP_F_SHARED), false);
 out_unlock:
 	xfs_iunlock(ip, lockmode);
 	return error;
@@ -1836,6 +1837,8 @@ xfs_buffered_write_iomap_begin(
 	bool print = false;
 
 	if (offset == special_write_fail_address)
+		print = true;
+	if ((offset >= 0x45000) && (offset <= 0x45000 + 0xf800 + 0x1000))
 		print = true;
 	if (print)
 		pr_err("%s offset=%lld (0x%llx) count=%lld (0x%llx) iomap=%pS srcmap=%pS\n",
@@ -2096,7 +2099,7 @@ found_imap:
 		pr_err("%s3.8 found_imap:\n", __func__);
 	seq = xfs_iomap_inode_sequence(ip, iomap_flags);
 	xfs_iunlock(ip, lockmode);
-	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq);
+	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, iomap_flags, seq, print);
 
 convert_delay:
 	if (print)
@@ -2113,10 +2116,11 @@ convert_delay:
 
 found_cow:
 	if (print)
-		pr_err("%s3.11 found_cow: imap.br_startoff=%lld offset_fsb=%lld\n", __func__, imap.br_startoff, offset_fsb);
+		pr_err("%s3.11 found_cow: imap.br_startoff=%lld offset_fsb=%lld cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, imap.br_startoff, offset_fsb, cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
 	if (imap.br_startoff <= offset_fsb) {
 		error = xfs_bmbt_to_iomap(ip, srcmap, &imap, flags, 0,
-				xfs_iomap_inode_sequence(ip, 0));
+				xfs_iomap_inode_sequence(ip, 0), print);
 		if (error)
 			goto out_unlock;
 	} else {
@@ -2130,7 +2134,7 @@ found_cow:
 	if (print)
 		pr_err("%s3.12 found_cow: calling xfs_bmbt_to_iomap cmap.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n", __func__,
 			 cmap.br_startoff, cmap.br_startblock, cmap.br_blockcount, cmap.br_state);
-	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, iomap_flags, seq);
+	return xfs_bmbt_to_iomap(ip, iomap, &cmap, flags, iomap_flags, seq, print);
 
 out_unlock:
 	if (print)
@@ -2242,7 +2246,7 @@ xfs_read_iomap_begin(
 		return error;
 	trace_xfs_iomap_found(ip, offset, length, XFS_DATA_FORK, &imap);
 	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags,
-				 shared ? IOMAP_F_SHARED : 0, seq);
+				 shared ? IOMAP_F_SHARED : 0, seq, false);
 }
 
 const struct iomap_ops xfs_read_iomap_ops = {
@@ -2304,7 +2308,7 @@ xfs_seek_iomap_begin(
 		xfs_trim_extent(&cmap, offset_fsb, end_fsb - offset_fsb);
 		seq = xfs_iomap_inode_sequence(ip, IOMAP_F_SHARED);
 		error = xfs_bmbt_to_iomap(ip, iomap, &cmap, flags,
-				IOMAP_F_SHARED, seq);
+				IOMAP_F_SHARED, seq, false);
 		/*
 		 * This is a COW extent, so we must probe the page cache
 		 * because there could be dirty page cache being backed
@@ -2327,7 +2331,7 @@ xfs_seek_iomap_begin(
 done:
 	seq = xfs_iomap_inode_sequence(ip, 0);
 	xfs_trim_extent(&imap, offset_fsb, end_fsb - offset_fsb);
-	error = xfs_bmbt_to_iomap(ip, iomap, &imap, flags, 0, seq);
+	error = xfs_bmbt_to_iomap(ip, iomap, &imap, flags, 0, seq, false);
 out_unlock:
 	xfs_iunlock(ip, lockmode);
 	return error;
@@ -2377,7 +2381,7 @@ out_unlock:
 	if (error)
 		return error;
 	ASSERT(nimaps);
-	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, IOMAP_F_XATTR, seq);
+	return xfs_bmbt_to_iomap(ip, iomap, &imap, flags, IOMAP_F_XATTR, seq, false);
 }
 
 const struct iomap_ops xfs_xattr_iomap_ops = {

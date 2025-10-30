@@ -208,7 +208,7 @@ xfs_fs_map_blocks(
 	}
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 
-	error = xfs_bmbt_to_iomap(ip, iomap, &imap, 0, 0, seq);
+	error = xfs_bmbt_to_iomap(ip, iomap, &imap, 0, 0, seq, false);
 	*device_generation = mp->m_generation;
 	return error;
 out_unlock:

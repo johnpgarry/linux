@@ -4416,7 +4416,7 @@ xfs_bmapi_convert_one_delalloc(
 	 */
 	if (!isnullstartblock(bma.got.br_startblock)) {
 		xfs_bmbt_to_iomap(ip, iomap, &bma.got, 0, flags,
-				xfs_iomap_inode_sequence(ip, flags));
+				xfs_iomap_inode_sequence(ip, flags), false);
 		if (seq)
 			*seq = READ_ONCE(ifp->if_seq);
 		goto out_trans_cancel;
@@ -4464,7 +4464,7 @@ xfs_bmapi_convert_one_delalloc(
 
 	ASSERT(!isnullstartblock(bma.got.br_startblock));
 	xfs_bmbt_to_iomap(ip, iomap, &bma.got, 0, flags,
-				xfs_iomap_inode_sequence(ip, flags));
+				xfs_iomap_inode_sequence(ip, flags), false);
 	if (seq)
 		*seq = READ_ONCE(ifp->if_seq);
 
