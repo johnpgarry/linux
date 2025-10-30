@@ -300,7 +300,7 @@ xfs_file_read_iter(
 
 	XFS_STATS_INC(mp, xs_read_calls);
 
-	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
+	//pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(to));
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
@@ -1094,7 +1094,7 @@ xfs_file_write_iter(
 
 	if (ocount == 0)
 		return 0;
-	pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
+	//pr_err("%s ki_pos=%lld ocount=%zd\n", __func__, iocb->ki_pos, iov_iter_count(from));
 	if (xfs_is_shutdown(ip->i_mount))
 		return -EIO;
 
