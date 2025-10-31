@@ -1128,6 +1128,7 @@ xfs_atomic_write_cow_iomap_begin(
 	unsigned int		dblocks = 0, rblocks = 0;
 	int			error;
 	u64			seq;
+	xfs_filblks_t		count_fsb_orig = count_fsb;
 
 
 
@@ -1290,7 +1291,7 @@ found:
 		pr_err("%s2.1 !XFS_EXT_NORM offset=%lld length=%lld cmap.br_state=%d isnullstartblock=%d DELAYSTARTBLOCK=%d !XFS_EXT_NORM calling xfs_reflink_convert_cow_locked offset_fsb=%lld count_fsb=%lld\n",
 			__func__, offset, length, cmap.br_state, isnullstartblock(cmap.br_startblock), cmap.br_startblock == DELAYSTARTBLOCK, offset_fsb, count_fsb);
 		error = xfs_reflink_convert_cow_locked(ip, offset_fsb,
-				count_fsb);
+				count_fsb_orig);
 		if (error)
 			goto out_unlock;
 		cmap.br_state = XFS_EXT_NORM;
