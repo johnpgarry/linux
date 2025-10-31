@@ -812,6 +812,7 @@ xfs_reflink_end_cow_extent_locked(
 	bool			isrt = XFS_IS_REALTIME_INODE(ip);
 	int			error;
 
+	pr_err("%s *offset_fsb=%lld end_fsb=%lld\n", __func__, *offset_fsb, end_fsb);
 	/*
 	 * In case of racing, overlapping AIO writes no COW extents might be
 	 * left by the time I/O completes for the loser of the race.  In that
@@ -820,8 +821,12 @@ xfs_reflink_end_cow_extent_locked(
 	if (!xfs_iext_lookup_extent(ip, ifp, *offset_fsb, &icur, &got) ||
 	    got.br_startoff >= end_fsb) {
 		*offset_fsb = end_fsb;
+		pr_err("%s2 *offset_fsb=%lld end_fsb=%lld called xfs_iext_lookup_extent and return got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, *offset_fsb, end_fsb, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 		return 0;
 	}
+	pr_err("%s2.1 *offset_fsb=%lld end_fsb=%lld called xfs_iext_lookup_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, *offset_fsb, end_fsb, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 
 	/*
 	 * Only remap real extents that contain data.  With AIO, speculative
@@ -831,14 +836,20 @@ xfs_reflink_end_cow_extent_locked(
 	 * actually remapping.
 	 */
 	while (!xfs_bmap_is_written_extent(&got)) {
+		pr_err("%s3 *offset_fsb=%lld end_fsb=%lld called xfs_bmap_is_written_extent got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+			__func__, *offset_fsb, end_fsb, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 		if (!xfs_iext_next_extent(ifp, &icur, &got) ||
 		    got.br_startoff >= end_fsb) {
 			*offset_fsb = end_fsb;
+			pr_err("%s3.1 *offset_fsb=%lld end_fsb=%lld returning got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+				__func__, *offset_fsb, end_fsb, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
 			return 0;
 		}
 	}
 	del = got;
 	xfs_trim_extent(&del, *offset_fsb, end_fsb - *offset_fsb);
+	pr_err("%s4 *offset_fsb=%lld end_fsb=%lld called xfs_trim_extent del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+				__func__, *offset_fsb, end_fsb, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 
 	error = xfs_iext_count_extend(tp, ip, XFS_DATA_FORK,
 			XFS_IEXT_REFLINK_END_COW_CNT);
@@ -860,6 +871,8 @@ xfs_reflink_end_cow_extent_locked(
 	trace_xfs_reflink_cow_remap_to(ip, &data);
 
 	if (xfs_bmap_is_real_extent(&data)) {
+		pr_err("%s5.2 xfs_bmap_is_real_extent *offset_fsb=%lld end_fsb=%lld del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, *offset_fsb, end_fsb, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 		/*
 		 * If the extent we're remapping is backed by storage (written
 		 * or not), unmap the extent and drop its refcount.
@@ -870,6 +883,8 @@ xfs_reflink_end_cow_extent_locked(
 	} else if (data.br_startblock == DELAYSTARTBLOCK) {
 		int		done;
 
+		pr_err("%s5.3 DELAYSTARTBLOCK *offset_fsb=%lld end_fsb=%lld del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, *offset_fsb, end_fsb, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 		/*
 		 * If the extent we're remapping is a delalloc reservation,
 		 * we can use the regular bunmapi function to release the
@@ -881,6 +896,10 @@ xfs_reflink_end_cow_extent_locked(
 		if (error)
 			return error;
 		ASSERT(done);
+	} else {
+
+		pr_err("%s5.4 nothing? *offset_fsb=%lld end_fsb=%lld del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, *offset_fsb, end_fsb, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 	}
 
 	/* Free the CoW orphan record. */
@@ -888,11 +907,17 @@ xfs_reflink_end_cow_extent_locked(
 			del.br_blockcount);
 
 	/* Map the new blocks into the data fork. */
+	pr_err("%s6 calling xfs_bmap_map_extent del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 	xfs_bmap_map_extent(tp, ip, XFS_DATA_FORK, &del);
 
 	/* Charge this new data fork mapping to the on-disk quota. */
 	xfs_reflink_update_quota(tp, ip, true, del.br_blockcount);
 
+	pr_err("%s7 calling xfs_bmap_del_extent_cow got.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, got.br_startoff, got.br_startblock, got.br_blockcount, got.br_state);
+	pr_err("%s7.1 calling xfs_bmap_del_extent_cow del.br_startoff=%lld, br_startblock=%lld, br_blockcount=%lld, br_state=%d\n",
+					__func__, del.br_startoff, del.br_startblock, del.br_blockcount, del.br_state);
 	/* Remove the mapping from the CoW fork. */
 	xfs_bmap_del_extent_cow(ip, &icur, &got, &del);
 
@@ -989,8 +1014,13 @@ xfs_reflink_end_cow(
 	 * have never supported this 100%.  If either disk write succeeds the
 	 * blocks will be remapped.
 	 */
-	while (end_fsb > offset_fsb && !error)
+	while (end_fsb > offset_fsb && !error) {
+		pr_err("%s calling xfs_reflink_end_cow_extent offset_fsb=%lld end_fsb=%lld\n",
+			__func__, offset_fsb, end_fsb);
 		error = xfs_reflink_end_cow_extent(ip, &offset_fsb, end_fsb);
+		pr_err("%s2 called xfs_reflink_end_cow_extent offset_fsb=%lld end_fsb=%lld\n",
+			__func__, offset_fsb, end_fsb);
+	}
 
 	if (error)
 		trace_xfs_reflink_end_cow_error(ip, error, _RET_IP_);
