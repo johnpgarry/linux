@@ -1220,6 +1220,7 @@ static blk_status_t nvme_prep_rq(struct request *req)
 	iod->total_len = 0;
 	iod->meta_total_len = 0;
 
+	pr_err("%s req=%pS (bio=%pS)\n", __func__, req, req->bio);
 	ret = nvme_setup_cmd(req->q->queuedata, req);
 	if (ret)
 		return ret;
@@ -1236,6 +1237,7 @@ static blk_status_t nvme_prep_rq(struct request *req)
 			goto out_unmap_data;
 	}
 
+	pr_err("%s1 calling nvme_start_request req=%pS (bio=%pS)\n", __func__, req, req->bio);
 	nvme_start_request(req);
 	return BLK_STS_OK;
 out_unmap_data:
@@ -1255,6 +1257,7 @@ static blk_status_t nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
 
+	pr_err("%s req=%pS (bio=%pS)\n", __func__, req, req->bio);
 	/*
 	 * We should not need to do this, but we're still using this to
 	 * ensure we can drain requests on a dying queue.
@@ -1265,6 +1268,7 @@ static blk_status_t nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(!nvme_check_ready(&dev->ctrl, req, true)))
 		return nvme_fail_nonready_command(&dev->ctrl, req);
 
+	pr_err("%s1 req=%pS calling nvme_prep_rq\n", __func__, req);
 	ret = nvme_prep_rq(req);
 	if (unlikely(ret))
 		return ret;
@@ -3171,6 +3175,7 @@ static void nvme_reset_work(struct work_struct *work)
 	bool was_suspend = !!(dev->ctrl.ctrl_config & NVME_CC_SHN_NORMAL);
 	int result;
 
+	pr_err("%s dev=%pS &dev->ctr%pS\n", __func__, dev, &dev->ctrl);
 	if (nvme_ctrl_state(&dev->ctrl) != NVME_CTRL_RESETTING) {
 		dev_warn(dev->ctrl.device, "ctrl state %d is not RESETTING\n",
 			 dev->ctrl.state);
@@ -3204,7 +3209,9 @@ static void nvme_reset_work(struct work_struct *work)
 		goto out;
 	}
 
+	pr_err("%s1 dev=%pS &dev->ctr%pS calling nvme_init_ctrl_finish\n", __func__, dev, &dev->ctrl);
 	result = nvme_init_ctrl_finish(&dev->ctrl, was_suspend);
+	pr_err("%s1.1 dev=%pS &dev->ctr%pS called nvme_init_ctrl_finish\n", __func__, dev, &dev->ctrl);
 	if (result)
 		goto out;
 
@@ -3249,6 +3256,7 @@ static void nvme_reset_work(struct work_struct *work)
 	 * If only admin queue live, keep it to do further investigation or
 	 * recovery.
 	 */
+	pr_err("%s2 dev=%pS &dev->ctr%pS calling nvme_change_ctrl_state\n", __func__, dev, &dev->ctrl);
 	if (!nvme_change_ctrl_state(&dev->ctrl, NVME_CTRL_LIVE)) {
 		dev_warn(dev->ctrl.device,
 			"failed to mark controller live state\n");
@@ -3256,7 +3264,9 @@ static void nvme_reset_work(struct work_struct *work)
 		goto out;
 	}
 
+	pr_err("%s9 dev=%pS &dev->ctr%pS calling nvme_start_ctrl\n", __func__, dev, &dev->ctrl);
 	nvme_start_ctrl(&dev->ctrl);
+	pr_err("%s10 dev=%pS &dev->ctr%pS called nvme_start_ctrl\n", __func__, dev, &dev->ctrl);
 	return;
 
  out_unlock:
@@ -3448,8 +3458,10 @@ static struct nvme_dev *nvme_pci_alloc_dev(struct pci_dev *pdev,
 	struct nvme_dev *dev;
 	int ret = -ENOMEM;
 
+	dev_err(&pdev->dev, "%s\n", __func__);
 	dev = kzalloc_node(struct_size(dev, descriptor_pools, nr_node_ids),
 			GFP_KERNEL, node);
+	dev_err(&pdev->dev, "%s0 nvme_dev=%pS\n", __func__, dev);
 	if (!dev)
 		return ERR_PTR(-ENOMEM);
 	INIT_WORK(&dev->ctrl.reset_work, nvme_reset_work);
@@ -3477,10 +3489,12 @@ static struct nvme_dev *nvme_pci_alloc_dev(struct pci_dev *pdev,
 			 "platform quirk: setting simple suspend\n");
 		quirks |= NVME_QUIRK_SIMPLE_SUSPEND;
 	}
+	dev_err(&pdev->dev, "%s1 nvme_dev=%pS calling nvme_init_ctrl &dev->ctrl=%pS\n", __func__, dev, &dev->ctrl);
 	ret = nvme_init_ctrl(&dev->ctrl, &pdev->dev, &nvme_pci_ctrl_ops,
 			     quirks);
 	if (ret)
 		goto out_put_device;
+	dev_err(&pdev->dev, "%s1.1 nvme_dev=%pS called nvme_init_ctrl &dev->ctrl=%pS\n", __func__, dev, &dev->ctrl);
 
 	if (dev->ctrl.quirks & NVME_QUIRK_DMA_ADDRESS_BITS_48)
 		dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(48));
@@ -3551,7 +3565,12 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto out_disable;
 	}
 
+
+	dev_info(dev->ctrl.device, "%s1 pci function %s calling nvme_init_ctrl_finish dev=%pS &dev->ctrl=%pS\n", __func__, 
+		dev_name(&pdev->dev), dev, &dev->ctrl);
 	result = nvme_init_ctrl_finish(&dev->ctrl, false);
+	dev_info(dev->ctrl.device, "%s1.1 pci function %s called nvme_init_ctrl_finish dev=%pS &dev->ctrl=%pS\n", __func__,
+		dev_name(&pdev->dev), dev, &dev->ctrl);
 	if (result)
 		goto out_disable;
 
