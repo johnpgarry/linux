@@ -1150,6 +1150,8 @@ static inline void nvme_hwmon_exit(struct nvme_ctrl *ctrl)
 
 static inline void nvme_start_request(struct request *rq)
 {
+	pr_err("%s REQ_NVME_MPATH set=%d (call nvme_mpath_start_request if set) rq=%pS (bio=%pS)\n",
+		__func__, !!(rq->cmd_flags & REQ_NVME_MPATH), rq, rq->bio);
 	if (rq->cmd_flags & REQ_NVME_MPATH)
 		nvme_mpath_start_request(rq);
 	blk_mq_start_request(rq);
