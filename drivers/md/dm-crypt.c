@@ -3515,8 +3515,11 @@ static int crypt_map(struct dm_target *ti, struct bio *bio)
 	 * Check if bio is too large, split as needed.
 	 */
 	max_sectors = get_max_request_sectors(ti, bio);
-	if (unlikely(bio_sectors(bio) > max_sectors))
+	if (unlikely(bio_sectors(bio) > max_sectors)) {
+		if (bio->bi_opf & REQ_ATOMIC)
+			return DM_MAPIO_KILL;
 		dm_accept_partial_bio(bio, max_sectors);
+	}
 
 	/*
 	 * Ensure that bio is a multiple of internal sector encryption size
@@ -3744,6 +3747,8 @@ static int crypt_iterate_devices(struct dm_target *ti,
 static void crypt_io_hints(struct dm_target *ti, struct queue_limits *limits)
 {
 	struct crypt_config *cc = ti->private;
+	unsigned int _max_write_size =
+		min_not_zero(max_write_size, DM_CRYPT_DEFAULT_MAX_WRITE_SIZE);
 
 	limits->logical_block_size =
 		max_t(unsigned int, limits->logical_block_size, cc->sector_size);
@@ -3762,6 +3767,18 @@ static void crypt_io_hints(struct dm_target *ti, struct queue_limits *limits)
 	if (ti->emulate_zone_append)
 		limits->max_hw_sectors = min(limits->max_hw_sectors,
 					     BIO_MAX_VECS << PAGE_SECTORS_SHIFT);
+
+	if (_max_write_size < limits->atomic_write_hw_unit_min) {
+		limits->atomic_write_hw_unit_min = 0;
+		limits->atomic_write_hw_unit_max = 0;
+		limits->atomic_write_hw_max = 0;
+		limits->atomic_write_hw_boundary = 0;
+	} else {
+		limits->atomic_write_hw_unit_max =
+			min(limits->atomic_write_hw_unit_max, _max_write_size);
+		limits->atomic_write_hw_max =
+			min(limits->atomic_write_hw_max, _max_write_size);
+	}
 }
 
 static struct target_type crypt_target = {
@@ -3770,7 +3787,7 @@ static struct target_type crypt_target = {
 	.module = THIS_MODULE,
 	.ctr    = crypt_ctr,
 	.dtr    = crypt_dtr,
-	.features = DM_TARGET_ZONED_HM,
+	.features = DM_TARGET_ZONED_HM | DM_TARGET_ATOMIC_WRITES,
 	.report_zones = crypt_report_zones,
 	.map    = crypt_map,
 	.status = crypt_status,
