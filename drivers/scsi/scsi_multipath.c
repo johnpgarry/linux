@@ -911,6 +911,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 
 	list_add_tail(&shost->mpath_sdev, &sdev->mpath_entry);
 
+	set_bit(GD_SUPPRESS_PART_SCAN, &sdev->mpath_disk->state);
 	ret = device_add(&mp_disk->dev); // see nvme_init_subsystem()
 	pr_err("%s3 called device_add ret=%d\n", __func__, ret);
 	if (ret)
