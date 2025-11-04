@@ -3821,16 +3821,17 @@ static void sd_revalidate_disk(struct gendisk *disk)
 	/* for multipath device, Adjust queue limits for MPATH disk */
 	if (scsi_is_sdev_multipath(sdp)) {
 		struct queue_limits *mpath_lim = &sdp->mpath_disk->queue->limits;
+		struct queue_limits lim2;
 
 		//blk_mq_freeze_queue(sdp->mpath_disk->queue);
 		pr_err("%s8 calling queue_limits_start_update\n", __func__);
-		lim = queue_limits_start_update(sdp->mpath_disk->queue);
+		lim2 = queue_limits_start_update(sdp->mpath_disk->queue);
 		pr_err("%s8.1 called queue_limits_start_update calling queue_limits_stack_bdev\n", __func__);
-		lim.logical_block_size = mpath_lim->logical_block_size;
-		lim.physical_block_size = mpath_lim->physical_block_size;
-		lim.io_min = mpath_lim->io_min;
-		lim.io_opt = mpath_lim->io_opt;
-		queue_limits_stack_bdev(&lim, sdp->mpath_disk->part0, 0,
+		lim2.logical_block_size = mpath_lim->logical_block_size;
+		lim2.physical_block_size = mpath_lim->physical_block_size;
+		lim2.io_min = mpath_lim->io_min;
+		lim2.io_opt = mpath_lim->io_opt;
+		queue_limits_stack_bdev(&lim2, sdp->mpath_disk->part0, 0,
 		    sdp->mpath_disk->disk_name);
 
 		//sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
@@ -3840,7 +3841,7 @@ static void sd_revalidate_disk(struct gendisk *disk)
 		    logical_to_sectors(sdp, sdkp->capacity));
 
 		pr_err("%s8.3 calling queue_limits_commit_update\n", __func__);
-		err = queue_limits_commit_update(sdp->mpath_disk->queue, &lim);
+		err = queue_limits_commit_update(sdp->mpath_disk->queue, &lim2);
 
 		pr_err("%s8.4 calling scsi_mpath_revalidate_path err=%d\n", __func__, err);
 		scsi_mpath_revalidate_path(sdp->mpath_disk,
@@ -3848,8 +3849,9 @@ static void sd_revalidate_disk(struct gendisk *disk)
 		pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
 
 		//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
-		if (err)
-			return err;
+		if (err) {
+			//return err;
+		}
 	}
 	/*
 	 * For a zoned drive, revalidating the zones can be done only once
