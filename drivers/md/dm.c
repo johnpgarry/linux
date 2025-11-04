@@ -1285,8 +1285,8 @@ out:
  * A target may call dm_accept_partial_bio only from the map routine.  It is
  * allowed for all bio types except REQ_PREFLUSH, REQ_OP_ZONE_* zone management
  * operations, zone append writes (native with REQ_OP_ZONE_APPEND or emulated
- * with write BIOs flagged with BIO_EMULATES_ZONE_APPEND) and any bio serviced
- * by __send_duplicate_bios().
+ * with write BIOs flagged with BIO_EMULATES_ZONE_APPEND), any bio serviced
+ * by __send_duplicate_bios(), and REQ_ATOMIC.
  *
  * dm_accept_partial_bio informs the dm that the target only wants to process
  * additional n_sectors sectors of the bio and the rest of the data should be
@@ -1321,6 +1321,7 @@ void dm_accept_partial_bio(struct bio *bio, unsigned int n_sectors)
 	BUG_ON(dm_tio_flagged(tio, DM_TIO_IS_DUPLICATE_BIO));
 	BUG_ON(bio_sectors > *tio->len_ptr);
 	BUG_ON(n_sectors > bio_sectors);
+	BUG_ON(bio->bi_opf & REQ_ATOMIC);
 
 	if (static_branch_unlikely(&zoned_enabled) &&
 	    unlikely(bdev_is_zoned(bio->bi_bdev))) {
