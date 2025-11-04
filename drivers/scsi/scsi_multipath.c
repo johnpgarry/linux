@@ -714,13 +714,23 @@ EXPORT_SYMBOL_GPL(scsi_mpath_unique_id);
 
 int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
-	struct scsi_mpath_dh_data *dh_data = sdev->mpath_pg_data;
+	struct scsi_mpath_dh_data *dh_data;
 	char device_id_str[40];
 	int ret = -EINVAL;
+
+//	pr_err("%s sdev=%pS\n", __func__, sdev);
+	dh_data = sdev->mpath_pg_data;
+//	pr_err("%s1 sdev=%pS dh_data=%pS\n", __func__, sdev, dh_data);
+//	pr_err("%s2 sdev=%pS dh_data=%pS device_id_len=%d\n",
+//		__func__, sdev, dh_data, dh_data->device_id_len);
+//	pr_err("%s3 sdev=%pS dh_data=%pS device_id_str=%s\n",
+//		__func__, sdev, dh_data, dh_data->device_id_str);
 
 	ret = scsi_vpd_lun_id(sdev, device_id_str, dh_data->device_id_len);
 	if (ret < 0)
 		return ret;
+//	pr_err("%s4 sdev=%pS dh_data=%pS device_id_len=%d device_id_str=%s\n",
+//		__func__, sdev, dh_data, dh_data->device_id_len, device_id_str);
 
 	if (strncmp(dh_data->device_id_str, device_id_str,
 	    dh_data->device_id_len) == 0)
@@ -737,6 +747,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	struct Scsi_Host *shost = sdev->host;
 	struct queue_limits lim;
 
+	pr_err("%s dev=%pS\n", __func__, sdev);
 	/*
 	 * Don't allocate mpath disk if ALUA handler is not attached
 	 */

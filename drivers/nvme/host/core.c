@@ -4213,11 +4213,11 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 			ctrl->instance, ns->head->instance);
 		disk->flags |= GENHD_FL_HIDDEN;
 	} else if (multipath) {
-		pr_err("%s2.2 multipath=true ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
+		pr_err("%s2.2 multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->subsys->instance,
 			ns->head->instance);
 	} else {
-		pr_err("%s2.3 ns=%pS ctrl=%pS info=%pS\n", __func__, ns, ctrl, info);
+		pr_err("%s2.3 ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->instance,
 			ns->head->instance);
 	}

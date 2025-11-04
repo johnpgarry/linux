@@ -186,7 +186,7 @@ void nvme_mpath_start_request(struct request *rq)
 	struct nvme_ns *ns = rq->q->queuedata;
 	struct gendisk *disk = ns->head->disk;
 
-	pr_err("%s rq=%pS (bio=%pS) disk=%pS (%s)\n", __func__, rq, rq->bio, disk, disk->disk_name);
+	pr_err_once("%s rq=%pS (bio=%pS) disk=%pS (%s)\n", __func__, rq, rq->bio, disk, disk->disk_name);
 	if ((READ_ONCE(ns->head->subsys->iopolicy) == NVME_IOPOLICY_QD) &&
 	    !(nvme_req(rq)->flags & NVME_MPATH_CNT_ACTIVE)) {
 		atomic_inc(&ns->ctrl->nr_active);
@@ -207,7 +207,7 @@ void nvme_mpath_end_request(struct request *rq)
 {
 	struct nvme_ns *ns = rq->q->queuedata;
 
-	pr_err("%s rq=%pS (bio=%pS)\n", __func__, rq, rq->bio);
+	pr_err_once("%s rq=%pS (bio=%pS)\n", __func__, rq, rq->bio);
 	if (nvme_req(rq)->flags & NVME_MPATH_CNT_ACTIVE)
 		atomic_dec_if_positive(&ns->ctrl->nr_active);
 
@@ -324,10 +324,10 @@ static struct nvme_ns *__nvme_find_path(struct nvme_ns_head *head, int node)
 	int found_distance = INT_MAX, fallback_distance = INT_MAX, distance;
 	struct nvme_ns *found = NULL, *fallback = NULL, *ns;
 
-	pr_err("%s head=%pS\n", __func__, head);
+	pr_err_once("%s head=%pS\n", __func__, head);
 	list_for_each_entry_srcu(ns, &head->list, siblings,
 				 srcu_read_lock_held(&head->srcu)) {
-		pr_err("%s1 head=%pS looping ns=%pS found=%pS fallback=%pS\n",
+		pr_err_once("%s1 head=%pS looping ns=%pS found=%pS fallback=%pS\n",
 			__func__, head, ns, found, fallback);
 		if (nvme_path_is_disabled(ns))
 			continue;
@@ -358,7 +358,7 @@ static struct nvme_ns *__nvme_find_path(struct nvme_ns_head *head, int node)
 
 	if (!found)
 		found = fallback;
-	pr_err("%s9 head=%pS found=%pS fallback=%pS maybe calling rcu_assign_pointer\n", __func__, head, found, fallback);
+	pr_err_once("%s9 head=%pS found=%pS fallback=%pS maybe calling rcu_assign_pointer\n", __func__, head, found, fallback);
 	if (found)
 		rcu_assign_pointer(head->current_path[node], found);
 	return found;
@@ -369,7 +369,7 @@ static struct nvme_ns *nvme_next_ns(struct nvme_ns_head *head,
 {
 	ns = list_next_or_null_rcu(&head->list, &ns->siblings, struct nvme_ns,
 			siblings);
-	pr_err("%s head=%pS\n", __func__, head);
+	pr_err_once("%s head=%pS\n", __func__, head);
 	if (ns)
 		return ns;
 	return list_first_or_null_rcu(&head->list, struct nvme_ns, siblings);
@@ -382,7 +382,7 @@ static struct nvme_ns *nvme_round_robin_path(struct nvme_ns_head *head)
 	struct nvme_ns *old = srcu_dereference(head->current_path[node],
 					       &head->srcu);
 
-	pr_err("%s head=%pS old=%pS\n", __func__, head, old);
+	pr_err_once("%s head=%pS old=%pS\n", __func__, head, old);
 	if (unlikely(!old))
 		return __nvme_find_path(head, node);
 
@@ -473,9 +473,9 @@ static struct nvme_ns *nvme_numa_path(struct nvme_ns_head *head)
 	int node = numa_node_id();
 	struct nvme_ns *ns;
 
-	pr_err("%s head=%pS\n", __func__, head);
+	pr_err_once("%s head=%pS\n", __func__, head);
 	ns = srcu_dereference(head->current_path[node], &head->srcu);
-	pr_err("%s1 head=%pS ns=%pS\n", __func__, head, ns);
+	pr_err_once("%s1 head=%pS ns=%pS\n", __func__, head, ns);
 	if (unlikely(!ns))
 		return __nvme_find_path(head, node);
 	if (unlikely(!nvme_path_is_optimized(ns)))
@@ -485,7 +485,7 @@ static struct nvme_ns *nvme_numa_path(struct nvme_ns_head *head)
 
 inline struct nvme_ns *nvme_find_path(struct nvme_ns_head *head)
 {
-	pr_err("%s head=%pS iopolicy=%d\n", __func__, head, READ_ONCE(head->subsys->iopolicy));
+	pr_err_once("%s head=%pS iopolicy=%d\n", __func__, head, READ_ONCE(head->subsys->iopolicy));
 	switch (READ_ONCE(head->subsys->iopolicy)) {
 	case NVME_IOPOLICY_QD:
 		return nvme_queue_depth_path(head);
@@ -537,7 +537,7 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 	struct nvme_ns *ns;
 	int srcu_idx;
 
-	pr_err("%s head=%pS bio=%pS\n", __func__, head, bio);
+	pr_err_once("%s head=%pS bio=%pS\n", __func__, head, bio);
 	/*
 	 * The namespace might be going away and the bio might be moved to a
 	 * different queue via blk_steal_bios(), so we need to use the bio_split
@@ -548,15 +548,15 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 		return;
 
 	srcu_idx = srcu_read_lock(&head->srcu);
-	pr_err("%s1 head=%pS bio=%pS calling nvme_find_path\n", __func__, head, bio);
+	pr_err_once("%s1 head=%pS bio=%pS calling nvme_find_path\n", __func__, head, bio);
 	ns = nvme_find_path(head);
-	pr_err("%s1.1 head=%pS bio=%pS called nvme_find_path ns=%pS\n", __func__, head, bio, ns);
+	pr_err_once("%s1.1 head=%pS bio=%pS called nvme_find_path ns=%pS\n", __func__, head, bio, ns);
 	if (likely(ns)) {
 		bio_set_dev(bio, ns->disk->part0);
 		bio->bi_opf |= REQ_NVME_MPATH;
 		trace_block_bio_remap(bio, disk_devt(ns->head->disk),
 				      bio->bi_iter.bi_sector);
-		pr_err("%s1.2 head=%pS bio=%pS ns=%pS REQ_NVME_MPATH being set and calling submit_bio_noacct\n", __func__, head, bio, ns);
+		pr_err_once("%s1.2 head=%pS bio=%pS ns=%pS REQ_NVME_MPATH being set and calling submit_bio_noacct\n", __func__, head, bio, ns);
 		submit_bio_noacct(bio);
 	} else if (nvme_available_path(head)) {
 		dev_warn_ratelimited(dev, "no usable path - requeuing I/O\n");
@@ -575,7 +575,7 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 
 static int nvme_ns_head_open(struct gendisk *disk, blk_mode_t mode)
 {
-	pr_err("%s disk=%pS (disk_name=%s)\n", __func__, disk, disk->disk_name);
+	pr_err_once("%s disk=%pS (disk_name=%s)\n", __func__, disk, disk->disk_name);
 	if (!nvme_tryget_ns_head(disk->private_data))
 		return -ENXIO;
 	return 0;
@@ -799,6 +799,8 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	set_bit(GD_SUPPRESS_PART_SCAN, &head->disk->state);
 	sprintf(head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
+	pr_err("%s9 head->disk=%pS called blk_alloc_disk name=%s\n",
+		__func__, head->disk, head->disk->disk_name);
 	nvme_tryget_ns_head(head);
 	return 0;
 }

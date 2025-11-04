@@ -3973,9 +3973,14 @@ static int sd_probe(struct device *dev)
 	if (!sdkp)
 		goto out;
 
-	if (scsi_mpath_enabled(sdp) && sdp->is_shared)
+	if (scsi_mpath_enabled(sdp) && sdp->is_shared) {
+		pr_err("%s calling scsi_mpath_alloc_disk sdp=%pS sdkp=%pS\n",
+			__func__, sdp, sdkp);
 		scsi_mpath_alloc_disk(sdp);
+	}
 
+	pr_err("%s2 calling blk_mq_alloc_disk_for_queue sdp=%pS sdkp=%pS\n",
+			__func__, sdp, sdkp);
 	gd = blk_mq_alloc_disk_for_queue(sdp->request_queue,
 					 &sd_bio_compl_lkclass);
 	if (!gd)
@@ -3993,9 +3998,16 @@ static int sd_probe(struct device *dev)
 		goto out_free_index;
 	}
 
-	if (scsi_is_sdev_multipath(sdp))
+	sdev_printk(KERN_INFO, sdp, "%s3 gd=%pS sdp->mpath_disk=%pS\n", __func__, gd->disk_name, sdp->mpath_disk);
+	if (scsi_is_sdev_multipath(sdp)) {
 		snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "mpath%dsd%d",
 		    sdp->host->host_no, index);
+		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd=%pS sdp->mpath_disk->disk_name=%s\n",
+			gd->disk_name, sdp->mpath_disk->disk_name);
+	} else {
+		gd->flags |= GENHD_FL_HIDDEN;
+		sdev_printk(KERN_INFO, sdp, "sd_probe5 gd=%pS !scsi_is_sdev_multipath GENHD_FL_HIDDEN\n", gd->disk_name);
+	}
 
 	sdkp->device = sdp;
 	sdkp->disk = gd;
