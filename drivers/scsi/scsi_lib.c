@@ -1877,7 +1877,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
 
-	pr_err("%s req=%pS part=%pS pos=%lld bytes=%d bio=%pS sdev=%pS is_flush=%d rq_flags=0x%x\n",
+	pr_err_once("%s req=%pS part=%pS pos=%lld bytes=%d bio=%pS sdev=%pS is_flush=%d rq_flags=0x%x\n",
 		__func__, req, req->part, blk_rq_pos(req), blk_rq_bytes(req), req->bio, sdev, is_flush, req->rq_flags);
 	WARN_ON_ONCE(cmd->budget_token < 0);
 

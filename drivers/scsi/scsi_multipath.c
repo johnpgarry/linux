@@ -853,16 +853,18 @@ int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 	if (ret < 0)
 		return ret;
 	pr_err("%s4 sdev=%pS dh_data=%pS \n", __func__, sdev, dh_data);
-	pr_err("%s4.1 device_id_len=%d device_id_str=%s (len=%zd) device_id_str=%s (len=%zd)\n",
+	pr_err("%s4.1 device_id_len=%d device_id_str=%s (len=%zd) dh_data->device_id_str=%s (len=%zd)\n",
 		__func__,
 		dh_data->device_id_len, device_id_str, strlen(dh_data->device_id_str),
-		device_id_str, strlen(device_id_str));
+		dh_data->device_id_str, strlen(dh_data->device_id_str));
 
 	if (strncmp(dh_data->device_id_str, device_id_str,
-	    dh_data->device_id_len) == 0)
-		return -EINVAL;
+	    dh_data->device_id_len) == 0) {
+		pr_err("%s4.1 matches\n", __func__);
+		return 0;
+	}
 
-	return 0;
+	return -EINVAL;
 }
 
 static void scsi_mp_disk_release(struct device *dev)
@@ -887,7 +889,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	 */
 	if (!sdev->handler || strncmp(sdev->handler->name, "alua", 4) != 0) {
 		sdev_printk(KERN_NOTICE, sdev,
-		    "No Handler or correct handler attached for multipath \n");
+		    "No Handler or correct handler attached for multipath\n");
 		return 0;
 	}
 
