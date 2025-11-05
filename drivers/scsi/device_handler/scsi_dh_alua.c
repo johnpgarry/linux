@@ -226,7 +226,7 @@ static void configure_scsi_mpath(struct scsi_device *sdev, struct alua_port_grou
 	pr_err("%s2 sdev=%pS dh_data=%pS dh_data->device_id_str=%s\n",
 		__func__, sdev, dh_data, dh_data->device_id_str);
 	dh_data->device_id_len = pg->device_id_len;
-	sdev->host->mpath_alua_grpid = pg->group_id;
+//	sdev->host->mpath_alua_grpid = pg->group_id;
 }
 
 /*

@@ -570,9 +570,9 @@ struct Scsi_Host {
 	struct blk_mq_tag_set	tag_set;
 
 #ifdef	CONFIG_SCSI_MULTIPATH
-	struct scsi_mpath	*mpath_dev;
-	struct list_head	mpath_sdev;
-	int			mpath_alua_grpid; /* Grounp ID for ALUA devices */
+//	struct scsi_mpath	*mpath_dev;
+//	struct list_head	mpath_sdev;
+//	int			mpath_alua_grpid; /* Grounp ID for ALUA devices */
 #endif
 
 	atomic_t host_blocked;
