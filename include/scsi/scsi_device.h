@@ -125,6 +125,20 @@ struct scsi_mpath_disk {
 	unsigned long           mpath_flags;		/* flag for multipath devices*/
 };
 
+
+struct scsi_mpath_device {
+	struct srcu_struct 	srcu;
+	//struct Scsi_Host	*shost;	/*Scsi_Host where this mpath belong */
+	struct list_head        mpath_list;  /* list of multipath scsi_device   */
+	struct	bio_list	mpath_requeue_list; /* list for requeing bio */
+	spinlock_t		mpath_requeue_lock;
+	struct work_struct	mpath_requeue_work; /* work struct for requeue */
+	struct mutex            mpath_lock;
+	unsigned long		mpath_start_time;
+	struct delayed_work	activate_mpath; /* Path Activation work */
+	struct scsi_device __rcu *current_path[]; /* scsi_device of current path */
+};
+
 struct scsi_device {
 	struct Scsi_Host *host;
 	struct request_queue *request_queue;

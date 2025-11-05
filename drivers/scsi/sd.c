@@ -4027,6 +4027,7 @@ static int sd_probe(struct device *dev)
 		pr_err("%s calling scsi_mpath_alloc_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
 		scsi_mpath_alloc_disk(sdp);
+		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
 
 	pr_err("%s2 calling blk_mq_alloc_disk_for_queue sdp=%pS sdkp=%pS\n",
@@ -4306,6 +4307,7 @@ static void sd_shutdown(struct device *dev)
 	if (pm_runtime_suspended(dev))
 		return;
 
+	#if 0
 	if (scsi_is_sdev_multipath(sdkp->device)) {
 		struct scsi_device *sdp = sdkp->device;
 		bool last_path = false;
@@ -4324,6 +4326,7 @@ static void sd_shutdown(struct device *dev)
 		if (last_path)
 			scsi_mpath_shutdown_disk(sdp);
 	}
+	#endif
 
 	if (sdkp->WCE && sdkp->media_present) {
 		sd_printk(KERN_NOTICE, sdkp, "Synchronizing SCSI cache\n");
