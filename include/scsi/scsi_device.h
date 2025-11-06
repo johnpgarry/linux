@@ -129,13 +129,17 @@ struct scsi_mpath_disk {
 struct scsi_mpath_device {
 	struct srcu_struct 	srcu;
 	//struct Scsi_Host	*shost;	/*Scsi_Host where this mpath belong */
-	struct list_head        mpath_list;  /* list of multipath scsi_device   */
 	struct	bio_list	mpath_requeue_list; /* list for requeing bio */
 	spinlock_t		mpath_requeue_lock;
 	struct work_struct	mpath_requeue_work; /* work struct for requeue */
 	struct mutex            mpath_lock;
 	unsigned long		mpath_start_time;
 	struct delayed_work	activate_mpath; /* Path Activation work */
+	struct gendisk		*gd;
+	struct device		dev;
+	struct work_struct	partition_scan_work;
+	struct list_head	entry; // for list of mpath devices
+	struct list_head	mpath_sdev_list;	/* list of all mpath_sdevs */
 	struct scsi_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
@@ -313,6 +317,7 @@ struct scsi_device {
 	struct device		sdev_gendev,
 				sdev_dev;
 
+
 #ifdef	CONFIG_SCSI_MULTIPATH
 	int				is_shared; 	/* Set Multipath flag  */
 	int				mpath_first_path; /* Indicate if this was first path */
@@ -326,11 +331,13 @@ struct scsi_device {
 	atomic_t			nr_mpath;	/* Number of Active mpath */
 	void *scsi_mp_disk;
 
+
 #define SCSI_MPATH_DISK_LIVE            0
 #define SCSI_MPATH_DISK_IO_PENDING      1
 #define SCSI_MPATH_IO_STATS             2
 
 	unsigned long           mpath_flags;		/* flag for multipath devices*/
+	struct scsi_mpath_device *mpath_dev;
 #endif
 
 	struct work_struct	requeue_work;
