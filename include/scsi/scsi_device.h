@@ -142,6 +142,7 @@ struct scsi_mpath_device {
 	struct list_head	mpath_sdev_list;	/* list of all mpath_sdevs */
 	int					index;
 	unsigned long           mpath_flags;		/* flag for multipath devices*/
+	enum scsi_mpath_iopolicy	mpath_iopolicy;
 	struct scsi_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
@@ -321,17 +322,16 @@ struct scsi_device {
 
 
 #ifdef	CONFIG_SCSI_MULTIPATH
-	int				is_shared; 	/* Set Multipath flag  */
-	int				mpath_first_path; /* Indicate if this was first path */
-	struct gendisk          	*mpath_disk;	/* Multipath disk */
+	//int				is_shared; 	/* Set Multipath flag  */
+	//int				mpath_first_path; /* Indicate if this was first path */
+	//struct gendisk          	*mpath_disk;	/* Multipath disk */
 	int				mpath_numa_node; /* NUMA node for Path  */
 	enum scsi_mpath_access_state	mpath_state;	/* Multipath State */
-	enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
+	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
 	struct list_head		mpath_entry;	/* list of all mpath_sdevs */
 	struct scsi_mpath_dh_data	*mpath_pg_data; /* Place holder for Port group data */
 	struct work_struct		activate_mpath; /* Activate path work */
-	atomic_t			nr_mpath;	/* Number of Active mpath */
-	void *scsi_mp_disk;
+	//atomic_t			nr_mpath;	/* Number of Active mpath */
 
 
 #define SCSI_MPATH_DISK_LIVE            0
@@ -391,7 +391,7 @@ static inline bool scsi_mpath_enabled(struct scsi_device *sdev)
 }
 static inline bool scsi_is_sdev_multipath(struct scsi_device *sdev)
 {
-	return IS_ENABLED(CONFIG_SCSI_MULTIPATH) && sdev->mpath_disk;
+	return IS_ENABLED(CONFIG_SCSI_MULTIPATH) && sdev->mpath_dev;
 }
 #else
 #define scsi_multipath	false;

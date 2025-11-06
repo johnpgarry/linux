@@ -1226,10 +1226,11 @@ sdev_show_multipath_iopolicy(struct device *dev,
 			     char *buf)
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
-	const char *name = scsi_mpath_policy_name(sdev->mpath_iopolicy);
+	const char *name;
 
-	if (!sdev->mpath_disk)
+	if (!sdev->mpath_dev)
 		return -EINVAL;
+	name = scsi_mpath_policy_name(sdev->mpath_dev->mpath_iopolicy);
 
 	return sysfs_emit(buf, "%s\n", name);
 }
@@ -1287,7 +1288,7 @@ sdev_show_multipath_state(struct device *dev,
 	struct scsi_device *sdev = to_scsi_device(dev);
 	const char *name = scsi_mpath_state_names(sdev->mpath_state);
 
-	if (!sdev->mpath_disk)
+	if (!sdev->mpath_dev)
 		return -EINVAL;
 
 	return sysfs_emit(buf, "%s\n", name);

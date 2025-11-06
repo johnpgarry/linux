@@ -147,9 +147,9 @@ module_param_call(iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
 MODULE_PARM_DESC(iopolicy,
     "Default multipath I/O policy; 'numa' (default) or 'round-robin'");
 
-void scsi_mpath_default_iopolicy(struct scsi_device *sdev)
+void scsi_mpath_default_iopolicy(struct scsi_mpath_device *mpath_dev)
 {
-	sdev->mpath_iopolicy = iopolicy;
+	mpath_dev->mpath_iopolicy = iopolicy;
 }
 
 void scsi_multipath_iopolicy_update(struct scsi_device *sdev, int iopolicy)
@@ -388,7 +388,7 @@ inline struct scsi_device *__scsi_find_path(struct scsi_mpath_device *mpath_dev,
 			continue;
 
 		if (sdev->mpath_numa_node != NUMA_NO_NODE &&
-		    (READ_ONCE(sdev->mpath_iopolicy) == SCSI_MPATH_IOPOLICY_NUMA))
+		    (READ_ONCE(mpath_dev->mpath_iopolicy) == SCSI_MPATH_IOPOLICY_NUMA))
 			distance = node_distance(node, sdev->mpath_numa_node);
 		else
 			distance = LOCAL_DISTANCE;
@@ -432,7 +432,7 @@ inline struct scsi_device *scsi_find_path(struct scsi_mpath_device *mpath_dev)
 	if (unlikely(!sdev))
 		sdev = __scsi_find_path(mpath_dev, node);
 
-	if (READ_ONCE(sdev->mpath_iopolicy) == SCSI_MPATH_IOPOLICY_RR)
+	if (READ_ONCE(mpath_dev->mpath_iopolicy) == SCSI_MPATH_IOPOLICY_RR)
 		return scsi_mpath_round_robin_path(mpath_dev, node, sdev);
 
 	if (unlikely(!scsi_mpath_is_optimized(sdev)))
@@ -446,6 +446,8 @@ void scsi_mpath_requeue_work(struct work_struct *work)
 	struct scsi_mpath_device *mpath_dev =
 	    container_of(work, struct scsi_mpath_device, mpath_requeue_work);
 	struct bio *bio, *next;
+
+	pr_err("%s mpath_dev=%pS\n", __func__, mpath_dev);
 
 	spin_lock_irq(&mpath_dev->mpath_requeue_lock);
 	next = bio_list_get(&mpath_dev->mpath_requeue_list);
@@ -647,7 +649,7 @@ int scsi_multipath_init(struct scsi_device *sdev)
 	INIT_WORK(&sdev->activate_mpath, scsi_activate_mpath_work);
 //	INIT_LIST_HEAD(&sdev->mpath_entry);
 	sdev->mpath_numa_node = NUMA_NO_NODE;
-	sdev->is_shared = 1;
+//	sdev->is_shared = 1;
 
 	return 0;
 
@@ -700,10 +702,15 @@ void scsi_mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 	int srcu_idx;
 	int node;
 
+	pr_err("%s disk=%pS\n", __func__, disk);
+	pr_err("%s2 private_data=%pS\n", __func__, disk->private_data);
+	mpath_dev = disk->private_data;
+
 	if (!mpath_dev)
 		return;
 
 	srcu_idx = srcu_read_lock(&mpath_dev->srcu);
+	pr_err("%s3 srcu_idx=%d\n", __func__, srcu_idx);
 	#if 0
 	list_for_each_entry_rcu(sdev, &mpath_dev->mpath_sdev_list, mpath_sdev_entry) {
 		if (capacity != get_capacity(sdev->mpath_dev->gd))
@@ -711,9 +718,14 @@ void scsi_mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 	}
 	#endif
 	srcu_read_unlock(&mpath_dev->srcu, srcu_idx);
+	pr_err("%s4 srcu_idx=%d\n", __func__, srcu_idx);
 
-	for_each_node(node)
+	for_each_node(node) {
+
+		pr_err("%s5 node=%d\n", __func__, node);
 		rcu_assign_pointer(mpath_dev->current_path[node], NULL);
+	}
+	pr_err("%s6 calling kblockd_schedule_work\n", __func__);
 	kblockd_schedule_work(&mpath_dev->mpath_requeue_work);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_revalidate_path);
@@ -918,8 +930,10 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	static int disk_count;
 	struct scsi_mpath_device *mpath_dev;
 	int index;
+	struct Scsi_Host *shost = sdev->host;
+	struct device *shost_dev = &shost->shost_dev;
 
-	pr_err("%s sdev=%pS\n", __func__, sdev);
+	pr_err("%s sdev=%pS shost=%pS shost_dev=%pS\n", __func__, sdev, shost, shost_dev);
 	/*
 	 * Don't allocate mpath disk if ALUA handler is not attached
 	 */
@@ -992,7 +1006,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	lim.max_zone_append_sectors = 0;
 	lim.dma_alignment = 3;
 
-	mpath_dev->gd = blk_alloc_disk(&lim, sdev->mpath_numa_node);
+	mpath_dev->gd = blk_alloc_disk(&lim, dev_to_node(shost_dev));
 	pr_err("%s2 dev=%pS sdev->mpath_dev=%pS mpath_dev->gd=%pS\n", __func__, sdev, sdev->mpath_dev, mpath_dev->gd);
 	if (IS_ERR(mpath_dev->gd))
 		return PTR_ERR(mpath_dev->gd);
@@ -1019,7 +1033,16 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	//	put_disk(sdp->mpath_disk);
 	//	goto out;
 	}
-	pr_err("%s4\n", __func__);
+
+	ret = init_srcu_struct(&mpath_dev->srcu);
+	pr_err("%s4 ret=%d after init_srcu_struct\n", __func__, ret);
+	if (ret)
+		return ret;
+
+	INIT_WORK(&mpath_dev->mpath_requeue_work, scsi_mpath_requeue_work);
+	spin_lock_init(&mpath_dev->mpath_requeue_lock);
+	bio_list_init(&mpath_dev->mpath_requeue_list);
+
 	sdev->mpath_dev = mpath_dev;
 	pr_err("%s5\n", __func__);
 	list_add_tail(&sdev->mpath_entry, &mpath_dev->mpath_sdev_list);
@@ -1107,8 +1130,8 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 	if (!sdev->mpath_dev)
 		return;
 
-	if (!sdev->is_shared)
-		return;
+//	if (!sdev->is_shared)
+//		return;
 
 	/* Make sure All pending bio's are cleaned up */
 	kblockd_schedule_work(&sdev->mpath_dev->mpath_requeue_work);
