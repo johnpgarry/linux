@@ -143,6 +143,7 @@ struct scsi_mpath_device {
 	int					index;
 	unsigned long           mpath_flags;		/* flag for multipath devices*/
 	enum scsi_mpath_iopolicy	mpath_iopolicy;
+	struct kref		ref;
 	struct scsi_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
