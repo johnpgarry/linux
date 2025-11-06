@@ -431,6 +431,39 @@ static void scsi_requeue_work(struct work_struct *work)
 		submit_bio_noacct(bio);
 	}
 }
+#include <linux/sysfs.h>
+
+static struct attribute dummy_attr = {
+	.name = "dummy",
+};
+
+static struct attribute *scsi_mpath_attrs[] = {
+	&dummy_attr,
+	NULL
+};
+
+static bool multipath_sysfs_group_visible(struct kobject *kobj)
+{
+	__maybe_unused struct device *dev = container_of(kobj, struct device, kobj);
+
+	//return nvme_disk_is_ns_head(dev_to_disk(dev));
+	return true;
+}
+
+static bool multipath_sysfs_attr_visible(struct kobject *kobj,
+		struct attribute *attr, int n)
+{
+	return false;
+}
+
+DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
+
+const struct attribute_group scsi_mpath_attr_group = {
+	.name           = "multipath",
+	.attrs		= scsi_mpath_attrs,
+	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
+};
+
 
 static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 {
@@ -471,9 +504,9 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 		pr_err("%s1.1 itering mpath_dev=%pS sdev->request_queue=%pS\n", __func__, mpath_dev, sdev->request_queue);
 		if (!sdev->request_queue)
 			continue;
-		pr_err("%s1.2 itering mpath_dev=%pS sdev->request_queue->queuedata=%pS\n", __func__, mpath_dev, sdev->request_queue->queuedata);
-	//	if (!test_bit(GD_ADDED, &sdev->disk->state))
-	//		continue;
+		pr_err("%s1.2 itering mpath_dev=%pS mpath_dev->gd=%pS\n", __func__, mpath_dev, mpath_dev->gd);
+		if (!test_bit(GD_ADDED, &mpath_dev->gd->state))
+			continue;
 
 		/*
 		 * Avoid creating link if it already exists for the given path.
@@ -490,22 +523,23 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 		if (test_and_set_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags))
 			continue;
 
-		#if 0
-		target = disk_to_dev(ns->disk);
+		pr_err("%s1.3 itering mpath_dev=%pS mpath_dev->gd=%pS\n", __func__, mpath_dev, mpath_dev->gd);
+		target = disk_to_dev(mpath_dev->gd);
+		pr_err("%s1.4 itering mpath_dev=%pS mpath_dev->gd=%pS target=%pS\n", __func__, mpath_dev, mpath_dev->gd, target);
 		/*
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
 		 */
-		rc = sysfs_add_link_to_group(kobj, nvme_ns_mpath_attr_group.name,
+		rc = sysfs_add_link_to_group(kobj, scsi_mpath_attr_group.name,
 				&target->kobj, dev_name(target));
 		if (unlikely(rc)) {
-			dev_err(disk_to_dev(ns->head->disk),
+			dev_err(disk_to_dev(mpath_disk->gd),
 					"failed to create link to %s\n",
 					dev_name(target));
 			clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags);
 		}
-		#endif
 	}
+
 
 	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 }
