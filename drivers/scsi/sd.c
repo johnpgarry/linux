@@ -112,7 +112,6 @@ static void sd_shutdown(struct device *);
 static void scsi_disk_release(struct device *cdev);
 
 static DEFINE_IDA(sd_index_ida);
-static DEFINE_IDA(sd_mpath_index_ida);
 
 static mempool_t *sd_page_pool;
 static struct lock_class_key sd_bio_compl_lkclass;
@@ -4011,8 +4010,8 @@ static int sd_probe(struct device *dev)
 	sdev_printk(KERN_INFO, sdp, "%s3 gd=%pS gd=%pS part0=%pS sdp->mpath_disk=%pS index=%d\n",
 		__func__, gd, gd->disk_name, gd->part0, sdp->mpath_disk, index);
 	if (scsi_is_sdev_multipath(sdp)) {
-		int mindex = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
-		snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "sd_mpath%d", mindex);
+		
+		//snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "sd_mpath%d", mindex);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd name=%pS sdp->mpath_disk->disk_name=%s\n",
 			gd->disk_name, sdp->mpath_disk->disk_name);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4.1 gd name=%pS scsi_is_sdev_multipath\n", gd->disk_name);
@@ -4105,24 +4104,7 @@ static int sd_probe(struct device *dev)
 	scsi_autopm_put_device(sdp);
 
 	if (scsi_is_sdev_multipath(sdp)) {
-		int mindex = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
 
-		sdp->mpath_disk->major = sd_major((mindex & 0xf0) >> 4);
-		sdp->mpath_disk->first_minor = ((mindex & 0xf) << 4) | (mindex & 0xfff00);
-		sdp->mpath_disk->minors = SD_MINORS;
-		pr_err("%s7 major=%d first_minor=%d index=%d mindex=%d calling scsi_mpath_add_disk\n",
-			__func__, sdp->mpath_disk->major, sdp->mpath_disk->first_minor, index, mindex);
-		scsi_mpath_add_disk(sdp);
-		pr_err("%s7.1 major=%d first_minor=%d index=%d mindex=%d called scsi_mpath_add_disk\n",
-			__func__, sdp->mpath_disk->major, sdp->mpath_disk->first_minor, index, mindex);
-
-		if (!test_bit(SCSI_MPATH_DISK_LIVE, &sdp->mpath_flags)) {
-			BUG();
-			device_unregister(&sdkp->disk_dev);
-			clear_bit(SCSI_MPATH_DISK_LIVE, &sdp->mpath_flags);
-			put_disk(sdp->mpath_disk);
-			goto out;
-		}
 	}
 
 	return 0;
