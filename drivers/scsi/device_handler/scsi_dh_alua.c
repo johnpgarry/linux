@@ -1103,6 +1103,7 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 {
 	int err = SCSI_DH_DEV_UNSUPP, tpgs;
 
+	pr_err("%s sdev=%pS h=%pS\n", __func__, sdev, h);
 	mutex_lock(&h->init_mutex);
 	h->disabled = false;
 	tpgs = alua_check_tpgs(sdev);
