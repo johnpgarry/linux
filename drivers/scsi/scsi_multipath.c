@@ -597,15 +597,15 @@ EXPORT_SYMBOL_GPL(scsi_mpath_add_disk);
 
 int scsi_multipath_init(struct scsi_device *sdev)
 {
-	#if 0
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_mpath_dh_data *h;
-	struct scsi_mpath_device *mpath_dev;
+//	struct scsi_mpath_device *mpath_dev;
 	int ret = -ENOMEM;
 
-	mpath_dev = kzalloc(sizeof(struct scsi_mpath_device), GFP_KERNEL);
-	if (!mpath_dev)
-		return ret;
+	pr_err("%s sdev=%pS\n", __func__, sdev);
+//	mpath_dev = kzalloc(sizeof(struct scsi_mpath_device), GFP_KERNEL);
+//	if (!mpath_dev)
+//		return ret;
 
 	h = kzalloc(sizeof(struct scsi_mpath_dh_data), GFP_KERNEL);
 	if (!h)
@@ -613,37 +613,34 @@ int scsi_multipath_init(struct scsi_device *sdev)
 
 	sdev->mpath_pg_data = h;
 
-	ret = init_srcu_struct(&mpath_dev->srcu);
-	if (ret) {
-		cleanup_srcu_struct(&mpath_dev->srcu);
-		goto out_handler;
-	}
+//	ret = init_srcu_struct(&mpath_dev->srcu);
+//	if (ret) {
+//		cleanup_srcu_struct(&mpath_dev->srcu);
+//		goto out_handler;
+//	}
 
-	pr_err("%s sdev=%pS mpath_dev=%pS h=%pS shost=%pS\n",
-		__func__, sdev, mpath_dev, h, shost);
+	pr_err("%s sdev=%pS sdev->mpath_dev=%pS h=%pS shost=%pS\n",
+		__func__, sdev, sdev->mpath_dev, h, shost);
 
-	mutex_init(&mpath_dev->mpath_lock);
-	bio_list_init(&mpath_dev->mpath_requeue_list);
-	spin_lock_init(&mpath_dev->mpath_requeue_lock);
-	INIT_WORK(&mpath_dev->mpath_requeue_work, scsi_mpath_requeue_work);
-	INIT_LIST_HEAD(&mpath_dev->mpath_list);
+//	mutex_init(&mpath_dev->mpath_lock);
+//	bio_list_init(&mpath_dev->mpath_requeue_list);
+//	spin_lock_init(&mpath_dev->mpath_requeue_lock);
+//	INIT_WORK(&mpath_dev->mpath_requeue_work, scsi_mpath_requeue_work);
+//	INIT_LIST_HEAD(&mpath_dev->mpath_list);
 	INIT_WORK(&sdev->activate_mpath, scsi_activate_mpath_work);
-	INIT_LIST_HEAD(&sdev->mpath_entry);
+//	INIT_LIST_HEAD(&sdev->mpath_entry);
 	sdev->mpath_numa_node = NUMA_NO_NODE;
 	sdev->is_shared = 1;
 
 	return 0;
 
-out_handler:
-	kfree(h);
+//out_handler:
+//	kfree(h);
 out_mpath_dev:
-	if (mpath_dev)
-		kfree(mpath_dev);
+//	if (mpath_dev)
+//		kfree(mpath_dev);
 
 	return ret;
-	#else
-	return 0;
-	#endif
 }
 EXPORT_SYMBOL_GPL(scsi_multipath_init);
 
