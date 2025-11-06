@@ -1029,7 +1029,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	mpath_dev->gd->fops = &scsi_mpath_ops;
 
 	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_dev->gd->state);
-	sprintf(mpath_dev->gd->disk_name, "scsi_mpath_dev_disk%d", mpath_dev->index);
+	sprintf(mpath_dev->gd->disk_name, "scsi_mpath_disk%d", mpath_dev->index);
 
 	ret = device_add(&mpath_dev->dev); // see nvme_init_subsystem()
 	pr_err("%s3 called device_add ret=%d\n", __func__, ret);
