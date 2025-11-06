@@ -419,8 +419,10 @@ int sysfs_add_link_to_group(struct kobject *kobj, const char *group_name,
 	int error = 0;
 
 	parent = kernfs_find_and_get(kobj->sd, group_name);
-	if (!parent)
+	if (!parent) {
+		pr_err("%s kernfs_find_and_get failed group_name=%s\n", __func__, group_name);
 		return -ENOENT;
+	}
 
 	error = sysfs_create_link_sd(parent, target, link_name);
 	kernfs_put(parent);

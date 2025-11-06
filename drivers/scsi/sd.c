@@ -3830,6 +3830,8 @@ static void sd_revalidate_disk(struct gendisk *disk)
 
 		mpath_disk = mpath_dev1->disk;
 		pr_err("%s8.1 mpath_disk=%pS\n", __func__, mpath_disk);
+		if (!mpath_disk)
+			goto skip;
 		pr_err("%s8.2 mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
 		mpath_lim = &mpath_disk->gd->queue->limits;
 
@@ -3863,6 +3865,7 @@ static void sd_revalidate_disk(struct gendisk *disk)
 			//return err;
 		}
 	}
+skip:
 	/*
 	 * For a zoned drive, revalidating the zones can be done only once
 	 * the gendisk capacity is set. So if this fails, set back the gendisk
@@ -3943,6 +3946,38 @@ static int sd_format_disk_name(char *prefix, int index, char *buf, int buflen)
 	return 0;
 }
 
+static struct attribute *scsi_mpath_attrs[] = {
+	NULL
+};
+
+static bool multipath_sysfs_group_visible(struct kobject *kobj)
+{
+	__maybe_unused struct device *dev = container_of(kobj, struct device, kobj);
+
+	//return nvme_disk_is_ns_head(dev_to_disk(dev));
+	return true;
+}
+
+static bool multipath_sysfs_attr_visible(struct kobject *kobj,
+		struct attribute *attr, int n)
+{
+	return true;
+}
+
+DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
+
+const struct attribute_group scsi_mpath_attr_group = {
+	.name           = "multipath",
+	.attrs		= scsi_mpath_attrs,
+	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
+};
+
+
+const struct attribute_group *sd_attr_groups[] = {
+	&scsi_mpath_attr_group,
+	NULL
+};
+
 /**
  *	sd_probe - called during driver initialization and whenever a
  *	new scsi device is attached to the system. It is called once
@@ -4013,12 +4048,6 @@ static int sd_probe(struct device *dev)
 		goto out_free_index;
 	}
 
-	if (scsi_mpath_enabled(sdp) && 1/* sdp->is_shared */) {
-		pr_err("%s calling scsi_mpath_alloc_disk sdp=%pS sdkp=%pS\n",
-			__func__, sdp, sdkp);
-		scsi_mpath_alloc_disk(sdp, gd);
-		//head = nvme_find_ns_head(ctrl, info->nsid);
-	}
 
 	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->mpath_dev=%pS index=%d\n",
 		__func__, gd, gd->disk_name, gd->part0, sdp->mpath_dev, index);
@@ -4100,7 +4129,8 @@ static int sd_probe(struct device *dev)
 	}
 
 
-	error = device_add_disk(dev, gd, NULL);
+	error = device_add_disk(dev, gd, sd_attr_groups);
+	pr_err("%s error from device_add_disk = %d\n", __func__, error);
 	if (error) {
 		device_unregister(&sdkp->disk_dev);
 		put_disk(gd);
@@ -4119,6 +4149,13 @@ static int sd_probe(struct device *dev)
 
 	if (scsi_is_sdev_multipath(sdp)) {
 
+	}
+
+	if (scsi_mpath_enabled(sdp) && 1/* sdp->is_shared */) {
+		pr_err("%s calling scsi_mpath_alloc_disk sdp=%pS sdkp=%pS\n",
+			__func__, sdp, sdkp);
+		scsi_mpath_alloc_disk(sdp, gd);
+		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
 
 	return 0;
