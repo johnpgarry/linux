@@ -41,6 +41,7 @@ struct scsi_mpath_dh_data {
 	int	prefrence;		/* Path prefrence for Port Group from RTPG cmd */
 	int	is_active;		/* Current Sdev is active */
 };
+struct scsi_mpath_device;
 
 extern void scsi_mpath_default_iopolicy(struct scsi_device *);
 extern void scsi_mpath_unfreeze(struct Scsi_Host *);
@@ -65,7 +66,7 @@ extern int scsi_mpath_add_disk(struct scsi_device *);
 void scsi_mpath_set_live(struct scsi_device *);
 void scsi_activate_path(struct scsi_device *);
 void scsi_multipath_iopolicy_update(struct scsi_device *, int);
-void scsi_mpath_clear_paths(struct Scsi_Host *);
+void scsi_mpath_clear_paths(struct scsi_mpath_device *);
 int scsi_mpath_unique_lun_id(struct scsi_device *);
 
 extern void scsi_mpath_revalidate_path(struct gendisk *, sector_t);
