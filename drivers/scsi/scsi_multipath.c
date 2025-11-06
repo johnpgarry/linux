@@ -732,8 +732,10 @@ EXPORT_SYMBOL_GPL(scsi_mpath_revalidate_path);
 
 static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 {
-	pr_err("%s disk=%pS\n", __func__, disk);
-	if (!scsi_get_device(disk->private_data)) {
+	struct scsi_mpath_device *mpath_dev = disk->private_data;
+	pr_err("%s disk=%pS mpath_dev=%pS\n", __func__, disk, mpath_dev);
+
+	if (!kref_get_unless_zero(&mpath_dev->ref)) {
 		pr_err("%s1 disk=%pS ENXIO\n", __func__, disk);
 		return -ENXIO;
 	}
@@ -741,15 +743,26 @@ static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 	return 0;
 }
 
+static void scsi_mpath_free(struct kref *ref)
+{
+	struct scsi_mpath_device *mpath_dev =
+		container_of(ref, struct scsi_mpath_device, ref);
+
+	pr_err("%s ref=%pS mpath_dev=%pS\n", __func__, ref, mpath_dev);
+	/*
+	nvme_mpath_put_disk(head);
+	ida_free(&head->subsys->ns_ida, head->instance);
+	cleanup_srcu_struct(&head->srcu);
+	nvme_put_subsystem(head->subsys);
+	kfree(head->plids);
+	kfree(head);
+	*/
+}
+
 static void scsi_mpath_release(struct gendisk *disk)
 {
 	struct scsi_mpath_device *mpath_dev = disk->private_data;
-	struct scsi_device *sdev;
-	int srcu_idx;
-
-	srcu_idx = srcu_read_lock(&mpath_dev->srcu);
-	sdev = scsi_find_path(mpath_dev);
-	srcu_read_unlock(&mpath_dev->srcu, srcu_idx);
+	kref_put(&mpath_dev->ref, scsi_mpath_free);
 }
 
 int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
@@ -992,6 +1005,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	INIT_WORK(&mpath_dev->partition_scan_work, scsi_multipath_partition_scan_work);
 
 	mutex_init(&mpath_dev->lock);
+	kref_init(&mpath_dev->ref);
 
 	mpath_dev->dev.class = &scsi_mpath_device_class;
 	mpath_dev->dev.release = scsi_mpath_device_release;
