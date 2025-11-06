@@ -43,7 +43,7 @@ struct scsi_mpath_dh_data {
 };
 struct scsi_mpath_device;
 
-extern void scsi_mpath_default_iopolicy(struct scsi_device *);
+extern void scsi_mpath_default_iopolicy(struct scsi_mpath_device *);
 extern void scsi_mpath_unfreeze(struct Scsi_Host *);
 extern void scsi_mpath_wait_freeze(struct Scsi_Host *);
 extern void scsi_mpath_start_freeze(struct Scsi_Host *);
