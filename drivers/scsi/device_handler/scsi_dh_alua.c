@@ -209,11 +209,18 @@ static struct alua_port_group *alua_find_get_pg(char *id_str, size_t id_size,
 
 static void configure_scsi_mpath(struct scsi_device *sdev, struct alua_port_group *pg)
 {
-	struct scsi_mpath_dh_data *dh_data = sdev->mpath_pg_data;
+	struct scsi_mpath_dh_data *dh_data;
 
-	pr_err("%s sdev=%pS pg=%pS scsi_mpath_enabled=%d dh_data=%pS\n",
-		__func__, sdev, pg, scsi_mpath_enabled(sdev), dh_data);
+	pr_err("%s sdev=%pS pg=%pS scsi_mpath_enabled=%d sdev->mpath_dev=%pS\n",
+		__func__, sdev, pg, scsi_mpath_enabled(sdev), sdev->mpath_dev);
 	if (!scsi_mpath_enabled(sdev))
+		return;
+	if (!sdev->mpath_dev)
+		return;
+	dh_data = sdev->mpath_dev->pg_data;
+	pr_err("%s2 sdev=%pS pg=%pS scsi_mpath_enabled=%d sdev->mpath_dev=%pS dh_data=%pS\n",
+		__func__, sdev, pg, scsi_mpath_enabled(sdev), sdev->mpath_dev, dh_data);
+	if (!dh_data)
 		return;
 
 	dh_data->group_id = pg->group_id;

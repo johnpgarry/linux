@@ -41,9 +41,10 @@ struct scsi_mpath_dh_data {
 	int	prefrence;		/* Path prefrence for Port Group from RTPG cmd */
 	int	is_active;		/* Current Sdev is active */
 };
+struct scsi_mpath_disk;
 struct scsi_mpath_device;
 
-extern void scsi_mpath_default_iopolicy(struct scsi_mpath_device *);
+extern void scsi_mpath_default_iopolicy(struct scsi_mpath_disk *);
 extern void scsi_mpath_unfreeze(struct Scsi_Host *);
 extern void scsi_mpath_wait_freeze(struct Scsi_Host *);
 extern void scsi_mpath_start_freeze(struct Scsi_Host *);
@@ -51,25 +52,25 @@ extern void scsi_mpath_failover_req(struct request *);
 extern void scsi_mpath_start_request(struct request *);
 extern void scsi_mpath_end_request(struct request *);
 extern void scsi_kick_requeue_lists(struct Scsi_Host *);
-extern bool scsi_mpath_clear_current_path(struct scsi_device *);
+extern bool scsi_mpath_clear_current_path(struct scsi_mpath_device *);
 int scsi_multipath_init(struct scsi_device *);
 extern int scsi_mpath_failover_disposition(struct scsi_cmnd *);
-int scsi_mpath_alloc_disk(struct scsi_device *);
+int scsi_mpath_alloc_disk(struct scsi_device *, struct gendisk *gd);
 extern void scsi_mpath_remove_disk(struct scsi_device *);
-extern void scsi_mpath_shutdown_disk(struct scsi_device *);
+extern void scsi_mpath_shutdown_disk(struct scsi_device *sdev);
 void scsi_put_mpath_sdev(struct scsi_device *);
 void scsi_mpath_requeue_work(struct work_struct *);
 extern void scsi_mpath_dev_release(struct scsi_device *);
 void scsi_mpath_kick_requeue_lists(struct Scsi_Host *);
-int scsi_mpath_update_state(struct scsi_device *);
-extern int scsi_mpath_add_disk(struct scsi_mpath_device *, struct scsi_device *sdev);
+int scsi_mpath_update_state(struct scsi_mpath_device *mpath_dev);
+extern int scsi_mpath_add_disk(struct scsi_mpath_device *);
 void scsi_mpath_set_live(struct scsi_mpath_device *);
 void scsi_activate_path(struct scsi_device *);
 void scsi_multipath_iopolicy_update(struct scsi_device *, int);
-void scsi_mpath_clear_paths(struct scsi_mpath_device *);
+void scsi_mpath_clear_paths(struct scsi_mpath_disk *);
 int scsi_mpath_unique_lun_id(struct scsi_device *);
 
 extern void scsi_mpath_revalidate_path(struct gendisk *, sector_t);
 extern int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type);
-bool scsi_mpath_lun_id_match(struct scsi_device *a, struct scsi_device *b);
+bool scsi_mpath_lun_id_match(struct scsi_mpath_device *a, struct scsi_mpath_device *b);
 #endif /* _SCSI_SCSI_MULTIPATH_H */

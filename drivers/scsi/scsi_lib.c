@@ -2907,8 +2907,10 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
-	if (scsi_mpath_enabled(sdev))
-		scsi_mpath_clear_current_path(sdev);
+	if (scsi_mpath_enabled(sdev)) {
+
+		//scsi_mpath_clear_current_path(sdev);
+	}
 
 	if (scsi_device_set_state(sdev, SDEV_BLOCK))
 		return scsi_device_set_state(sdev, SDEV_CREATED_BLOCK);

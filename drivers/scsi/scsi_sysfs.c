@@ -1228,9 +1228,9 @@ sdev_show_multipath_iopolicy(struct device *dev,
 	struct scsi_device *sdev = to_scsi_device(dev);
 	const char *name;
 
-	if (!sdev->mpath_dev)
+	if (!sdev->mpath_dev || !sdev->mpath_dev->disk)
 		return -EINVAL;
-	name = scsi_mpath_policy_name(sdev->mpath_dev->mpath_iopolicy);
+	name = scsi_mpath_policy_name(sdev->mpath_dev->disk->iopolicy);
 
 	return sysfs_emit(buf, "%s\n", name);
 }
@@ -1266,7 +1266,7 @@ static const struct {
 	{ SCSI_MPATH_TRANSITIONING,"transitioning" },
 };
 
-static const char *scsi_mpath_state_names(unsigned char state)
+static __maybe_unused const char *scsi_mpath_state_names(unsigned char state)
 {
 	int i;
 	char *name = NULL;
@@ -1286,7 +1286,7 @@ sdev_show_multipath_state(struct device *dev,
 			  char *buf)
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
-	const char *name = scsi_mpath_state_names(sdev->mpath_state);
+	const char *name = "";//scsi_mpath_state_names(sdev->mpath_state);
 
 	if (!sdev->mpath_dev)
 		return -EINVAL;

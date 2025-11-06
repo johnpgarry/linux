@@ -107,6 +107,7 @@ struct scsi_vpd {
  */
 #define REQ_SCSI_MPATH		REQ_DRV
 
+#if 0
 struct scsi_mpath_disk {
 	int				is_shared; 	/* Set Multipath flag  */
 	int				mpath_first_path; /* Indicate if this was first path */
@@ -118,33 +119,62 @@ struct scsi_mpath_disk {
 	struct work_struct		activate_mpath; /* Activate path work */
 	atomic_t			nr_mpath;	/* Number of Active mpath */
 
-#define SCSI_MPATH_DISK_LIVE            0
-#define SCSI_MPATH_DISK_IO_PENDING      1
-#define SCSI_MPATH_IO_STATS             2
 
 	unsigned long           mpath_flags;		/* flag for multipath devices*/
 };
+#endif
 
+#define SCSI_MPATH_DISK_LIVE            0
+#define SCSI_MPATH_DISK_IO_PENDING      1
+#define SCSI_MPATH_IO_STATS             2
+#define SCSI_MPATH_SYSFS_ATTR_LINK      3
 
-struct scsi_mpath_device {
+struct scsi_mpath_device;
+
+struct scsi_mpath_disk {
 	struct srcu_struct 	srcu;
 	//struct Scsi_Host	*shost;	/*Scsi_Host where this mpath belong */
-	struct	bio_list	mpath_requeue_list; /* list for requeing bio */
-	spinlock_t		mpath_requeue_lock;
-	struct work_struct	mpath_requeue_work; /* work struct for requeue */
+	struct	bio_list	requeue_list; /* list for requeing bio */
+	spinlock_t		requeue_lock;
+	struct work_struct	requeue_work; /* work struct for requeue */
 	struct mutex            lock;
-	unsigned long		mpath_start_time;
-	struct delayed_work	activate_mpath; /* Path Activation work */
+	unsigned long		start_time;
+	struct delayed_work	activate; /* Path Activation work */
 	struct gendisk		*gd;
 	struct device		dev;
 	struct work_struct	partition_scan_work;
 	struct list_head	entry; // for list of mpath devices
-	struct list_head	mpath_sdev_list;	/* list of all mpath_sdevs */
+	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	int					index;
-	unsigned long           mpath_flags;		/* flag for multipath devices*/
-	enum scsi_mpath_iopolicy	mpath_iopolicy;
+	unsigned long           flags;		/* flag for multipath devices*/
+	enum scsi_mpath_iopolicy	iopolicy;
 	struct kref		ref;
-	struct scsi_device __rcu *current_path[]; /* scsi_device of current path */
+	struct scsi_mpath_device __rcu *current_path[]; /* scsi_device of current path */
+};
+
+struct scsi_mpath_device {
+	struct scsi_device *sdev;
+	struct gendisk *gd;
+
+		//int				is_shared; 	/* Set Multipath flag  */
+	//int				mpath_first_path; /* Indicate if this was first path */
+	//struct gendisk          	*mpath_disk;	/* Multipath disk */
+	
+	enum scsi_mpath_access_state	state;	/* Multipath State */
+	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
+	struct list_head		entry;	/* list of all mpath_sdevs */
+	struct scsi_mpath_dh_data	*pg_data; /* Place holder for Port group data */
+	struct work_struct		activate; /* Activate path work */
+	int				numa_node; /* NUMA node for Path  */
+	//atomic_t			nr_mpath;	/* Number of Active mpath */
+
+
+#define SCSI_MPATH_DISK_LIVE            0
+#define SCSI_MPATH_DISK_IO_PENDING      1
+#define SCSI_MPATH_IO_STATS             2
+
+	unsigned long           flags;		/* flag for multipath devices*/
+	struct scsi_mpath_disk *disk;
 };
 
 struct scsi_device {
@@ -321,27 +351,7 @@ struct scsi_device {
 	struct device		sdev_gendev,
 				sdev_dev;
 
-
-#ifdef	CONFIG_SCSI_MULTIPATH
-	//int				is_shared; 	/* Set Multipath flag  */
-	//int				mpath_first_path; /* Indicate if this was first path */
-	//struct gendisk          	*mpath_disk;	/* Multipath disk */
-	int				mpath_numa_node; /* NUMA node for Path  */
-	enum scsi_mpath_access_state	mpath_state;	/* Multipath State */
-	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
-	struct list_head		mpath_entry;	/* list of all mpath_sdevs */
-	struct scsi_mpath_dh_data	*mpath_pg_data; /* Place holder for Port group data */
-	struct work_struct		activate_mpath; /* Activate path work */
-	//atomic_t			nr_mpath;	/* Number of Active mpath */
-
-
-#define SCSI_MPATH_DISK_LIVE            0
-#define SCSI_MPATH_DISK_IO_PENDING      1
-#define SCSI_MPATH_IO_STATS             2
-
-	unsigned long           mpath_flags;		/* flag for multipath devices*/
 	struct scsi_mpath_device *mpath_dev;
-#endif
 
 	struct work_struct	requeue_work;
 
