@@ -16,6 +16,8 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_multipath.h>
 
+static DEFINE_IDA(sd_mpath_index_ida);
+
 bool scsi_multipath = true;
 module_param(scsi_multipath, bool, 0444);
 MODULE_PARM_DESC(scsi_multipath,
@@ -28,6 +30,9 @@ static const char *scsi_iopolicy_names[] = {
 };
 
 static int iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
+
+static LIST_HEAD(mpath_devs_list);
+static DEFINE_MUTEX(mpath_devs_lock);
 
 static const struct class scsi_mp_disk_class = {
 	.name = "scsi_mp_disk",
@@ -580,18 +585,18 @@ static __maybe_unused void scsi_activate_mpath_work(struct work_struct *work)
 	scsi_activate_path(sdev);
 }
 
-int scsi_mpath_add_disk(struct scsi_device *sdev)
+int scsi_mpath_add_disk(struct scsi_mpath_device *mpath_dev, struct scsi_device *sdev)
 {
 	if (!sdev->mpath_pg_data) {
 		/* Re initialize ALUA */
-		sdev->handler->rescan(sdev);
+	//	sdev->handler->rescan(sdev);
 	} else {
 		sdev->mpath_state = SCSI_MPATH_OPTIMAL;
-		pr_err("%s calling scsi_mpath_set_live\n", __func__);
-		scsi_mpath_set_live(sdev);
+		pr_err("%s not calling scsi_mpath_set_live\n", __func__);
+	//	scsi_mpath_set_live(sdev);
 	}
 
-	return (test_bit(SCSI_MPATH_DISK_LIVE, &sdev->mpath_flags));
+	return (test_bit(SCSI_MPATH_DISK_LIVE, &mpath_dev->mpath_flags));
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_add_disk);
 
@@ -840,6 +845,20 @@ int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16],
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_unique_id);
 
+bool scsi_mpath_lun_id_match(struct scsi_device *a, struct scsi_device *b)
+{
+	struct scsi_mpath_dh_data *dh_data_a = a->mpath_pg_data, *dh_data_b = b->mpath_pg_data;
+
+	if (!dh_data_a || !dh_data_b)
+		return false;
+
+	if (dh_data_a->device_id_len != dh_data_b->device_id_len)
+		return false;
+
+	return !strncmp(dh_data_a->device_id_str, dh_data_b->device_id_str, dh_data_a->device_id_len);
+}
+EXPORT_SYMBOL_GPL(scsi_mpath_lun_id_match);
+
 int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
 	struct scsi_mpath_dh_data *dh_data;
@@ -886,8 +905,9 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	int ret;
 	static int disk_count;
 	struct scsi_mpath_device *mpath_dev;
+	int index;
 
-	pr_err("%s dev=%pS\n", __func__, sdev);
+	pr_err("%s sdev=%pS\n", __func__, sdev);
 	/*
 	 * Don't allocate mpath disk if ALUA handler is not attached
 	 */
@@ -908,23 +928,49 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	}
 
 	if (scsi_mpath_unique_lun_id(sdev) == 0) {
-		sdev_printk(KERN_NOTICE, sdev,
-		    "existing sdev with path, return\n");
-		return 0;
+	//	sdev_printk(KERN_NOTICE, sdev,
+	//	    "existing sdev with path, return\n");
+	//	return 0;
 	}
+
+	mutex_lock(&mpath_devs_lock);
+	list_for_each_entry(mpath_dev, &mpath_devs_list, entry) {
+		struct scsi_device *_sdev;
+
+		pr_err("%s itering mpath_dev=%pS\n", __func__, mpath_dev);
+		_sdev = list_first_entry(&mpath_dev->mpath_sdev_list, struct scsi_device, mpath_entry);
+		pr_err("%s2 itering mpath_dev=%pS _sdev=%pS\n", __func__, mpath_dev, _sdev);
+
+
+		if (scsi_mpath_lun_id_match(sdev, _sdev)) {
+			pr_err("%s3 matches device_id_str\n", __func__);
+			sdev->mpath_dev = mpath_dev;
+			mutex_lock(&mpath_dev->lock);
+			list_add_tail(&sdev->mpath_entry, &mpath_dev->mpath_sdev_list);
+			mutex_unlock(&mpath_dev->lock);
+			mutex_unlock(&mpath_devs_lock);
+			return 0;
+		}
+	}
+
+	mutex_unlock(&mpath_devs_lock);
 
 	mpath_dev = kzalloc(sizeof(*mpath_dev), GFP_KERNEL);
 	if (!mpath_dev)
 		return -ENOMEM;
 
+	mpath_dev->index = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
+
 	INIT_LIST_HEAD(&mpath_dev->entry);
 	INIT_LIST_HEAD(&mpath_dev->mpath_sdev_list);
 	INIT_WORK(&mpath_dev->partition_scan_work, scsi_multipath_partition_scan_work);
 
+	mutex_init(&mpath_dev->lock);
+
 	mpath_dev->dev.class = &scsi_mp_disk_class;
 	mpath_dev->dev.release = scsi_mp_disk_release;
 	mpath_dev->dev.groups = scsi_mp_disk_attrs_groups;
-	dev_set_name(&mpath_dev->dev, "scsi_mp_disk%d", disk_count);
+	dev_set_name(&mpath_dev->dev, "scsi_mpath_dev%d", mpath_dev->index);
 	disk_count++;
 	device_initialize(&mpath_dev->dev);
 
@@ -935,21 +981,45 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev)
 	lim.dma_alignment = 3;
 
 	mpath_dev->gd = blk_alloc_disk(&lim, sdev->mpath_numa_node);
-	pr_err("%s2 dev=%pS sdev->mpath_dev=%pS\n", __func__, sdev, sdev->mpath_dev);
-	if (IS_ERR(sdev->mpath_dev))
-		return PTR_ERR(sdev->mpath_dev);
+	pr_err("%s2 dev=%pS sdev->mpath_dev=%pS mpath_dev->gd=%pS\n", __func__, sdev, sdev->mpath_dev, mpath_dev->gd);
+	if (IS_ERR(mpath_dev->gd))
+		return PTR_ERR(mpath_dev->gd);
 
 	mpath_dev->gd->private_data = mpath_dev;
 	mpath_dev->gd->fops = &scsi_mpath_ops;
 
-	set_bit(GD_SUPPRESS_PART_SCAN, &sdev->mpath_dev->gd->state);
+	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_dev->gd->state);
 	ret = device_add(&mpath_dev->dev); // see nvme_init_subsystem()
 	pr_err("%s3 called device_add ret=%d\n", __func__, ret);
 	if (ret)
 		return ret;
 
+	//sdp->mpath_dev->major = sd_major((mpath_dev->index & 0xf0) >> 4);
+	//sdp->mpath_dev->first_minor = ((mpath_dev->index & 0xf) << 4) | (mpath_dev->index & 0xfff00);
+	//sdp->mpath_dev->minors = SD_MINORS;
+
+	if (0 && !test_bit(SCSI_MPATH_DISK_LIVE, &mpath_dev->mpath_flags)) {
+		BUG();
+	//	device_unregister(&sdkp->disk_dev);
+	//	clear_bit(SCSI_MPATH_DISK_LIVE, &mpath_dev->mpath_flags);
+	//	put_disk(sdp->mpath_disk);
+	//	goto out;
+	}
+	pr_err("%s4\n", __func__);
 	sdev->mpath_dev = mpath_dev;
+	pr_err("%s5\n", __func__);
 	list_add_tail(&sdev->mpath_entry, &mpath_dev->mpath_sdev_list);
+
+	pr_err("%s7 major=%d first_minor=%d index=%d mpath_dev->index=%d calling scsi_mpath_add_disk\n",
+		__func__, 0, 0, index, mpath_dev->index);
+	scsi_mpath_add_disk(mpath_dev, sdev);
+	pr_err("%s7.1 major=%d first_minor=%d index=%d mpath_dev->index=%d called scsi_mpath_add_disk\n",
+		__func__, 0, 0, index, mpath_dev->index);
+
+	mutex_lock(&mpath_devs_lock);
+	list_add_tail(&mpath_dev->entry, &mpath_devs_list);
+	pr_err("%s8\n", __func__);
+	mutex_unlock(&mpath_devs_lock);
 
 	return 0;
 }

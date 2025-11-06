@@ -62,7 +62,7 @@ void scsi_mpath_requeue_work(struct work_struct *);
 extern void scsi_mpath_dev_release(struct scsi_device *);
 void scsi_mpath_kick_requeue_lists(struct Scsi_Host *);
 int scsi_mpath_update_state(struct scsi_device *);
-extern int scsi_mpath_add_disk(struct scsi_device *);
+extern int scsi_mpath_add_disk(struct scsi_mpath_device *, struct scsi_device *sdev);
 void scsi_mpath_set_live(struct scsi_device *);
 void scsi_activate_path(struct scsi_device *);
 void scsi_multipath_iopolicy_update(struct scsi_device *, int);
@@ -71,4 +71,5 @@ int scsi_mpath_unique_lun_id(struct scsi_device *);
 
 extern void scsi_mpath_revalidate_path(struct gendisk *, sector_t);
 extern int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type);
+bool scsi_mpath_lun_id_match(struct scsi_device *a, struct scsi_device *b);
 #endif /* _SCSI_SCSI_MULTIPATH_H */
