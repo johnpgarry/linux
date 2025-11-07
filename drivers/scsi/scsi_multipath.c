@@ -478,7 +478,7 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 		pr_err("%s6.1 itering mpath_dev=%pS sdev->request_queue=%pS\n", __func__, mpath_dev, sdev->request_queue);
 		if (!sdev->request_queue)
 			continue;
-		pr_err("%s6.2 itering mpath_dev=%pS mpath_dev->gd=%pS GD_ADDED=%d\n",
+		pr_err("%s6.2 itering mpath_dev=%pS mpath_dev->gd=%pS checking GD_ADDED=%d\n",
 			__func__, mpath_dev, mpath_dev->gd, test_bit(GD_ADDED, &mpath_dev->gd->state));
 		if (!test_bit(GD_ADDED, &mpath_dev->gd->state))
 			continue;
@@ -495,6 +495,9 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 		 * The test_and_set_bit() is used because it is protecting
 		 * against multiple nvme paths being simultaneously added.
 		 */
+		pr_err("%s6.3 itering mpath_dev=%pS mpath_dev->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
+			__func__, mpath_dev, mpath_dev->gd, test_bit(GD_ADDED, &mpath_dev->gd->state),
+			test_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags));
 		if (test_and_set_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags))
 			continue;
 
@@ -1080,20 +1083,21 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	mutex_lock(&mpath_disks_lock);
 	list_for_each_entry(mpath_disk, &mpath_disks_list, entry) {
-		struct scsi_mpath_device *mpath_dev;
+		struct scsi_mpath_device *mpath_dev_search;
 
-		pr_err("%s itering mpath_dev=%pS\n", __func__, mpath_dev);
-		mpath_dev = list_first_entry(&mpath_disk->dev_list, struct scsi_mpath_device, entry);
-		pr_err("%s2 itering mpath_dev=%pS mpath_dev->sdev=%pS sdev=%pS\n", __func__, mpath_dev, mpath_dev->sdev, sdev);
+		pr_err("%s itering mpath_disk=%pS\n", __func__, mpath_disk);
+		mpath_dev_search = list_first_entry(&mpath_disk->dev_list, struct scsi_mpath_device, entry);
+		pr_err("%s2 itering mpath_dev_search=%pS mpath_dev_search->sdev=%pS sdev=%pS\n", __func__, mpath_dev_search, mpath_dev_search->sdev, sdev);
 
 
-		if (scsi_mpath_lun_id_match(sdev->mpath_dev, mpath_dev)) {
-			pr_err("%s3 matches device_id_str\n", __func__);
-			//sdev->mpath_dev = mpath_dev; allocate
+		if (scsi_mpath_lun_id_match(sdev->mpath_dev, mpath_dev_search)) {
+			pr_err("%s3 matches device_id_str calling scsi_mpath_add_disk\n", __func__);
 			mutex_lock(&mpath_disk->lock);
-			list_add_tail(&mpath_dev->entry, &mpath_disk->dev_list);
+			list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
 			mutex_unlock(&mpath_disk->lock);
 			mutex_unlock(&mpath_disks_lock);
+			sdev->mpath_dev->disk = mpath_disk;
+			scsi_mpath_add_disk(sdev->mpath_dev);
 			return 0;
 		}
 	}
