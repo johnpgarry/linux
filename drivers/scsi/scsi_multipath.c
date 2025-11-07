@@ -40,22 +40,22 @@ static const struct class scsi_mpath_disk_class = {
 	.name = "scsi_mpath_disk",
 };
 
-static ssize_t scsi_mpath_disk_attr_device_id_show(struct device *dev,
+static ssize_t scsi_mpath_disk_attr_wwid_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
-	struct scsi_mpath_disk *scsi_mpath_disk =
+	struct scsi_mpath_disk *mpath_disk =
 		container_of(dev, struct scsi_mpath_disk, dev);
 
-	return sysfs_emit(buf, "%s\n", scsi_mpath_disk->device_id_str);
+	return sysfs_emit(buf, "%s\n", mpath_disk->wwid);
 }
 
-struct device_attribute scsi_mpath_disk_attr_device_id = \
-		__ATTR(device_id, S_IRUGO, scsi_mpath_disk_attr_device_id_show, NULL);
+struct device_attribute scsi_mpath_disk_attr_wwid = \
+		__ATTR(wwid, S_IRUGO, scsi_mpath_disk_attr_wwid_show, NULL);
 
 
 static struct attribute *scsi_mpath_disk_attrs[] = {
-	&scsi_mpath_disk_attr_device_id.attr,
+	&scsi_mpath_disk_attr_wwid.attr,
 	NULL
 };
 
@@ -1092,7 +1092,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 		pr_err("%s itering mpath_disk=%pS\n", __func__, mpath_disk);
 
-		if (strncmp(mpath_disk->device_id_str, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len) == 0) {
+		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len) == 0) {
 			pr_err("%s3 matches device_id_str calling scsi_mpath_add_disk\n", __func__);
 			mutex_lock(&mpath_disk->lock);
 			list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
@@ -1175,7 +1175,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	spin_lock_init(&mpath_disk->requeue_lock);
 	bio_list_init(&mpath_disk->requeue_list);
 
-	sprintf(mpath_disk->device_id_str, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len);
+	sprintf(mpath_disk->wwid, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len);
 
 	pr_err("%s13 ret=%d after bio_list_init sdev->mpath_dev=%pS\n", __func__, ret, sdev->mpath_dev);
 	list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
