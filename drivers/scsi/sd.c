@@ -3693,6 +3693,48 @@ static void sd_read_block_zero(struct scsi_disk *sdkp)
 	kfree(buffer);
 }
 
+static int sd_revalidate_mpath_disk(struct scsi_mpath_disk *mpath_disk, struct scsi_disk *sdkp)
+{
+	struct scsi_device *sdp = sdkp->device;
+	struct queue_limits *mpath_lim;
+	struct queue_limits lim2;
+	int err;
+
+	//blk_mq_freeze_queue(sdp->mpath_disk->queue);
+
+	pr_err("%s mpath_disk=%pS\n", __func__, mpath_disk);
+
+	pr_err("%s1 mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
+	mpath_lim = &mpath_disk->gd->queue->limits;
+
+	lim2 = queue_limits_start_update(mpath_disk->gd->queue);
+	pr_err("%s8.1 called queue_limits_start_update calling queue_limits_stack_bdev\n", __func__);
+	lim2.logical_block_size = mpath_lim->logical_block_size;
+	lim2.physical_block_size = mpath_lim->physical_block_size;
+	lim2.io_min = mpath_lim->io_min;
+	lim2.io_opt = mpath_lim->io_opt;
+	queue_limits_stack_bdev(&lim2, mpath_disk->gd->part0, 0, mpath_disk->gd->disk_name);
+
+	//sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
+
+	pr_err("%s8.2 calling set_capacity_and_notify\n", __func__);
+	set_capacity_and_notify(mpath_disk->gd,
+	    logical_to_sectors(sdp, sdkp->capacity));
+
+	pr_err("%s8.3 calling queue_limits_commit_update\n", __func__);
+	err = queue_limits_commit_update(mpath_disk->gd->queue, &lim2);
+	pr_err("%s8.4 calling scsi_mpath_revalidate_path err=%d\n",
+		__func__, err);
+	pr_err("%s8.4.1 calling scsi_mpath_revalidate_path err=%d mpath_dev->gd=%pS\n",
+		__func__, err, mpath_disk);
+	scsi_mpath_revalidate_path(mpath_disk->gd,
+	    logical_to_sectors(sdp, sdkp->capacity));
+	pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
+	//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
+
+	return err;
+}
+
 /**
  *	sd_revalidate_disk - called the first time a new disk is seen,
  *	performs disk spin up, read_capacity, etc.
@@ -3818,54 +3860,6 @@ static void sd_revalidate_disk(struct gendisk *disk)
 	if (sdkp->media_present && scsi_device_supports_vpd(sdp))
 		sd_read_cpr(sdkp);
 
-	/* for multipath device, Adjust queue limits for MPATH disk */
-	if (scsi_is_sdev_multipath(sdp)) {
-		struct scsi_mpath_device *mpath_dev1 = sdp->mpath_dev;
-		struct scsi_mpath_disk *mpath_disk;
-		struct queue_limits *mpath_lim;
-		struct queue_limits lim2;
-
-		//blk_mq_freeze_queue(sdp->mpath_disk->queue);
-		pr_err("%s8 calling queue_limits_start_update mpath_dev1=%pS\n", __func__, mpath_dev1);
-
-		mpath_disk = mpath_dev1->disk;
-		pr_err("%s8.1 mpath_disk=%pS\n", __func__, mpath_disk);
-		if (!mpath_disk)
-			goto skip;
-		pr_err("%s8.2 mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
-		mpath_lim = &mpath_disk->gd->queue->limits;
-
-		lim2 = queue_limits_start_update(mpath_disk->gd->queue);
-		pr_err("%s8.1 called queue_limits_start_update calling queue_limits_stack_bdev\n", __func__);
-		lim2.logical_block_size = mpath_lim->logical_block_size;
-		lim2.physical_block_size = mpath_lim->physical_block_size;
-		lim2.io_min = mpath_lim->io_min;
-		lim2.io_opt = mpath_lim->io_opt;
-		queue_limits_stack_bdev(&lim2, mpath_disk->gd->part0, 0, mpath_disk->gd->disk_name);
-
-		//sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
-
-		pr_err("%s8.2 calling set_capacity_and_notify\n", __func__);
-		set_capacity_and_notify(mpath_disk->gd,
-		    logical_to_sectors(sdp, sdkp->capacity));
-
-		pr_err("%s8.3 calling queue_limits_commit_update\n", __func__);
-		err = queue_limits_commit_update(mpath_disk->gd->queue, &lim2);
-
-		pr_err("%s8.4 calling scsi_mpath_revalidate_path err=%d mpath_dev1=%pS\n",
-			__func__, err, mpath_dev1);
-		pr_err("%s8.4.1 calling scsi_mpath_revalidate_path err=%d mpath_dev->gd=%pS\n",
-			__func__, err, mpath_disk);
-		scsi_mpath_revalidate_path(mpath_disk->gd,
-		    logical_to_sectors(sdp, sdkp->capacity));
-		pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
-
-		//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
-		if (err) {
-			//return err;
-		}
-	}
-skip:
 	/*
 	 * For a zoned drive, revalidating the zones can be done only once
 	 * the gendisk capacity is set. So if this fails, set back the gendisk
@@ -4157,6 +4151,7 @@ static int sd_probe(struct device *dev)
 		pr_err("%s calling scsi_mpath_alloc_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
 		scsi_mpath_alloc_disk(sdp, gd);
+		sd_revalidate_mpath_disk(sdp->mpath_dev->disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
 
