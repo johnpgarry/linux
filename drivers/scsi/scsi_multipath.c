@@ -63,39 +63,37 @@ static ssize_t scsi_mpath_disk_iopolicy_show(struct device *dev,
 			  scsi_mpath_iopolicy_names[READ_ONCE(mpath_disk->iopolicy)]);
 }
 
-#if 0
-static void scsi_mpath_disk_iopolicy_update(struct nvme_subsystem *subsys,
+static void scsi_mpath_disk_iopolicy_update(struct scsi_mpath_disk *mpath_disk,
 		int iopolicy)
 {
-	struct nvme_ctrl *ctrl;
-	int old_iopolicy = READ_ONCE(subsys->iopolicy);
+	int old_iopolicy = READ_ONCE(mpath_disk->iopolicy);
 
 	if (old_iopolicy == iopolicy)
 		return;
 
-	WRITE_ONCE(subsys->iopolicy, iopolicy);
+	WRITE_ONCE(mpath_disk->iopolicy, iopolicy);
 
 	/* iopolicy changes clear the mpath by design */
-	mutex_lock(&nvme_subsystems_lock);
-	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
-		nvme_mpath_clear_ctrl_paths(ctrl);
-	mutex_unlock(&nvme_subsystems_lock);
+	//mutex_lock(&nvme_subsystems_lock);
+	//list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
+	//	scsi_mpath_disk_clear_ctrl_paths(ctrl);
+	//mutex_unlock(&nvme_subsystems_lock);
 
-	pr_notice("subsysnqn %s iopolicy changed from %s to %s\n",
-			subsys->subnqn,
-			nvme_iopolicy_names[old_iopolicy],
-			nvme_iopolicy_names[iopolicy]);
+	pr_notice("mpath_disk %d iopolicy changed from %s to %s\n",
+			mpath_disk->index,
+			scsi_mpath_iopolicy_names[old_iopolicy],
+			scsi_mpath_iopolicy_names[iopolicy]);
 }
 static ssize_t scsi_mpath_disk_iopolicy_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct nvme_subsystem *subsys =
-		container_of(dev, struct nvme_subsystem, dev);
+	struct scsi_mpath_disk *mpath_disk =
+		container_of(dev, struct scsi_mpath_disk, dev);
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(nvme_iopolicy_names); i++) {
-		if (sysfs_streq(buf, nvme_iopolicy_names[i])) {
-			nvme_subsys_iopolicy_update(subsys, i);
+	for (i = 0; i < ARRAY_SIZE(scsi_mpath_iopolicy_names); i++) {
+		if (sysfs_streq(buf, scsi_mpath_iopolicy_names[i])) {
+			scsi_mpath_disk_iopolicy_update(mpath_disk, i);
 			return count;
 		}
 	}
@@ -103,10 +101,8 @@ static ssize_t scsi_mpath_disk_iopolicy_store(struct device *dev,
 	return -EINVAL;
 }
 
-#endif
-
 struct device_attribute scsi_mpath_disk_iopolicy = \
-		__ATTR(iopolicy, S_IRUGO | S_IWUSR, scsi_mpath_disk_iopolicy_show, NULL);
+		__ATTR(iopolicy, S_IRUGO | S_IWUSR, scsi_mpath_disk_iopolicy_show, scsi_mpath_disk_iopolicy_store);
 
 
 static struct attribute *scsi_mpath_disk_attrs[] = {
