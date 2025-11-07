@@ -4004,6 +4004,8 @@ static int sd_probe(struct device *dev)
 	int index;
 	int error;
 
+	dev_err(dev, "%s dev is related to scsi_disk\n", __func__);
+
 	scsi_autopm_get_device(sdp);
 	error = -ENODEV;
 	if (sdp->type != TYPE_DISK &&
