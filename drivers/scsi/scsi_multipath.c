@@ -26,7 +26,7 @@ MODULE_PARM_DESC(scsi_multipath,
     "turn on native support for multiple scsi devices \n"
     "set this value to false to disable multipath, \n");
 
-static const char *scsi_iopolicy_names[] = {
+static const char *scsi_mpath_iopolicy_names[] = {
 	[SCSI_MPATH_IOPOLICY_NUMA]	= "numa",
 	[SCSI_MPATH_IOPOLICY_RR]	= "round-robin",
 };
@@ -40,7 +40,7 @@ static const struct class scsi_mpath_disk_class = {
 	.name = "scsi_mpath_disk",
 };
 
-static ssize_t scsi_mpath_disk_attr_wwid_show(struct device *dev,
+static ssize_t scsi_mpath_disk_wwid_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -50,12 +50,68 @@ static ssize_t scsi_mpath_disk_attr_wwid_show(struct device *dev,
 	return sysfs_emit(buf, "%s\n", mpath_disk->wwid);
 }
 
-struct device_attribute scsi_mpath_disk_attr_wwid = \
-		__ATTR(wwid, S_IRUGO, scsi_mpath_disk_attr_wwid_show, NULL);
+struct device_attribute scsi_mpath_disk_wwid = \
+		__ATTR(wwid, S_IRUGO, scsi_mpath_disk_wwid_show, NULL);
+
+static ssize_t scsi_mpath_disk_iopolicy_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct scsi_mpath_disk *mpath_disk =
+		container_of(dev, struct scsi_mpath_disk, dev);
+
+	return sysfs_emit(buf, "%s\n",
+			  scsi_mpath_iopolicy_names[READ_ONCE(mpath_disk->iopolicy)]);
+}
+
+#if 0
+static void scsi_mpath_disk_iopolicy_update(struct nvme_subsystem *subsys,
+		int iopolicy)
+{
+	struct nvme_ctrl *ctrl;
+	int old_iopolicy = READ_ONCE(subsys->iopolicy);
+
+	if (old_iopolicy == iopolicy)
+		return;
+
+	WRITE_ONCE(subsys->iopolicy, iopolicy);
+
+	/* iopolicy changes clear the mpath by design */
+	mutex_lock(&nvme_subsystems_lock);
+	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
+		nvme_mpath_clear_ctrl_paths(ctrl);
+	mutex_unlock(&nvme_subsystems_lock);
+
+	pr_notice("subsysnqn %s iopolicy changed from %s to %s\n",
+			subsys->subnqn,
+			nvme_iopolicy_names[old_iopolicy],
+			nvme_iopolicy_names[iopolicy]);
+}
+static ssize_t scsi_mpath_disk_iopolicy_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct nvme_subsystem *subsys =
+		container_of(dev, struct nvme_subsystem, dev);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(nvme_iopolicy_names); i++) {
+		if (sysfs_streq(buf, nvme_iopolicy_names[i])) {
+			nvme_subsys_iopolicy_update(subsys, i);
+			return count;
+		}
+	}
+
+	return -EINVAL;
+}
+
+#endif
+
+struct device_attribute scsi_mpath_disk_iopolicy = \
+		__ATTR(iopolicy, S_IRUGO | S_IWUSR, scsi_mpath_disk_iopolicy_show, NULL);
 
 
 static struct attribute *scsi_mpath_disk_attrs[] = {
-	&scsi_mpath_disk_attr_wwid.attr,
+	&scsi_mpath_disk_wwid.attr,
+	&scsi_mpath_disk_iopolicy.attr,
 	NULL
 };
 
@@ -107,7 +163,7 @@ static int scsi_set_iopolicy(const char *val, const struct kernel_param *kp)
 
 static int scsi_get_iopolicy(char *buf, const struct kernel_param *kp)
 {
-	return sprintf(buf, "%s\n", scsi_iopolicy_names[iopolicy]);
+	return sprintf(buf, "%s\n", scsi_mpath_iopolicy_names[iopolicy]);
 }
 
 module_param_call(iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
