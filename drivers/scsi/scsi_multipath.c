@@ -40,23 +40,23 @@ static const struct class scsi_mpath_disk_class = {
 	.name = "scsi_mpath_disk",
 };
 
-static ssize_t scsi_mpath_disk_attr_model_show(struct device *dev,
+static ssize_t scsi_mpath_disk_attr_device_id_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
-//	struct scsi_mp_disk *scsi_mp_disk =
-//		container_of(dev, struct scsi_mp_disk, dev);
+	struct scsi_mpath_disk *scsi_mpath_disk =
+		container_of(dev, struct scsi_mpath_disk, dev);
 
-	return sysfs_emit(buf, "%d\n", 123);
+	return sysfs_emit(buf, "%s\n", scsi_mpath_disk->device_id_str);
 }
 
-struct device_attribute scsi_mpath_disk_attr_model = \
-		__ATTR(model, S_IRUGO, scsi_mpath_disk_attr_model_show, NULL);
+struct device_attribute scsi_mpath_disk_attr_device_id = \
+		__ATTR(device_id, S_IRUGO, scsi_mpath_disk_attr_device_id_show, NULL);
 
 
 static struct attribute *scsi_mpath_disk_attrs[] = {
-	&scsi_mpath_disk_attr_model.attr,
-	NULL,
+	&scsi_mpath_disk_attr_device_id.attr,
+	NULL
 };
 
 static const struct attribute_group scsi_mpath_disk_attrs_group = {
@@ -1083,14 +1083,10 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	mutex_lock(&mpath_disks_lock);
 	list_for_each_entry(mpath_disk, &mpath_disks_list, entry) {
-		struct scsi_mpath_device *mpath_dev_search;
 
 		pr_err("%s itering mpath_disk=%pS\n", __func__, mpath_disk);
-		mpath_dev_search = list_first_entry(&mpath_disk->dev_list, struct scsi_mpath_device, entry);
-		pr_err("%s2 itering mpath_dev_search=%pS mpath_dev_search->sdev=%pS sdev=%pS\n", __func__, mpath_dev_search, mpath_dev_search->sdev, sdev);
 
-
-		if (scsi_mpath_lun_id_match(sdev->mpath_dev, mpath_dev_search)) {
+		if (strncmp(mpath_disk->device_id_str, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len) == 0) {
 			pr_err("%s3 matches device_id_str calling scsi_mpath_add_disk\n", __func__);
 			mutex_lock(&mpath_disk->lock);
 			list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
@@ -1172,6 +1168,8 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	INIT_WORK(&mpath_disk->requeue_work, scsi_requeue_work);
 	spin_lock_init(&mpath_disk->requeue_lock);
 	bio_list_init(&mpath_disk->requeue_list);
+
+	sprintf(mpath_disk->device_id_str, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len);
 
 	pr_err("%s13 ret=%d after bio_list_init sdev->mpath_dev=%pS\n", __func__, ret, sdev->mpath_dev);
 	list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
