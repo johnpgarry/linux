@@ -890,7 +890,7 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 	struct scsi_mpath_device *mpath_dev;
 
 	//WARN_ON_ONCE(1);
-//	if (bio->bi_iter.bi_size == 16384)
+	if (bio->bi_iter.bi_size == 16384)
 		special = true;
 
 	/*
@@ -909,11 +909,17 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 
 	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
 	mpath_dev = scsi_find_path(mpath_disk);
+	sdev = mpath_dev->sdev;
 	if (special) {
-		pr_err("%s2 bio=%pS bio->bi_bdev=%pS bio->bi_bdev->bd_disk=%pS bio->bi_bdev->bd_disk->part0=%pS mpath_disk=%pS\n",
-			__func__, bio, bio->bi_bdev, bio->bi_bdev->bd_disk, bio->bi_bdev->bd_disk->part0, mpath_disk);
-		pr_err("%s2.1 bio=%pS sdev=%pS request_queue=%pS request_queue->disk=%pS request_queue->disk->part0=%pS\n",
-			__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk, sdev->request_queue->disk->part0);
+		pr_err("%s2 bio=%pS bio->bi_bdev=%pS bio->bi_bdev->bd_disk=%pS bio->bi_bdev->bd_disk->part0=%pS mpath_disk=%pS mpath_dev=%pS\n",
+			__func__, bio, bio->bi_bdev, bio->bi_bdev->bd_disk, bio->bi_bdev->bd_disk->part0, mpath_disk, mpath_dev);
+		
+		pr_err("%s2.1 bio=%pS sdev=%pS request_queue=%pS request_queue=%pS\n",
+			__func__, bio, sdev, sdev->request_queue, sdev->request_queue);
+		pr_err("%s2.2 bio=%pS sdev=%pS request_queue=%pS request_queue->disk=%pS\n",
+			__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk);
+		pr_err("%s2.3 bio=%pS sdev=%pS request_queue=%pS request_queue->disk->part0=%pS\n",
+			__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk->part0);
 	}
 	if (likely(mpath_dev)) {
 		bio_set_dev(bio, mpath_dev->sdev->request_queue->disk->part0);
@@ -1120,7 +1126,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	mpath_disk->dev.release = scsi_mpath_disk_release;
 	mpath_disk->dev.groups = scsi_mpath_disk_attrs_groups;
 	pr_err("%s7\n", __func__);
-	dev_set_name(&mpath_disk->dev, "scsi_mpath_disk%d", mpath_disk->index);
+	dev_set_name(&mpath_disk->dev, "scsi_mpath_device%d", mpath_disk->index);
 	disk_count++;
 	device_initialize(&mpath_disk->dev);
 
