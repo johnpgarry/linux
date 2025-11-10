@@ -3888,6 +3888,8 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	size_t size = sizeof(*head);
 	int ret = -ENOMEM;
 
+
+	pr_err("%s ctrl=%pS info=%pS\n", __func__, ctrl, info);
 #ifdef CONFIG_NVME_MULTIPATH
 	size += num_possible_nodes() * sizeof(struct nvme_ns *);
 #endif
@@ -3919,6 +3921,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	} else
 		head->effects = ctrl->effects;
 
+	pr_err("%s2 ctrl=%pS info=%pS head=%pS calling nvme_mpath_alloc_disk\n", __func__, ctrl, info, head);
 	ret = nvme_mpath_alloc_disk(ctrl, head);
 	if (ret)
 		goto out_cleanup_srcu;
@@ -3972,6 +3975,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	struct nvme_ns_head *head = NULL;
 	int ret;
 
+	pr_err("%s ns=%pS info=%pS\n", __func__, ns, info);
 	ret = nvme_global_check_duplicate_ids(ctrl->subsys, &info->ids);
 	if (ret) {
 		/*
@@ -4012,6 +4016,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 	mutex_lock(&ctrl->subsys->lock);
 	head = nvme_find_ns_head(ctrl, info->nsid);
+	pr_err("%s2 ns=%pS info=%pS head=%pS called nvme_find_ns_head\n", __func__, ns, info, head);
 	if (!head) {
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, &info->ids);
 		if (ret) {
