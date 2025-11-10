@@ -261,6 +261,8 @@ static void blk_validate_atomic_write_limits(struct queue_limits *lim)
 	unsigned int atomic_write_hw_max_sectors =
 			lim->atomic_write_hw_max >> SECTOR_SHIFT;
 
+	pr_err("%s atomic_write_hw_max=%d BLK_FEAT_ATOMIC_WRITES=%d\n",
+		__func__, lim->atomic_write_hw_max, !!(lim->features & BLK_FEAT_ATOMIC_WRITES));
 	if (!(lim->features & BLK_FEAT_ATOMIC_WRITES))
 		goto unsupported;
 
@@ -768,6 +770,8 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 {
 	unsigned int top, bottom, alignment;
 	int ret = 0;
+	
+	//pr_err("%s t=%pS b=%pS\n", __func__, t, b);
 
 	t->features |= (b->features & BLK_FEAT_INHERIT_MASK);
 

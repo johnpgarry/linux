@@ -1422,6 +1422,7 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 
 	scsi_autopm_get_device(sdev);
 
+	pr_err("%s calling scsi_dh_add_device sdev=%pS\n", __func__, sdev);
 	scsi_dh_add_device(sdev);
 
 	error = device_add(&sdev->sdev_gendev);

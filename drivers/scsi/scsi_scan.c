@@ -1120,6 +1120,7 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 	 * register it and tell the rest of the kernel
 	 * about it.
 	 */
+	pr_err("%s calling scsi_dh_add_device sdev=%pS if !(async=%d)==1\n", __func__, sdev, async);
 	if (!async && scsi_sysfs_add_sdev(sdev) != 0)
 		return SCSI_SCAN_NO_RESPONSE;
 
@@ -1911,6 +1912,8 @@ static void scsi_sysfs_add_devices(struct Scsi_Host *shost)
 		/* If device is already visible, skip adding it to sysfs */
 		if (sdev->is_visible)
 			continue;
+
+		pr_err("%s calling scsi_dh_add_device sdev=%pS if !(scsi_host_scan_allowed=%d)==1\n", __func__, sdev, scsi_host_scan_allowed(shost));
 		if (!scsi_host_scan_allowed(shost) ||
 		    scsi_sysfs_add_sdev(sdev) != 0)
 			__scsi_remove_device(sdev);

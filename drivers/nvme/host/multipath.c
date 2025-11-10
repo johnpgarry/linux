@@ -718,6 +718,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct queue_limits lim;
 
+	pr_err("%s ctrl=%pS head=%pS\n", __func__, ctrl, head);
 	mutex_init(&head->lock);
 	bio_list_init(&head->requeue_list);
 	spin_lock_init(&head->requeue_lock);
@@ -776,6 +777,8 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
 	int rc;
+
+	dev_err(disk_to_dev(head->disk), "%s ns=%pS\n", __func__, ns);
 
 	if (!head->disk)
 		return;
@@ -990,6 +993,7 @@ void nvme_mpath_update(struct nvme_ctrl *ctrl)
 {
 	u32 nr_change_groups = 0;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	if (!ctrl->ana_log_buf)
 		return;
 
@@ -1187,6 +1191,7 @@ void nvme_mpath_add_sysfs_link(struct nvme_ns_head *head)
 	struct nvme_ns *ns;
 	struct kobject *kobj;
 
+	dev_err(disk_to_dev(head->disk), "%s head=%pS\n", __func__, head);
 	/*
 	 * Ensure head disk node is already added otherwise we may get invalid
 	 * kobj for head disk node
@@ -1353,6 +1358,8 @@ int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	size_t ana_log_size;
 	int error = 0;
 
+
+	dev_err(&ctrl->ctrl_device, "%s\n", __func__);
 	/* check if multipath is enabled and we have the capability */
 	if (!multipath || !ctrl->subsys ||
 	    !(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA))

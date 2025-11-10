@@ -126,10 +126,14 @@ static int scsi_dh_handler_attach(struct scsi_device *sdev,
 {
 	int error, ret = 0;
 
+	pr_err("%s sdev=%pS scsi_dh=%pS\n", __func__, sdev, scsi_dh);
 	if (!try_module_get(scsi_dh->module))
 		return -EINVAL;
 
+	pr_err("%s2 sdev=%pS scsi_dh=%pS calling scsi_dh->attach=%pS\n", __func__, sdev, scsi_dh, scsi_dh->attach);
 	error = scsi_dh->attach(sdev);
+	pr_err("%s2.1 sdev=%pS scsi_dh=%pS called scsi_dh->attach=%pS error=%d\n",
+		__func__, sdev, scsi_dh, scsi_dh->attach, error);
 	if (error != SCSI_DH_OK) {
 		switch (error) {
 		case SCSI_DH_NOMEM:
@@ -172,13 +176,16 @@ void scsi_dh_add_device(struct scsi_device *sdev)
 	struct scsi_device_handler *devinfo = NULL;
 	const char *drv;
 
+
 	drv = scsi_dh_find_driver(sdev);
+	pr_err("%s sdev=%pS called scsi_dh_find_driver drv=%s\n", __func__, sdev, drv);
 	if (drv)
 		devinfo = __scsi_dh_lookup(drv);
 	/*
 	 * device_handler is optional, so ignore errors
 	 * from scsi_dh_handler_attach()
 	 */
+	pr_err("%s2 sdev=%pS called drv=%s calling scsi_dh_handler_attach devinfo=%pS\n", __func__, sdev, drv, devinfo);
 	if (devinfo)
 		(void)scsi_dh_handler_attach(sdev, devinfo);
 }
@@ -253,7 +260,9 @@ int scsi_dh_activate(struct request_queue *q, activate_complete fn, void *data)
 	struct scsi_device *sdev;
 	int err = SCSI_DH_NOSYS;
 
+
 	sdev = scsi_device_from_queue(q);
+	pr_err("%s q=%pS fn=%pS data=%pS sdev=%pS\n", __func__, q, fn, sdev, data);
 	if (!sdev) {
 		if (fn)
 			fn(data, err);
@@ -271,8 +280,10 @@ int scsi_dh_activate(struct request_queue *q, activate_complete fn, void *data)
 	if (sdev->sdev_state == SDEV_OFFLINE)
 		goto out_fn;
 
-	if (sdev->handler->activate)
+	pr_err("%s3 q=%pS fn=%pS data=%pS sdev=%pS calling sdev->handler->activate=%ps\n", __func__, q, fn, sdev, data, sdev->handler->activate);
+	if (sdev->handler->activate) {
 		err = sdev->handler->activate(sdev, fn, data);
+	}
 
 out_put_device:
 	put_device(&sdev->sdev_gendev);
@@ -301,11 +312,14 @@ int scsi_dh_set_params(struct request_queue *q, const char *params)
 	int err = -SCSI_DH_NOSYS;
 
 	sdev = scsi_device_from_queue(q);
+	pr_err("%s sdev=%pS params=%s\n", __func__, sdev, params);
 	if (!sdev)
 		return err;
 
-	if (sdev->handler && sdev->handler->set_params)
+	if (sdev->handler && sdev->handler->set_params) {
+		pr_err("%s2 sdev=%pS params=%s calling %pS\n", __func__, sdev, params, sdev->handler->set_params);
 		err = sdev->handler->set_params(sdev, params);
+	}
 	put_device(&sdev->sdev_gendev);
 	return err;
 }
@@ -324,6 +338,7 @@ int scsi_dh_attach(struct request_queue *q, const char *name)
 	int err = 0;
 
 	sdev = scsi_device_from_queue(q);
+	pr_err("%s name=%s sdev=%pS\n", __func__, name, sdev);
 	if (!sdev)
 		return -ENODEV;
 
