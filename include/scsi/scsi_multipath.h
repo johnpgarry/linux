@@ -62,7 +62,7 @@ void scsi_mpath_requeue_work(struct work_struct *);
 extern void scsi_mpath_dev_release(struct scsi_device *);
 void scsi_mpath_kick_requeue_lists(struct Scsi_Host *);
 int scsi_mpath_update_state(struct scsi_mpath_device *mpath_dev);
-extern int scsi_mpath_add_disk(struct scsi_device *);
+extern void scsi_mpath_add_disk(struct scsi_device *);
 void scsi_mpath_set_live(struct scsi_mpath_device *);
 void scsi_activate_path(struct scsi_device *);
 void scsi_multipath_iopolicy_update(struct scsi_device *, int);
