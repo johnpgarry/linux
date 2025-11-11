@@ -15,6 +15,8 @@
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_dh.h>
 
+#include "scsi_dh_alua.h"
+
 #define ALUA_DH_NAME "alua"
 #define ALUA_DH_VER "2.0"
 
@@ -230,8 +232,13 @@ static void configure_scsi_mpath(struct scsi_device *sdev, struct alua_port_grou
 	dh_data->prefrence = pg->pref;
 	dh_data->is_active = 1;
 	dh_data->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
-	pr_err("%s2 sdev=%pS dh_data=%pS dh_data->device_id_str=%s\n",
-		__func__, sdev, dh_data, dh_data->device_id_str);
+	pr_err("%s2 sdev=%pS dh_data=%pS dh_data->device_id_str=%s group_id=%d tpgs=%d state=%d valid_states=%d pref=%d\n",
+		__func__, sdev, dh_data, dh_data->device_id_str,
+		pg->group_id,
+		pg->tpgs,
+		pg->state,
+		pg->valid_states,
+		pg->pref);
 	dh_data->device_id_len = pg->device_id_len;
 //	sdev->host->mpath_alua_grpid = pg->group_id;
 }
@@ -288,13 +295,19 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 	if (tmp_pg) {
 		spin_unlock(&port_group_lock);
 		kfree(pg);
+		sdev_printk(KERN_ERR, sdev, "%s0 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS calling configure_scsi_mpath\n",
+			__func__, sdev, group_id, tpgs, tmp_pg);
 		configure_scsi_mpath(sdev, tmp_pg);
-		sdev_printk(KERN_ERR, sdev, "%s1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS\n",
+		sdev_printk(KERN_ERR, sdev, "%s0.1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS called configure_scsi_mpath\n",
 			__func__, sdev, group_id, tpgs, tmp_pg);
 		return tmp_pg;
 	}
 
+	sdev_printk(KERN_ERR, sdev, "%s1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS calling configure_scsi_mpath\n",
+			__func__, sdev, group_id, tpgs, tmp_pg);
 	configure_scsi_mpath(sdev, pg);
+	sdev_printk(KERN_ERR, sdev, "%s1.1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS called configure_scsi_mpath\n",
+			__func__, sdev, group_id, tpgs, tmp_pg);
 	
 
 	list_add(&pg->node, &port_group_list);
@@ -1123,6 +1136,7 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 	mutex_unlock(&h->init_mutex);
 	return err;
 }
+
 /*
  * alua_set_params - set/unset the optimize flag
  * @sdev: device on the path to be activated
@@ -1177,7 +1191,7 @@ static int alua_set_params(struct scsi_device *sdev, const char *params)
  * based on a certain policy. But until we actually encounter them it
  * should be okay.
  */
-static int alua_activate(struct scsi_device *sdev,
+int alua_activate(struct scsi_device *sdev,
 			activate_complete fn, void *data)
 {
 	struct alua_dh_data *h = sdev->handler_data;
@@ -1219,6 +1233,7 @@ out:
 		fn(data, err);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(alua_activate);
 
 /*
  * alua_check - check path status
@@ -1287,7 +1302,7 @@ static void alua_rescan(struct scsi_device *sdev)
  * alua_bus_attach - Attach device handler
  * @sdev: device to be attached to
  */
-static int alua_bus_attach(struct scsi_device *sdev)
+int alua_bus_attach(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h;
 	int err;
@@ -1314,6 +1329,7 @@ failed:
 	kfree(h);
 	return err;
 }
+EXPORT_SYMBOL_GPL(alua_bus_attach);
 
 /*
  * alua_bus_detach - Detach device handler
