@@ -4045,16 +4045,32 @@ static int sd_probe(struct device *dev)
 	}
 
 
+
+
+
 	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->mpath_dev=%pS index=%d\n",
 		__func__, gd, gd->disk_name, gd->part0, sdp->mpath_dev, index);
-	if (scsi_is_sdev_multipath(sdp)) {
-		struct scsi_mpath_device *mpath_dev = sdp->mpath_dev;
-		
+	if (scsi_mpath_enabled(sdp)) {
+		struct scsi_mpath_device *mpath_dev;
+		sdev_printk(KERN_INFO, sdp, "%s3.2 calling scsi_mpath_alloc_disk\n", __func__);
+		error = scsi_mpath_alloc_disk(sdp, gd);
+		if (error) {
+			sdev_printk(KERN_WARNING, sdp, "could not alloc mpath disk\n");
+			goto out_free_index;
+		}
+		mpath_dev = sdp->mpath_dev;
+		pr_err("%s3.3.1 sdp->mpath_dev=%pS\n", __func__, sdp->mpath_dev);
+		if (sdp->mpath_dev)
+			pr_err("%s3.3.1 sdp->mpath_dev=%pS mpath_dev dksk=%pS\n", __func__, sdp->mpath_dev, sdp->mpath_dev->disk);
+		else
+			pr_err("%s3.3.2 sdp->mpath_dev=%pS mpath_disk=NULL\n", __func__, sdp->mpath_dev);
+
 		//snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "sd_mpath%d", mindex);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd name=%pS mpath_dev->gd->disk_name=%s\n",
 			gd->disk_name, mpath_dev->gd->disk_name);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4.1 gd name=%pS scsi_is_sdev_multipath\n", gd->disk_name);
 		gd->flags |= GENHD_FL_HIDDEN;
+		pr_err("%s3.3.2\n", __func__);
 	} else {
 		sdev_printk(KERN_INFO, sdp, "sd_probe5 gdname =%pS !scsi_is_sdev_multipath\n", gd->disk_name);
 		
@@ -4097,7 +4113,6 @@ static int sd_probe(struct device *dev)
 
 	gd->fops = &sd_fops;
 	gd->private_data = sdkp;
-
 	/* defaults, until the device tells us otherwise */
 	sdp->sector_size = 512;
 	sdkp->capacity = 0;
@@ -4133,6 +4148,8 @@ static int sd_probe(struct device *dev)
 		goto out;
 	}
 
+	// for nvme, we add mpath disk now
+
 	if (sdkp->security) {
 		sdkp->opal_dev = init_opal_dev(sdkp, &sd_sec_submit);
 		if (sdkp->opal_dev)
@@ -4143,14 +4160,14 @@ static int sd_probe(struct device *dev)
 		  sdp->removable ? "removable " : "");
 	scsi_autopm_put_device(sdp);
 
-	if (scsi_is_sdev_multipath(sdp)) {
-
-	}
-
-	if (scsi_mpath_enabled(sdp) && 1/* sdp->is_shared */) {
-		pr_err("%s calling scsi_mpath_alloc_disk sdp=%pS sdkp=%pS\n",
+	if (scsi_is_sdev_multipath(sdp) && 1/* sdp->is_shared */) {
+		pr_err("%s calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
-		scsi_mpath_alloc_disk(sdp, gd);
+		error = scsi_mpath_add_disk(sdp);
+		if (error) {
+			sdev_printk(KERN_INFO, sdp, "could not add mpath disk\n");
+			goto out;
+		}
 		sd_revalidate_mpath_disk(sdp->mpath_dev->disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}

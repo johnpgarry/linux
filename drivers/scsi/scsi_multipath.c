@@ -123,7 +123,56 @@ const struct attribute_group *scsi_mpath_disk_attrs_groups[] = {
 
 static void scsi_mpath_alua_activate_done(void *data, int errors)
 {
-	pr_err("%s data=%pS errors=%d\n", __func__, data, errors);
+//	struct pgpath *pgpath = data;
+//	struct priority_group *pg = pgpath->pg;
+//	struct multipath *m = pg->m;
+//	unsigned long flags;
+
+	pr_err("%s data=%pS errors=%d SCSI_DH_OK=%d\n", __func__, data, errors, SCSI_DH_OK);
+
+	/* device or driver problems */
+	switch (errors) {
+	case SCSI_DH_OK:
+		break;
+	case SCSI_DH_NOSYS:
+		if (1) {
+			errors = 0;
+			break;
+		}
+		//DMERR("Could not failover the device: Handler scsi_dh_%s "
+		 //     "Error %d.", m->hw_handler_name, errors);
+		/*
+		 * Fail path for now, so we do not ping pong
+		 */
+	//	fail_path(pgpath);
+		break;
+	case SCSI_DH_DEV_TEMP_BUSY:
+		/*
+		 * Probably doing something like FW upgrade on the
+		 * controller so try the other pg.
+		 */
+	//	bypass_pg(m, pg, true, false);
+		break;
+	case SCSI_DH_RETRY:
+		/* Wait before retrying. */
+	//	delay_retry = true;
+		fallthrough;
+	case SCSI_DH_IMM_RETRY:
+	case SCSI_DH_RES_TEMP_UNAVAIL:
+	//	if (pg_init_limit_reached(m, pgpath))
+	//		fail_path(pgpath);
+		errors = 0;
+		break;
+	case SCSI_DH_DEV_OFFLINED:
+	default:
+		/*
+		 * We probably do not want to fail the path for a device
+		 * error, but this is what the old dm did. In future
+		 * patches we can do more advanced handling.
+		 */
+	//	fail_path(pgpath);
+	}
+
 }
 
 static void scsi_multipath_partition_scan_work(struct work_struct *work)
@@ -725,12 +774,16 @@ static __maybe_unused void scsi_activate_mpath_work(struct work_struct *work)
 	scsi_activate_path(sdev);
 }
 
-int scsi_mpath_add_disk(struct scsi_mpath_device *mpath_dev)
+int scsi_mpath_add_disk(struct scsi_device *sdev)
 {
+	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
 	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
+	struct scsi_mpath_dh_data *dh_data = sdev->mpath_dev->pg_data;
 	pr_err("%s mpath_dev=%pS\n", __func__, mpath_dev);
 	mpath_disk = mpath_dev->disk;
 	pr_err("%s1 mpath_disk=%pS\n", __func__, mpath_disk);
+	dh_data = mpath_dev->pg_data;
+	pr_err("%s2 dh_data=%pS state=%d\n", __func__, dh_data, dh_data->state);
 	
 	if (!mpath_dev->pg_data) {
 		/* Re initialize ALUA */
@@ -744,77 +797,6 @@ int scsi_mpath_add_disk(struct scsi_mpath_device *mpath_dev)
 	return (test_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags));
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_add_disk);
-
-int scsi_multipath_init(struct scsi_device *sdev)
-{
-	struct Scsi_Host *shost = sdev->host;
-	struct scsi_mpath_dh_data *h;
-	struct scsi_mpath_device *mpath_dev;
-	int ret = -ENOMEM;
-
-	pr_err("%s sdev=%pS\n", __func__, sdev);
-	mpath_dev = kzalloc(sizeof(*mpath_dev), GFP_KERNEL);
-	if (!mpath_dev)
-		return ret;
-	mpath_dev->sdev = sdev;
-	sdev->mpath_dev = mpath_dev;
-
-
-	h = kzalloc(sizeof(struct scsi_mpath_dh_data), GFP_KERNEL);
-	if (!h)
-		goto out_mpath_dev;
-
-	mpath_dev->pg_data = h;
-	
-#if 0
-struct gendisk          	*mpath_disk;	/* Multipath disk */
-	
-	enum scsi_mpath_access_state	state;	/* Multipath State */
-	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
-	struct list_head		entry;	/* list of all mpath_sdevs */
-	struct scsi_mpath_dh_data	*pg_data; /* Place holder for Port group data */
-	struct work_struct		activate; /* Activate path work */
-	int				numa_node; /* NUMA node for Path  */
-	//atomic_t			nr_mpath;	/* Number of Active mpath */
-
-
-#define SCSI_MPATH_DISK_LIVE            0
-#define SCSI_MPATH_DISK_IO_PENDING      1
-#define SCSI_MPATH_IO_STATS             2
-
-	unsigned long           flags;		/* flag for multipath devices*/
-	struct scsi_mpath_disk *disk;
-	#endif
-//	ret = init_srcu_struct(&mpath_disk->srcu);
-//	if (ret) {
-//		cleanup_srcu_struct(&mpath_disk->srcu);
-//		goto out_handler;
-//	}
-
-	pr_err("%s sdev=%pS sdev->mpath_dev=%pS h=%pS shost=%pS\n",
-		__func__, sdev, sdev->mpath_dev, h, shost);
-
-//	mutex_init(&mpath_dev->mpath_lock);
-//	bio_list_init(&mpath_disk->requeue_list);
-//	spin_lock_init(&mpath_disk->requeue_lock);
-//	INIT_WORK(&mpath_disk->requeue_lock, scsi_requeue_work);
-//	INIT_LIST_HEAD(&mpath_dev->mpath_list);
-	INIT_WORK(&mpath_dev->activate, scsi_activate_mpath_work);
-//	INIT_LIST_HEAD(&sdev->mpath_entry);
-	mpath_dev->numa_node = NUMA_NO_NODE;
-//	sdev->is_shared = 1;
-
-	return 0;
-
-//out_handler:
-//	kfree(h);
-out_mpath_dev:
-//	if (mpath_dev)
-//		kfree(mpath_dev);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(scsi_multipath_init);
 
 static bool scsi_available_mpath(struct scsi_mpath_disk *mpath_disk)
 {
@@ -1100,6 +1082,95 @@ static void scsi_mpath_disk_release(struct device *dev)
 	pr_err("%s dev=%pS\n", __func__, dev);
 }
 
+static int scsi_multipath_init(struct scsi_device *sdev)
+{
+	struct Scsi_Host *shost = sdev->host;
+	struct scsi_mpath_dh_data *h;
+	struct scsi_mpath_device *mpath_dev;
+	int ret = -ENOMEM;
+
+	pr_err("%s sdev=%pS\n", __func__, sdev);
+	mpath_dev = kzalloc(sizeof(*mpath_dev), GFP_KERNEL);
+	if (!mpath_dev)
+		return ret;
+	mpath_dev->sdev = sdev;
+	sdev->mpath_dev = mpath_dev;
+
+
+	h = kzalloc(sizeof(struct scsi_mpath_dh_data), GFP_KERNEL);
+	if (!h)
+		goto out_mpath_dev;
+
+	mpath_dev->pg_data = h;
+	
+#if 0
+struct gendisk          	*mpath_disk;	/* Multipath disk */
+	
+	enum scsi_mpath_access_state	state;	/* Multipath State */
+	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
+	struct list_head		entry;	/* list of all mpath_sdevs */
+	struct scsi_mpath_dh_data	*pg_data; /* Place holder for Port group data */
+	struct work_struct		activate; /* Activate path work */
+	int				numa_node; /* NUMA node for Path  */
+	//atomic_t			nr_mpath;	/* Number of Active mpath */
+
+
+#define SCSI_MPATH_DISK_LIVE            0
+#define SCSI_MPATH_DISK_IO_PENDING      1
+#define SCSI_MPATH_IO_STATS             2
+
+	unsigned long           flags;		/* flag for multipath devices*/
+	struct scsi_mpath_disk *disk;
+	#endif
+//	ret = init_srcu_struct(&mpath_disk->srcu);
+//	if (ret) {
+//		cleanup_srcu_struct(&mpath_disk->srcu);
+//		goto out_handler;
+//	}
+
+	pr_err("%s sdev=%pS sdev->mpath_dev=%pS h=%pS shost=%pS\n",
+		__func__, sdev, sdev->mpath_dev, h, shost);
+
+//	mutex_init(&mpath_dev->mpath_lock);
+//	bio_list_init(&mpath_disk->requeue_list);
+//	spin_lock_init(&mpath_disk->requeue_lock);
+//	INIT_WORK(&mpath_disk->requeue_lock, scsi_requeue_work);
+//	INIT_LIST_HEAD(&mpath_dev->mpath_list);
+	INIT_WORK(&mpath_dev->activate, scsi_activate_mpath_work);
+//	INIT_LIST_HEAD(&sdev->mpath_entry);
+	mpath_dev->numa_node = NUMA_NO_NODE;
+//	sdev->is_shared = 1;
+
+	return 0;
+
+//out_handler:
+//	kfree(h);
+out_mpath_dev:
+//	if (mpath_dev)
+//		kfree(mpath_dev);
+
+	return ret;
+}
+
+static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
+{
+	struct scsi_mpath_disk *mpath_disk;
+
+	mutex_lock(&mpath_disks_lock);
+	list_for_each_entry(mpath_disk, &mpath_disks_list, entry) {
+
+		pr_err("%s itering mpath_disk=%pS\n", __func__, mpath_disk);
+
+		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len) == 0) {
+			pr_err("%s3 matches wwid\n", __func__);
+			mutex_unlock(&mpath_disks_lock);
+			return mpath_disk;
+		}
+	}
+	mutex_unlock(&mpath_disks_lock);
+	return NULL;
+}
+
 /*
  * Allocate Disk for Multipath Device
  */
@@ -1109,23 +1180,23 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	int ret;
 	static int disk_count;
 	struct scsi_mpath_disk *mpath_disk;
-	int index;
+	__maybe_unused int index;
 	struct Scsi_Host *shost = sdev->host;
 	struct device *shost_dev = &shost->shost_dev;
 
-	pr_err("%s sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS\n",
-		__func__, sdev, sdev->mpath_dev, shost, shost_dev);
-	/*
-	 * Don't allocate mpath disk if ALUA handler is not attached
-	 */
-	if (!sdev->handler || strncmp(sdev->handler->name, "alua", 4) != 0) {
-		sdev_printk(KERN_NOTICE, sdev,
-		    "No Handler or correct handler attached for multipath\n");
+	pr_err("%s sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS scsi_device_tpgs=%d\n",
+		__func__, sdev, sdev->mpath_dev, shost, shost_dev, scsi_device_tpgs(sdev));
+
+	if (!scsi_device_tpgs(sdev)) {
+		sdev_printk(KERN_NOTICE, sdev, "tpgs are required for mpath support\n");
 		return 0;
 	}
 
-	if (!sdev->mpath_dev)
-		return 0;
+	pr_err("%s1 sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS calling scsi_multipath_init\n",
+		__func__, sdev, sdev->mpath_dev, shost, shost_dev);
+	scsi_multipath_init(sdev);
+	pr_err("%s1.1 sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS called scsi_multipath_init\n",
+		__func__, sdev, sdev->mpath_dev, shost, shost_dev);
 
 	sdev->mpath_dev->gd = gd;
 
@@ -1148,7 +1219,6 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	if (alua_activate(sdev, scsi_mpath_alua_activate_done, NULL)) {
 		sdev_printk(KERN_NOTICE, sdev,
 		    "%s sdev=%pS alua_activate failed\n", __func__, sdev);
-
 	}
 
 
@@ -1160,21 +1230,12 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	//	return 0;
 	}
 
-	mutex_lock(&mpath_disks_lock);
-	list_for_each_entry(mpath_disk, &mpath_disks_list, entry) {
-
-		pr_err("%s itering mpath_disk=%pS\n", __func__, mpath_disk);
-
-		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len) == 0) {
-			pr_err("%s3 matches device_id_str calling scsi_mpath_add_disk\n", __func__);
-			mutex_lock(&mpath_disk->lock);
-			list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
-			mutex_unlock(&mpath_disk->lock);
-			mutex_unlock(&mpath_disks_lock);
-			sdev->mpath_dev->disk = mpath_disk;
-			scsi_mpath_add_disk(sdev->mpath_dev);
-			return 0;
-		}
+	mpath_disk = scsi_mpath_find_disk(sdev);
+	if (mpath_disk) {
+		mutex_lock(&mpath_disk->lock);
+		list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
+		mutex_unlock(&mpath_disk->lock);
+		return 0;
 	}
 
 	mutex_unlock(&mpath_disks_lock);
@@ -1253,11 +1314,11 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s13 ret=%d after bio_list_init sdev->mpath_dev=%pS\n", __func__, ret, sdev->mpath_dev);
 	list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
 
-	pr_err("%s14 major=%d first_minor=%d index=%d mpath_disk->index=%d calling scsi_mpath_add_disk\n",
-		__func__, 0, 0, index, mpath_disk->index);
-	scsi_mpath_add_disk(sdev->mpath_dev);
-	pr_err("%s15 major=%d first_minor=%d index=%d mpath_disk->index=%d called scsi_mpath_add_disk\n",
-		__func__, 0, 0, index, mpath_disk->index);
+//	pr_err("%s14 major=%d first_minor=%d index=%d mpath_disk->index=%d calling scsi_mpath_add_disk\n",
+//		__func__, 0, 0, index, mpath_disk->index);
+
+//	pr_err("%s15 major=%d first_minor=%d index=%d mpath_disk->index=%d called scsi_mpath_add_disk\n",
+//		__func__, 0, 0, index, mpath_disk->index);
 
 	mutex_lock(&mpath_disks_lock);
 	list_add_tail(&mpath_disk->entry, &mpath_disks_list);
@@ -1265,6 +1326,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s16\n", __func__);
 	mutex_unlock(&mpath_disks_lock);
 
+	pr_err("%s16 out\n", __func__);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_alloc_disk);

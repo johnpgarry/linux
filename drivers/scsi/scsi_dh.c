@@ -126,12 +126,15 @@ static int scsi_dh_handler_attach(struct scsi_device *sdev,
 {
 	int error, ret = 0;
 
+	if (scsi_multipath)
+		return -ENODEV;
+
 	pr_err("%s sdev=%pS scsi_dh=%pS\n", __func__, sdev, scsi_dh);
 	if (!try_module_get(scsi_dh->module))
 		return -EINVAL;
 
-	if (scsi_mpath_enabled(sdev))
-		scsi_multipath_init(sdev);
+	if (scsi_mpath_enabled(sdev)) {
+	}
 
 	pr_err("%s2 sdev=%pS scsi_dh=%pS calling scsi_dh->attach\n", __func__, sdev, scsi_dh);
 	error = scsi_dh->attach(sdev);
