@@ -30,17 +30,6 @@ enum scsi_mpath_access_state {
 	SCSI_MPATH_INVALID	= 0xFF
 };
 
-struct scsi_mpath_dh_data {
-	const char	*hndlr_name; /* device Handler name */
-	int	group_id;		/* Group ID reported from RTPG cmd */
-	int	tpgs;			/* Target Port Groups reported from RTPG cmd */
-	int	state;			/* Target Port Group State */
-	char	*device_id_str;		/* Multipath Device String */
-	int	device_id_len;		/* Device ID Length */
-	int	valid_states;		/* states from RTPG cmd */
-	int	prefrence;		/* Path prefrence for Port Group from RTPG cmd */
-	int	is_active;		/* Current Sdev is active */
-};
 struct scsi_mpath_disk;
 struct scsi_mpath_device;
 

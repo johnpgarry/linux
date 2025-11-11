@@ -150,6 +150,7 @@ struct scsi_mpath_disk {
 	enum scsi_mpath_iopolicy	iopolicy;
 	struct kref		ref;
 	char wwid[40];
+
 	struct scsi_mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
@@ -161,10 +162,9 @@ struct scsi_mpath_device {
 	//int				mpath_first_path; /* Indicate if this was first path */
 	//struct gendisk          	*mpath_disk;	/* Multipath disk */
 	
-	enum scsi_mpath_access_state	state;	/* Multipath State */
+	//enum scsi_mpath_access_state	state;	/* Multipath State */
 	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
 	struct list_head		entry;	/* list of all mpath_sdevs */
-	struct scsi_mpath_dh_data	*pg_data; /* Place holder for Port group data */
 	struct work_struct		activate; /* Activate path work */
 	int				numa_node; /* NUMA node for Path  */
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
@@ -176,6 +176,18 @@ struct scsi_mpath_device {
 
 	unsigned long           flags;		/* flag for multipath devices*/
 	struct scsi_mpath_disk *disk;
+
+
+
+	/* copied from scsi_mpath_dh_data */
+	int	group_id;		/* Group ID reported from RTPG cmd */
+	int	tpgs;			/* Target Port Groups reported from RTPG cmd */
+	int	state;			/* Target Port Group State */
+	char	*device_id_str;		/* Multipath Device String */
+	int	device_id_len;		/* Device ID Length */
+	int	valid_states;		/* states from RTPG cmd */
+	int	prefrence;		/* Path prefrence for Port Group from RTPG cmd */
+	int	is_active;		/* Current Sdev is active */
 };
 
 struct scsi_device {
