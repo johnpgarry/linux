@@ -4163,11 +4163,7 @@ static int sd_probe(struct device *dev)
 	if (scsi_is_sdev_multipath(sdp) && 1/* sdp->is_shared */) {
 		pr_err("%s calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
-		error = scsi_mpath_add_disk(sdp);
-		if (error) {
-			sdev_printk(KERN_INFO, sdp, "could not add mpath disk\n");
-			goto out;
-		}
+		scsi_mpath_add_disk(sdp);
 		sd_revalidate_mpath_disk(sdp->mpath_dev->disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}

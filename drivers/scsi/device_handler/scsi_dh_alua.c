@@ -848,7 +848,7 @@ static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	int retval;
 	struct scsi_sense_hdr sense_hdr;
 
-	pr_err("%s sdev=%pS pg=%pS state=%d OPTIMAL=%d ACTIVE=%d\n",
+	pr_err("%s sdev=%pS pg=%pS state=%d OPTIMAL=%d ACTIVE=%d Issue a SET TARGET PORT GROUP command\n",
 		__func__, sdev, pg, pg->state, SCSI_ACCESS_STATE_OPTIMAL,
 		SCSI_ACCESS_STATE_ACTIVE);
 	if (!(pg->tpgs & TPGS_MODE_EXPLICIT)) {

@@ -41,6 +41,19 @@ static const struct class scsi_mpath_disk_class = {
 	.name = "scsi_mpath_disk",
 };
 
+static bool scsi_mpath_state_is_live(unsigned int state)
+{
+	switch (state) {
+	case SCSI_ACCESS_STATE_OPTIMAL:
+	case SCSI_ACCESS_STATE_ACTIVE:
+	case SCSI_ACCESS_STATE_LBA:
+	case SCSI_ACCESS_STATE_TRANSITIONING:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static ssize_t scsi_mpath_disk_wwid_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
@@ -121,7 +134,7 @@ const struct attribute_group *scsi_mpath_disk_attrs_groups[] = {
 	NULL
 };
 
-static void scsi_mpath_alua_activate_done(void *data, int errors)
+__maybe_unused static void scsi_mpath_alua_activate_done(void *data, int errors)
 {
 //	struct pgpath *pgpath = data;
 //	struct priority_group *pg = pgpath->pg;
@@ -285,7 +298,7 @@ void scsi_mpath_clear_paths(struct scsi_mpath_disk *mpath_disk)
 
 }
 
-static inline bool scsi_mpath_state_is_live(enum scsi_mpath_access_state state)
+static inline bool scsi_mpath_state_is_live2(enum scsi_mpath_access_state state)
 {
 	if (state == SCSI_MPATH_OPTIMAL ||
 	    state == SCSI_MPATH_ACTIVE)
@@ -318,7 +331,7 @@ static bool scsi_mpath_is_disabled(struct scsi_device *sdev)
 	 * if device multipath state is not set to LIVE
 	 * then return true
 	 */
-	if (!scsi_mpath_state_is_live(sdev->mpath_dev->state))
+	if (!scsi_mpath_state_is_live2(sdev->mpath_dev->state))
 		return true;
 
 	/*
@@ -463,7 +476,10 @@ inline struct scsi_mpath_device *__scsi_find_path(struct scsi_mpath_disk *mpath_
 	//struct scsi_device *sdev_found = NULL, *sdev_fallback = NULL, *sdev;
 	struct scsi_mpath_device *mpath_dev_found, *mpath_dev_fallback, *mpath_dev;
 
+	pr_err("%s mpath_disk=%pS\n", __func__, mpath_disk);
 	list_for_each_entry_rcu(mpath_dev, &mpath_disk->dev_list, entry) {
+		pr_err("%s1 itering mpath_disk=%pS mpath_dev=%pS disabled=%d\n",
+			__func__, mpath_disk, mpath_dev, scsi_mpath_is_disabled(mpath_dev->sdev));
 		if (scsi_mpath_is_disabled(mpath_dev->sdev))
 			continue;
 
@@ -507,6 +523,8 @@ inline struct scsi_mpath_device *scsi_find_path(struct scsi_mpath_disk *mpath_di
 
 	mpath_dev = srcu_dereference(mpath_disk->current_path[node],
 	    &mpath_disk->srcu);
+
+	pr_err("%s mpath_dev=%pS mpath_disk=%pS\n", __func__, mpath_dev, mpath_disk);
 
 	if (unlikely(!mpath_dev))
 		mpath_dev = __scsi_find_path(mpath_disk, node);
@@ -730,7 +748,7 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	if (retry)
 		set_bit(SCSI_MPATH_DISK_IO_PENDING, &mpath_dev->flags);
 
-        if (scsi_mpath_state_is_live(mpath_dev->state)) {
+        if (scsi_mpath_state_is_live2(mpath_dev->state)) {
 			pr_err("%s calling scsi_mpath_set_live\n", __func__);
 			scsi_mpath_set_live(mpath_dev);
         }
@@ -747,7 +765,7 @@ void scsi_activate_path(struct scsi_device *sdev)
 	if (!mpath_dh)
 		return;
 
-        if (!(scsi_mpath_state_is_live(sdev->state))) {
+        if (!(scsi_mpath_state_is_live2(sdev->state))) {
 		sdev_printk(KERN_INFO, sdev, "Path state is not live \n");
                 return;
 	}
@@ -774,7 +792,7 @@ static __maybe_unused void scsi_activate_mpath_work(struct work_struct *work)
 	scsi_activate_path(sdev);
 }
 
-int scsi_mpath_add_disk(struct scsi_device *sdev)
+void scsi_mpath_add_disk(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
 	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
@@ -784,17 +802,12 @@ int scsi_mpath_add_disk(struct scsi_device *sdev)
 	pr_err("%s1 mpath_disk=%pS\n", __func__, mpath_disk);
 	dh_data = mpath_dev->pg_data;
 	pr_err("%s2 dh_data=%pS state=%d\n", __func__, dh_data, dh_data->state);
-	
-	if (!mpath_dev->pg_data) {
-		/* Re initialize ALUA */
-	//	sdev->handler->rescan(sdev);
-	} else {
+
+	if (scsi_mpath_state_is_live(dh_data->state)) {
 		//mpath_disk->state = SCSI_MPATH_OPTIMAL;
-		pr_err("%s not calling scsi_mpath_set_live\n", __func__);
+		pr_err("%s calling scsi_mpath_set_live\n", __func__);
 		scsi_mpath_set_live(mpath_dev);
 	}
-
-	return (test_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags));
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_add_disk);
 
@@ -1216,10 +1229,10 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	}
 
-	if (alua_activate(sdev, scsi_mpath_alua_activate_done, NULL)) {
-		sdev_printk(KERN_NOTICE, sdev,
-		    "%s sdev=%pS alua_activate failed\n", __func__, sdev);
-	}
+//	if (alua_activate(sdev, scsi_mpath_alua_activate_done, NULL)) {
+//		sdev_printk(KERN_NOTICE, sdev,
+//		    "%s sdev=%pS alua_activate failed\n", __func__, sdev);
+//	}
 
 
 
@@ -1390,6 +1403,7 @@ void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
 
 	mpath_disk = sdev->mpath_dev->disk;
 
+	pr_err("%s clearing SCSI_MPATH_DISK_LIVE (if set) sdev=%pS\n", __func__, sdev);
 	if (test_and_clear_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags)) {
 		synchronize_srcu(&mpath_disk->srcu);
 		kblockd_schedule_work(&mpath_disk->requeue_work);
