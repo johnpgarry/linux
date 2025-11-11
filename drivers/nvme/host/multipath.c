@@ -812,6 +812,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	struct nvme_ns_head *head = ns->head;
 	int rc;
 
+	WARN_ON(1);
 	pr_err("%s ns=%pS head=%pS head->disk=%pS\n", __func__, ns, head, head->disk);
 	if (!head->disk)
 		return;
@@ -908,6 +909,7 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	ns->ana_grpid = le32_to_cpu(desc->grpid);
 	ns->ana_state = desc->state;
 	clear_bit(NVME_NS_ANA_PENDING, &ns->flags);
+	pr_err("%s ns=%pS\n", __func__, ns);
 	/*
 	 * nvme_mpath_set_live() will trigger I/O to the multipath path device
 	 * and in turn to this path device.  However we cannot accept this I/O
@@ -919,7 +921,7 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	 */
 	if (nvme_state_is_live(ns->ana_state) &&
 	    nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE) {
-		pr_err("%s calling nvme_mpath_set_live\n", __func__);
+		pr_err("%s2 calling nvme_mpath_set_live\n", __func__);
 		nvme_mpath_set_live(ns);
 	} else {
 		/*
@@ -1022,9 +1024,12 @@ static void nvme_ana_work(struct work_struct *work)
 {
 	struct nvme_ctrl *ctrl = container_of(work, struct nvme_ctrl, ana_work);
 
+	pr_err("%s ctrl=%pS nvme_ctrl_state(ctrl)=%d NVME_CTRL_LIVE=%d\n",
+		__func__, ctrl, NVME_CTRL_LIVE, NVME_CTRL_LIVE);
 	if (nvme_ctrl_state(ctrl) != NVME_CTRL_LIVE)
 		return;
 
+	pr_err("%s2 ctrl=%pS calling nvme_read_ana_log\n", __func__, ctrl);
 	nvme_read_ana_log(ctrl);
 }
 
@@ -1314,12 +1319,16 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 
 		mutex_lock(&ns->ctrl->ana_lock);
 		ns->ana_grpid = le32_to_cpu(anagrpid);
+		pr_err("%s1 ns=%pS anagrpid=0x%x nvme_ctrl_use_ana=%d calling nvme_parse_ana_log\n",
+			__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl));
 		nvme_parse_ana_log(ns->ctrl, &desc, nvme_lookup_ana_group_desc);
 		mutex_unlock(&ns->ctrl->ana_lock);
 		if (desc.state) {
 			/* found the group desc: update */
 			nvme_update_ns_ana_state(&desc, ns);
 		} else {
+			pr_err("%s2 ns=%pS queue_work for &ns->ctrl->ana_work\n",
+				__func__, ns);
 			/* group desc not found: trigger a re-read */
 			set_bit(NVME_NS_ANA_PENDING, &ns->flags);
 			queue_work(nvme_wq, &ns->ctrl->ana_work);
@@ -1445,6 +1454,7 @@ int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 			return -ENOMEM;
 	}
 	ctrl->ana_log_size = ana_log_size;
+	pr_err("%s3 ctrl=%pS calling nvme_read_ana_log\n", __func__, ctrl);
 	error = nvme_read_ana_log(ctrl);
 	if (error)
 		goto out_uninit;
