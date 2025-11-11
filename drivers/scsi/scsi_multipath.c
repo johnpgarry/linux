@@ -15,6 +15,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_multipath.h>
+#include "device_handler/scsi_dh_alua.h"
 
 static DEFINE_IDA(sd_mpath_index_ida);
 
@@ -119,6 +120,11 @@ const struct attribute_group *scsi_mpath_disk_attrs_groups[] = {
 	&scsi_mpath_disk_attrs_group,
 	NULL
 };
+
+static void scsi_mpath_alua_activate_done(void *data, int errors)
+{
+	pr_err("%s data=%pS errors=%d\n", __func__, data, errors);
+}
 
 static void scsi_multipath_partition_scan_work(struct work_struct *work)
 {
@@ -1132,6 +1138,21 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		    sdev->handler->name);
 		return 0;
 	}
+
+	if (alua_bus_attach(sdev)) {
+		sdev_printk(KERN_NOTICE, sdev,
+		    "%s sdev=%pS alua_bus_attach failed\n", __func__, sdev);
+
+	}
+
+	if (alua_activate(sdev, scsi_mpath_alua_activate_done, NULL)) {
+		sdev_printk(KERN_NOTICE, sdev,
+		    "%s sdev=%pS alua_activate failed\n", __func__, sdev);
+
+	}
+
+
+
 
 	if (scsi_mpath_unique_lun_id(sdev) == 0) {
 	//	sdev_printk(KERN_NOTICE, sdev,
