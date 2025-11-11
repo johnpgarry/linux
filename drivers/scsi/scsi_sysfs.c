@@ -1524,8 +1524,10 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 
 	scsi_autopm_get_device(sdev);
 
+	pr_err("%s sdev=%pS calling scsi_dh_add_device\n", __func__, sdev);
 	scsi_dh_add_device(sdev);
 
+	pr_err("%s1 sdev=%pS calling device_add sdev_gendev\n", __func__, sdev);
 	error = device_add(&sdev->sdev_gendev);
 	if (error) {
 		sdev_printk(KERN_INFO, sdev,
@@ -1534,6 +1536,7 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	}
 
 	device_enable_async_suspend(&sdev->sdev_dev);
+	pr_err("%s2 sdev=%pS calling device_add sdev_dev\n", __func__, sdev);
 	error = device_add(&sdev->sdev_dev);
 	if (error) {
 		sdev_printk(KERN_INFO, sdev,

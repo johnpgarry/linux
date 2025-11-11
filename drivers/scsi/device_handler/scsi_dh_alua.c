@@ -1110,12 +1110,15 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 {
 	int err = SCSI_DH_DEV_UNSUPP, tpgs;
 
-	pr_err("%s sdev=%pS h=%pS\n", __func__, sdev, h);
+	pr_err("%s sdev=%pS h=%pS calling alua_check_tpgs\n", __func__, sdev, h);
 	mutex_lock(&h->init_mutex);
 	h->disabled = false;
 	tpgs = alua_check_tpgs(sdev);
-	if (tpgs != TPGS_MODE_NONE)
+	pr_err("%s2 sdev=%pS h=%pS called alua_check_tpgs tpgs=%d\n", __func__, sdev, h, tpgs);
+	if (tpgs != TPGS_MODE_NONE) {
+		pr_err("%s2 sdev=%pS h=%pS calling alua_check_vpd tpgs=%d\n", __func__, sdev, h, tpgs);
 		err = alua_check_vpd(sdev, h, tpgs);
+	}
 	h->init_error = err;
 	mutex_unlock(&h->init_mutex);
 	return err;
@@ -1182,7 +1185,7 @@ static int alua_activate(struct scsi_device *sdev,
 	struct alua_queue_data *qdata;
 	struct alua_port_group *pg;
 
-	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s data=%pS\n", __func__, data);
 	qdata = kzalloc(sizeof(*qdata), GFP_KERNEL);
 	if (!qdata) {
 		err = SCSI_DH_RES_TEMP_UNAVAIL;
@@ -1288,6 +1291,8 @@ static int alua_bus_attach(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h;
 	int err;
+
+	pr_err("%s sdev=%pS\n", __func__, sdev);
 	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
 	if (!h)
