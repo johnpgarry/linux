@@ -703,13 +703,10 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	struct scsi_device *sdev = data;	
 	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
 	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
-	struct scsi_mpath_dh_data *mpath_h = mpath_dev->pg_data;
 	bool retry = false;
 
-	pr_err("%s sdev=%pS mpath_disk=%pS mpath_h=%pS\n",
-		__func__, sdev, mpath_disk, mpath_h);
-	if (!mpath_h)
-		return;
+	pr_err("%s sdev=%pS mpath_disk=%pS mpath_dev=%pS\n",
+		__func__, sdev, mpath_disk, mpath_dev);
 
 	switch (err) {
 	case SCSI_DH_OK:
@@ -733,8 +730,8 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	case SCSI_DH_RES_TEMP_UNAVAIL:
 		sdev_printk(KERN_ERR, sdev,
 			"Device Handler Path Unavailable, Clear current path \n");
-		if ((mpath_h->state == SCSI_ACCESS_STATE_OFFLINE) ||
-		    (mpath_h->state == SCSI_ACCESS_STATE_UNAVAILABLE))
+		if ((mpath_dev->state == SCSI_ACCESS_STATE_OFFLINE) ||
+		    (mpath_dev->state == SCSI_ACCESS_STATE_UNAVAILABLE))
 			scsi_mpath_clear_current_path(mpath_dev);
 		err = 0;
 		break;
@@ -757,10 +754,9 @@ static __maybe_unused void activate_mpath(void *data, int err)
 void scsi_activate_path(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
-	struct scsi_mpath_dh_data *mpath_dh = mpath_dev->pg_data;
 
-	pr_err("%s mpath_dh=%pS sdev=%pS q\n",
-		__func__, mpath_dh, mpath_dh);
+	pr_err("%s mpath_dev=%pS sdev=%pS q\n",
+		__func__, mpath_dev, sdev);
 	#if 0
 	if (!mpath_dh)
 		return;
@@ -789,21 +785,19 @@ static __maybe_unused void scsi_activate_mpath_work(struct work_struct *work)
 	if (!sdev)
 		return;
 
-	scsi_activate_path(sdev);
+
+
 }
 
 void scsi_mpath_add_disk(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
 	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
-	struct scsi_mpath_dh_data *dh_data = sdev->mpath_dev->pg_data;
 	pr_err("%s mpath_dev=%pS\n", __func__, mpath_dev);
 	mpath_disk = mpath_dev->disk;
 	pr_err("%s1 mpath_disk=%pS\n", __func__, mpath_disk);
-	dh_data = mpath_dev->pg_data;
-	pr_err("%s2 dh_data=%pS state=%d\n", __func__, dh_data, dh_data->state);
 
-	if (scsi_mpath_state_is_live(dh_data->state)) {
+	if (scsi_mpath_state_is_live(mpath_dev->state)) {
 		//mpath_disk->state = SCSI_MPATH_OPTIMAL;
 		pr_err("%s calling scsi_mpath_set_live\n", __func__);
 		scsi_mpath_set_live(mpath_dev);
@@ -836,7 +830,6 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 	cancel_work_sync(&mpath_disk->requeue_work);
 	cleanup_srcu_struct(&mpath_disk->srcu);
 
-	kfree(mpath_dev->pg_data);
 	kfree(mpath_dev);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_dev_release);
@@ -1045,15 +1038,10 @@ EXPORT_SYMBOL_GPL(scsi_mpath_unique_id);
 
 bool scsi_mpath_lun_id_match(struct scsi_mpath_device *a, struct scsi_mpath_device *b)
 {
-	struct scsi_mpath_dh_data *dh_data_a = a->pg_data, *dh_data_b = b->pg_data;
-
-	if (!dh_data_a || !dh_data_b)
+	if (a->device_id_len != b->device_id_len)
 		return false;
 
-	if (dh_data_a->device_id_len != dh_data_b->device_id_len)
-		return false;
-
-	return !strncmp(dh_data_a->device_id_str, dh_data_b->device_id_str, dh_data_a->device_id_len);
+	return !strncmp(a->device_id_str, b->device_id_str, a->device_id_len);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_lun_id_match);
 
@@ -1098,7 +1086,6 @@ static void scsi_mpath_disk_release(struct device *dev)
 static int scsi_multipath_init(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
-	struct scsi_mpath_dh_data *h;
 	struct scsi_mpath_device *mpath_dev;
 	int ret = -ENOMEM;
 
@@ -1109,12 +1096,6 @@ static int scsi_multipath_init(struct scsi_device *sdev)
 	mpath_dev->sdev = sdev;
 	sdev->mpath_dev = mpath_dev;
 
-
-	h = kzalloc(sizeof(struct scsi_mpath_dh_data), GFP_KERNEL);
-	if (!h)
-		goto out_mpath_dev;
-
-	mpath_dev->pg_data = h;
 	
 #if 0
 struct gendisk          	*mpath_disk;	/* Multipath disk */
@@ -1141,8 +1122,8 @@ struct gendisk          	*mpath_disk;	/* Multipath disk */
 //		goto out_handler;
 //	}
 
-	pr_err("%s sdev=%pS sdev->mpath_dev=%pS h=%pS shost=%pS\n",
-		__func__, sdev, sdev->mpath_dev, h, shost);
+	pr_err("%s sdev=%pS sdev->mpath_dev=%pS shost=%pS\n",
+		__func__, sdev, sdev->mpath_dev, shost);
 
 //	mutex_init(&mpath_dev->mpath_lock);
 //	bio_list_init(&mpath_disk->requeue_list);
@@ -1158,7 +1139,7 @@ struct gendisk          	*mpath_disk;	/* Multipath disk */
 
 //out_handler:
 //	kfree(h);
-out_mpath_dev:
+//out_mpath_dev:
 //	if (mpath_dev)
 //		kfree(mpath_dev);
 
@@ -1174,7 +1155,7 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 
 		pr_err("%s itering mpath_disk=%pS\n", __func__, mpath_disk);
 
-		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len) == 0) {
+		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->device_id_str, sdev->mpath_dev->device_id_len) == 0) {
 			pr_err("%s3 matches wwid\n", __func__);
 			mutex_unlock(&mpath_disks_lock);
 			return mpath_disk;
@@ -1322,7 +1303,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	spin_lock_init(&mpath_disk->requeue_lock);
 	bio_list_init(&mpath_disk->requeue_list);
 
-	sprintf(mpath_disk->wwid, sdev->mpath_dev->pg_data->device_id_str, sdev->mpath_dev->pg_data->device_id_len);
+	sprintf(mpath_disk->wwid, sdev->mpath_dev->device_id_str, sdev->mpath_dev->device_id_len);
 
 	pr_err("%s13 ret=%d after bio_list_init sdev->mpath_dev=%pS\n", __func__, ret, sdev->mpath_dev);
 	list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
@@ -1429,13 +1410,7 @@ EXPORT_SYMBOL_GPL(scsi_mpath_remove_disk);
 
 int scsi_mpath_update_state(struct scsi_mpath_device *mpath_dev)
 {
-        struct scsi_mpath_dh_data *mpath_h;
-
-        mpath_h = mpath_dev->pg_data;
-        if (!mpath_h)
-		return SCSI_MPATH_UNAVAILABLE;
-
-	switch(mpath_h->state) {
+		switch(mpath_dev->state) {
 		case SCSI_ACCESS_STATE_OPTIMAL:
 			mpath_dev->state = SCSI_MPATH_OPTIMAL;
 			break;
