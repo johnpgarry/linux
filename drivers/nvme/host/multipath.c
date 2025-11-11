@@ -1319,10 +1319,12 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 
 		mutex_lock(&ns->ctrl->ana_lock);
 		ns->ana_grpid = le32_to_cpu(anagrpid);
-		pr_err("%s1 ns=%pS anagrpid=0x%x nvme_ctrl_use_ana=%d calling nvme_parse_ana_log\n",
-			__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl));
+		pr_err("%s1 ns=%pS anagrpid=0x%x nvme_ctrl_use_ana=%d calling nvme_parse_ana_log desc.state=%d\n",
+			__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl), desc.state);
 		nvme_parse_ana_log(ns->ctrl, &desc, nvme_lookup_ana_group_desc);
 		mutex_unlock(&ns->ctrl->ana_lock);
+		pr_err("%s1.1 ns=%pS anagrpid=0x%x nvme_ctrl_use_ana=%d called nvme_parse_ana_log desc.state=%d\n",
+			__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl), desc.state);
 		if (desc.state) {
 			/* found the group desc: update */
 			nvme_update_ns_ana_state(&desc, ns);
