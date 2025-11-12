@@ -9,6 +9,7 @@
 #include <scsi/scsi.h>
 #include <linux/atomic.h>
 #include <linux/sbitmap.h>
+#include <linux/cdev.h>
 #include <scsi/scsi_multipath.h>
 #include <scsi/scsi_host.h>
 
@@ -150,6 +151,9 @@ struct scsi_mpath_disk {
 	enum scsi_mpath_iopolicy	iopolicy;
 	struct kref		ref;
 	char wwid[40];
+
+	struct cdev		*cdev;
+	struct device		*cdev_class_device;
 
 	struct scsi_mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
