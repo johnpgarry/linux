@@ -15,11 +15,14 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_multipath.h>
+#include <scsi/scsi_ioctl.h>
 #include "device_handler/scsi_dh_alua.h"
 
 static DEFINE_IDA(sd_mpath_index_ida);
 
+static dev_t scsi_mpath_disk_major;
 
+#define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
 bool scsi_multipath = true;
 module_param(scsi_multipath, bool, 0444);
@@ -653,6 +656,52 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 }
 
+
+static int scsi_mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
+		    unsigned int cmd, unsigned long arg)
+{
+	struct gendisk *disk = bdev->bd_disk;
+	struct scsi_mpath_disk *mpath_disk = disk->private_data;
+	struct scsi_mpath_device *mpath_dev;
+	struct scsi_device *sdev;
+	int srcu_idx, err;
+
+	pr_err("%s cmd=0x%x arg=%ld mpath_disk=%pS\n", __func__, cmd, arg, mpath_disk);
+	
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	mpath_dev = scsi_find_path(mpath_disk);
+	pr_err("%s1 cmd=0x%x arg=%ld mpath_disk=%pS called scsi_find_path srcu_idx=%d mpath_dev=%pS\n",
+		__func__, cmd, arg, mpath_disk, srcu_idx, mpath_dev);
+	if (!mpath_dev)
+		goto out_unlock;
+	sdev = mpath_dev->sdev;
+	pr_err("%s2 cmd=0x%x arg=%ld sdev=%pS\n", __func__, cmd, arg, sdev);
+
+	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO)) {
+		err = -ENOIOCTLCMD;
+		goto out_unlock;
+	}
+
+	/*
+	 * If we are in the middle of error recovery, don't let anyone
+	 * else try and use this device.  Also, if error recovery fails, it
+	 * may try and take the device offline, in which case all further
+	 * access to the device is prohibited.
+	 */
+	err = scsi_ioctl_block_when_processing_errors(sdev, cmd,
+			(mode & BLK_OPEN_NDELAY));
+	if (err)
+		goto out_unlock;
+
+	pr_err("%s3 cmd=0x%x arg=%ld sdev=%pS calling scsi_ioctl\n", __func__, cmd, arg, sdev);
+	err = scsi_ioctl(sdev, mode & BLK_OPEN_WRITE, cmd, (void __user *)arg);
+	pr_err("%s3.1 cmd=0x%x arg=%ld sdev=%pS called scsi_ioctl err=%d\n", __func__, cmd, arg, sdev, err);
+
+out_unlock:
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+	return err;
+}
+
 void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
 {
 	int ret;
@@ -1015,6 +1064,7 @@ const struct block_device_operations scsi_mpath_ops = {
 	.submit_bio	= scsi_multipath_submit_bio,
 	.open		= scsi_mpath_open,
 	.release	= scsi_mpath_release,
+	.ioctl			= scsi_mpath_ioctl,
 	.get_unique_id	= scsi_mpath_get_unique_id,
 };
 
@@ -1273,6 +1323,11 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	mpath_disk->gd->private_data = mpath_disk;
 	mpath_disk->gd->fops = &scsi_mpath_ops;
 
+
+//	mpath_disk->gd->major = scsi_mpath_disk_major;
+//	mpath_disk->gd->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
+//	mpath_disk->gd->minors = SCSI_MPATH_DISK_MINORS;
+
 	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state);
 	sprintf(mpath_disk->gd->disk_name, "scsi_mpath_disk%d", mpath_disk->index);
 
@@ -1435,9 +1490,27 @@ int scsi_mpath_update_state(struct scsi_mpath_device *mpath_dev)
 	return mpath_dev->state;
 }
 
+static void scsi_mpath_disk_probe(dev_t devt)
+{
+	pr_err("%s devt=%d\n", __func__, devt);
+}
+
 static int __init init_scsi_mp(void)
 {
-	return class_register(&scsi_mpath_disk_class);
+	int err = class_register(&scsi_mpath_disk_class);
+
+	if (err < 0)
+		return err;
+	scsi_mpath_disk_major = err = __register_blkdev(0, "scsi-mpath-disk", scsi_mpath_disk_probe);
+	pr_err("%s err=%d\n", __func__, err);
+	if (err < 0)
+		goto destroy_class;
+
+	return 0;
+
+destroy_class:
+	class_unregister(&scsi_mpath_disk_class);
+	return err;
 }
 
 /**
@@ -1448,6 +1521,8 @@ static int __init init_scsi_mp(void)
 static void __exit exit_scsi_mp(void)
 {
 	pr_err("%s\n", __func__);
+	class_unregister(&scsi_mpath_disk_class);
+	unregister_blkdev(0, "scsi-mpath-disk");
 }
 
 module_init(init_scsi_mp);
