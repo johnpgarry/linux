@@ -919,7 +919,7 @@ sg_ioctl_common(struct file *filp, Sg_device *sdp, Sg_fd *sfp,
 	unsigned long iflags;
 
 	sg_printk(KERN_INFO, sdp,
-				   "sg_ioctl: cmd=0x%x\n", (int) cmd_in);
+				   "sg_ioctl_common: cmd=0x%x SG_IO=0x%x SG_GET_VERSION_NUM=0x%x\n", (int) cmd_in, SG_IO, SG_GET_VERSION_NUM);
 	read_only = (O_RDWR != (filp->f_flags & O_ACCMODE));
 
 	switch (cmd_in) {

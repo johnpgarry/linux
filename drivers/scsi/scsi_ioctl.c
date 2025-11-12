@@ -903,22 +903,31 @@ int scsi_ioctl(struct scsi_device *sdev, bool open_for_write, int cmd,
 
 	switch (cmd) {
 	case SG_GET_VERSION_NUM:
+		pr_err("%s2 sdev=%pS cmd=0x%x SG_GET_VERSION_NUM calling sg_get_version\n", __func__, sdev, cmd);
 		return sg_get_version(arg);
 	case SG_SET_TIMEOUT:
+		pr_err("%s2 sdev=%pS cmd=0x%x SG_SET_TIMEOUT calling sg_set_timeout\n", __func__, sdev, cmd);
 		return sg_set_timeout(sdev, arg);
 	case SG_GET_TIMEOUT:
+		pr_err("%s2 sdev=%pS cmd=0x%x SG_GET_TIMEOUT calling jiffies_to_clock_t\n", __func__, sdev, cmd);
 		return jiffies_to_clock_t(sdev->sg_timeout);
 	case SG_GET_RESERVED_SIZE:
+		pr_err("%s2 sdev=%pS cmd=0x%x SG_GET_RESERVED_SIZE calling sg_get_reserved_size\n", __func__, sdev, cmd);
 		return sg_get_reserved_size(sdev, arg);
 	case SG_SET_RESERVED_SIZE:
+		pr_err("%s2 sdev=%pS cmd=0x%x SG_SET_RESERVED_SIZE calling sg_set_reserved_size\n", __func__, sdev, cmd);
 		return sg_set_reserved_size(sdev, arg);
 	case SG_EMULATED_HOST:
+		pr_err("%s2 sdev=%pS cmd=0x%x SG_EMULATED_HOST calling sg_emulated_host\n", __func__, sdev, cmd);
 		return sg_emulated_host(q, arg);
 	case SG_IO:
+		pr_err("%s2 sdev=%pS cmd=0x%x SG_IO calling scsi_ioctl_sg_io\n", __func__, sdev, cmd);
 		return scsi_ioctl_sg_io(sdev, open_for_write, arg);
 	case SCSI_IOCTL_SEND_COMMAND:
+		pr_err("%s2 sdev=%pS cmd=0x%x SCSI_IOCTL_SEND_COMMAND calling sg_scsi_ioctl\n", __func__, sdev, cmd);
 		return sg_scsi_ioctl(q, open_for_write, arg);
 	case CDROM_SEND_PACKET:
+		pr_err("%s2 sdev=%pS cmd=0x%x CDROM_SEND_PACKET calling scsi_cdrom_send_packet\n", __func__, sdev, cmd);
 		return scsi_cdrom_send_packet(sdev, open_for_write, arg);
 	case CDROMCLOSETRAY:
 		return scsi_send_start_stop(sdev, 3);
@@ -938,8 +947,10 @@ int scsi_ioctl(struct scsi_device *sdev, bool open_for_write, int cmd,
 		return scsi_test_unit_ready(sdev, IOCTL_NORMAL_TIMEOUT,
 					    NORMAL_RETRIES, &sense_hdr);
 	case SCSI_IOCTL_START_UNIT:
+		pr_err("%s2 sdev=%pS cmd=0x%x SCSI_IOCTL_START_UNIT calling scsi_send_start_stop\n", __func__, sdev, cmd);
 		return scsi_send_start_stop(sdev, 1);
 	case SCSI_IOCTL_STOP_UNIT:
+		pr_err("%s2 sdev=%pS cmd=0x%x SCSI_IOCTL_STOP_UNIT calling scsi_send_start_stop\n", __func__, sdev, cmd);
 		return scsi_send_start_stop(sdev, 0);
         case SCSI_IOCTL_GET_PCI:
                 return scsi_ioctl_get_pci(sdev, arg);
