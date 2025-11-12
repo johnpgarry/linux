@@ -942,9 +942,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 
 	trace_block_rq_complete(req, error, nr_bytes);
 
-	if (req->cmd_flags & REQ_DRV)
-		pr_err("%s req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d __REQ_DRV=%d __RQF_FLUSH_SEQ=%d is_flush=%d\n",
-				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error, __REQ_DRV, __RQF_FLUSH_SEQ, is_flush);
+//	if (req->cmd_flags & REQ_DRV)
+//		pr_err("%s req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d __REQ_DRV=%d __RQF_FLUSH_SEQ=%d is_flush=%d\n",
+//				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error, __REQ_DRV, __RQF_FLUSH_SEQ, is_flush);
 
 	if (!req->bio)
 		return false;
@@ -969,9 +969,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	blk_account_io_completion(req, nr_bytes);
 
 	total_bytes = 0;
-	if (req->cmd_flags & REQ_DRV)
-		pr_err("%s0 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d going to loop\n",
-				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
+//	if (req->cmd_flags & REQ_DRV)
+//		pr_err("%s0 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d going to loop\n",
+//				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
 	while (req->bio) {
 		struct bio *bio = req->bio;
 		unsigned bio_bytes = min(bio->bi_iter.bi_size, nr_bytes);
@@ -998,9 +998,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 		bio_advance(bio, bio_bytes);
 
 
-		if (req->cmd_flags & REQ_DRV)
-			pr_err("%s1 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d bio->bi_iter.bi_size=%d is_flush=%d Don't actually finish bio....\n",
-					__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error, bio->bi_iter.bi_size, is_flush);
+//		if (req->cmd_flags & REQ_DRV)
+	//		pr_err("%s1 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d bio->bi_iter.bi_size=%d is_flush=%d Don't actually finish bio....\n",
+	//				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error, bio->bi_iter.bi_size, is_flush);
 
 		/* Don't actually finish bio if it's part of flush sequence */
 		if (!bio->bi_iter.bi_size) {
@@ -1020,14 +1020,14 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	/*
 	 * completely done
 	 */
-	if (req->cmd_flags & REQ_DRV)
-			pr_err("%s2.1 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d completely done?\n",
-					__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
+//	if (req->cmd_flags & REQ_DRV)
+//			pr_err("%s2.1 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d completely done?\n",
+//					__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
 	if (!req->bio) {
 
-		if (req->cmd_flags & REQ_DRV)
-			pr_err("%s2.2 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d completely done\n",
-					__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
+		//if (req->cmd_flags & REQ_DRV)
+		//	pr_err("%s2.2 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d completely done\n",
+		//			__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
 
 		/*
 		 * Reset counters so that the request stacking driver
@@ -1038,9 +1038,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 		return false;
 	}
 
-	if (req->cmd_flags & REQ_DRV)
-			pr_err("%s2.3 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d not completely done?\n",
-					__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
+	//if (req->cmd_flags & REQ_DRV)
+	//		pr_err("%s2.3 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d not completely done?\n",
+	//				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
 	req->__data_len -= total_bytes;
 
 	/* update sector only for requests with clear definition of sector */
@@ -1067,9 +1067,9 @@ bool blk_update_request(struct request *req, blk_status_t error,
 		req->nr_phys_segments = blk_recalc_rq_segments(req);
 	}
 
-	if (req->cmd_flags & REQ_DRV)
-		pr_err("%s10 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d more to do\n",
-					__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
+	//if (req->cmd_flags & REQ_DRV)
+	//	pr_err("%s10 req=%pS bytes=%d bio=%pS nr_bytes=%d error=%d more to do\n",
+	//				__func__, req, blk_rq_bytes(req), req->bio, nr_bytes, error);
 	return true;
 }
 EXPORT_SYMBOL_GPL(blk_update_request);
@@ -1169,13 +1169,13 @@ inline void __blk_mq_end_request(struct request *rq, blk_status_t error)
 	if (blk_mq_need_time_stamp(rq))
 		__blk_mq_end_request_acct(rq, blk_time_get_ns());
 
-	if (rq->cmd_flags & REQ_DRV)
-		pr_err("%s rq=%pS rq->end_io=%pS calling blk_mq_finish_request\n", __func__, rq, rq->end_io);
+//	if (rq->cmd_flags & REQ_DRV)
+//		pr_err("%s rq=%pS rq->end_io=%pS calling blk_mq_finish_request\n", __func__, rq, rq->end_io);
 	blk_mq_finish_request(rq);
 
 
-	if (rq->cmd_flags & REQ_DRV)
-		pr_err("%s2 rq=%pS maybe calling rq->end_io=%pS \n", __func__, rq, rq->end_io);
+//	if (rq->cmd_flags & REQ_DRV)
+//		pr_err("%s2 rq=%pS maybe calling rq->end_io=%pS \n", __func__, rq, rq->end_io);
 	if (rq->end_io) {
 		rq_qos_done(rq->q, rq);
 		if (rq->end_io(rq, error) == RQ_END_IO_FREE)
