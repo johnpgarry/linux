@@ -1650,8 +1650,8 @@ static int sd_ioctl(struct block_device *bdev, blk_mode_t mode,
 	void __user *p = (void __user *)arg;
 	int error;
     
-	 sd_printk(KERN_INFO, sdkp, "sd_ioctl: disk=%s, "
-				    "cmd=0x%x\n", disk->disk_name, cmd);
+	 sd_printk(KERN_INFO, sdkp, "sd_ioctl: disk=%s cmd=0x%x arg=%ld partition=%d is_sed_ioctl=%d\n",
+	 	disk->disk_name, cmd, arg, bdev_is_partition(bdev), is_sed_ioctl(cmd));
 
 	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO))
 		return -ENOIOCTLCMD;
@@ -4044,16 +4044,13 @@ static int sd_probe(struct device *dev)
 		goto out_free_index;
 	}
 
-
-
-
-
-	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->mpath_dev=%pS index=%d\n",
-		__func__, gd, gd->disk_name, gd->part0, sdp->mpath_dev, index);
-	if (scsi_mpath_enabled(sdp)) {
+	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->mpath_dev=%pS index=%d scsi_device_tpgs=%d\n",
+		__func__, gd, gd->disk_name, gd->part0, sdp->mpath_dev, index, scsi_device_tpgs(sdp));
+	if (scsi_mpath_enabled(sdp) && scsi_device_tpgs(sdp)) {
 		struct scsi_mpath_device *mpath_dev;
 		sdev_printk(KERN_INFO, sdp, "%s3.2 calling scsi_mpath_alloc_disk\n", __func__);
 		error = scsi_mpath_alloc_disk(sdp, gd);
+		sdev_printk(KERN_INFO, sdp, "%s3.3.1 called scsi_mpath_alloc_disk error=%d\n", __func__, error);
 		if (error) {
 			sdev_printk(KERN_WARNING, sdp, "could not alloc mpath disk\n");
 			goto out_free_index;

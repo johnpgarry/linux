@@ -552,9 +552,9 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 	ns = nvme_find_path(head);
 	pr_err_once("%s1.1 head=%pS bio=%pS called nvme_find_path ns=%pS\n", __func__, head, bio, ns);
 	if (likely(ns)) {
-		pr_err("%s1.2 calling bio_set_dev bio->bi_bdev=%pS ns->disk->part0=%pS\n", __func__, ns->disk->part0, ns->disk->part0);
+		pr_err_once("%s1.2 calling bio_set_dev bio->bi_bdev=%pS ns->disk->part0=%pS\n", __func__, ns->disk->part0, ns->disk->part0);
 		bio_set_dev(bio, ns->disk->part0);
-		pr_err("%s1.3 called bio_set_dev bio->bi_bdev=%pS ns->disk->part0=%pS\n", __func__, ns->disk->part0, ns->disk->part0);
+		pr_err_once("%s1.3 called bio_set_dev bio->bi_bdev=%pS ns->disk->part0=%pS\n", __func__, ns->disk->part0, ns->disk->part0);
 		bio->bi_opf |= REQ_NVME_MPATH;
 		trace_block_bio_remap(bio, disk_devt(ns->head->disk),
 				      bio->bi_iter.bi_sector);

@@ -1183,7 +1183,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	if (!scsi_device_tpgs(sdev)) {
 		sdev_printk(KERN_NOTICE, sdev, "tpgs are required for mpath support\n");
-		return 0;
+		return -ENODEV;
 	}
 
 	pr_err("%s1 sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS calling scsi_multipath_init\n",

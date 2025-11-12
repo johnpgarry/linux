@@ -546,13 +546,16 @@ static bool is_ctrl_ioctl(unsigned int cmd)
 static int nvme_ctrl_ioctl(struct nvme_ctrl *ctrl, unsigned int cmd,
 		void __user *argp, bool open_for_write)
 {
-	pr_err("%s cmd=%d\n", __func__, cmd);
+	pr_err("%s cmd=0x%x\n", __func__, cmd);
 	switch (cmd) {
 	case NVME_IOCTL_ADMIN_CMD:
+		pr_err("%s1 NVME_IOCTL_ADMIN_CMD cmd=0x%x calling nvme_user_cmd\n", __func__, cmd);
 		return nvme_user_cmd(ctrl, NULL, argp, 0, open_for_write);
 	case NVME_IOCTL_ADMIN64_CMD:
+		pr_err("%s2 NVME_IOCTL_ADMIN64_CMD cmd=0x%x calling nvme_user_cmd64\n", __func__, cmd);
 		return nvme_user_cmd64(ctrl, NULL, argp, 0, open_for_write);
 	default:
+		pr_err("%s3 default cmd=0x%x calling sed_ioctl\n", __func__, cmd);
 		return sed_ioctl(ctrl->opal_dev, cmd, argp);
 	}
 }
@@ -634,6 +637,7 @@ long nvme_ns_chr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	bool open_for_write = file->f_mode & FMODE_WRITE;
 	void __user *argp = (void __user *)arg;
 
+	pr_err("%s cmd=0x%x calling nvme_ctrl_ioctl\n", __func__, cmd);
 	if (is_ctrl_ioctl(cmd))
 		return nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
 	return nvme_ns_ioctl(ns, cmd, argp, 0, open_for_write);
@@ -703,6 +707,7 @@ static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
 
 	nvme_get_ctrl(ns->ctrl);
 	srcu_read_unlock(&head->srcu, srcu_idx);
+	pr_err("%s cmd=0x%x calling nvme_ctrl_ioctl\n", __func__, cmd);
 	ret = nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
 
 	nvme_put_ctrl(ctrl);
@@ -732,10 +737,13 @@ int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
 	 * separately and drop the ns SRCU reference early.  This avoids a
 	 * deadlock when deleting namespaces using the passthrough interface.
 	 */
-	if (is_ctrl_ioctl(cmd))
+	if (is_ctrl_ioctl(cmd)) {
+		pr_err("%s2 is_ctrl_ioctl=%d calling nvme_ns_head_ctrl_ioctl\n", __func__, is_ctrl_ioctl(cmd));
 		return nvme_ns_head_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
 					       open_for_write);
+	}
 
+	pr_err("%s3 is_ctrl_ioctl=%d calling nvme_ns_ioctl\n", __func__, is_ctrl_ioctl(cmd));
 	ret = nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
 out_unlock:
 	srcu_read_unlock(&head->srcu, srcu_idx);
@@ -753,15 +761,20 @@ long nvme_ns_head_chr_ioctl(struct file *file, unsigned int cmd,
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
+	pr_err("%s cmd=0x%x arg=%ld open_for_write=%d is_ctrl_ioctl=%d\n", __func__, cmd, arg, open_for_write, is_ctrl_ioctl(cmd));
+
 	srcu_idx = srcu_read_lock(&head->srcu);
 	ns = nvme_find_path(head);
 	if (!ns)
 		goto out_unlock;
 
-	if (is_ctrl_ioctl(cmd))
+	if (is_ctrl_ioctl(cmd)) {
+		pr_err("%s2 cmd=0x%x arg=%ld ns=%pS calling nvme_ns_head_ctrl_ioctl\n", __func__, cmd, arg, ns);
 		return nvme_ns_head_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
 				open_for_write);
+	}
 
+	pr_err("%s3 cmd=0x%x arg=%ld ns=%pS calling nvme_ns_ioctl\n", __func__, cmd, arg, ns);
 	ret = nvme_ns_ioctl(ns, cmd, argp, 0, open_for_write);
 out_unlock:
 	srcu_read_unlock(&head->srcu, srcu_idx);
@@ -856,25 +869,30 @@ long nvme_dev_ioctl(struct file *file, unsigned int cmd,
 	struct nvme_ctrl *ctrl = file->private_data;
 	void __user *argp = (void __user *)arg;
 
-	pr_err("%s ctrl=%pS\n", __func__, ctrl);
+	pr_err("%s ctrl=%pS cmd=0x%x\n", __func__, ctrl, cmd);
 	switch (cmd) {
 	case NVME_IOCTL_ADMIN_CMD:
+		pr_err("%s1 ctrl=%pS NVME_IOCTL_ADMIN_CMD calling nvme_user_cmd\n", __func__, ctrl);
 		return nvme_user_cmd(ctrl, NULL, argp, 0, open_for_write);
 	case NVME_IOCTL_ADMIN64_CMD:
+		pr_err("%s1 ctrl=%pS NVME_IOCTL_ADMIN64_CMD calling nvme_user_cmd64\n", __func__, ctrl);
 		return nvme_user_cmd64(ctrl, NULL, argp, 0, open_for_write);
 	case NVME_IOCTL_IO_CMD:
 		pr_err("%s4 ctrl=%pS NVME_IOCTL_IO_CMD calling nvme_dev_user_cmd\n", __func__, ctrl);
 		return nvme_dev_user_cmd(ctrl, argp, open_for_write);
 	case NVME_IOCTL_RESET:
+		pr_err("%s5 ctrl=%pS NVME_IOCTL_RESET calling nvme_reset_ctrl_sync\n", __func__, ctrl);
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 		dev_warn(ctrl->device, "resetting controller\n");
 		return nvme_reset_ctrl_sync(ctrl);
 	case NVME_IOCTL_SUBSYS_RESET:
+		pr_err("%s6 ctrl=%pS NVME_IOCTL_SUBSYS_RESET calling nvme_reset_subsystem\n", __func__, ctrl);
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 		return nvme_reset_subsystem(ctrl);
 	case NVME_IOCTL_RESCAN:
+		pr_err("%s6 ctrl=%pS NVME_IOCTL_RESCAN calling nvme_queue_scan\n", __func__, ctrl);
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 		nvme_queue_scan(ctrl);

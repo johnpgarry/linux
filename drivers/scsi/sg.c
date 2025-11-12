@@ -918,8 +918,8 @@ sg_ioctl_common(struct file *filp, Sg_device *sdp, Sg_fd *sfp,
 	Sg_request *srp;
 	unsigned long iflags;
 
-	SCSI_LOG_TIMEOUT(3, sg_printk(KERN_INFO, sdp,
-				   "sg_ioctl: cmd=0x%x\n", (int) cmd_in));
+	sg_printk(KERN_INFO, sdp,
+				   "sg_ioctl: cmd=0x%x\n", (int) cmd_in);
 	read_only = (O_RDWR != (filp->f_flags & O_ACCMODE));
 
 	switch (cmd_in) {
@@ -1152,10 +1152,12 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 
 	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
 		return -ENXIO;
-
+	pr_err("%s1 cmd_in=0x%x arg=%ld calling sg_ioctl_common\n", __func__, cmd_in, arg);
 	ret = sg_ioctl_common(filp, sdp, sfp, cmd_in, p);
+	pr_err("%s1.1 cmd_in=0x%x arg=%ld called sg_ioctl_common ret=%d ENOIOCTLCMD=%d\n", __func__, cmd_in, arg, ret, ENOIOCTLCMD);
 	if (ret != -ENOIOCTLCMD)
 		return ret;
+	pr_err("%s2 cmd_in=0x%x arg=%ld called scsi_ioctl ret=%d\n", __func__, cmd_in, arg, ret);
 	return scsi_ioctl(sdp->device, filp->f_mode & FMODE_WRITE, cmd_in, p);
 }
 
