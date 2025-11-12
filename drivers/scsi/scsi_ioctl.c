@@ -884,6 +884,7 @@ int scsi_ioctl(struct scsi_device *sdev, bool open_for_write, int cmd,
 	struct request_queue *q = sdev->request_queue;
 	struct scsi_sense_hdr sense_hdr;
 
+	pr_err("%s sdev=%pS cmd=0x%x\n", __func__, sdev, cmd);
 	/* Check for deprecated ioctls ... all the ioctls which don't
 	 * follow the new unique numbering scheme are deprecated */
 	switch (cmd) {
