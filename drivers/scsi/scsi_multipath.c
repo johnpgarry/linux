@@ -44,6 +44,13 @@ static const struct class scsi_mpath_disk_class = {
 	.name = "scsi_mpath_disk",
 };
 
+
+//static DEFINE_IDA(nvme_ns_chr_minor_ida);
+static dev_t scsi_mpath_disk_chr_devt;
+static const struct class scsi_mpath_disk_chr_class = {
+	.name = "scsi-mpath-generic",
+};
+
 static bool scsi_mpath_state_is_live(unsigned int state)
 {
 	switch (state) {
@@ -656,7 +663,6 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 }
 
-
 static int scsi_mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg)
 {
@@ -702,14 +708,83 @@ out_unlock:
 	return err;
 }
 
-void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
+#if 0
+static inline struct nvme_ns_head *cdev_to_ns_head(struct cdev *cdev)
+{
+	return container_of(cdev, struct nvme_ns_head, cdev);
+}
+
+static int nvme_ns_head_chr_open(struct inode *inode, struct file *file)
+{
+	if (!nvme_tryget_ns_head(cdev_to_ns_head(inode->i_cdev)))
+		return -ENXIO;
+	return 0;
+}
+
+static int nvme_ns_head_chr_release(struct inode *inode, struct file *file)
+{
+	nvme_put_ns_head(cdev_to_ns_head(inode->i_cdev));
+	return 0;
+}
+
+static const struct file_operations nvme_ns_head_chr_fops = {
+	.owner		= THIS_MODULE,
+	.open		= nvme_ns_head_chr_open,
+	.release	= nvme_ns_head_chr_release,
+	.unlocked_ioctl	= nvme_ns_head_chr_ioctl,
+	.compat_ioctl	= compat_ptr_ioctl,
+	.uring_cmd	= nvme_ns_head_chr_uring_cmd,
+	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
+};
+
+int nvme_cdev_add(struct cdev *cdev, struct device *cdev_device,
+		const struct file_operations *fops, struct module *owner)
+{
+	int minor, ret;
+
+	minor = ida_alloc(&nvme_ns_chr_minor_ida, GFP_KERNEL);
+	if (minor < 0)
+		return minor;
+	cdev_device->devt = MKDEV(MAJOR(nvme_ns_chr_devt), minor);
+	cdev_device->class = &nvme_ns_chr_class;
+	cdev_device->release = nvme_cdev_rel;
+	device_initialize(cdev_device);
+	cdev_init(cdev, fops);
+	cdev->owner = owner;
+	ret = cdev_device_add(cdev, cdev_device);
+	if (ret)
+		put_device(cdev_device);
+
+	return ret;
+}
+
+static int scsi_mpath_disk_add_cdev(struct scsi_mpath_disk *mpath_disk)
 {
 	int ret;
+
+	head->cdev_device.parent = &head->subsys->dev;
+	ret = dev_set_name(&mpath_disk->cdev_device, "smdpg%d",
+						mpath_disk->instance);
+	if (ret)
+		return ret;
+	ret = nvme_cdev_add(&mpath_disk->cdev, &mpath_disk->cdev_device,
+			    &nvme_ns_head_chr_fops, THIS_MODULE);
+	return ret;
+}
+#else
+static int scsi_mpath_disk_add_cdev(struct scsi_mpath_disk *mpath_disk)
+{
+	return 0;
+}
+#endif
+
+void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
+{
 	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
+	int ret;
 
 	pr_err("%s mpath_disk=%pS SCSI_MPATH_DISK_LIVE=%d\n",
 		__func__, mpath_disk, test_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags));
-
 
 	if (!test_and_set_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags)) {
 		pr_err("%s calling device_add_disk\n", __func__);
@@ -720,6 +795,7 @@ void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
 			return;
 		}
 		pr_err("%s2 calling kblockd_schedule_work partition_scan_work\n", __func__);
+		scsi_mpath_disk_add_cdev(mpath_disk);
 		kblockd_schedule_work(&mpath_disk->partition_scan_work);
 	}
 
@@ -1501,12 +1577,18 @@ static int __init init_scsi_mp(void)
 
 	if (err < 0)
 		return err;
-	scsi_mpath_disk_major = err = __register_blkdev(0, "scsi-mpath-disk", scsi_mpath_disk_probe);
+	err = __register_blkdev(0, "scsi-mpath", scsi_mpath_disk_probe);
 	pr_err("%s err=%d\n", __func__, err);
 	if (err < 0)
 		goto destroy_class;
+	scsi_mpath_disk_major = err;
+	err = alloc_chrdev_region(&scsi_mpath_disk_chr_devt, 0, 1U << MINORBITS,
+				     "scsi-mpath-generic");
+	if (err < 0)
+		goto unregister_blkdev;
 
 	return 0;
+unregister_blkdev:
 
 destroy_class:
 	class_unregister(&scsi_mpath_disk_class);
