@@ -343,12 +343,16 @@ static bool multipath_sysfs_group_visible(struct kobject *kobj)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
 	return nvme_disk_is_ns_head(dev_to_disk(dev));
 }
 
 static bool multipath_sysfs_attr_visible(struct kobject *kobj,
 		struct attribute *attr, int n)
 {
+	struct device *dev = container_of(kobj, struct device, kobj);
+
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
 	return false;
 }
 

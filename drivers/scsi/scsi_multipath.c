@@ -566,24 +566,34 @@ static void scsi_requeue_work(struct work_struct *work)
 		submit_bio_noacct(bio);
 	}
 }
+
 #include <linux/sysfs.h>
 
+static struct attribute dummy_attr = {
+	.name = "dummy",
+};
+
 static struct attribute *scsi_mpath_attrs[] = {
+	&dummy_attr,
 	NULL
 };
 
 static bool multipath_sysfs_group_visible(struct kobject *kobj)
 {
-	__maybe_unused struct device *dev = container_of(kobj, struct device, kobj);
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct gendisk *disk = dev_to_disk(dev);
 
-	//return nvme_disk_is_ns_head(dev_to_disk(dev));
-	return true;
+	dev_err(dev, "%s dev=%pS disk=%pS fops=%pS\n", __func__, dev, disk, disk->fops);
+	return disk->fops == &scsi_mpath_ops;
 }
 
 static bool multipath_sysfs_attr_visible(struct kobject *kobj,
 		struct attribute *attr, int n)
 {
-	return true;
+	struct device *dev = container_of(kobj, struct device, kobj);
+
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
+	return false;
 }
 
 DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
@@ -598,7 +608,6 @@ const struct attribute_group *sd_attr_groups[] = {
 	&scsi_mpath_attr_group,
 	NULL
 };
-
 
 static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 {
@@ -845,7 +854,7 @@ void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
 		__func__, mpath_disk, test_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags));
 
 	if (!test_and_set_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags)) {
-		pr_err("%s calling device_add_disk\n", __func__);
+		pr_err("%s calling device_add_disk &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
 		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, sd_attr_groups);
 		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
 		if (ret) {
