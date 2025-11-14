@@ -1776,6 +1776,11 @@ void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 	sdev->sdev_dev.class = &sdev_class;
 	dev_set_name(&sdev->sdev_dev, "%d:%d:%d:%llu",
 		     sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
+
+
+	dev_err(&sdev->sdev_dev, "%s2 sdev=%pS\n", __func__, sdev);
+	dev_err(sdev->sdev_dev.parent, "%s3 sdev=%pS\n", __func__, sdev);
+	
 	/*
 	 * Get a default scsi_level from the target (derived from sibling
 	 * devices).  This is the best we can do for guessing how to set

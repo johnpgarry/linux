@@ -2072,8 +2072,10 @@ maybe_retry:
 	 * For SCSI Multipath check if there are path errors to
 	 * trigger failover to available path
 	 */
-	if (scsi_mpath_enabled(scmd->device))
+	if (scsi_mpath_enabled(scmd->device)) {
+		pr_err("%s calling scsi_mpath_failover_disposition\n", __func__);
 		return scsi_mpath_failover_disposition(scmd);
+	}
 
 	/* we requeue for retry because the error was retryable, and
 	 * the request was not marked fast fail.  Note that above,

@@ -2912,8 +2912,11 @@ static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 		//scsi_mpath_clear_current_path(sdev);
 	}
 
-	if (scsi_device_set_state(sdev, SDEV_BLOCK))
+	if (scsi_device_set_state(sdev, SDEV_BLOCK)) {
+
+		pr_err("%s calling scsi_device_set_state SDEV_CREATED_BLOCK\n", __func__);
 		return scsi_device_set_state(sdev, SDEV_CREATED_BLOCK);
+	}
 
 	return 0;
 }
@@ -3030,8 +3033,8 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 
 	/* For multipath device set the path live */
 	if (scsi_mpath_enabled(sdev)) {
-		pr_err("%s sdev=%pS calling scsi_mpath_set_live\n", __func__, sdev);
-		scsi_mpath_set_live(NULL);
+	//	pr_err("%s sdev=%pS calling scsi_mpath_set_live\n", __func__, sdev);
+	//	scsi_mpath_set_live(NULL);
 	}
 
 	/*
