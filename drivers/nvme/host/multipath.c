@@ -1279,6 +1279,7 @@ void nvme_mpath_add_sysfs_link(struct nvme_ns_head *head)
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
 		 */
+		pr_err("%s2 head=%pS nvme_ns_mpath_attr_group.name=%s\n", __func__, head, nvme_ns_mpath_attr_group.name);
 		rc = sysfs_add_link_to_group(kobj, nvme_ns_mpath_attr_group.name,
 				&target->kobj, dev_name(target));
 		if (unlikely(rc)) {
