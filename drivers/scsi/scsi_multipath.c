@@ -568,7 +568,37 @@ static void scsi_requeue_work(struct work_struct *work)
 }
 #include <linux/sysfs.h>
 
-extern const struct attribute_group scsi_mpath_attr_group;
+static struct attribute *scsi_mpath_attrs[] = {
+	NULL
+};
+
+static bool multipath_sysfs_group_visible(struct kobject *kobj)
+{
+	__maybe_unused struct device *dev = container_of(kobj, struct device, kobj);
+
+	//return nvme_disk_is_ns_head(dev_to_disk(dev));
+	return true;
+}
+
+static bool multipath_sysfs_attr_visible(struct kobject *kobj,
+		struct attribute *attr, int n)
+{
+	return true;
+}
+
+DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
+
+const struct attribute_group scsi_mpath_attr_group = {
+	.name           = "multipath",
+	.attrs		= scsi_mpath_attrs,
+	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
+};
+
+const struct attribute_group *sd_attr_groups[] = {
+	&scsi_mpath_attr_group,
+	NULL
+};
+
 
 static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 {
@@ -647,22 +677,15 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
 		 */
-		#if 0
-		rc = sysfs_add_link_to_group(kobj, scsi_mpath_attr_group.name,
+		rc = sysfs_add_link_to_group(mpath_gd_kobj, scsi_mpath_attr_group.name,
 				&target->kobj, dev_name(target));
-		#else
-	//	rc = sysfs_create_link(mpath_gd_kobj, &sdev_gendev->kobj,
-	//			dev_name(sdev_gendev));
-	//	pr_err("%s7.5 called sysfs_create_link for mpath_gd_kobj rc=%d\n", __func__, rc);
-		rc = 0;
-		#endif
+		pr_err("%s7.5 called sysfs_add_link_to_group rc=%d\n", __func__, rc);
 		if (unlikely(rc)) {
-			dev_err(disk_to_dev(mpath_disk->gd),
-					"failed to create link to %s rc=%d\n",
-					dev_name(target), rc);
-			clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags);
+	//		dev_err(disk_to_dev(mpath_disk->gd),
+	//				"failed to create link to %s rc=%d\n",
+	//				dev_name(target), rc);
+		//	clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags);
 		}
-
 
 		rc = sysfs_create_link(mpath_device_kobj, &sdev_gendev->kobj,
 				dev_name(sdev_gendev));
@@ -823,7 +846,7 @@ void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
 
 	if (!test_and_set_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags)) {
 		pr_err("%s calling device_add_disk\n", __func__);
-		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, NULL);
+		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, sd_attr_groups);
 		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
 		if (ret) {
 			clear_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags);

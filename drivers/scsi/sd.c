@@ -3947,37 +3947,7 @@ static int sd_format_disk_name(char *prefix, int index, char *buf, int buflen)
 	return 0;
 }
 
-static struct attribute *scsi_mpath_attrs[] = {
-	NULL
-};
-
-static bool multipath_sysfs_group_visible(struct kobject *kobj)
-{
-	__maybe_unused struct device *dev = container_of(kobj, struct device, kobj);
-
-	//return nvme_disk_is_ns_head(dev_to_disk(dev));
-	return true;
-}
-
-static bool multipath_sysfs_attr_visible(struct kobject *kobj,
-		struct attribute *attr, int n)
-{
-	return true;
-}
-
-DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
-
-const struct attribute_group scsi_mpath_attr_group = {
-	.name           = "multipath",
-	.attrs		= scsi_mpath_attrs,
-	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
-};
-
-
-const struct attribute_group *sd_attr_groups[] = {
-	&scsi_mpath_attr_group,
-	NULL
-};
+extern const struct attribute_group *sd_attr_groups[];
 
 /**
  *	sd_probe - called during driver initialization and whenever a
