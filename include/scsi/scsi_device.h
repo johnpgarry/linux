@@ -152,8 +152,8 @@ struct scsi_mpath_disk {
 	struct kref		ref;
 	char wwid[40];
 
-	struct cdev		*cdev;
-	struct device		*cdev_class_device;
+	struct cdev		cdev;
+	struct device		cdev_device;
 
 	struct scsi_mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };

@@ -1758,6 +1758,7 @@ void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 	const struct scsi_host_template *hostt = shost->hostt;
 	struct scsi_target  *starget = sdev->sdev_target;
 
+	pr_err("%s sdev=%pS\n", __func__, sdev);
 	device_initialize(&sdev->sdev_gendev);
 	sdev->sdev_gendev.bus = &scsi_bus_type;
 	sdev->sdev_gendev.type = &scsi_dev_type;

@@ -1495,6 +1495,10 @@ sg_add_device(struct device *cl_dev)
 	int error;
 	unsigned long iflags;
 
+	//WARN_ON_ONCE(1);
+
+	pr_err("%s\n", __func__);
+
 	if (!blk_get_queue(scsidp->request_queue)) {
 		pr_warn("%s: get scsi_device queue failed\n", __func__);
 		return -ENODEV;
@@ -1521,6 +1525,7 @@ sg_add_device(struct device *cl_dev)
 		goto cdev_add_err;
 
 	sdp->cdev = cdev;
+	pr_err("%s2 sg_sysfs_valid=%d scsidp=%pS\n", __func__, sg_sysfs_valid, scsidp);
 	if (sg_sysfs_valid) {
 		struct device *sg_class_member;
 
@@ -1533,6 +1538,7 @@ sg_add_device(struct device *cl_dev)
 			error = PTR_ERR(sg_class_member);
 			goto cdev_add_err;
 		}
+		dev_err(sg_class_member, "%s3 calling sysfs_create_link scsidp=%pS\n", __func__, scsidp);
 		error = sysfs_create_link(&scsidp->sdev_gendev.kobj,
 					  &sg_class_member->kobj, "generic");
 		if (error)
