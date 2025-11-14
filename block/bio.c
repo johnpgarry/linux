@@ -1363,7 +1363,7 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter,
 
 static void submit_bio_wait_endio(struct bio *bio)
 {
-	pr_err("%s bio=%pS\n", __func__, bio);
+	pr_err_once("%s bio=%pS\n", __func__, bio);
 	complete(bio->bi_private);
 }
 
