@@ -1304,7 +1304,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	mpath_disk->dev.release = scsi_mpath_disk_release;
 	mpath_disk->dev.groups = scsi_mpath_disk_attrs_groups;
 	pr_err("%s7\n", __func__);
-	dev_set_name(&mpath_disk->dev, "scsi_mpath_device%d", mpath_disk->index);
+	dev_set_name(&mpath_disk->dev, "smpd%d", mpath_disk->index);
 	disk_count++;
 	device_initialize(&mpath_disk->dev);
 
@@ -1329,7 +1329,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 //	mpath_disk->gd->minors = SCSI_MPATH_DISK_MINORS;
 
 	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state);
-	sprintf(mpath_disk->gd->disk_name, "scsi_mpath_disk%d", mpath_disk->index);
+	sprintf(mpath_disk->gd->disk_name, "smpd%d", mpath_disk->index);
 
 	pr_err("%s10\n", __func__);
 	ret = device_add(&mpath_disk->dev); // see nvme_init_subsystem()
