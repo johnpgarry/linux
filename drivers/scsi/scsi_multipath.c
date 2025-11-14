@@ -47,8 +47,8 @@ static const struct class scsi_mpath_disk_class = {
 
 //static DEFINE_IDA(nvme_ns_chr_minor_ida);
 static dev_t scsi_mpath_disk_chr_devt;
-static const struct class scsi_mpath_disk_chr_class = {
-	.name = "scsi-mpath-generic",
+static const struct class scsi_mpath_generic_class = {
+	.name = "scsi_mpath_generic",
 };
 
 static bool scsi_mpath_state_is_live(unsigned int state)
@@ -726,21 +726,29 @@ static int nvme_ns_head_chr_release(struct inode *inode, struct file *file)
 	nvme_put_ns_head(cdev_to_ns_head(inode->i_cdev));
 	return 0;
 }
+#endif
 
-static const struct file_operations nvme_ns_head_chr_fops = {
+static long scsi_mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
+		unsigned long arg)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+
+	pr_err("%s cdev=%pS cmd=0x%x arg=%ld\n", __func__, cdev, cmd, arg);
+
+	return 0;
+}
+static const struct file_operations scsi_mpath_generic_chr_fops = {
 	.owner		= THIS_MODULE,
-	.open		= nvme_ns_head_chr_open,
-	.release	= nvme_ns_head_chr_release,
-	.unlocked_ioctl	= nvme_ns_head_chr_ioctl,
-	.compat_ioctl	= compat_ptr_ioctl,
-	.uring_cmd	= nvme_ns_head_chr_uring_cmd,
-	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
+//	.open		= nvme_ns_head_chr_open,
+//	.release	= nvme_ns_head_chr_release,
+	.unlocked_ioctl	= scsi_mpath_generic_chr_ioctl,
+//	.compat_ioctl	= compat_ptr_ioctl,
 };
 
+#ifdef dsdsddsds
 int nvme_cdev_add(struct cdev *cdev, struct device *cdev_device,
 		const struct file_operations *fops, struct module *owner)
 {
-	int minor, ret;
 
 	minor = ida_alloc(&nvme_ns_chr_minor_ida, GFP_KERNEL);
 	if (minor < 0)
@@ -757,26 +765,36 @@ int nvme_cdev_add(struct cdev *cdev, struct device *cdev_device,
 
 	return ret;
 }
-
-static int scsi_mpath_disk_add_cdev(struct scsi_mpath_disk *mpath_disk)
+static void nvme_cdev_rel(struct device *dev)
 {
-	int ret;
-
-	head->cdev_device.parent = &head->subsys->dev;
-	ret = dev_set_name(&mpath_disk->cdev_device, "smdpg%d",
-						mpath_disk->instance);
-	if (ret)
-		return ret;
-	ret = nvme_cdev_add(&mpath_disk->cdev, &mpath_disk->cdev_device,
-			    &nvme_ns_head_chr_fops, THIS_MODULE);
-	return ret;
-}
-#else
-static int scsi_mpath_disk_add_cdev(struct scsi_mpath_disk *mpath_disk)
-{
-	return 0;
+	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
 }
 #endif
+
+
+static int scsi_mpath_disk_add_cdev(struct scsi_mpath_disk *mpath_disk)
+{
+	int ret, minor = mpath_disk->index;
+
+	mpath_disk->cdev_device.parent = &mpath_disk->dev;
+	ret = dev_set_name(&mpath_disk->cdev_device, "smpg%d",
+						mpath_disk->index);
+	pr_err("%s called dev_set_name ret=%d\n", __func__, ret);
+	if (ret)
+		return ret;
+
+	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), minor);
+	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
+	//mpath_disk->cdev_device.release = nvme_cdev_rel;
+	device_initialize(&mpath_disk->cdev_device);
+	cdev_init(&mpath_disk->cdev, &scsi_mpath_generic_chr_fops);
+	mpath_disk->cdev.owner = THIS_MODULE;
+	ret = cdev_device_add(&mpath_disk->cdev, &mpath_disk->cdev_device);
+	pr_err("%s1 called cdev_device_add ret=%d\n", __func__, ret);
+	if (ret)
+		put_device(&mpath_disk->cdev_device);
+	return ret;
+}
 
 void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
 {
@@ -1577,20 +1595,24 @@ static int __init init_scsi_mp(void)
 
 	if (err < 0)
 		return err;
-	err = __register_blkdev(0, "scsi-mpath", scsi_mpath_disk_probe);
-	pr_err("%s err=%d\n", __func__, err);
+	err = __register_blkdev(0, "scsi-mpath-disk", scsi_mpath_disk_probe);
 	if (err < 0)
-		goto destroy_class;
+		goto destroy_disk_class;
 	scsi_mpath_disk_major = err;
 	err = alloc_chrdev_region(&scsi_mpath_disk_chr_devt, 0, 1U << MINORBITS,
 				     "scsi-mpath-generic");
 	if (err < 0)
 		goto unregister_blkdev;
+	err = class_register(&scsi_mpath_generic_class);
+	if (err < 0)
+		goto unregister_chrdev;
 
 	return 0;
+unregister_chrdev:
+	unregister_chrdev_region(scsi_mpath_disk_chr_devt, 1U << MINORBITS);
 unregister_blkdev:
-
-destroy_class:
+	unregister_blkdev(0, "scsi-mpath-disk");
+destroy_disk_class:
 	class_unregister(&scsi_mpath_disk_class);
 	return err;
 }
