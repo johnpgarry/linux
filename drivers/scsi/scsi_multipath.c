@@ -763,35 +763,101 @@ static inline struct nvme_ns_head *cdev_to_ns_head(struct cdev *cdev)
 	return container_of(cdev, struct nvme_ns_head, cdev);
 }
 
-static int nvme_ns_head_chr_open(struct inode *inode, struct file *file)
+#endif
+
+static void scsi_mpath_free(struct kref *ref)
 {
-	if (!nvme_tryget_ns_head(cdev_to_ns_head(inode->i_cdev)))
+	struct scsi_mpath_disk *mpath_disk =
+		container_of(ref, struct scsi_mpath_disk, ref);
+
+	pr_err("%s ref=%pS mpath_disk=%pS\n", __func__, ref, mpath_disk);
+	/*
+	nvme_mpath_put_disk(head);
+	ida_free(&head->subsys->ns_ida, head->instance);
+	cleanup_srcu_struct(&head->srcu);
+	nvme_put_subsystem(head->subsys);
+	kfree(head->plids);
+	kfree(head);
+	*/
+}
+
+
+static int scsi_mpath_generic_chr_open(struct inode *inode, struct file *file)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct scsi_mpath_disk *mpath_disk = container_of(cdev, struct scsi_mpath_disk, cdev);
+
+	pr_err("%s cdev=%pS mpath_disk=%pS\n", __func__, cdev, mpath_disk);
+
+	if (!kref_get_unless_zero(&mpath_disk->ref)) {
+		pr_err("%s1 mpath_disk=%pS ENXIO\n", __func__, mpath_disk);
 		return -ENXIO;
+	}
 	return 0;
 }
 
-static int nvme_ns_head_chr_release(struct inode *inode, struct file *file)
+static int scsi_mpath_generic_chr_release(struct inode *inode, struct file *file)
 {
-	nvme_put_ns_head(cdev_to_ns_head(inode->i_cdev));
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct scsi_mpath_disk *mpath_disk = container_of(cdev, struct scsi_mpath_disk, cdev);
+
+	pr_err("%s cdev=%pS mpath_disk=%pS\n", __func__, cdev, mpath_disk);
+
+	kref_put(&mpath_disk->ref, scsi_mpath_free);
 	return 0;
 }
-#endif
 
 static long scsi_mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 		unsigned long arg)
 {
 	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct scsi_mpath_disk *mpath_disk = container_of(cdev, struct scsi_mpath_disk, cdev);
+	struct scsi_mpath_device *mpath_dev;
+	struct scsi_device *sdev;
+	fmode_t mode = file->f_mode;
+	int srcu_idx, err;
 
-	pr_err("%s cdev=%pS cmd=0x%x arg=%ld\n", __func__, cdev, cmd, arg);
+	pr_err("%s cdev=%pS cmd=0x%x arg=%ld mpath_disk=%pS\n", __func__, cdev, cmd, arg, mpath_disk);
+	
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	mpath_dev = scsi_find_path(mpath_disk);
+	pr_err("%s1 cmd=0x%x arg=%ld mpath_disk=%pS called scsi_find_path srcu_idx=%d mpath_dev=%pS\n",
+		__func__, cmd, arg, mpath_disk, srcu_idx, mpath_dev);
+	if (!mpath_dev)
+		goto out_unlock;
+	sdev = mpath_dev->sdev;
+	pr_err("%s2 cmd=0x%x arg=%ld sdev=%pS\n", __func__, cmd, arg, sdev);
 
-	return 0;
+//	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO)) {
+//		err = -ENOIOCTLCMD;
+//		goto out_unlock;
+//	}
+
+	/*
+	 * If we are in the middle of error recovery, don't let anyone
+	 * else try and use this device.  Also, if error recovery fails, it
+	 * may try and take the device offline, in which case all further
+	 * access to the device is prohibited.
+	 */
+	err = scsi_ioctl_block_when_processing_errors(sdev, cmd,
+			(mode & O_NDELAY));
+	if (err)
+		goto out_unlock;
+
+	pr_err("%s3 cmd=0x%x arg=%ld sdev=%pS calling scsi_ioctl\n", __func__, cmd, arg, sdev);
+	err = scsi_ioctl(sdev, file->f_mode & FMODE_WRITE, cmd, (void __user *)arg);
+	pr_err("%s3.1 cmd=0x%x arg=%ld sdev=%pS called scsi_ioctl err=%d\n", __func__, cmd, arg, sdev, err);
+
+out_unlock:
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+	return err;
 }
 static const struct file_operations scsi_mpath_generic_chr_fops = {
 	.owner		= THIS_MODULE,
-//	.open		= nvme_ns_head_chr_open,
-//	.release	= nvme_ns_head_chr_release,
+	.open		= scsi_mpath_generic_chr_open,
+	.release	= scsi_mpath_generic_chr_release,
 	.unlocked_ioctl	= scsi_mpath_generic_chr_ioctl,
-//	.compat_ioctl	= compat_ptr_ioctl,
+	.compat_ioctl	= compat_ptr_ioctl,
 };
 
 #ifdef dsdsddsds
@@ -1076,22 +1142,6 @@ static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 	}
 
 	return 0;
-}
-
-static void scsi_mpath_free(struct kref *ref)
-{
-	struct scsi_mpath_disk *mpath_disk =
-		container_of(ref, struct scsi_mpath_disk, ref);
-
-	pr_err("%s ref=%pS mpath_disk=%pS\n", __func__, ref, mpath_disk);
-	/*
-	nvme_mpath_put_disk(head);
-	ida_free(&head->subsys->ns_ida, head->instance);
-	cleanup_srcu_struct(&head->srcu);
-	nvme_put_subsystem(head->subsys);
-	kfree(head->plids);
-	kfree(head);
-	*/
 }
 
 static void scsi_mpath_release(struct gendisk *disk)
