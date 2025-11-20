@@ -1339,7 +1339,7 @@ failed:
 	kfree(h);
 	return err;
 }
-EXPORT_SYMBOL_GPL(alua_bus_attach);
+EXPORT_SYMBOL_NS_GPL(alua_bus_attach, "SCSI_DH_ALUA");
 
 /*
  * alua_bus_detach - Detach device handler
