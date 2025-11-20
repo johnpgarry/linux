@@ -18,6 +18,8 @@
 #include <scsi/scsi_ioctl.h>
 #include "device_handler/scsi_dh_alua.h"
 
+MODULE_IMPORT_NS("SCSI_DH_ALUA");
+
 static DEFINE_IDA(sd_mpath_index_ida);
 
 static dev_t scsi_mpath_disk_major;
