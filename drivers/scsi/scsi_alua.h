@@ -71,4 +71,6 @@ struct scsi_alua_port_group {
 	struct scsi_device	*rtpg_sdev;
 };
 
+int scsi_alua_check_tpgs(struct scsi_device *sdev);
+
 #endif // _SCSI_ALUA_H

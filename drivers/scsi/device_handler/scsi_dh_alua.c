@@ -311,59 +311,6 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 }
 
 /*
- * alua_check_tpgs - Evaluate TPGS setting
- * @sdev: device to be checked
- *
- * Examine the TPGS setting of the sdev to find out if ALUA
- * is supported.
- */
-static int alua_check_tpgs(struct scsi_device *sdev)
-{
-	int tpgs = TPGS_MODE_NONE;
-
-	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
-	/*
-	 * ALUA support for non-disk devices is fraught with
-	 * difficulties, so disable it for now.
-	 */
-	if (sdev->type != TYPE_DISK) {
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: disable for non-disk devices\n",
-			    ALUA_DH_NAME);
-		return tpgs;
-	}
-
-	tpgs = scsi_device_tpgs(sdev);
-	switch (tpgs) {
-	case TPGS_MODE_EXPLICIT|TPGS_MODE_IMPLICIT:
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: supports implicit and explicit TPGS\n",
-			    ALUA_DH_NAME);
-		break;
-	case TPGS_MODE_EXPLICIT:
-		sdev_printk(KERN_INFO, sdev, "%s: supports explicit TPGS\n",
-			    ALUA_DH_NAME);
-		break;
-	case TPGS_MODE_IMPLICIT:
-		sdev_printk(KERN_INFO, sdev, "%s: supports implicit TPGS\n",
-			    ALUA_DH_NAME);
-		break;
-	case TPGS_MODE_NONE:
-		sdev_printk(KERN_INFO, sdev, "%s: not supported\n",
-			    ALUA_DH_NAME);
-		break;
-	default:
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: unsupported TPGS setting %d\n",
-			    ALUA_DH_NAME, tpgs);
-		tpgs = TPGS_MODE_NONE;
-		break;
-	}
-
-	return tpgs;
-}
-
-/*
  * alua_check_vpd - Evaluate INQUIRY vpd page 0x83
  * @sdev: device to be checked
  *
@@ -1135,7 +1082,7 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 	pr_err("%s sdev=%pS h=%pS calling alua_check_tpgs\n", __func__, sdev, h);
 	mutex_lock(&h->init_mutex);
 	h->disabled = false;
-	tpgs = alua_check_tpgs(sdev);
+	tpgs = scsi_alua_check_tpgs(sdev);
 	pr_err("%s2 sdev=%pS h=%pS called alua_check_tpgs tpgs=%d\n", __func__, sdev, h, tpgs);
 	if (tpgs != TPGS_MODE_NONE) {
 		pr_err("%s2 sdev=%pS h=%pS calling alua_check_vpd tpgs=%d\n", __func__, sdev, h, tpgs);
