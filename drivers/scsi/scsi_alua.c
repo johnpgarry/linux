@@ -8,6 +8,24 @@
 
 #define DRV_NAME "scsi_alua"
 
+static struct workqueue_struct *kaluad_wq;
+
+static LIST_HEAD(port_group_list);
+static DEFINE_SPINLOCK(port_group_lock);
+
+static void scsi_release_port_group(struct kref *kref)
+{
+	struct scsi_alua_port_group *pg;
+
+	pg = container_of(kref, struct scsi_alua_port_group, kref);
+	if (pg->rtpg_sdev)
+		flush_delayed_work(&pg->rtpg_work);
+	spin_lock(&port_group_lock);
+	list_del(&pg->node);
+	spin_unlock(&port_group_lock);
+	kfree_rcu(pg, rcu);
+}
+
 /*
  * alua_check_tpgs - Evaluate TPGS setting
  * @sdev: device to be checked
@@ -76,9 +94,9 @@ int scsi_alua_check_tpgs(struct scsi_device *sdev)
  * Context: may be called from atomic context (alua_check()) only if the caller
  *	holds an sdev reference.
  */
-bool scsi_alua_rtpg_queue(struct alua_port_group *pg,
+bool scsi_alua_rtpg_queue(struct scsi_alua_port_group *pg,
 			    struct scsi_device *sdev,
-			    struct alua_queue_data *qdata, bool force)
+			    struct scsi_alua_queue_data *qdata, bool force)
 {
 	int start_queue = 0;
 	unsigned long flags;
@@ -94,16 +112,16 @@ bool scsi_alua_rtpg_queue(struct alua_port_group *pg,
 		force = true;
 	}
 	if (pg->rtpg_sdev == NULL) {
-		struct alua_dh_data *h = sdev->handler_data;
+	//	struct alua_dh_data *h = sdev->handler_data;
 
 		rcu_read_lock();
-		if (h && rcu_dereference(h->pg) == pg) {
-			pg->interval = 0;
-			pg->flags |= ALUA_PG_RUN_RTPG;
-			kref_get(&pg->kref);
-			pg->rtpg_sdev = sdev;
-			start_queue = 1;
-		}
+	//	if (h && rcu_dereference(h->pg) == pg) {
+	//		pg->interval = 0;
+	//		pg->flags |= ALUA_PG_RUN_RTPG;
+	//		kref_get(&pg->kref);
+	//		pg->rtpg_sdev = sdev;
+	//		start_queue = 1;
+	//	}
 		rcu_read_unlock();
 	} else if (!(pg->flags & ALUA_PG_RUN_RTPG) && force) {
 		pg->flags |= ALUA_PG_RUN_RTPG;
@@ -121,86 +139,10 @@ bool scsi_alua_rtpg_queue(struct alua_port_group *pg,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS)))
 			sdev = NULL;
 		else
-			kref_put(&pg->kref, release_port_group);
+			kref_put(&pg->kref, scsi_release_port_group);
 	}
 	if (sdev)
 		scsi_device_put(sdev);
 
 	return true;
-}
-
-/*
- * alua_check_vpd - Evaluate INQUIRY vpd page 0x83
- * @sdev: device to be checked
- *
- * Extract the relative target port and the target port group
- * descriptor from the list of identificators.
- */
-int scsi_alua_check_vpd(struct scsi_device *sdev, int tpgs)
-{
-	int rel_port = -1, group_id;
-	struct alua_port_group *pg, *old_pg = NULL;
-	bool pg_updated = false;
-	unsigned long flags;
-
-	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS\n", __func__, sdev);
-	group_id = scsi_vpd_tpg_id(sdev, &rel_port);
-	if (group_id < 0) {
-		/*
-		 * Internal error; TPGS supported but required
-		 * VPD identification descriptors not present.
-		 * Disable ALUA support
-		 */
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: No target port descriptors found\n",
-			    ALUA_DH_NAME);
-		return SCSI_DH_DEV_UNSUPP;
-	}
-
-	pg = scsi_alua_alloc_pg(sdev, group_id, tpgs);
-	if (IS_ERR(pg)) {
-		if (PTR_ERR(pg) == -ENOMEM)
-			return SCSI_DH_NOMEM;
-		return SCSI_DH_DEV_UNSUPP;
-	}
-	if (pg->device_id_len)
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: device %s port group %x rel port %x\n",
-			    ALUA_DH_NAME, pg->device_id_str,
-			    group_id, rel_port);
-	else
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: port group %x rel port %x\n",
-			    ALUA_DH_NAME, group_id, rel_port);
-
-	kref_get(&pg->kref);
-
-	/* Check for existing port group references */
-	spin_lock(&h->pg_lock);
-	old_pg = rcu_dereference_protected(h->pg, lockdep_is_held(&h->pg_lock));
-	if (old_pg != pg) {
-		/* port group has changed. Update to new port group */
-		if (h->pg) {
-			spin_lock_irqsave(&old_pg->lock, flags);
-			list_del_rcu(&h->node);
-			spin_unlock_irqrestore(&old_pg->lock, flags);
-		}
-		rcu_assign_pointer(h->pg, pg);
-		pg_updated = true;
-	}
-
-	spin_lock_irqsave(&pg->lock, flags);
-	if (pg_updated)
-		list_add_rcu(&h->node, &pg->dh_list);
-	spin_unlock_irqrestore(&pg->lock, flags);
-
-	spin_unlock(&h->pg_lock);
-
-	scsi_alua_rtpg_queue(pg, sdev, NULL, true);
-	kref_put(&pg->kref, release_port_group);
-
-	if (old_pg)
-		kref_put(&old_pg->kref, release_port_group);
-
-	return 0;
 }

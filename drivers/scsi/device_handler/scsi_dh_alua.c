@@ -39,19 +39,10 @@ struct alua_dh_data {
 	bool			disabled;
 };
 
-struct alua_queue_data {
-	struct list_head	entry;
-	activate_complete	callback_fn;
-	void			*callback_data;
-};
-
 #define ALUA_POLICY_SWITCH_CURRENT	0
 #define ALUA_POLICY_SWITCH_ALL		1
 
 static void alua_rtpg_work(struct work_struct *work);
-static bool alua_rtpg_queue(struct alua_port_group *pg,
-			    struct scsi_device *sdev,
-			    struct alua_queue_data *qdata, bool force);
 static void alua_check(struct scsi_device *sdev, bool force);
 
 static void release_port_group(struct kref *kref)
@@ -644,7 +635,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 					tmp_pg->pref = desc[0] >> 7;
 					rcu_read_lock();
 					list_for_each_entry_rcu(h,
-						&tmp_pg->dh_list, node) {
+						&a->dh_list, node) {
 						if (!h->sdev)
 							continue;
 						h->sdev->access_state = desc[0];
@@ -841,7 +832,7 @@ static void alua_rtpg_work(struct work_struct *work)
 	struct scsi_device *sdev, *prev_sdev = NULL;
 	LIST_HEAD(qdata_list);
 	int err = SCSI_DH_OK;
-	struct alua_queue_data *qdata, *tmp;
+	struct scsi_alua_queue_data *qdata, *tmp;
 	struct alua_dh_data *h;
 	unsigned long flags;
 
@@ -966,7 +957,7 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 	pr_err("%s2 sdev=%pS h=%pS called alua_check_tpgs tpgs=%d\n", __func__, sdev, h, tpgs);
 	if (tpgs != TPGS_MODE_NONE) {
 		pr_err("%s2 sdev=%pS h=%pS calling alua_check_vpd tpgs=%d\n", __func__, sdev, h, tpgs);
-		err = scsi_alua_check_vpd(sdev, h, tpgs);
+		err = alua_check_vpd(sdev, h, tpgs);
 	}
 	h->init_error = err;
 	mutex_unlock(&h->init_mutex);
@@ -1032,7 +1023,7 @@ static int alua_activate(struct scsi_device *sdev,
 {
 	struct alua_dh_data *h = sdev->handler_data;
 	int err = SCSI_DH_OK;
-	struct alua_queue_data *qdata;
+	struct scsi_alua_queue_data *qdata;
 	struct alua_port_group *pg;
 
 	sdev_printk(KERN_ERR, sdev, "%s data=%pS\n", __func__, data);
