@@ -1673,7 +1673,10 @@ static int sd_ioctl(struct block_device *bdev, blk_mode_t mode,
 		return sed_ioctl(sdkp->opal_dev, cmd, p);
 	}
 	sd_printk(KERN_INFO, sdkp, "sd_ioctl3: calling scsi_ioctl\n");
-	return scsi_ioctl(sdp, mode & BLK_OPEN_WRITE, cmd, p);
+	error = scsi_ioctl(sdp, mode & BLK_OPEN_WRITE, cmd, p);
+	sd_printk(KERN_INFO, sdkp, "sd_ioctl10: called scsi_ioctl error=%d\n", error);
+
+	return error;
 }
 
 static void set_media_not_present(struct scsi_disk *sdkp)
