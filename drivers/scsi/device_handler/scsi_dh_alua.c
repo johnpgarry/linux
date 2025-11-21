@@ -14,43 +14,10 @@
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_dh.h>
+#include "../scsi_alua.h"
 
-#include "scsi_dh_alua.h"
-
-#define ALUA_DH_NAME "alua"
+#define ALUA_DH_NAME "dh_alua"
 #define ALUA_DH_VER "2.0"
-
-#define TPGS_SUPPORT_NONE		0x00
-#define TPGS_SUPPORT_OPTIMIZED		0x01
-#define TPGS_SUPPORT_NONOPTIMIZED	0x02
-#define TPGS_SUPPORT_STANDBY		0x04
-#define TPGS_SUPPORT_UNAVAILABLE	0x08
-#define TPGS_SUPPORT_LBA_DEPENDENT	0x10
-#define TPGS_SUPPORT_OFFLINE		0x40
-#define TPGS_SUPPORT_TRANSITION		0x80
-#define TPGS_SUPPORT_ALL		0xdf
-
-#define RTPG_FMT_MASK			0x70
-#define RTPG_FMT_EXT_HDR		0x10
-
-#define TPGS_MODE_UNINITIALIZED		 -1
-#define TPGS_MODE_NONE			0x0
-#define TPGS_MODE_IMPLICIT		0x1
-#define TPGS_MODE_EXPLICIT		0x2
-
-#define ALUA_RTPG_SIZE			128
-#define ALUA_FAILOVER_TIMEOUT		60
-#define ALUA_FAILOVER_RETRIES		5
-#define ALUA_RTPG_DELAY_MSECS		5
-#define ALUA_RTPG_RETRY_DELAY		2
-
-/* device handler flags */
-#define ALUA_OPTIMIZE_STPG		0x01
-#define ALUA_RTPG_EXT_HDR_UNSUPP	0x02
-/* State machine flags */
-#define ALUA_PG_RUN_RTPG		0x10
-#define ALUA_PG_RUN_STPG		0x20
-#define ALUA_PG_RUNNING			0x40
 
 static uint optimize_stpg;
 module_param(optimize_stpg, uint, S_IRUGO|S_IWUSR);
@@ -60,27 +27,6 @@ static LIST_HEAD(port_group_list);
 static DEFINE_SPINLOCK(port_group_lock);
 static struct workqueue_struct *kaluad_wq;
 
-struct alua_port_group {
-	struct kref		kref;
-	struct rcu_head		rcu;
-	struct list_head	node;
-	struct list_head	dh_list;
-	unsigned char		device_id_str[256];
-	int			device_id_len;
-	int			group_id;
-	int			tpgs;
-	int			state;
-	int			pref;
-	int			valid_states;
-	unsigned		flags; /* used for optimizing STPG */
-	unsigned char		transition_tmo;
-	unsigned long		expiry;
-	unsigned long		interval;
-	struct delayed_work	rtpg_work;
-	spinlock_t		lock;
-	struct list_head	rtpg_list;
-	struct scsi_device	*rtpg_sdev;
-};
 
 struct alua_dh_data {
 	struct list_head	node;
@@ -309,59 +255,6 @@ static struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 	spin_unlock(&port_group_lock);
 
 	return pg;
-}
-
-/*
- * alua_check_tpgs - Evaluate TPGS setting
- * @sdev: device to be checked
- *
- * Examine the TPGS setting of the sdev to find out if ALUA
- * is supported.
- */
-static int alua_check_tpgs(struct scsi_device *sdev)
-{
-	int tpgs = TPGS_MODE_NONE;
-
-	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
-	/*
-	 * ALUA support for non-disk devices is fraught with
-	 * difficulties, so disable it for now.
-	 */
-	if (sdev->type != TYPE_DISK) {
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: disable for non-disk devices\n",
-			    ALUA_DH_NAME);
-		return tpgs;
-	}
-
-	tpgs = scsi_device_tpgs(sdev);
-	switch (tpgs) {
-	case TPGS_MODE_EXPLICIT|TPGS_MODE_IMPLICIT:
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: supports implicit and explicit TPGS\n",
-			    ALUA_DH_NAME);
-		break;
-	case TPGS_MODE_EXPLICIT:
-		sdev_printk(KERN_INFO, sdev, "%s: supports explicit TPGS\n",
-			    ALUA_DH_NAME);
-		break;
-	case TPGS_MODE_IMPLICIT:
-		sdev_printk(KERN_INFO, sdev, "%s: supports implicit TPGS\n",
-			    ALUA_DH_NAME);
-		break;
-	case TPGS_MODE_NONE:
-		sdev_printk(KERN_INFO, sdev, "%s: not supported\n",
-			    ALUA_DH_NAME);
-		break;
-	default:
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: unsupported TPGS setting %d\n",
-			    ALUA_DH_NAME, tpgs);
-		tpgs = TPGS_MODE_NONE;
-		break;
-	}
-
-	return tpgs;
 }
 
 /*
@@ -1055,73 +948,6 @@ queue_rtpg:
 	queue_delayed_work(kaluad_wq, &pg->rtpg_work, pg->interval * HZ);
 }
 
-/**
- * alua_rtpg_queue() - cause RTPG to be submitted asynchronously
- * @pg: ALUA port group associated with @sdev.
- * @sdev: SCSI device for which to submit an RTPG.
- * @qdata: Information about the callback to invoke after the RTPG.
- * @force: Whether or not to submit an RTPG if a work item that will submit an
- *         RTPG already has been scheduled.
- *
- * Returns true if and only if alua_rtpg_work() will be called asynchronously.
- * That function is responsible for calling @qdata->fn().
- *
- * Context: may be called from atomic context (alua_check()) only if the caller
- *	holds an sdev reference.
- */
-static bool alua_rtpg_queue(struct alua_port_group *pg,
-			    struct scsi_device *sdev,
-			    struct alua_queue_data *qdata, bool force)
-{
-	int start_queue = 0;
-	unsigned long flags;
-
-	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
-	if (WARN_ON_ONCE(!pg) || scsi_device_get(sdev))
-		return false;
-
-	spin_lock_irqsave(&pg->lock, flags);
-	if (qdata) {
-		list_add_tail(&qdata->entry, &pg->rtpg_list);
-		pg->flags |= ALUA_PG_RUN_STPG;
-		force = true;
-	}
-	if (pg->rtpg_sdev == NULL) {
-		struct alua_dh_data *h = sdev->handler_data;
-
-		rcu_read_lock();
-		if (h && rcu_dereference(h->pg) == pg) {
-			pg->interval = 0;
-			pg->flags |= ALUA_PG_RUN_RTPG;
-			kref_get(&pg->kref);
-			pg->rtpg_sdev = sdev;
-			start_queue = 1;
-		}
-		rcu_read_unlock();
-	} else if (!(pg->flags & ALUA_PG_RUN_RTPG) && force) {
-		pg->flags |= ALUA_PG_RUN_RTPG;
-		/* Do not queue if the worker is already running */
-		if (!(pg->flags & ALUA_PG_RUNNING)) {
-			kref_get(&pg->kref);
-			start_queue = 1;
-		}
-	}
-
-	spin_unlock_irqrestore(&pg->lock, flags);
-
-	if (start_queue) {
-		if (queue_delayed_work(kaluad_wq, &pg->rtpg_work,
-				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS)))
-			sdev = NULL;
-		else
-			kref_put(&pg->kref, release_port_group);
-	}
-	if (sdev)
-		scsi_device_put(sdev);
-
-	return true;
-}
-
 /*
  * alua_initialize - Initialize ALUA state
  * @sdev: the device to be initialized
@@ -1136,11 +962,11 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 	pr_err("%s sdev=%pS h=%pS calling alua_check_tpgs\n", __func__, sdev, h);
 	mutex_lock(&h->init_mutex);
 	h->disabled = false;
-	tpgs = alua_check_tpgs(sdev);
+	tpgs = scsi_alua_check_tpgs(sdev);
 	pr_err("%s2 sdev=%pS h=%pS called alua_check_tpgs tpgs=%d\n", __func__, sdev, h, tpgs);
 	if (tpgs != TPGS_MODE_NONE) {
 		pr_err("%s2 sdev=%pS h=%pS calling alua_check_vpd tpgs=%d\n", __func__, sdev, h, tpgs);
-		err = alua_check_vpd(sdev, h, tpgs);
+		err = scsi_alua_check_vpd(sdev, h, tpgs);
 	}
 	h->init_error = err;
 	mutex_unlock(&h->init_mutex);
@@ -1201,7 +1027,7 @@ static int alua_set_params(struct scsi_device *sdev, const char *params)
  * based on a certain policy. But until we actually encounter them it
  * should be okay.
  */
-int alua_activate(struct scsi_device *sdev,
+static int alua_activate(struct scsi_device *sdev,
 			activate_complete fn, void *data)
 {
 	struct alua_dh_data *h = sdev->handler_data;
@@ -1243,7 +1069,6 @@ out:
 		fn(data, err);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(alua_activate);
 
 /*
  * alua_check - check path status
@@ -1312,7 +1137,7 @@ static void alua_rescan(struct scsi_device *sdev)
  * alua_bus_attach - Attach device handler
  * @sdev: device to be attached to
  */
-int alua_bus_attach(struct scsi_device *sdev)
+static int alua_bus_attach(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h;
 	int err;
@@ -1339,7 +1164,6 @@ failed:
 	kfree(h);
 	return err;
 }
-EXPORT_SYMBOL_NS_GPL(alua_bus_attach, "SCSI_DH_ALUA");
 
 /*
  * alua_bus_detach - Detach device handler
