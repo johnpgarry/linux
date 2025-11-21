@@ -49,14 +49,6 @@
 #define ALUA_PG_RUN_STPG		0x20
 #define ALUA_PG_RUNNING			0x40
 
-typedef void (*scsi_activate_complete)(void *, int);
-
-struct scsi_alua_queue_data {
-	struct list_head	entry;
-	scsi_activate_complete	callback_fn;
-	void			*callback_data;
-};
-
 struct scsi_alua_port_group {
 	struct kref		kref;
 	struct rcu_head		rcu;
@@ -78,12 +70,5 @@ struct scsi_alua_port_group {
 	struct list_head	rtpg_list;
 	struct scsi_device	*rtpg_sdev;
 };
-
-int scsi_alua_check_tpgs(struct scsi_device *sdev);
-
-
-bool scsi_alua_rtpg_queue(struct scsi_alua_port_group *pg,
-			    struct scsi_device *sdev,
-			    struct scsi_alua_queue_data *qdata, bool force);
 
 #endif // _SCSI_ALUA_H
