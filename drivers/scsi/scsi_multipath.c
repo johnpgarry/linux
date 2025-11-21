@@ -16,7 +16,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_multipath.h>
 #include <scsi/scsi_ioctl.h>
-#include "device_handler/scsi_dh_alua.h"
+#include "scsi_alua.h"
 
 MODULE_IMPORT_NS("SCSI_DH_ALUA");
 
@@ -1411,7 +1411,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		return 0;
 	}
 
-	if (alua_bus_attach(sdev)) {
+	if (1/*alua_bus_attach(sdev)*/) {
 		sdev_printk(KERN_NOTICE, sdev,
 		    "%s sdev=%pS alua_bus_attach failed\n", __func__, sdev);
 
