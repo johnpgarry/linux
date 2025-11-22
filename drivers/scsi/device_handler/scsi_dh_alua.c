@@ -19,29 +19,6 @@
 #define ALUA_DH_NAME "alua"
 #define ALUA_DH_VER "2.0"
 
-#define TPGS_SUPPORT_NONE		0x00
-#define TPGS_SUPPORT_OPTIMIZED		0x01
-#define TPGS_SUPPORT_NONOPTIMIZED	0x02
-#define TPGS_SUPPORT_STANDBY		0x04
-#define TPGS_SUPPORT_UNAVAILABLE	0x08
-#define TPGS_SUPPORT_LBA_DEPENDENT	0x10
-#define TPGS_SUPPORT_OFFLINE		0x40
-#define TPGS_SUPPORT_TRANSITION		0x80
-#define TPGS_SUPPORT_ALL		0xdf
-
-#define RTPG_FMT_MASK			0x70
-#define RTPG_FMT_EXT_HDR		0x10
-
-#define TPGS_MODE_UNINITIALIZED		 -1
-#define TPGS_MODE_NONE			0x0
-#define TPGS_MODE_IMPLICIT		0x1
-#define TPGS_MODE_EXPLICIT		0x2
-
-#define ALUA_RTPG_SIZE			128
-#define ALUA_FAILOVER_TIMEOUT		60
-#define ALUA_FAILOVER_RETRIES		5
-#define ALUA_RTPG_DELAY_MSECS		5
-#define ALUA_RTPG_RETRY_DELAY		2
 
 /* device handler flags */
 #define ALUA_OPTIMIZE_STPG		0x01
@@ -149,13 +126,13 @@ static int submit_stpg(struct scsi_device *sdev, int group_id,
 	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	/* Prepare the data buffer */
 	memset(stpg_data, 0, stpg_len);
-	stpg_data[4] = SCSI_ACCESS_STATE_OPTIMAL;
+	stpg_data[4] = SCSI_ACCESS_STATE_OPTIMAL; // see spc5 r22 table 297
 	put_unaligned_be16(group_id, &stpg_data[6]);
 
 	/* Prepare the command. */
 	memset(cdb, 0x0, MAX_COMMAND_SIZE);
 	cdb[0] = MAINTENANCE_OUT;
-	cdb[1] = MO_SET_TARGET_PGS;
+	cdb[1] = MO_SET_TARGET_PGS; //spc5 r22 table 298 SET TARGET PORT GROUPS
 	put_unaligned_be32(stpg_len, &cdb[6]);
 
 	return scsi_execute_cmd(sdev, cdb, opf, stpg_data,
