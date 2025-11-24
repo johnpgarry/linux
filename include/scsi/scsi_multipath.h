@@ -17,6 +17,7 @@ struct scsi_device;
 enum scsi_mpath_iopolicy {
 	SCSI_MPATH_IOPOLICY_NUMA,
 	SCSI_MPATH_IOPOLICY_RR,
+	SCSI_MPATH_IOPOLICY_QD,
 };
 
 enum scsi_mpath_access_state {

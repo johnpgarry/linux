@@ -35,6 +35,7 @@ MODULE_PARM_DESC(scsi_multipath,
 static const char *scsi_mpath_iopolicy_names[] = {
 	[SCSI_MPATH_IOPOLICY_NUMA]	= "numa",
 	[SCSI_MPATH_IOPOLICY_RR]	= "round-robin",
+	[SCSI_MPATH_IOPOLICY_QD]	= "queue-depth",
 };
 
 static int iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
@@ -231,6 +232,8 @@ static int scsi_set_iopolicy(const char *val, const struct kernel_param *kp)
 		iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
 	else if (!strncmp(val, "round-robin", 11))
 		iopolicy = SCSI_MPATH_IOPOLICY_RR;
+	else if (!strncmp(val, "queue-depth", 11))
+		iopolicy = SCSI_MPATH_IOPOLICY_QD;
 	else
 		return -EINVAL;
 
@@ -441,6 +444,45 @@ static struct scsi_mpath_device *scsi_next_mpath_dev(struct scsi_mpath_disk *mpa
 	return NULL;
 }
 
+static struct scsi_mpath_device *scsi_mpath_qd_path(struct scsi_mpath_disk *mpath_disk)
+{
+	struct scsi_mpath_device *best_opt = NULL, *best_nonopt = NULL, *mpath_dev;
+	unsigned int min_depth_opt = UINT_MAX, min_depth_nonopt = UINT_MAX;
+	unsigned int depth;
+
+	pr_err("%s mpath_disk=%pS min_depth_nonopt=%d\n", __func__, mpath_disk, min_depth_nonopt);
+	list_for_each_entry_srcu(mpath_dev, &mpath_disk->dev_list, entry,
+				 srcu_read_lock_held(&mpath_disk->srcu)) {
+	//	if (nvme_path_is_disabled(ns))
+	//		continue;
+
+		depth = atomic_read(&mpath_dev->nr_active);
+
+/*
+		switch (ns->ana_state) {
+		case NVME_ANA_OPTIMIZED:
+			if (depth < min_depth_opt) {
+				min_depth_opt = depth;
+				best_opt = ns;
+			}
+			break;
+		case NVME_ANA_NONOPTIMIZED:
+			if (depth < min_depth_nonopt) {
+				min_depth_nonopt = depth;
+				best_nonopt = ns;
+			}
+			break;
+		default:
+			break;
+		}
+*/
+		if (min_depth_opt == 0)
+			return best_opt;
+	}
+
+	return best_opt ? best_opt : best_nonopt;
+}
+
 static struct scsi_mpath_device *scsi_mpath_round_robin_path(struct scsi_mpath_disk *mpath_disk,
 	int node, struct scsi_mpath_device *old_mpath_dev)
 {
@@ -543,6 +585,8 @@ inline struct scsi_mpath_device *scsi_find_path(struct scsi_mpath_disk *mpath_di
 
 	if (READ_ONCE(mpath_disk->iopolicy) == SCSI_MPATH_IOPOLICY_RR)
 		return scsi_mpath_round_robin_path(mpath_disk, node, mpath_dev);
+	if (READ_ONCE(mpath_disk->iopolicy) == SCSI_MPATH_IOPOLICY_QD)
+		return scsi_mpath_qd_path(mpath_disk);
 
 	if (unlikely(!scsi_mpath_is_optimized(mpath_dev)))
 		return __scsi_find_path(mpath_disk, node);
@@ -1507,8 +1551,16 @@ void scsi_mpath_start_request(struct request *req)
 {
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = scmd->device;
-	struct scsi_mpath_disk *mpath_disk = sdev->mpath_dev->disk;
+	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
+	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
 	struct gendisk *disk = mpath_disk->gd;
+
+
+	if ((READ_ONCE(mpath_disk->iopolicy) == SCSI_MPATH_IOPOLICY_QD) &&
+	    !(scmd->flags & SCMD_MPATH_CNT_ACTIVE)) {
+		atomic_inc(&mpath_dev->nr_active);
+		scmd->flags |= SCMD_MPATH_CNT_ACTIVE;
+	}
 
 	if (!blk_queue_io_stat(disk->queue) || blk_rq_is_passthrough(req) ||
 	    (scmd->flags & SCMD_MPATH_IO_STATS))
@@ -1523,10 +1575,13 @@ void scsi_mpath_end_request(struct request *req)
 {
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = scmd->device;
-	struct scsi_mpath_disk *mpath_disk = sdev->mpath_dev->disk;
+	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
+	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
 	struct gendisk *disk = mpath_disk->gd;
 
 	pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
+	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE)
+		atomic_dec_if_positive(&mpath_dev->nr_active);
 
 	if (!(scmd->flags & SCMD_MPATH_IO_STATS))
 		return;
