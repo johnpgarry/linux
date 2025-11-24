@@ -1505,17 +1505,34 @@ EXPORT_SYMBOL_GPL(scsi_mpath_alloc_disk);
 
 void scsi_mpath_start_request(struct request *req)
 {
-	__maybe_unused struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
-	__maybe_unused struct scsi_device *sdev = cmd->device;
-	__maybe_unused struct scsi_mpath_disk *mpath_disk = sdev->mpath_dev->disk;
+	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
+	struct scsi_device *sdev = scmd->device;
+	struct scsi_mpath_disk *mpath_disk = sdev->mpath_dev->disk;
+	struct gendisk *disk = mpath_disk->gd;
+
+	if (!blk_queue_io_stat(disk->queue) || blk_rq_is_passthrough(req) ||
+	    (scmd->flags & SCMD_MPATH_IO_STATS))
+		return;
+
+	scmd->flags |= SCMD_MPATH_IO_STATS;
+	scmd->mpath_start_time = bdev_start_io_acct(disk->part0, req_op(req),
+						      jiffies);
 }
 
 void scsi_mpath_end_request(struct request *req)
 {
-	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
-	struct scsi_device *sdev = cmd->device;
+	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
+	struct scsi_device *sdev = scmd->device;
+	struct scsi_mpath_disk *mpath_disk = sdev->mpath_dev->disk;
+	struct gendisk *disk = mpath_disk->gd;
 
-	pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, cmd, sdev);
+	pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
+
+	if (!(scmd->flags & SCMD_MPATH_IO_STATS))
+		return;
+	bdev_end_io_acct(disk->part0, req_op(req),
+			 blk_rq_bytes(req) >> SECTOR_SHIFT,
+			  scmd->mpath_start_time);
 }
 
 #if 0
