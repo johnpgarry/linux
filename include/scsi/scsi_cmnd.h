@@ -61,6 +61,7 @@ struct scsi_pointer {
 /* flags preserved across unprep / reprep */
 #define SCMD_PRESERVED_FLAGS	(SCMD_INITIALIZED | SCMD_FAIL_IF_RECOVERING)
 #define SCMD_MPATH_IO_STATS (1 << 5)
+#define SCMD_MPATH_CNT_ACTIVE (1 << 6)
 
 /* for scmd->state */
 #define SCMD_STATE_COMPLETE	0

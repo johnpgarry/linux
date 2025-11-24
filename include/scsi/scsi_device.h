@@ -173,6 +173,8 @@ struct scsi_mpath_device {
 	int				numa_node; /* NUMA node for Path  */
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
 
+	atomic_t nr_active;
+
 
 #define SCSI_MPATH_DISK_LIVE            0
 #define SCSI_MPATH_DISK_IO_PENDING      1
