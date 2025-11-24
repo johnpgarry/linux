@@ -60,6 +60,7 @@ struct scsi_pointer {
 #define SCMD_FAIL_IF_RECOVERING	(1 << 4)
 /* flags preserved across unprep / reprep */
 #define SCMD_PRESERVED_FLAGS	(SCMD_INITIALIZED | SCMD_FAIL_IF_RECOVERING)
+#define SCMD_MPATH_IO_STATS (1 << 5)
 
 /* for scmd->state */
 #define SCMD_STATE_COMPLETE	0
@@ -88,6 +89,10 @@ struct scsi_cmnd {
 	 * been outstanding
 	 */
 	unsigned long jiffies_at_alloc;
+
+	#ifdef CONFIG_SCSI_MULTIPATH
+	unsigned long		mpath_start_time;
+	#endif
 
 	int retries;
 	int allowed;
