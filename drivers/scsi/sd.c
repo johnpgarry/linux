@@ -4189,6 +4189,12 @@ static int sd_remove(struct device *dev)
 		sd_shutdown(dev);
 	}
 
+// sdkp->disk_dev.class = &sd_disk_class;
+
+	// static struct class sd_disk_class = {
+	//.name		= "scsi_disk",
+	//.dev_release	= scsi_disk_release,
+
 	dev_err(dev, "%s4 calling put_disk(sdkp->disk) sdp=%pS\n",
 		__func__, sdp);
 	put_disk(sdkp->disk);

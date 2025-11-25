@@ -29,6 +29,7 @@ static dev_t scsi_mpath_disk_major;
 static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev);
 static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk);
 struct scsi_mpath_device *scsi_find_path(struct scsi_mpath_disk *mpath_disk);
+static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *mpath_dev);
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
@@ -1413,13 +1414,23 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 
 	}
 
-
 	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 }
 
-__maybe_unused static void scsi_mpath_mpath_remove_sysfs_link(struct scsi_mpath_device *mpath_dev)
+static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *mpath_dev)
 {
-	BUG();
+	struct device *target;
+	struct kobject *mpath_gd_kobj;
+	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
+
+	if (!test_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags))
+		return;
+
+	target = disk_to_dev(mpath_dev->gd);
+	mpath_gd_kobj = &disk_to_dev(mpath_disk->gd)->kobj;
+	sysfs_remove_link_from_group(mpath_gd_kobj, "multipath",
+			dev_name(target));
+	clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags);
 }
 
 void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
@@ -1465,6 +1476,7 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 	if (!sdev->mpath_dev || !sdev->mpath_dev->disk)
 		return;
 
+	scsi_mpath_remove_sysfs_link(sdev->mpath_dev);
 //	if (!sdev->is_shared)
 //		return;
 
