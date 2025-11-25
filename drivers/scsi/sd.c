@@ -4170,15 +4170,30 @@ static int sd_probe(struct device *dev)
 static int sd_remove(struct device *dev)
 {
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+	struct scsi_device *sdp = to_scsi_device(dev);
+
+	dev_err(dev, "%s scsi_is_sdev_multipath=%d sdp=%pS\n",
+		__func__, scsi_is_sdev_multipath(sdkp->device), sdp);
 
 	scsi_autopm_get_device(sdkp->device);
 
+	dev_err(dev, "%s1 calling device_del(&sdkp->disk_dev) sdp=%pS\n",
+		__func__, sdp);
 	device_del(&sdkp->disk_dev);
+	dev_err(dev, "%s2 calling del_gendisk(sdkp->disk) sdp=%pS\n",
+		__func__, sdp);
 	del_gendisk(sdkp->disk);
-	if (!sdkp->suspended)
+	if (!sdkp->suspended) {
+		dev_err(dev, "%s3 calling sd_shutdown sdp=%pS\n",
+			__func__, sdp);
 		sd_shutdown(dev);
+	}
 
+	dev_err(dev, "%s4 calling put_disk(sdkp->disk) sdp=%pS\n",
+		__func__, sdp);
 	put_disk(sdkp->disk);
+	dev_err(dev, "%s4.1 called put_disk(sdkp->disk) sdp=%pS\n",
+		__func__, sdp);
 
 	if (scsi_is_sdev_multipath(sdkp->device))
 		scsi_mpath_remove_disk(sdkp->device);
@@ -4191,13 +4206,20 @@ static void scsi_disk_release(struct device *dev)
 	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	struct scsi_device *sdp = to_scsi_device(dev);
 
+	dev_err(dev, "%s scsi_is_sdev_multipath=%d sdp=%pS\n",
+		__func__, scsi_is_sdev_multipath(sdp), sdp);
+
 	if (scsi_is_sdev_multipath(sdp))
 		scsi_mpath_dev_release(sdp);
 
 	ida_free(&sd_index_ida, sdkp->index);
+	dev_err(dev, "%s2 sdp=%pS calling put_device(&sdkp->device->sdev_gendev)\n",
+		__func__, sdp);
 	put_device(&sdkp->device->sdev_gendev);
 	free_opal_dev(sdkp->opal_dev);
 
+	dev_err(dev, "%s3 sdp=%pS calling kfree(sdkp)\n",
+		__func__, sdp);
 	kfree(sdkp);
 }
 

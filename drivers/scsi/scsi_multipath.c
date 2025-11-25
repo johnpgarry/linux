@@ -1126,12 +1126,17 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
 	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
 
+	pr_err("%s sdev=%pS mpath_dev=%pS mpath_disk=%pS\n",
+		__func__, sdev, mpath_dev, mpath_disk);
+
 	if (!mpath_disk)
 		return;
 
 	cancel_work_sync(&mpath_disk->requeue_work);
 	cleanup_srcu_struct(&mpath_disk->srcu);
 
+	pr_err("%s2 sdev=%pS mpath_dev=%pS mpath_disk=%pS calling kfree mpath_dev\n",
+		__func__, sdev, mpath_dev, mpath_disk);
 	kfree(mpath_dev);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_dev_release);
@@ -1451,10 +1456,12 @@ void scsi_mpath_add_disk(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_add_disk);
 
-
-
 void scsi_mpath_remove_disk(struct scsi_device *sdev)
 {
+
+	dev_err(&sdev->sdev_gendev, "%s mpath_dev=%pS disk=%pS\n",
+		__func__, sdev->mpath_dev, sdev->mpath_dev ? sdev->mpath_dev->disk : NULL);
+
 	if (!sdev->mpath_dev || !sdev->mpath_dev->disk)
 		return;
 
@@ -1465,6 +1472,8 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 	kblockd_schedule_work(&sdev->mpath_dev->disk->requeue_work);
 	flush_work(&sdev->mpath_dev->disk->requeue_work);
 	//put_disk(sdev->mpath_dev);
+	dev_err(&sdev->sdev_gendev, "%s10 mpath_dev=%pS disk=%pS\n",
+		__func__, sdev->mpath_dev, sdev->mpath_dev ? sdev->mpath_dev->disk : NULL);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_remove_disk);
 
