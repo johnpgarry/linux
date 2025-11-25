@@ -1198,105 +1198,45 @@ sdev_show_preferred_path(struct device *dev,
 static DEVICE_ATTR(preferred_path, S_IRUGO, sdev_show_preferred_path, NULL);
 #endif
 
-#ifdef olldsdd
-#ifdef CONFIG_SCSI_MULTIPATH
-static const struct {
-	unsigned char	value;
-	char		*name;
-} scsi_multipath_iopolicy[] = {
-	{ SCSI_MPATH_IOPOLICY_NUMA, "NUMA" },
-	{ SCSI_MPATH_IOPOLICY_RR, "Round-Robin" },
-};
-static const char *scsi_mpath_policy_name(unsigned char policy)
-{
-	int i;
-	char *name = NULL;
-
-	for (i = 0; i < ARRAY_SIZE(scsi_multipath_iopolicy); i++) {
-		if (scsi_multipath_iopolicy[i].value == policy) {
-			name = scsi_multipath_iopolicy[i].name;
-			break;
-		}
-	}
-	return name;
-}
-
-static ssize_t
-sdev_show_multipath_iopolicy(struct device *dev,
-			     struct device_attribute *attr,
-			     char *buf)
-{
-	struct scsi_device *sdev = to_scsi_device(dev);
-	const char *name;
-
-	if (!sdev->mpath_dev || !sdev->mpath_dev->disk)
-		return -EINVAL;
-	name = scsi_mpath_policy_name(sdev->mpath_dev->disk->iopolicy);
-
-	return sysfs_emit(buf, "%s\n", name);
-}
-
-static ssize_t sdev_store_multipath_iopolicy(struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct scsi_device *sdev = to_scsi_device(dev);
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(scsi_multipath_iopolicy); i++) {
-		if (sysfs_streq(buf, scsi_mpath_policy_name(i))) {
-			scsi_multipath_iopolicy_update(sdev, i);
-			return count;
-		}
-	}
-
-	return -EINVAL;
-}
-static DEVICE_ATTR(multipath_iopolicy, S_IRUGO, sdev_show_multipath_iopolicy,
-    sdev_store_multipath_iopolicy);
-
-static const struct {
-	unsigned char	value;
-	char		*name;
-} scsi_mpath_states[] = {
-	{ SCSI_MPATH_OPTIMAL,	"active/optimized" },
-	{ SCSI_MPATH_ACTIVE,	"active/non-optimized" },
-	{ SCSI_MPATH_STANDBY,	"standby" },
-	{ SCSI_MPATH_UNAVAILABLE,"unavailable" },
-	{ SCSI_MPATH_LBA,	"lba-dependent" },
-	{ SCSI_MPATH_OFFLINE,	"offline" },
-	{ SCSI_MPATH_TRANSITIONING,"transitioning" },
+static struct attribute dummy_attr = {
+	.name = "dummy",
 };
 
-static __maybe_unused const char *scsi_mpath_state_names(unsigned char state)
-{
-	int i;
-	char *name = NULL;
+static struct attribute *scsi_mpath_attrs[] = {
+	&dummy_attr,
+	NULL
+};
 
-	for (i = 0; i < ARRAY_SIZE(scsi_mpath_states); i++) {
-		if (scsi_mpath_states[i].value == state) {
-		    name = scsi_mpath_states[i].name;
-		    break;
-		}
-	}
-	return name;
+static bool multipath_sysfs_group_visible(struct kobject *kobj)
+{
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct gendisk *disk = dev_to_disk(dev);
+
+	dev_err(dev, "%s dev=%pS disk=%pS fops=%pS\n", __func__, dev, disk, disk->fops);
+	return disk->fops == &scsi_mpath_ops;
 }
 
-static ssize_t
-sdev_show_multipath_state(struct device *dev,
-			  struct device_attribute *attr,
-			  char *buf)
+static bool multipath_sysfs_attr_visible(struct kobject *kobj,
+		struct attribute *attr, int n)
 {
-	struct scsi_device *sdev = to_scsi_device(dev);
-	const char *name = "";//scsi_mpath_state_names(sdev->mpath_state);
+	struct device *dev = container_of(kobj, struct device, kobj);
 
-	if (!sdev->mpath_dev)
-		return -EINVAL;
-
-	return sysfs_emit(buf, "%s\n", name);
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
+	return false;
 }
-static DEVICE_ATTR(multipath_state, S_IRUGO, sdev_show_multipath_state, NULL);
-#endif // CONFIG_SCSI_MULTIPATH
-#endif
+
+DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
+
+const struct attribute_group scsi_mpath_attr_group = {
+	.name           = "multipath",
+	.attrs		= scsi_mpath_attrs,
+	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
+};
+
+const struct attribute_group *scsi_device_groups[] = {
+	&scsi_mpath_attr_group,
+	NULL
+};
 
 static ssize_t
 sdev_show_queue_ramp_up_period(struct device *dev,
