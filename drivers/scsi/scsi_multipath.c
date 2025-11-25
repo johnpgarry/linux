@@ -33,8 +33,7 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk);
 bool scsi_multipath = true;
 module_param(scsi_multipath, bool, 0444);
 MODULE_PARM_DESC(scsi_multipath,
-    "turn on native support for multiple scsi devices \n"
-    "set this value to false to disable multipath, \n");
+    "turn on native support for multiple scsi devices set this value to false to disable multipath, \n");
 
 static const char *scsi_mpath_iopolicy_names[] = {
 	[SCSI_MPATH_IOPOLICY_NUMA]	= "numa",
@@ -43,6 +42,9 @@ static const char *scsi_mpath_iopolicy_names[] = {
 };
 
 static int iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
+
+//static DEFINE_IDA(nvme_ns_chr_minor_ida);
+static dev_t scsi_mpath_disk_chr_devt;
 
 static LIST_HEAD(mpath_disks_list);
 static DEFINE_MUTEX(mpath_disks_lock);
@@ -179,13 +181,9 @@ static const struct class scsi_mpath_disk_class = {
 	.name = "scsi_mpath_disk",
 };
 
-
-//static DEFINE_IDA(nvme_ns_chr_minor_ida);
-static dev_t scsi_mpath_disk_chr_devt;
 static const struct class scsi_mpath_generic_class = {
 	.name = "scsi_mpath_generic",
 };
-
 
 static int scsi_multipath_init(struct scsi_device *sdev)
 {
@@ -214,7 +212,7 @@ static int scsi_multipath_init(struct scsi_device *sdev)
  * In Future, if more apropriate IO-policy is introduced will be added
  * based on community feedback.
  */
-static int scsi_set_iopolicy(const char *val, const struct kernel_param *kp)
+static int scsi_mpath_set_iopolicy(const char *val, const struct kernel_param *kp)
 {
 	if (!val)
 		return -EINVAL;
@@ -229,7 +227,6 @@ static int scsi_set_iopolicy(const char *val, const struct kernel_param *kp)
 
 	return 0;
 }
-
 
 static ssize_t scsi_mpath_disk_wwid_show(struct device *dev,
 			struct device_attribute *attr,
@@ -262,6 +259,25 @@ const struct attribute_group *scsi_mpath_disk_attrs_groups[] = {
 	&scsi_mpath_disk_attrs_group,
 	NULL
 };
+
+static int scsi_mpath_get_iopolicy(char *buf, const struct kernel_param *kp)
+{
+	return sprintf(buf, "%s\n", scsi_mpath_iopolicy_names[iopolicy]);
+}
+
+module_param_call(iopolicy, scsi_mpath_set_iopolicy, scsi_mpath_get_iopolicy,
+	&iopolicy, 0644);
+MODULE_PARM_DESC(iopolicy,
+	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
+
+static __maybe_unused void nvme_mpath_unfreeze(struct scsi_mpath_disk *mpath_disk)
+{
+	pr_err("%s mpath_disk=%pS\n", __func__, mpath_disk);
+//	lockdep_assert_held(&subsys->lock);
+//	list_for_each_entry(h, &subsys->nsheads, entry)
+//		if (h->disk)
+//			blk_mq_unfreeze_queue_nomemrestore(h->disk->queue);
+}
 
 /* handle failover request for path */
 void scsi_mpath_failover_req(struct request *req)
@@ -396,22 +412,6 @@ static void scsi_multipath_partition_scan_work(struct work_struct *work)
 		__func__, mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
 	bdev_disk_changed(mpath_disk->gd, false);
 	//mutex_unlock(&head->disk->open_mutex);
-}
-
-
-static int scsi_get_iopolicy(char *buf, const struct kernel_param *kp)
-{
-	return sprintf(buf, "%s\n", scsi_mpath_iopolicy_names[iopolicy]);
-}
-
-module_param_call(iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
-    &iopolicy, 0644);
-MODULE_PARM_DESC(iopolicy,
-    "Default multipath I/O policy; 'numa' (default) or 'round-robin'");
-
-void scsi_mpath_default_iopolicy(struct scsi_mpath_disk *mpath_disk)
-{
-	mpath_disk->iopolicy = iopolicy;
 }
 
 void scsi_multipath_iopolicy_update(struct scsi_device *sdev, int iopolicy)

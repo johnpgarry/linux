@@ -34,7 +34,6 @@ enum scsi_mpath_access_state {
 struct scsi_mpath_disk;
 struct scsi_mpath_device;
 
-extern void scsi_mpath_default_iopolicy(struct scsi_mpath_disk *);
 extern void scsi_mpath_unfreeze(struct Scsi_Host *);
 extern void scsi_mpath_wait_freeze(struct Scsi_Host *);
 extern void scsi_mpath_start_freeze(struct Scsi_Host *);
