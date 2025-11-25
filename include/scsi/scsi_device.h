@@ -144,7 +144,7 @@ struct scsi_mpath_disk {
 	struct gendisk		*gd;
 	struct device		dev;
 	struct work_struct	partition_scan_work;
-	struct list_head	entry; // for list of mpath devices
+	struct list_head	entry; // for list of mpath disks
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	int					index;
 	unsigned long           flags;		/* flag for multipath devices*/
