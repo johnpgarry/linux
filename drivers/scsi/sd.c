@@ -4115,7 +4115,7 @@ static int sd_probe(struct device *dev)
 	}
 
 
-	error = device_add_disk(dev, gd, sd_attr_groups);
+	error = device_add_disk(dev, gd, scsi_device_groups);
 	pr_err("%s error from device_add_disk = %d gd=%pS\n", __func__, error, gd);
 	if (error) {
 		device_unregister(&sdkp->disk_dev);
