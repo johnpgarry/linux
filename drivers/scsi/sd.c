@@ -4175,6 +4175,9 @@ static int sd_remove(struct device *dev)
 	dev_err(dev, "%s scsi_is_sdev_multipath=%d sdp=%pS\n",
 		__func__, scsi_is_sdev_multipath(sdkp->device), sdp);
 
+	if (scsi_is_sdev_multipath(sdkp->device))
+		scsi_mpath_remove_disk(sdkp->device);
+	
 	scsi_autopm_get_device(sdkp->device);
 
 	dev_err(dev, "%s1 calling device_del(&sdkp->disk_dev) sdp=%pS\n",
@@ -4201,8 +4204,6 @@ static int sd_remove(struct device *dev)
 	dev_err(dev, "%s4.1 called put_disk(sdkp->disk) sdp=%pS\n",
 		__func__, sdp);
 
-	if (scsi_is_sdev_multipath(sdkp->device))
-		scsi_mpath_remove_disk(sdkp->device);
 
 	return 0;
 }
