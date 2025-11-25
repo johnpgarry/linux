@@ -415,9 +415,9 @@ static inline bool scsi_disk_is_multipath(struct gendisk *disk)
 	return disk->fops == &scsi_mpath_ops;
 }
 
-static inline bool scsi_mpath_enabled(struct scsi_device *sdev)
+static inline bool scsi_mpath_enabled(void)
 {
-	return IS_ENABLED(CONFIG_SCSI_MULTIPATH);
+	return IS_ENABLED(CONFIG_SCSI_MULTIPATH) && scsi_multipath;
 }
 static inline bool scsi_is_sdev_multipath(struct scsi_device *sdev)
 {
@@ -429,7 +429,7 @@ static inline bool scsi_disk_is_multipath(struct gendisk *disk)
 {
 	return false;
 }
-static inline bool scsi_mpath_enabled(struct scsi_device *sdev)
+static inline bool scsi_mpath_enabled(void)
 {
 	return false;
 }

@@ -2072,7 +2072,7 @@ maybe_retry:
 	 * For SCSI Multipath check if there are path errors to
 	 * trigger failover to available path
 	 */
-	if (scsi_mpath_enabled(scmd->device)) {
+	if (scsi_is_sdev_multipath(scmd->device)) {
 		pr_err("%s calling scsi_mpath_failover_disposition\n", __func__);
 		return scsi_mpath_failover_disposition(scmd);
 	}

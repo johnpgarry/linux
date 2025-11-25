@@ -1904,7 +1904,7 @@ static int sd_get_unique_id(struct gendisk *disk, u8 id[16],
 			break;
 	}
 
-	if (scsi_mpath_enabled(sdev)) {
+	if (scsi_is_sdev_multipath(sdev)) {
 
 		pr_err("%s calling scsi_mpath_unique_id\n", __func__);
 		ret = scsi_mpath_unique_id(sdev, id, type);
@@ -4024,7 +4024,7 @@ static int sd_probe(struct device *dev)
 
 	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->mpath_dev=%pS index=%d scsi_device_tpgs=%d\n",
 		__func__, gd, gd->disk_name, gd->part0, sdp->mpath_dev, index, scsi_device_tpgs(sdp));
-	if (scsi_mpath_enabled(sdp) && scsi_device_tpgs(sdp)) {
+	if (scsi_mpath_enabled() && scsi_device_tpgs(sdp)) {
 		struct scsi_mpath_device *mpath_dev;
 		sdev_printk(KERN_INFO, sdp, "%s3.2 calling scsi_mpath_alloc_disk\n", __func__);
 		error = scsi_mpath_alloc_disk(sdp, gd);

@@ -126,18 +126,19 @@ static int scsi_dh_handler_attach(struct scsi_device *sdev,
 {
 	int error, ret = 0;
 
-	if (scsi_multipath)
+	pr_err("%s sdev=%pS mpath_dev=%pS scsi_multipath=%d\n",
+		__func__, sdev, sdev->mpath_dev, scsi_multipath);
+	if (scsi_mpath_enabled())
 		return -ENODEV;
 
 	pr_err("%s sdev=%pS scsi_dh=%pS\n", __func__, sdev, scsi_dh);
 	if (!try_module_get(scsi_dh->module))
 		return -EINVAL;
 
-	if (scsi_mpath_enabled(sdev)) {
-	}
-
 	pr_err("%s2 sdev=%pS scsi_dh=%pS calling scsi_dh->attach\n", __func__, sdev, scsi_dh);
 	error = scsi_dh->attach(sdev);
+	pr_err("%s2.1 sdev=%pS scsi_dh=%pS called scsi_dh->attach=%pS error=%d\n",
+		__func__, sdev, scsi_dh, scsi_dh->attach, error);
 	if (error != SCSI_DH_OK) {
 		switch (error) {
 		case SCSI_DH_NOMEM:
@@ -284,6 +285,7 @@ int scsi_dh_activate(struct request_queue *q, activate_complete fn, void *data)
 	if (sdev->sdev_state == SDEV_OFFLINE)
 		goto out_fn;
 
+	pr_err("%s3 q=%pS fn=%pS data=%pS sdev=%pS calling sdev->handler->activate=%ps\n", __func__, q, fn, sdev, data, sdev->handler->activate);
 	if (sdev->handler->activate)
 		err = sdev->handler->activate(sdev, fn, data);
 

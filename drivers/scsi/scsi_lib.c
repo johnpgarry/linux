@@ -2907,7 +2907,7 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
-	if (scsi_mpath_enabled(sdev)) {
+	if (scsi_is_sdev_multipath(sdev)) {
 
 		//scsi_mpath_clear_current_path(sdev);
 	}
@@ -3032,7 +3032,7 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 	}
 
 	/* For multipath device set the path live */
-	if (scsi_mpath_enabled(sdev)) {
+	if (scsi_is_sdev_multipath(sdev)) {
 	//	pr_err("%s sdev=%pS calling scsi_mpath_set_live\n", __func__, sdev);
 	//	scsi_mpath_set_live(NULL);
 	}
