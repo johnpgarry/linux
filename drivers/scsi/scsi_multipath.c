@@ -1526,9 +1526,13 @@ static void scsi_mpath_free_disk(struct kref *ref)
 		__func__, mpath_disk, ref, mpath_disk->gd);
 	put_disk(mpath_disk->gd);
 	#endif
-//	ida_free(&head->subsys->ns_ida, head->instance);
-//	cleanup_srcu_struct(&head->srcu);
+	ida_free(&sd_mpath_index_ida, mpath_disk->index);
+	cleanup_srcu_struct(&mpath_disk->srcu);
 //	nvme_put_subsystem(head->subsys);
+	mutex_lock(&mpath_disks_lock);
+	list_del(&mpath_disk->entry);
+	mutex_unlock(&mpath_disks_lock);
+
 //	kfree(head->plids);
 	kfree(mpath_disk);
 }
