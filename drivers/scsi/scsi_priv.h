@@ -156,6 +156,7 @@ extern void __scsi_remove_device(struct scsi_device *);
 
 extern const struct bus_type scsi_bus_type;
 extern const struct attribute_group *scsi_shost_groups[];
+extern const struct attribute_group *scsi_device_groups[];
 
 /* scsi_netlink.c */
 #ifdef CONFIG_SCSI_NETLINK
