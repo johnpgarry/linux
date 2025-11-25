@@ -53,5 +53,4 @@ int scsi_mpath_unique_lun_id(struct scsi_device *);
 
 extern void scsi_mpath_revalidate_path(struct gendisk *, sector_t);
 extern int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type);
-bool scsi_mpath_lun_id_match(struct scsi_mpath_device *a, struct scsi_mpath_device *b);
 #endif /* _SCSI_SCSI_MULTIPATH_H */
