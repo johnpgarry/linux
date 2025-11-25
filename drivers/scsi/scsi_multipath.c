@@ -1405,7 +1405,8 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 
 		rc = sysfs_create_link(mpath_device_kobj, &sdev_gendev->kobj,
 				dev_name(sdev_gendev));
-		pr_err("%s7.6 called sysfs_create_link for mpath_gd_kobj rc=%d\n", __func__, rc);
+		pr_err("%s7.6 called sysfs_create_link for mpath_gd_kobj=%pS rc=%d &sdev_gendev->kobj=%pS dev_name(sdev_gendev)=%s\n",
+			__func__, mpath_device_kobj, rc, &sdev_gendev->kobj, dev_name(sdev_gendev));
 		if (unlikely(rc)) {
 			dev_err(disk_to_dev(mpath_disk->gd),
 					"failed to create link to %s rc=%d\n",
@@ -1423,6 +1424,10 @@ static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *mpath_dev)
 	struct device *target;
 	struct kobject *mpath_gd_kobj;
 	struct scsi_mpath_disk *mpath_disk = mpath_dev->disk;
+	struct device *sdev_gendev;
+	struct scsi_device *sdev;
+	struct device *mpath_device = &mpath_disk->dev;
+	struct kobject *mpath_device_kobj = &mpath_device->kobj;
 
 	pr_err("%s mpath_dev=%pS mpath_disk=%pS SCSI_MPATH_SYSFS_ATTR_LINK set=%d\n",
 		__func__, mpath_dev, mpath_disk,
@@ -1438,6 +1443,16 @@ static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *mpath_dev)
 
 	sysfs_remove_link_from_group(mpath_gd_kobj, "multipath",
 			dev_name(target));
+
+	pr_err("%s3 calling sysfs_delete_link mpath_gd_kobj=%pS dev_name(target)=%s\n",
+		__func__, mpath_gd_kobj, dev_name(target));
+
+	sdev = mpath_dev->sdev;
+	sdev_gendev = &sdev->sdev_gendev;
+	sysfs_delete_link(mpath_device_kobj, &sdev_gendev->kobj,
+			dev_name(sdev_gendev));
+
+	
 	clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &mpath_dev->flags);
 }
 
