@@ -193,8 +193,17 @@ static int scsi_mpath_disk_add_cdev(struct scsi_mpath_disk *mpath_disk)
 	return ret;
 }
 
+static __maybe_unused void scsi_mpath_disk_release1(struct device *dev)
+{
+	struct scsi_mpath_disk *mpath_disk = container_of(dev, struct scsi_mpath_disk, dev);
+	dev_err(dev, "%s dev=%pS mpath_disk=%pS\n", __func__, dev, mpath_disk);
+
+}
+
 static const struct class scsi_mpath_disk_class = {
 	.name = "scsi_mpath_disk",
+	.dev_release	= scsi_mpath_disk_release1,
+	.dev_groups = scsi_mpath_groups,
 };
 
 static int scsi_multipath_init(struct scsi_device *sdev)
@@ -864,10 +873,10 @@ static void scsi_requeue_work(struct work_struct *work)
 	}
 }
 
-
-static void scsi_mpath_disk_release(struct device *dev)
+static __maybe_unused void scsi_mpath_disk_release(struct device *dev)
 {
-	pr_err("%s dev=%pS\n", __func__, dev);
+	struct scsi_mpath_disk *mpath_disk = container_of(dev, struct scsi_mpath_disk, dev);
+	dev_err(dev, "%s dev=%pS mpath_disk=%pS\n", __func__, dev, mpath_disk);
 }
 
 /*
@@ -947,9 +956,9 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	kref_init(&mpath_disk->ref);
 
 	mpath_disk->dev.class = &scsi_mpath_disk_class;
-	mpath_disk->dev.release = scsi_mpath_disk_release;
-	mpath_disk->dev.groups = scsi_mpath_groups;
-	pr_err("%s7\n", __func__);
+//	mpath_disk->dev.release = scsi_mpath_disk_release;
+//	mpath_disk->dev.groups = scsi_mpath_groups;
+	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
 	dev_set_name(&mpath_disk->dev, "smpd%d", mpath_disk->index);
 	disk_count++;
 	device_initialize(&mpath_disk->dev);
@@ -1130,15 +1139,15 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 	pr_err("%s sdev=%pS mpath_dev=%pS mpath_disk=%pS\n",
 		__func__, sdev, mpath_dev, mpath_disk);
 
-	if (!mpath_disk)
-		return;
+//	if (!mpath_disk)
+//		return;
 
-	cancel_work_sync(&mpath_disk->requeue_work);
-	cleanup_srcu_struct(&mpath_disk->srcu);
+//	cancel_work_sync(&mpath_disk->requeue_work);
+//	cleanup_srcu_struct(&mpath_disk->srcu);
 
-	pr_err("%s2 sdev=%pS mpath_dev=%pS mpath_disk=%pS calling kfree mpath_dev\n",
-		__func__, sdev, mpath_dev, mpath_disk);
-	kfree(mpath_dev);
+//	pr_err("%s2 sdev=%pS mpath_dev=%pS mpath_disk=%pS calling kfree mpath_dev\n",
+//		__func__, sdev, mpath_dev, mpath_disk);
+//	kfree(mpath_dev);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_dev_release);
 
@@ -1490,16 +1499,66 @@ void scsi_mpath_add_disk(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_add_disk);
 
+#ifdef dsdsd
+void scsi_mpath_put_disk(struct nvme_ns_head *head)
+{
+	if (!head->disk)
+		return;
+	/* make sure all pending bios are cleaned up */
+	kblockd_schedule_work(&head->requeue_work);
+	flush_work(&head->requeue_work);
+	flush_work(&head->partition_scan_work);
+	put_disk(head->disk);
+}
+
+#endif
+
+static void scsi_mpath_free_disk(struct kref *ref)
+{
+	struct scsi_mpath_disk *mpath_disk =
+		container_of(ref, struct scsi_mpath_disk, ref);
+
+	pr_err("%s mpath_disk=%pS ref=%pS\n", __func__, mpath_disk, ref);
+	#ifdef dsdsd
+	nvme_mpath_put_disk(head);
+	#else
+	pr_err("%s1 mpath_disk=%pS ref=%pS calling put_disk gd=%pS\n",
+		__func__, mpath_disk, ref, mpath_disk->gd);
+	put_disk(mpath_disk->gd);
+	#endif
+//	ida_free(&head->subsys->ns_ida, head->instance);
+//	cleanup_srcu_struct(&head->srcu);
+//	nvme_put_subsystem(head->subsys);
+//	kfree(head->plids);
+	kfree(mpath_disk);
+}
+
+static void scsi_mpath_put_disk(struct scsi_mpath_disk *mpath_disk)
+{
+	kref_put(&mpath_disk->ref, scsi_mpath_free_disk);
+}
+
 void scsi_mpath_remove_disk(struct scsi_device *sdev)
 {
-
+	bool last_path = false;
+	struct scsi_mpath_disk *mpath_disk;
+	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
 	dev_err(&sdev->sdev_gendev, "%s mpath_dev=%pS disk=%pS\n",
 		__func__, sdev->mpath_dev, sdev->mpath_dev ? sdev->mpath_dev->disk : NULL);
 
 	if (!sdev->mpath_dev || !sdev->mpath_dev->disk)
 		return;
 
+	mpath_disk = sdev->mpath_dev->disk;
+
+	dev_err(&sdev->sdev_gendev, "%s1 mpath_dev=%pS disk=%pS calling scsi_mpath_remove_sysfs_link\n",
+		__func__, sdev->mpath_dev, sdev->mpath_dev ? sdev->mpath_dev->disk : NULL);
 	scsi_mpath_remove_sysfs_link(sdev->mpath_dev);
+
+	dev_err(&sdev->sdev_gendev, "%s2 mpath_dev=%pS disk=%pS calling put_disk(sdev->mpath_dev->disk->gd=%pS)\n",
+		__func__, sdev->mpath_dev, sdev->mpath_dev ? sdev->mpath_dev->disk : NULL,
+		sdev->mpath_dev->disk->gd);
+//	put_disk(sdev->mpath_dev->disk->gd);
 //	if (!sdev->is_shared)
 //		return;
 
@@ -1507,8 +1566,46 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 	kblockd_schedule_work(&sdev->mpath_dev->disk->requeue_work);
 	flush_work(&sdev->mpath_dev->disk->requeue_work);
 	//put_disk(sdev->mpath_dev);
+
+	mutex_lock(&mpath_disk->lock);
+	
+	list_del_rcu(&mpath_dev->entry);
+	dev_err(&sdev->sdev_gendev, "%s3 list_empty=%d\n", __func__, list_empty(&mpath_disk->dev_list));
+	if (list_empty(&mpath_disk->dev_list)) {
+//		if (!nvme_mpath_queue_if_no_path(ns->head))
+//			list_del_init(&ns->head->entry);
+		last_path = true;
+	}
+	mutex_unlock(&mpath_disk->lock);
+
+	dev_err(&sdev->sdev_gendev, "%s4 last_path=%d\n",
+		__func__, last_path);
+	if (last_path) {
+		dev_err(&sdev->sdev_gendev, "%s5 SCSI_MPATH_DISK_LIVE set=%d\n",
+			__func__, test_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags));
+		if (test_and_clear_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags)) {
+			/*
+			 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
+			 * to allow multipath to fail all I/O.
+			 */
+		//	kblockd_schedule_work(&head->requeue_work);
+
+		//	nvme_cdev_del(&head->cdev, &head->cdev_device);
+			synchronize_srcu(&mpath_disk->srcu);
+			dev_err(&sdev->sdev_gendev, "%s5.1 calling device_del\n", __func__);
+			device_del(&mpath_disk->dev);
+			dev_err(&sdev->sdev_gendev, "%s5.2 calling del_gendisk\n", __func__);
+			del_gendisk(mpath_disk->gd);
+		}
+		dev_err(&sdev->sdev_gendev, "%s6 calling put_disk on mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
+		scsi_mpath_put_disk(mpath_disk);
+	}
+
 	dev_err(&sdev->sdev_gendev, "%s10 mpath_dev=%pS disk=%pS\n",
 		__func__, sdev->mpath_dev, sdev->mpath_dev ? sdev->mpath_dev->disk : NULL);
+
+
+
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_remove_disk);
 
