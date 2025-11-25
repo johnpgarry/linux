@@ -160,7 +160,7 @@ const struct attribute_group scsi_mpath_attr_group = {
 	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
 };
 
-const struct attribute_group *sd_attr_groups[] = {
+const struct attribute_group *scsi_device_groups[] = {
 	&scsi_mpath_attr_group,
 	NULL
 };
