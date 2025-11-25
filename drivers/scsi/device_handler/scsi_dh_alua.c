@@ -165,14 +165,14 @@ static struct scsi_alua_port_group *alua_find_get_pg(char *id_str, size_t id_siz
 
 static void configure_scsi_mpath(struct scsi_device *sdev, struct scsi_alua_port_group *pg)
 {
-	pr_err("%s sdev=%pS pg=%pS scsi_mpath_enabled=%d sdev->mpath_dev=%pS\n",
-		__func__, sdev, pg, scsi_mpath_enabled(sdev), sdev->mpath_dev);
-	if (!scsi_mpath_enabled(sdev))
+	pr_err("%s sdev=%pS pg=%pS scsi_is_sdev_multipath=%d sdev->mpath_dev=%pS\n",
+		__func__, sdev, pg, scsi_is_sdev_multipath(sdev), sdev->mpath_dev);
+	if (!scsi_is_sdev_multipath(sdev))
 		return;
 	if (!sdev->mpath_dev)
 		return;
-	pr_err("%s2 sdev=%pS pg=%pS scsi_mpath_enabled=%d sdev->mpath_dev=%pS\n",
-		__func__, sdev, pg, scsi_mpath_enabled(sdev), sdev->mpath_dev);
+	pr_err("%s2 sdev=%pS pg=%pS scsi_is_sdev_multipath=%d sdev->mpath_dev=%pS\n",
+		__func__, sdev, pg, scsi_is_sdev_multipath(sdev), sdev->mpath_dev);
 
 	sdev->mpath_dev->group_id = pg->group_id;
 	sdev->mpath_dev->tpgs = pg->tpgs;

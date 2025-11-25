@@ -885,6 +885,16 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS scsi_device_tpgs=%d\n",
 		__func__, sdev, sdev->mpath_dev, shost, shost_dev, scsi_device_tpgs(sdev));
 
+	/*
+	 * Add multipath disk only if scsi host supports multipath modparam
+	 */
+	if (!scsi_multipath) {
+		sdev_printk(KERN_NOTICE, sdev,
+		    "%s modparam scsi_multipath is set to false \n",
+		    sdev->handler->name);
+		return 0;
+	}
+
 	if (!scsi_device_tpgs(sdev)) {
 		sdev_printk(KERN_NOTICE, sdev, "tpgs are required for mpath support\n");
 		return -ENODEV;
@@ -898,15 +908,6 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	sdev->mpath_dev->gd = gd;
 
-	/*
-	 * Add multipath disk only if scsi host supports multipath modparam
-	 */
-	if (!scsi_multipath) {
-		sdev_printk(KERN_NOTICE, sdev,
-		    "%s Handler attached but modparam scsi_multipath is set to false \n",
-		    sdev->handler->name);
-		return 0;
-	}
 
 	ret = scsi_mpath_unique_lun_id(sdev);
 	if (ret < 0) {
