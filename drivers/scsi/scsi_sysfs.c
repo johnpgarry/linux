@@ -1238,6 +1238,21 @@ const struct attribute_group *scsi_device_groups[] = {
 	NULL
 };
 
+static struct attribute *scsi_mpath_disk_attrs[] = {
+	&scsi_mpath_wwid.attr,
+	&scsi_mpath_iopolicy.attr,
+	NULL
+};
+
+static const struct attribute_group scsi_mpath_attrs_group = {
+	.attrs = scsi_mpath_disk_attrs,
+};
+
+const struct attribute_group *scsi_mpath_groups[] = {
+	&scsi_mpath_attrs_group,
+	NULL
+};
+
 static ssize_t
 sdev_show_queue_ramp_up_period(struct device *dev,
 			       struct device_attribute *attr,
