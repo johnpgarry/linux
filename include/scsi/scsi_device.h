@@ -131,7 +131,7 @@ struct scsi_mpath_disk {
 #define SCSI_MPATH_SYSFS_ATTR_LINK      3
 
 struct scsi_mpath_device;
-
+#define SCSI_MPATH_DEVICE_ID_LEN 40
 struct scsi_mpath_disk {
 	struct srcu_struct 	srcu;
 	//struct Scsi_Host	*shost;	/*Scsi_Host where this mpath belong */
@@ -154,6 +154,7 @@ struct scsi_mpath_disk {
 
 	struct cdev		cdev;
 	struct device		cdev_device;
+
 
 	struct scsi_mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
@@ -189,8 +190,7 @@ struct scsi_mpath_device {
 	int	group_id;		/* Group ID reported from RTPG cmd */
 	int	tpgs;			/* Target Port Groups reported from RTPG cmd */
 	int	state;			/* Target Port Group State */
-	char	*device_id_str;		/* Multipath Device String */
-	int	device_id_len;		/* Device ID Length */
+	char device_id_str[SCSI_MPATH_DEVICE_ID_LEN];
 	int	valid_states;		/* states from RTPG cmd */
 	int	prefrence;		/* Path prefrence for Port Group from RTPG cmd */
 	int	is_active;		/* Current Sdev is active */

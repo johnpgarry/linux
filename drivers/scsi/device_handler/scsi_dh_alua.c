@@ -180,8 +180,8 @@ static void configure_scsi_mpath(struct scsi_device *sdev, struct scsi_alua_port
 	sdev->mpath_dev->valid_states = pg->valid_states;
 	sdev->mpath_dev->prefrence = pg->pref;
 	sdev->mpath_dev->is_active = 1;
-	sdev->mpath_dev->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
-	sdev->mpath_dev->device_id_len = pg->device_id_len;
+//	sdev->mpath_dev->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
+//	sdev->mpath_dev->device_id_len = pg->device_id_len;
 	pr_err("%s2 sdev=%pS sdev->mpath_dev->device_id_str=%s group_id=%d tpgs=%d state=%d valid_states=%d pref=%d\n",
 		__func__, sdev, sdev->mpath_dev->device_id_str,
 		pg->group_id,

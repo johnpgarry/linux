@@ -62,3 +62,4 @@ int scsi_alua_check_tpgs(struct scsi_device *sdev)
 
 	return tpgs;
 }
+EXPORT_SYMBOL_GPL(scsi_alua_check_tpgs);

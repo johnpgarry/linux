@@ -998,10 +998,11 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		return 0;
 	}
 
-	if (1/*alua_bus_attach(sdev)*/) {
+	ret = scsi_mpath_unique_lun_id(sdev);
+	if (ret < 0) {
 		sdev_printk(KERN_NOTICE, sdev,
-		    "%s sdev=%pS alua_bus_attach failed\n", __func__, sdev);
-
+		    "%s sdev=%pS scsi_mpath_unique_lun_id failed\n", __func__, sdev);
+		return ret;
 	}
 
 	pr_err("%s4 calling scsi_mpath_find_disk sdev=%pS\n", __func__, sdev);
@@ -1066,15 +1067,21 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		return ret;
 
 	ret = init_srcu_struct(&mpath_disk->srcu);
-	pr_err("%s12 ret=%d after init_srcu_struct\n", __func__, ret);
+	pr_err("%s12 ret=%d after init_srcu_struct mpath_disk=%pS\n", __func__, ret, mpath_disk);
 	if (ret)
 		return ret;
 
 	INIT_WORK(&mpath_disk->requeue_work, scsi_requeue_work);
+	pr_err("%s12.1 ret=%d after INIT_WORK mpath_disk=%pS\n", __func__, ret, mpath_disk);
 	spin_lock_init(&mpath_disk->requeue_lock);
+	pr_err("%s12.2 ret=%d after spin_lock_init mpath_disk=%pS\n", __func__, ret, mpath_disk);
 	bio_list_init(&mpath_disk->requeue_list);
+	pr_err("%s12.3 ret=%d after bio_list_init mpath_disk=%pS sdev->mpath_dev=%pS\n",
+		__func__, ret, mpath_disk, sdev->mpath_dev);
+	pr_err("%s12.3.1 device_id_str=%s\n",
+		__func__, sdev->mpath_dev->device_id_str);
 
-	sprintf(mpath_disk->wwid, sdev->mpath_dev->device_id_str, sdev->mpath_dev->device_id_len);
+	sprintf(mpath_disk->wwid, sdev->mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);
 
 	pr_err("%s13 ret=%d after bio_list_init sdev->mpath_dev=%pS\n", __func__, ret, sdev->mpath_dev);
 	list_add_tail(&sdev->mpath_dev->entry, &mpath_disk->dev_list);
@@ -1312,46 +1319,24 @@ int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16],
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_unique_id);
 
-bool scsi_mpath_lun_id_match(struct scsi_mpath_device *a, struct scsi_mpath_device *b)
-{
-	if (a->device_id_len != b->device_id_len)
-		return false;
-
-	return !strncmp(a->device_id_str, b->device_id_str, a->device_id_len);
-}
-EXPORT_SYMBOL_GPL(scsi_mpath_lun_id_match);
-
 int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
-	#if 0
-	struct scsi_mpath_dh_data *dh_data;
-	char device_id_str[40];
+	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
 	int ret = -EINVAL;
 
-	pr_err("%s sdev=%pS\n", __func__, sdev);
-	dh_data = sdev->pg_data;
-	pr_err("%s1 sdev=%pS dh_data=%pS\n", __func__, sdev, dh_data);
-	pr_err("%s2 sdev=%pS dh_data=%pS device_id_len=%d\n",
-		__func__, sdev, dh_data, dh_data->device_id_len);
-	pr_err("%s3 sdev=%pS dh_data=%pS device_id_str=%s\n",
-		__func__, sdev, dh_data, dh_data->device_id_str);
+	pr_err("%s sdev=%pS sizeof(mpath_dev->device_id_str)=%zd sizeof(&mpath_dev->device_id_str)=%zd\n",
+		__func__, sdev, sizeof(mpath_dev->device_id_str), sizeof(&mpath_dev->device_id_str));
+	pr_err("%s sdev=%pS  &mpath_dev->device_id_str[0]=%pS mpath_dev->device_id_str=%pS\n",
+		__func__, sdev,  &mpath_dev->device_id_str[0], mpath_dev->device_id_str);
 
-	ret = scsi_vpd_lun_id(sdev, device_id_str, sizeof(device_id_str));
+	ret = scsi_vpd_lun_id(sdev, mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);
+	pr_err("%s1 sdev=%pS called scsi_vpd_lun_id ret=%d\n", __func__, sdev, ret);
 	if (ret < 0)
 		return ret;
-	pr_err("%s4 sdev=%pS dh_data=%pS \n", __func__, sdev, dh_data);
-	pr_err("%s4.1 device_id_len=%d device_id_str=%s (len=%zd) dh_data->device_id_str=%s (len=%zd)\n",
-		__func__,
-		dh_data->device_id_len, device_id_str, strlen(dh_data->device_id_str),
-		dh_data->device_id_str, strlen(dh_data->device_id_str));
 
-	if (strncmp(dh_data->device_id_str, device_id_str,
-	    dh_data->device_id_len) == 0) {
-		pr_err("%s4.1 matches\n", __func__);
-		return 0;
-	}
-	#endif
-	return -EINVAL;
+	pr_err("%s2 sdev=%pS mpath_dev->device_id_str=%s\n", __func__, sdev, mpath_dev->device_id_str);
+
+	return 0;
 }
 
 static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
@@ -1364,9 +1349,8 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 		pr_err("%s itering mpath_disk=%pS sdev->mpath_dev=%pS\n", __func__, mpath_disk, sdev->mpath_dev);
 		pr_err("%s1 wwid=%s\n", __func__, mpath_disk->wwid);
 		pr_err("%s2 sdev->mpath_dev->device_id_str=%s\n", __func__, sdev->mpath_dev->device_id_str);
-		pr_err("%s2.1 sdev->mpath_dev->device_id_len=%d\n", __func__, sdev->mpath_dev->device_id_len);
 
-		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->device_id_str, sdev->mpath_dev->device_id_len) == 0) {
+		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN) == 0) {
 			pr_err("%s3 matches wwid\n", __func__);
 			mutex_unlock(&mpath_disks_lock);
 			return mpath_disk;
