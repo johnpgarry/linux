@@ -17,6 +17,7 @@
 #include <scsi/scsi_multipath.h>
 #include <scsi/scsi_ioctl.h>
 #include "scsi_alua.h"
+#include "scsi_priv.h"
 
 #include <linux/sysfs.h>
 
@@ -64,19 +65,6 @@ static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
 	}
 
 	return false;
-}
-
-static __maybe_unused void scsi_activate_mpath_work(struct work_struct *work)
-{
-    struct scsi_mpath_device *mpath_dev = container_of(work,
-            struct scsi_mpath_device, activate);
-    struct scsi_device *sdev;
-
-    pr_err("%s mpath_dev=%pS\n", __func__, mpath_dev);
-    sdev = mpath_dev->sdev;
-    pr_err("%s2 sdev=%pS\n", __func__, sdev);
-	if (!sdev)
-		return;
 }
 
 static inline bool scsi_mpath_state_is_live2(enum scsi_mpath_access_state state)
@@ -201,7 +189,6 @@ static int scsi_multipath_init(struct scsi_device *sdev)
 	pr_err("%s2 sdev=%pS sdev->mpath_dev=%pS shost=%pS\n",
 		__func__, sdev, sdev->mpath_dev, shost);
 
-	INIT_WORK(&mpath_dev->activate, scsi_activate_mpath_work);
 	mpath_dev->numa_node = NUMA_NO_NODE;
 
 	return 0;
@@ -1177,7 +1164,7 @@ void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
 
 	if (!test_and_set_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags)) {
 		pr_err("%s calling device_add_disk &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
-		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, sd_attr_groups);
+		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, scsi_device_groups);
 		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
 		if (ret) {
 			clear_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags);
@@ -1277,32 +1264,6 @@ static bool scsi_mpath_state_is_live(unsigned int state)
 		return false;
 	}
 }
-
-void scsi_activate_path(struct scsi_device *sdev)
-{
-	struct scsi_mpath_device *mpath_dev = sdev->mpath_dev;
-
-	pr_err("%s mpath_dev=%pS sdev=%pS q\n",
-		__func__, mpath_dev, sdev);
-	#if 0
-	if (!mpath_dh)
-		return;
-
-        if (!(scsi_mpath_state_is_live2(sdev->state))) {
-		sdev_printk(KERN_INFO, sdev, "Path state is not live \n");
-                return;
-	}
-
-	if (!blk_queue_dying(q)) {
-		pr_err("%s1 mpath_dh=%pS calling scsi_dh_activate\n", __func__, mpath_dh);
-		scsi_dh_activate(q, activate_mpath, sdev);
-	} else {
-		pr_err("%s2 mpath_dh=%pS calling scsi_dh_activate\n", __func__, mpath_dh);
-		activate_mpath(sdev, SCSI_DH_OK);
-	}
-	#endif
-}
-
 
 /*  called when shost is being freed */
 void scsi_mpath_dev_release(struct scsi_device *sdev)
@@ -1528,12 +1489,12 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk)
 		pr_err("%s7.3 itering mpath_dev=%pS mpath_dev->gd=%pS\n", __func__, mpath_dev, mpath_dev->gd);
 		target = disk_to_dev(mpath_dev->gd);
 		pr_err("%s7.4 itering mpath_dev=%pS mpath_dev->gd=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
-			__func__, mpath_dev, mpath_dev->gd, target, scsi_mpath_attr_group.name);
+			__func__, mpath_dev, mpath_dev->gd, target, "multipath");
 		/*
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
 		 */
-		rc = sysfs_add_link_to_group(mpath_gd_kobj, scsi_mpath_attr_group.name,
+		rc = sysfs_add_link_to_group(mpath_gd_kobj, "multipath",
 				&target->kobj, dev_name(target));
 		pr_err("%s7.5 called sysfs_add_link_to_group rc=%d\n", __func__, rc);
 		if (unlikely(rc)) {
