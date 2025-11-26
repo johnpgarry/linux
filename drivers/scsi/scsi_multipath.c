@@ -876,7 +876,7 @@ static void scsi_requeue_work(struct work_struct *work)
 
 	spin_lock_irq(&mpath_disk->requeue_lock);
 	next = bio_list_get(&mpath_disk->requeue_list);
-	spin_unlock(&mpath_disk->requeue_lock);
+	spin_unlock_irq(&mpath_disk->requeue_lock);
 
 	while ((bio = next) != NULL) {
 		next = bio->bi_next;
