@@ -6,8 +6,7 @@
 #include <linux/device.h>
 
 struct mpath_disk {
-	struct cdev		cdev;
-	struct device		cdev_device;
+	struct srcu_struct 	srcu;
 };
 
 #define cdev_to_mpath_disk(cdev) container_of(cdev, struct mpath_disk, cdev)
