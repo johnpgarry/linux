@@ -493,6 +493,7 @@ void scsi_mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 	}
 	pr_err("%s6 calling kblockd_schedule_work\n", __func__);
 	kblockd_schedule_work(&mpath_disk->requeue_work);
+	pr_err("%s6.1 called kblockd_schedule_work\n", __func__);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_revalidate_path);
 
@@ -870,19 +871,20 @@ static void scsi_requeue_work(struct work_struct *work)
 {
 	struct scsi_mpath_disk *mpath_disk =
 	    container_of(work, struct scsi_mpath_disk, requeue_work);
+	__maybe_unused
 	struct bio *bio, *next;
 
 	pr_err("%s mpath_disk=%pS\n", __func__, mpath_disk);
 
 	spin_lock_irq(&mpath_disk->requeue_lock);
-	next = bio_list_get(&mpath_disk->requeue_list);
+//	next = bio_list_get(&mpath_disk->requeue_list);
 	spin_unlock_irq(&mpath_disk->requeue_lock);
 
-	while ((bio = next) != NULL) {
-		next = bio->bi_next;
-		bio->bi_next = NULL;
-		submit_bio_noacct(bio);
-	}
+//	while ((bio = next) != NULL) {
+//		next = bio->bi_next;
+//		bio->bi_next = NULL;
+//		submit_bio_noacct(bio);
+//	}
 }
 
 static __maybe_unused void scsi_mpath_disk_release(struct device *dev)
@@ -1049,8 +1051,9 @@ void scsi_mpath_set_live(struct scsi_mpath_device *mpath_dev)
 			clear_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags);
 			return;
 		}
-		pr_err("%s2 calling kblockd_schedule_work partition_scan_work\n", __func__);
+		pr_err("%s2 calling scsi_mpath_disk_add_cdev partition_scan_work\n", __func__);
 		scsi_mpath_disk_add_cdev(mpath_disk);
+		pr_err("%s3 calling kblockd_schedule_work partition_scan_work\n", __func__);
 		kblockd_schedule_work(&mpath_disk->partition_scan_work);
 	}
 
@@ -1548,7 +1551,12 @@ static void scsi_mpath_free_disk(struct kref *ref)
 	list_del(&mpath_disk->entry);
 	mutex_unlock(&mpath_disks_lock);
 
+	pr_err("%s2 mpath_disk=%pS calling device_del\n", __func__, mpath_disk);
+	device_del(&mpath_disk->dev);
+	pr_err("%s3 mpath_disk=%pS calling put_device\n", __func__, mpath_disk);
+	put_device(&mpath_disk->dev);
 //	kfree(head->plids);
+	pr_err("%s4 mpath_disk=%pS calling kfree\n", __func__, mpath_disk);
 	kfree(mpath_disk);
 }
 
@@ -1622,8 +1630,8 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 
 			scsi_mpath_cdev_del(&mpath_disk->cdev, &mpath_disk->cdev_device);
 			synchronize_srcu(&mpath_disk->srcu);
-			dev_err(&sdev->sdev_gendev, "%s5.1 calling device_del\n", __func__);
-			device_del(&mpath_disk->dev);
+			dev_err(&sdev->sdev_gendev, "%s5.1 not calling device_del\n", __func__);
+		//	device_del(&mpath_disk->dev);
 			dev_err(&sdev->sdev_gendev, "%s5.2 calling del_gendisk\n", __func__);
 			del_gendisk(mpath_disk->gd);
 		}
