@@ -127,7 +127,7 @@ static int scsi_dh_handler_attach(struct scsi_device *sdev,
 	int error, ret = 0;
 
 	pr_err("%s sdev=%pS mpath_dev=%pS scsi_multipath=%d\n",
-		__func__, sdev, sdev->mpath_dev, scsi_multipath);
+		__func__, sdev, sdev->scsi_mpath_dev, scsi_multipath);
 	if (scsi_mpath_enabled())
 		return -ENODEV;
 

@@ -12,7 +12,6 @@
 #include <scsi/scsi_ioctl.h>
 
 
-
 static int __init mpath_init(void)
 {
 	pr_err("%s\n", __func__);
