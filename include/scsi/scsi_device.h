@@ -10,6 +10,7 @@
 #include <linux/atomic.h>
 #include <linux/sbitmap.h>
 #include <linux/cdev.h>
+#include <linux/libmpath.h>
 #include <scsi/scsi_multipath.h>
 #include <scsi/scsi_host.h>
 
@@ -108,23 +109,6 @@ struct scsi_vpd {
  */
 #define REQ_SCSI_MPATH		REQ_DRV
 
-#if 0
-struct scsi_mpath_disk {
-	int				is_shared; 	/* Set Multipath flag  */
-	int				mpath_first_path; /* Indicate if this was first path */
-	int				mpath_numa_node; /* NUMA node for Path  */
-	enum scsi_mpath_access_state	mpath_state;	/* Multipath State */
-	enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
-	struct list_head		mpath_entry;	/* list of all mpath_sdevs */
-	struct scsi_mpath_dh_data	*mpath_pg_data; /* Place holder for Port group data */
-	struct work_struct		activate_mpath; /* Activate path work */
-	atomic_t			nr_mpath;	/* Number of Active mpath */
-
-
-	unsigned long           mpath_flags;		/* flag for multipath devices*/
-};
-#endif
-
 #define SCSI_MPATH_DISK_LIVE            0
 #define SCSI_MPATH_DISK_IO_PENDING      1
 #define SCSI_MPATH_IO_STATS             2
@@ -134,7 +118,6 @@ struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
 struct scsi_mpath_disk {
 	struct srcu_struct 	srcu;
-	//struct Scsi_Host	*shost;	/*Scsi_Host where this mpath belong */
 	struct	bio_list	requeue_list; /* list for requeing bio */
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work; /* work struct for requeue */
@@ -182,7 +165,7 @@ struct scsi_mpath_device {
 #define SCSI_MPATH_IO_STATS             2
 
 	unsigned long           flags;		/* flag for multipath devices*/
-	struct scsi_mpath_disk *disk;
+	struct scsi_mpath_disk *scsi_mpath_disk;
 
 
 
@@ -370,7 +353,7 @@ struct scsi_device {
 	struct device		sdev_gendev,
 				sdev_dev;
 
-	struct scsi_mpath_device *mpath_dev;
+	struct scsi_mpath_device *scsi_mpath_dev;
 
 	struct work_struct	requeue_work;
 
@@ -421,7 +404,7 @@ static inline bool scsi_mpath_enabled(void)
 }
 static inline bool scsi_is_sdev_multipath(struct scsi_device *sdev)
 {
-	return IS_ENABLED(CONFIG_SCSI_MULTIPATH) && sdev->mpath_dev;
+	return scsi_mpath_enabled() && sdev->scsi_mpath_dev;
 }
 #else
 #define scsi_multipath	false;

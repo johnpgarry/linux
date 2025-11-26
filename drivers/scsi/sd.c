@@ -4022,8 +4022,8 @@ static int sd_probe(struct device *dev)
 		goto out_free_index;
 	}
 
-	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->mpath_dev=%pS index=%d scsi_device_tpgs=%d\n",
-		__func__, gd, gd->disk_name, gd->part0, sdp->mpath_dev, index, scsi_device_tpgs(sdp));
+	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->scsi_mpath_dev=%pS index=%d scsi_device_tpgs=%d\n",
+		__func__, gd, gd->disk_name, gd->part0, sdp->scsi_mpath_dev, index, scsi_device_tpgs(sdp));
 	if (scsi_mpath_enabled() && scsi_device_tpgs(sdp)) {
 		struct scsi_mpath_device *mpath_dev;
 		sdev_printk(KERN_INFO, sdp, "%s3.2 calling scsi_mpath_alloc_disk\n", __func__);
@@ -4033,12 +4033,13 @@ static int sd_probe(struct device *dev)
 			sdev_printk(KERN_WARNING, sdp, "could not alloc mpath disk\n");
 			goto out_free_index;
 		}
-		mpath_dev = sdp->mpath_dev;
-		pr_err("%s3.3.1 sdp->mpath_dev=%pS\n", __func__, sdp->mpath_dev);
-		if (sdp->mpath_dev)
-			pr_err("%s3.3.1 sdp->mpath_dev=%pS mpath_dev dksk=%pS\n", __func__, sdp->mpath_dev, sdp->mpath_dev->disk);
+		mpath_dev = sdp->scsi_mpath_dev;
+		pr_err("%s3.3.1 sdp->scsi_mpath_dev=%pS\n", __func__, sdp->scsi_mpath_dev);
+		if (sdp->scsi_mpath_dev)
+			pr_err("%s3.3.1 sdp->scsi_mpath_dev=%pS mpath_dev dksk=%pS\n", __func__,
+				sdp->scsi_mpath_dev, sdp->scsi_mpath_dev->scsi_mpath_disk);
 		else
-			pr_err("%s3.3.2 sdp->mpath_dev=%pS mpath_disk=NULL\n", __func__, sdp->mpath_dev);
+			pr_err("%s3.3.2 sdp->scsi_mpath_dev=%pS mpath_disk=NULL\n", __func__, sdp->scsi_mpath_dev);
 
 		//snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "sd_mpath%d", mindex);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd name=%pS mpath_dev->gd->disk_name=%s\n",
@@ -4139,7 +4140,7 @@ static int sd_probe(struct device *dev)
 		pr_err("%s calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
 		scsi_mpath_add_disk(sdp);
-		sd_revalidate_mpath_disk(sdp->mpath_dev->disk, sdkp);
+		sd_revalidate_mpath_disk(sdp->scsi_mpath_dev->scsi_mpath_disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
 

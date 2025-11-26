@@ -166,24 +166,24 @@ static struct scsi_alua_port_group *alua_find_get_pg(char *id_str, size_t id_siz
 static void configure_scsi_mpath(struct scsi_device *sdev, struct scsi_alua_port_group *pg)
 {
 	pr_err("%s sdev=%pS pg=%pS scsi_is_sdev_multipath=%d sdev->mpath_dev=%pS\n",
-		__func__, sdev, pg, scsi_is_sdev_multipath(sdev), sdev->mpath_dev);
+		__func__, sdev, pg, scsi_is_sdev_multipath(sdev), sdev->scsi_mpath_dev);
 	if (!scsi_is_sdev_multipath(sdev))
 		return;
-	if (!sdev->mpath_dev)
+	if (!sdev->scsi_mpath_dev)
 		return;
 	pr_err("%s2 sdev=%pS pg=%pS scsi_is_sdev_multipath=%d sdev->mpath_dev=%pS\n",
-		__func__, sdev, pg, scsi_is_sdev_multipath(sdev), sdev->mpath_dev);
+		__func__, sdev, pg, scsi_is_sdev_multipath(sdev), sdev->scsi_mpath_dev);
 
-	sdev->mpath_dev->group_id = pg->group_id;
-	sdev->mpath_dev->tpgs = pg->tpgs;
-	sdev->mpath_dev->state = pg->state;
-	sdev->mpath_dev->valid_states = pg->valid_states;
-	sdev->mpath_dev->prefrence = pg->pref;
-	sdev->mpath_dev->is_active = 1;
-//	sdev->mpath_dev->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
-//	sdev->mpath_dev->device_id_len = pg->device_id_len;
-	pr_err("%s2 sdev=%pS sdev->mpath_dev->device_id_str=%s group_id=%d tpgs=%d state=%d valid_states=%d pref=%d\n",
-		__func__, sdev, sdev->mpath_dev->device_id_str,
+	sdev->scsi_mpath_dev->group_id = pg->group_id;
+	sdev->scsi_mpath_dev->tpgs = pg->tpgs;
+	sdev->scsi_mpath_dev->state = pg->state;
+	sdev->scsi_mpath_dev->valid_states = pg->valid_states;
+	sdev->scsi_mpath_dev->prefrence = pg->pref;
+	sdev->scsi_mpath_dev->is_active = 1;
+//	sdev->scsi_mpath_dev->device_id_str = kstrdup(pg->device_id_str, GFP_KERNEL);
+//	sdev->scsi_mpath_dev->device_id_len = pg->device_id_len;
+	pr_err("%s2 sdev=%pS sdev->scsi_mpath_dev->device_id_str=%s group_id=%d tpgs=%d state=%d valid_states=%d pref=%d\n",
+		__func__, sdev, sdev->scsi_mpath_dev->device_id_str,
 		pg->group_id,
 		pg->tpgs,
 		pg->state,
