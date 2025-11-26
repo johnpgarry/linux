@@ -1164,7 +1164,8 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 
 //	pr_err("%s2 sdev=%pS mpath_dev=%pS mpath_disk=%pS calling kfree mpath_dev\n",
 //		__func__, sdev, mpath_dev, mpath_disk);
-//	kfree(mpath_dev);
+	sdev->mpath_dev = NULL;
+	kfree(mpath_dev);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_dev_release);
 
