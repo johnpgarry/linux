@@ -950,8 +950,6 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		return 0;
 	}
 
-	mutex_unlock(&mpath_disks_lock);
-
 	size = sizeof(*mpath_disk);
 	size += num_possible_nodes() * sizeof(struct scsi_mpath_device *);
 
