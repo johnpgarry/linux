@@ -30,6 +30,8 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev);
 static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *mpath_disk);
 struct scsi_mpath_device *scsi_find_path(struct scsi_mpath_disk *mpath_disk);
 static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *mpath_dev);
+static void scsi_mpath_free_disk(struct kref *ref);
+static void scsi_mpath_cdev_rel(struct device *dev);
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
@@ -90,6 +92,20 @@ static void scsi_mpath_free(struct kref *ref)
 	*/
 }
 
+static void scsi_mpath_put_disk(struct scsi_mpath_disk *mpath_disk)
+{
+	kref_put(&mpath_disk->ref, scsi_mpath_free_disk);
+}
+
+static int scsi_mpath_get_disk(struct scsi_mpath_disk *mpath_disk)
+{
+	if (!kref_get_unless_zero(&mpath_disk->ref)) {
+		pr_err("%s1 mpath_disk=%pS ENXIO\n", __func__, mpath_disk);
+		return -ENXIO;
+	}
+	return 0;
+}
+
 static int scsi_mpath_generic_chr_open(struct inode *inode, struct file *file)
 {
 	struct cdev *cdev = file_inode(file)->i_cdev;
@@ -97,11 +113,7 @@ static int scsi_mpath_generic_chr_open(struct inode *inode, struct file *file)
 
 	pr_err("%s cdev=%pS mpath_disk=%pS\n", __func__, cdev, mpath_disk);
 
-	if (!kref_get_unless_zero(&mpath_disk->ref)) {
-		pr_err("%s1 mpath_disk=%pS ENXIO\n", __func__, mpath_disk);
-		return -ENXIO;
-	}
-	return 0;
+	return scsi_mpath_get_disk(mpath_disk);
 }
 
 static int scsi_mpath_generic_chr_release(struct inode *inode, struct file *file)
@@ -182,7 +194,7 @@ static int scsi_mpath_disk_add_cdev(struct scsi_mpath_disk *mpath_disk)
 
 	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), minor);
 	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
-	//mpath_disk->cdev_device.release = nvme_cdev_rel;
+	mpath_disk->cdev_device.release = scsi_mpath_cdev_rel;
 	device_initialize(&mpath_disk->cdev_device);
 	cdev_init(&mpath_disk->cdev, &scsi_mpath_generic_chr_fops);
 	mpath_disk->cdev.owner = THIS_MODULE;
@@ -1222,12 +1234,7 @@ static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 	struct scsi_mpath_disk *mpath_disk = disk->private_data;
 	pr_err("%s disk=%pS mpath_disk=%pS\n", __func__, disk, mpath_disk);
 
-	if (!kref_get_unless_zero(&mpath_disk->ref)) {
-		pr_err("%s1 disk=%pS ENXIO\n", __func__, disk);
-		return -ENXIO;
-	}
-
-	return 0;
+	return scsi_mpath_get_disk(mpath_disk);
 }
 
 static void scsi_mpath_release(struct gendisk *disk)
@@ -1305,6 +1312,7 @@ int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 {
 	struct scsi_mpath_disk *mpath_disk;
+	int ret;
 
 	mutex_lock(&mpath_disks_lock);
 	list_for_each_entry(mpath_disk, &mpath_disks_list, entry) {
@@ -1313,11 +1321,16 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 		pr_err("%s1 wwid=%s\n", __func__, mpath_disk->wwid);
 		pr_err("%s2 sdev->mpath_dev->device_id_str=%s\n", __func__, sdev->mpath_dev->device_id_str);
 
+		ret = scsi_mpath_get_disk(mpath_disk);
+		if (ret)
+			continue;
 		if (strncmp(mpath_disk->wwid, sdev->mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN) == 0) {
 			pr_err("%s3 matches wwid\n", __func__);
+			
 			mutex_unlock(&mpath_disks_lock);
 			return mpath_disk;
 		}
+		scsi_mpath_put_disk(mpath_disk);
 	}
 	mutex_unlock(&mpath_disks_lock);
 	return NULL;
@@ -1537,10 +1550,20 @@ static void scsi_mpath_free_disk(struct kref *ref)
 	kfree(mpath_disk);
 }
 
-static void scsi_mpath_put_disk(struct scsi_mpath_disk *mpath_disk)
+static void scsi_mpath_cdev_rel(struct device *dev)
 {
-	kref_put(&mpath_disk->ref, scsi_mpath_free_disk);
+	dev_err(dev, "%s\n", __func__);
+//	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
 }
+
+static void scsi_mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
+{
+	dev_err(cdev_device, "%s cdev=%pS calling cdev_device_del\n", __func__, cdev);
+	cdev_device_del(cdev, cdev_device);
+	dev_err(cdev_device, "%s2 calling put_device cdev_device=%pS\n", __func__, cdev_device);
+	put_device(cdev_device);
+}
+
 
 void scsi_mpath_remove_disk(struct scsi_device *sdev)
 {
@@ -1584,6 +1607,7 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 
 	dev_err(&sdev->sdev_gendev, "%s4 last_path=%d\n",
 		__func__, last_path);
+
 	if (last_path) {
 		dev_err(&sdev->sdev_gendev, "%s5 SCSI_MPATH_DISK_LIVE set=%d\n",
 			__func__, test_bit(SCSI_MPATH_DISK_LIVE, &mpath_disk->flags));
@@ -1594,7 +1618,7 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 			 */
 		//	kblockd_schedule_work(&head->requeue_work);
 
-		//	nvme_cdev_del(&head->cdev, &head->cdev_device);
+			scsi_mpath_cdev_del(&mpath_disk->cdev, &mpath_disk->cdev_device);
 			synchronize_srcu(&mpath_disk->srcu);
 			dev_err(&sdev->sdev_gendev, "%s5.1 calling device_del\n", __func__);
 			device_del(&mpath_disk->dev);
@@ -1602,8 +1626,9 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 			del_gendisk(mpath_disk->gd);
 		}
 		dev_err(&sdev->sdev_gendev, "%s6 calling put_disk on mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
-		scsi_mpath_put_disk(mpath_disk);
+		
 	}
+	scsi_mpath_put_disk(mpath_disk);
 
 	dev_err(&sdev->sdev_gendev, "%s10 mpath_dev=%pS disk=%pS\n",
 		__func__, sdev->mpath_dev, sdev->mpath_dev ? sdev->mpath_dev->disk : NULL);
