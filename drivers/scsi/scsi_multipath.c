@@ -499,14 +499,14 @@ EXPORT_SYMBOL_GPL(scsi_mpath_revalidate_path);
 
 static bool scsi_mpath_is_disabled(struct scsi_device *sdev)
 {
-	enum scsi_device_state sdev_state = sdev->sdev_state;
+//	enum scsi_device_state sdev_state = sdev->sdev_state;
 
 	/*
 	 * if device multipath state is not set to LIVE
 	 * then return true
 	 */
-	if (!scsi_mpath_state_is_live2(sdev->mpath_dev->state))
-		return true;
+//	if (!scsi_mpath_state_is_live2(sdev->mpath_dev->state))
+//		return true;
 
 	/*
 	 * Do not treat DELETING as a disabled path as I/O should
@@ -515,8 +515,8 @@ static bool scsi_mpath_is_disabled(struct scsi_device *sdev)
 	 * Otherwise I/O will fail immeadiately and return to
 	 * requeue list
 	 */
-	if (sdev_state != SDEV_RUNNING && sdev_state != SDEV_CANCEL)
-		return true;
+//	if (sdev_state != SDEV_RUNNING && sdev_state != SDEV_CANCEL)
+//		return true;
 
 	return false;
 }
