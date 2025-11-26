@@ -4201,8 +4201,8 @@ static int sd_remove(struct device *dev)
 	dev_err(dev, "%s4 calling put_disk(sdkp->disk) sdp=%pS scsi_is_sdev_multipath=%d sdkp=%pS\n",
 		__func__, sdp, scsi_is_sdev_multipath(sdp), sdkp);
 	put_disk(sdkp->disk);
-	dev_err(dev, "%s4.1 called put_disk(sdkp->disk) sdp=%pS scsi_is_sdev_multipath=%d\n",
-		__func__, sdp, scsi_is_sdev_multipath(sdp));
+	dev_err(dev, "%s4.1 called put_disk(sdkp->disk) sdp=%pS\n",
+		__func__, sdp);
 
 
 	return 0;
@@ -4216,8 +4216,8 @@ static void scsi_disk_release(struct device *dev)
 	dev_err(dev, "%s scsi_is_sdev_multipath=%d sdp=%pS sdkp=%pS dev=%pS\n",
 		__func__, scsi_is_sdev_multipath(sdp), sdp, sdkp, dev);
 
-//	if (scsi_is_sdev_multipath(sdp))
-//		scsi_mpath_dev_release(sdp);
+	if (scsi_is_sdev_multipath(sdp))
+		scsi_mpath_dev_release(sdp);
 
 	ida_free(&sd_index_ida, sdkp->index);
 	dev_err(dev, "%s2 sdp=%pS calling put_device(&sdkp->device->sdev_gendev)\n",
