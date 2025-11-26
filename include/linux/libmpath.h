@@ -1,0 +1,5 @@
+
+#ifndef _LIBMULTIPATH_H
+#define _LIBMULTIPATH_H
+
+#endif // _LIBMULTIPATH_H

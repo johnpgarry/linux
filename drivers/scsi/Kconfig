@@ -87,6 +87,7 @@ config SCSI_MULTIPATH
 	bool "SCSI multipath support"
 	depends on SCSI
 	depends on SCSI_ALUA
+	select LIBMULTIPATH
 	help
 	  This option enables support for native SCSI multipath support for
 	  SCSI host. This option depends on Asymmetric Logical Unit Access
