@@ -903,6 +903,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	__maybe_unused int index;
 	struct Scsi_Host *shost = sdev->host;
 	struct device *shost_dev = &shost->shost_dev;
+	size_t size;
 
 	pr_err("%s sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS scsi_device_tpgs=%d\n",
 		__func__, sdev, sdev->mpath_dev, shost, shost_dev, scsi_device_tpgs(sdev));
@@ -951,7 +952,10 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	mutex_unlock(&mpath_disks_lock);
 
-	mpath_disk = kzalloc(sizeof(*mpath_disk), GFP_KERNEL);
+	size = sizeof(*mpath_disk);
+	size += num_possible_nodes() * sizeof(struct scsi_mpath_device *);
+
+	mpath_disk = kzalloc(size, GFP_KERNEL);
 	pr_err("%s5 sdev=%pS sdev->mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS\n",
 		__func__, sdev, sdev->mpath_dev, shost, shost_dev, mpath_disk);
 	if (!mpath_disk)
