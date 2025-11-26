@@ -4306,9 +4306,10 @@ static int sd_start_stop_device(struct scsi_disk *sdkp, int start)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
-
+	dev_err(dev, "%s sdkp=%pS\n", __func__, sdkp);
 	if (!sdkp)
 		return;         /* this can happen */
+	dev_err(dev, "%s2 sdkp=%pS sdkp->device=%pS\n", __func__, sdkp, sdkp->device);
 
 	if (pm_runtime_suspended(dev))
 		return;

@@ -1235,6 +1235,49 @@ static ssize_t scsi_mpath_wwid_show(struct device *dev,
 struct device_attribute scsi_mpath_wwid = \
 		__ATTR(wwid, S_IRUGO, scsi_mpath_wwid_show, NULL);
 
+static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	int node, srcu_idx;
+	nodemask_t numa_nodes;
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct scsi_mpath_device *current_mpath_dev, *mpath_dev;
+	struct scsi_mpath_disk *mpath_disk;
+
+	dev_err(dev, "%s sdev=%pS mpath_dev=%pS\n", __func__,
+		sdev, sdev->mpath_dev);
+
+	mpath_dev = sdev->mpath_dev;
+
+	mpath_disk = mpath_dev->disk;
+	dev_err(dev, "%s2 mpath_disk->iopolicy=%d SCSI_MPATH_IOPOLICY_NUMA=%d\n", __func__,
+		mpath_disk->iopolicy, SCSI_MPATH_IOPOLICY_NUMA);
+
+//	struct nvme_ns *current_ns;
+//	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
+//	struct nvme_ns_head *head = ns->head;
+
+	if (mpath_disk->iopolicy != SCSI_MPATH_IOPOLICY_NUMA)
+		return 0;
+
+	nodes_clear(numa_nodes);
+
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	for_each_node(node) {
+		current_mpath_dev = srcu_dereference(mpath_disk->current_path[node],
+				&mpath_disk->srcu);
+		dev_err(dev, "%s3 node=%d current_mpath_dev=%pS mpath_dev=%pS\n", __func__, node, current_mpath_dev, mpath_dev);
+		if (mpath_dev == current_mpath_dev)
+			node_set(node, numa_nodes);
+	}
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+
+	return sysfs_emit(buf, "%*pbl\n", nodemask_pr_args(&numa_nodes));
+}
+
+struct device_attribute scsi_mpath_numa_nodes = \
+		__ATTR(numa_nodes, S_IRUGO, scsi_mpath_numa_nodes_show, NULL);
+
 static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 {
 	struct scsi_mpath_disk *mpath_disk = disk->private_data;

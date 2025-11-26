@@ -1391,12 +1391,10 @@ static struct attribute *scsi_sdev_attrs[] = {
 	&dev_attr_access_state.attr,
 	&dev_attr_preferred_path.attr,
 #endif
-#ifdef dsdsd
+
 #ifdef CONFIG_SCSI_MULTIPATH
-	&dev_attr_multipath_iopolicy.attr,
-	&dev_attr_multipath_state.attr,
+	&scsi_mpath_numa_nodes.attr,
 #endif // CONFIG_SCSI_MULTIPATH
-#endif // dsdsd
 	&dev_attr_queue_ramp_up_period.attr,
 	&dev_attr_cdl_supported.attr,
 	&dev_attr_cdl_enable.attr,
