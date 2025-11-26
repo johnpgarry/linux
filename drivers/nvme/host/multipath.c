@@ -812,7 +812,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	struct nvme_ns_head *head = ns->head;
 	int rc;
 
-	WARN_ON(1);
+	//WARN_ON(1);
 	pr_err("%s ns=%pS head=%pS head->disk=%pS\n", __func__, ns, head, head->disk);
 	if (!head->disk)
 		return;
