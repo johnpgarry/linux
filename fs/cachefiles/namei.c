@@ -168,7 +168,7 @@ retry:
 	ASSERT(d_backing_inode(subdir));
 
 	if (!d_can_lookup(subdir)) {
-		pr_err("%s is not a directory\n", dirname);
+	//	pr_err("%s is not a directory\n", dirname);
 		ret = -EIO;
 		goto check_error;
 	}

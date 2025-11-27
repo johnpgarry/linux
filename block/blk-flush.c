@@ -317,7 +317,7 @@ static void blk_kick_flush(struct request_queue *q, struct blk_flush_queue *fq,
 	flush_rq->cmd_flags = REQ_OP_FLUSH | REQ_PREFLUSH;
 	flush_rq->cmd_flags |= (flags & REQ_DRV) | (flags & REQ_FAILFAST_MASK);
 	flush_rq->rq_flags |= RQF_FLUSH_SEQ;
-	pr_err("%s setting RQF_FLUSH_SEQ flush_rq=%pS\n", __func__, flush_rq);
+	//pr_err("%s setting RQF_FLUSH_SEQ flush_rq=%pS\n", __func__, flush_rq);
 	flush_rq->end_io = flush_end_io;
 	/*
 	 * Order WRITE ->end_io and WRITE rq->ref, and its pair is the one
@@ -370,7 +370,7 @@ static enum rq_end_io_ret mq_flush_data_end_io(struct request *rq,
 static void blk_rq_init_flush(struct request *rq)
 {
 	rq->flush.seq = 0;
-	pr_err("%s setting RQF_FLUSH_SEQ rq=%pS\n", __func__, rq);
+	//pr_err("%s setting RQF_FLUSH_SEQ rq=%pS\n", __func__, rq);
 	rq->rq_flags |= RQF_FLUSH_SEQ;
 	rq->flush.saved_end_io = rq->end_io; /* Usually NULL */
 	rq->end_io = mq_flush_data_end_io;
