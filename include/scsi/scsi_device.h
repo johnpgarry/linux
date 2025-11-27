@@ -158,6 +158,8 @@ struct scsi_mpath_device {
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
 
 	atomic_t nr_active;
+	atomic_t nr_total;
+
 
 
 #define SCSI_MPATH_DISK_LIVE            0
