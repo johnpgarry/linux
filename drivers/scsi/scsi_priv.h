@@ -162,6 +162,7 @@ extern const struct attribute_group *scsi_mpath_groups[];
 extern struct device_attribute scsi_mpath_iopolicy;
 extern struct device_attribute scsi_mpath_wwid;
 extern struct device_attribute scsi_mpath_numa_nodes;
+extern struct device_attribute scsi_mpath_nr_total;
 
 /* scsi_netlink.c */
 #ifdef CONFIG_SCSI_NETLINK

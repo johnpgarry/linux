@@ -575,18 +575,12 @@ inline struct scsi_mpath_device *__scsi_find_path(struct scsi_mpath_disk *scsi_m
 static struct scsi_mpath_device *scsi_next_mpath_dev(struct scsi_mpath_disk *scsi_mpath_disk,
 			struct scsi_mpath_device *scsi_mpath_dev)
 {
-	#if 0
-	struct scsi_
-	sdev = list_next_or_null_rcu(&scsi_mpath_disk->dev_list, &scsi_mpath_dev->siblings,
-	    struct scsi_device, siblings);
+	scsi_mpath_dev = list_next_or_null_rcu(&scsi_mpath_disk->dev_list, &scsi_mpath_dev->entry, struct scsi_mpath_device,
+			entry);
 
-	if (sdev)
-		return sdev;
-
-	return list_first_or_null_rcu(&scsi_mpath_disk->dev_list, struct scsi_device,
-	    siblings);
-	#endif
-	return NULL;
+	if (scsi_mpath_dev)
+		return scsi_mpath_dev;
+	return list_first_or_null_rcu(&scsi_mpath_disk->dev_list, struct scsi_mpath_device, entry);
 }
 
 static struct scsi_mpath_device *scsi_mpath_round_robin_path(struct scsi_mpath_disk *scsi_mpath_disk)
@@ -596,15 +590,19 @@ static struct scsi_mpath_device *scsi_mpath_round_robin_path(struct scsi_mpath_d
 	struct scsi_mpath_device *old = srcu_dereference(scsi_mpath_disk->current_path[node],
 					       &scsi_mpath_disk->mpath_disk.srcu);
 
+	if (unlikely(!old))
+		return __scsi_find_path(scsi_mpath_disk, node);
+
 	if (list_is_singular(&scsi_mpath_disk->dev_list)) {
 		if(scsi_mpath_is_disabled(old->sdev))
 			return NULL;
 		return old;
 	}
 
-	for (scsi_mpath_dev = scsi_next_mpath_dev(scsi_mpath_disk, scsi_mpath_dev);
+	for (scsi_mpath_dev = scsi_next_mpath_dev(scsi_mpath_disk, old);
 	    scsi_mpath_dev && scsi_mpath_dev != old;
 	    scsi_mpath_dev = scsi_next_mpath_dev(scsi_mpath_disk, scsi_mpath_dev)) {
+
 		if (scsi_mpath_is_disabled(scsi_mpath_dev->sdev))
 			continue;
 		if (scsi_mpath_dev->state == SCSI_MPATH_OPTIMAL) {
@@ -614,6 +612,7 @@ static struct scsi_mpath_device *scsi_mpath_round_robin_path(struct scsi_mpath_d
 		if (scsi_mpath_dev->state == SCSI_MPATH_ACTIVE)
 			found = scsi_mpath_dev;
 	}
+
 
 	if (!scsi_mpath_is_disabled(old->sdev) &&
 	    (old->state == SCSI_MPATH_OPTIMAL ||
@@ -766,6 +765,7 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 	if (likely(scsi_mpath_dev)) {
 		bio_set_dev(bio, scsi_mpath_dev->sdev->request_queue->disk->part0);
 		bio->bi_opf |= REQ_SCSI_MPATH;
+		atomic_inc(&scsi_mpath_dev->nr_total);
 		if (special)
 			pr_err("%s3 bio=%pS bio->bi_bdev=%pS called bio_set_dev mpath_disk=%pS sdev=%pS calling submit_bio_noacct\n",
 				__func__, bio, bio->bi_bdev, scsi_mpath_disk, sdev);
@@ -1281,6 +1281,21 @@ static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attr
 struct device_attribute scsi_mpath_numa_nodes = \
 		__ATTR(numa_nodes, S_IRUGO, scsi_mpath_numa_nodes_show, NULL);
 
+static ssize_t scsi_mpath_nr_total_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct scsi_mpath_device *scsi_mpath_device = sdev->scsi_mpath_dev;
+
+	if (!scsi_mpath_device)
+		return 0;
+
+	return sysfs_emit(buf, "%d\n", atomic_read(&scsi_mpath_device->nr_total));
+}
+
+struct device_attribute scsi_mpath_nr_total = \
+		__ATTR(nr_total, S_IRUGO, scsi_mpath_nr_total_show, NULL);
+
 static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 {
 	struct scsi_mpath_disk *scsi_mpath_disk = disk->private_data;
@@ -1558,7 +1573,7 @@ void scsi_mpath_add_disk(struct scsi_device *sdev)
 	pr_err("%s1 mpath_disk=%pS\n", __func__, scsi_mpath_disk);
 
 	if (scsi_mpath_state_is_live(scsi_mpath_dev->state)) {
-		//mpath_disk->state = SCSI_MPATH_OPTIMAL;
+		scsi_mpath_dev->state = SCSI_MPATH_OPTIMAL;
 		pr_err("%s calling scsi_mpath_set_live\n", __func__);
 		scsi_mpath_set_live(scsi_mpath_dev);
 	}

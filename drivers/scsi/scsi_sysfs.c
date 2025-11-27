@@ -1394,6 +1394,7 @@ static struct attribute *scsi_sdev_attrs[] = {
 
 #ifdef CONFIG_SCSI_MULTIPATH
 	&scsi_mpath_numa_nodes.attr,
+	&scsi_mpath_nr_total.attr,
 #endif // CONFIG_SCSI_MULTIPATH
 	&dev_attr_queue_ramp_up_period.attr,
 	&dev_attr_cdl_supported.attr,
