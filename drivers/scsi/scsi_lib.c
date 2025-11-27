@@ -627,14 +627,6 @@ static void scsi_run_queue_async(struct scsi_device *sdev)
 	}
 }
 
-static inline void __scsi_mpath_end_request(struct request *req,
-    blk_status_t status)
-{
-	//pr_err("%s req=%pS req->bio=%pS status=%d REQ_SCSI_MPATH=%d\n", __func__, req, req->bio, status, !!(req->cmd_flags & REQ_SCSI_MPATH));
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		scsi_mpath_end_request(req);
-	blk_mq_end_request(req, status);
-}
 
 /* Returns false when no more bytes to process, true if there are more */
 static bool scsi_end_request(struct request *req, blk_status_t error,
