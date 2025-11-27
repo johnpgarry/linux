@@ -395,7 +395,7 @@ void scsi_mpath_end_request(struct request *req)
 	struct scsi_mpath_disk *scsi_mpath_disk = scsi_mpath_dev->scsi_mpath_disk;
 	struct gendisk *disk = scsi_mpath_disk->gd;
 
-	pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
+	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
 	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE)
 		atomic_dec_if_positive(&scsi_mpath_dev->nr_active);
 
@@ -531,10 +531,10 @@ inline struct scsi_mpath_device *__scsi_find_path(struct scsi_mpath_disk *scsi_m
 	//struct scsi_device *sdev_found = NULL, *sdev_fallback = NULL, *sdev;
 	struct scsi_mpath_device *scsi_mpath_dev_found, *scsi_mpath_dev_fallback, *scsi_mpath_dev;
 
-	pr_err("%s mpath_disk=%pS\n", __func__, scsi_mpath_disk);
+	//pr_err("%s mpath_disk=%pS\n", __func__, scsi_mpath_disk);
 	list_for_each_entry_rcu(scsi_mpath_dev, &scsi_mpath_disk->dev_list, entry) {
-		pr_err("%s1 itering mpath_disk=%pS mpath_dev=%pS disabled=%d\n",
-			__func__, scsi_mpath_disk, scsi_mpath_dev, scsi_mpath_is_disabled(scsi_mpath_dev->sdev));
+	//	pr_err("%s1 itering mpath_disk=%pS mpath_dev=%pS disabled=%d\n",
+	//		__func__, scsi_mpath_disk, scsi_mpath_dev, scsi_mpath_is_disabled(scsi_mpath_dev->sdev));
 		if (scsi_mpath_is_disabled(scsi_mpath_dev->sdev))
 			continue;
 
@@ -668,7 +668,7 @@ static struct scsi_mpath_device *scsi_mpath_queue_depth_path(struct scsi_mpath_d
 
 static inline bool scsi_mpath_is_optimized(struct scsi_mpath_device *scsi_mpath_dev)
 {
-	pr_err("%s mpath_dev=%pS\n", __func__, scsi_mpath_dev);
+	//pr_err("%s mpath_dev=%pS\n", __func__, scsi_mpath_dev);
 
 	if (!scsi_mpath_dev)
 		return false;
@@ -729,8 +729,10 @@ static void scsi_multipath_submit_bio(struct bio *bio)
 	struct scsi_mpath_device *scsi_mpath_dev;
 
 	//WARN_ON_ONCE(1);
-	if (bio->bi_iter.bi_size == 16384)
+	if (bio->bi_iter.bi_size == 16384) {
 		special = true;
+		special = false;
+	}
 
 	/*
 	 * The scsi device might be going away and the bio might be

@@ -631,7 +631,7 @@ static void scsi_run_queue_async(struct scsi_device *sdev)
 static inline void __scsi_mpath_end_request(struct request *req,
     blk_status_t status)
 {
-	pr_err("%s req=%pS req->bio=%pS status=%d REQ_SCSI_MPATH=%d\n", __func__, req, req->bio, status, !!(req->cmd_flags & REQ_SCSI_MPATH));
+	//pr_err("%s req=%pS req->bio=%pS status=%d REQ_SCSI_MPATH=%d\n", __func__, req, req->bio, status, !!(req->cmd_flags & REQ_SCSI_MPATH));
 	if (req->cmd_flags & REQ_SCSI_MPATH)
 		scsi_mpath_end_request(req);
 	blk_mq_end_request(req, status);
@@ -644,17 +644,17 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = cmd->device;
 	struct request_queue *q = sdev->request_queue;
-	bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
+	__maybe_unused bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s cmd=%pS req=%pS bytes=%d bio=%pS good=%d error=%d calling blk_update_request is_flush=%d\n",
-				__func__, cmd, req, blk_rq_bytes(req), req->bio, bytes, error, is_flush);
+//	if (req->cmd_flags & REQ_SCSI_MPATH)
+	//	pr_err("%s cmd=%pS req=%pS bytes=%d bio=%pS good=%d error=%d calling blk_update_request is_flush=%d\n",
+	//			__func__, cmd, req, blk_rq_bytes(req), req->bio, bytes, error, is_flush);
 
 	if (blk_update_request(req, error, bytes))
 		return true;
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s1 cmd=%pS req=%pS bytes=%d bio=%pS good=%d error=%d called blk_update_request\n",
-				__func__, cmd, req, blk_rq_bytes(req), req->bio, bytes, error);
+	//if (req->cmd_flags & REQ_SCSI_MPATH)
+	//	pr_err("%s1 cmd=%pS req=%pS bytes=%d bio=%pS good=%d error=%d called blk_update_request\n",
+	//			__func__, cmd, req, blk_rq_bytes(req), req->bio, bytes, error);
 
 	if (q->limits.features & BLK_FEAT_ADD_RANDOM)
 		add_disk_randomness(req->q->disk);
@@ -687,13 +687,13 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	percpu_ref_get(&q->q_usage_counter);
 
 	if (req->cmd_flags & REQ_SCSI_MPATH) {
-		pr_err("%s req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH\n", __func__, req, req->bio, cmd);
+	//	pr_err("%s req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH\n", __func__, req, req->bio, cmd);
 		scsi_mpath_end_request(req);
 	}
 
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s2 cmd=%pS req=%pS bytes=%d bio=%pS error=%d calling __blk_mq_end_request\n",
-				__func__, cmd, req, blk_rq_bytes(req), req->bio, error);
+	//if (req->cmd_flags & REQ_SCSI_MPATH)
+	//	pr_err("%s2 cmd=%pS req=%pS bytes=%d bio=%pS error=%d calling __blk_mq_end_request\n",
+	//			__func__, cmd, req, blk_rq_bytes(req), req->bio, error);
 	__blk_mq_end_request(req, error);
 
 	scsi_run_queue_async(sdev);
@@ -818,11 +818,11 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 	bool sense_valid;
 	bool sense_current = true;      /* false implies "deferred sense" */
 	blk_status_t blk_stat;
-	bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
+	__maybe_unused bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s req=%pS bytes=%d bio=%pS result=%d __REQ_DRV=%d __RQF_FLUSH_SEQ=%d is_flush=%d\n",
-				__func__, req, blk_rq_bytes(req), req->bio, result, __REQ_DRV, __RQF_FLUSH_SEQ, is_flush);
+	//if (req->cmd_flags & REQ_SCSI_MPATH)
+	//	pr_err("%s req=%pS bytes=%d bio=%pS result=%d __REQ_DRV=%d __RQF_FLUSH_SEQ=%d is_flush=%d\n",
+	//			__func__, req, blk_rq_bytes(req), req->bio, result, __REQ_DRV, __RQF_FLUSH_SEQ, is_flush);
 
 	sense_valid = scsi_command_normalize_sense(cmd, &sshdr);
 	if (sense_valid)
@@ -1090,7 +1090,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	int result = cmd->result;
 	struct request *req = scsi_cmd_to_rq(cmd);
 	blk_status_t blk_stat = BLK_STS_OK;
-	bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
+	__maybe_unused bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
 	if (unlikely(result))	/* a nz result may or may not be an error */
 		result = scsi_io_completion_nz_result(cmd, result, &blk_stat);
@@ -1107,23 +1107,23 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	 * Failed, zero length commands always need to drop down
 	 * to retry code. Fast path should return in this block.
 	 */
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d is_flush=%d\n",
-			__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes, is_flush);
+//	if (req->cmd_flags & REQ_SCSI_MPATH)
+//		pr_err("%s cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d is_flush=%d\n",
+//			__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes, is_flush);
 	if (likely(blk_rq_bytes(req) > 0 || blk_stat == BLK_STS_OK)) {
 		if (likely(!scsi_end_request(req, blk_stat, good_bytes))) {
-				if (req->cmd_flags & REQ_SCSI_MPATH)
-					pr_err("%s2 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d no bytes remaining\n",
-						__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
+		//		if (req->cmd_flags & REQ_SCSI_MPATH)
+		//			pr_err("%s2 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d no bytes remaining\n",
+		//				__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
 				return; /* no bytes remaining */
 			}
 	}
 
 	/* Kill remainder if no retries. */
 	if (unlikely(blk_stat && scsi_noretry_cmd(cmd))) {
-		if (req->cmd_flags & REQ_SCSI_MPATH)
-			pr_err("%s3 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d Kill remainder if no retries\n",
-				__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
+	//	if (req->cmd_flags & REQ_SCSI_MPATH)
+	//		pr_err("%s3 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d Kill remainder if no retries\n",
+		//		__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
 		if (scsi_end_request(req, blk_stat, blk_rq_bytes(req)))
 			WARN_ONCE(true,
 			    "Bytes remaining after failed, no-retry command");
@@ -1135,15 +1135,15 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	 * request just queue the command up again.
 	 */
 	if (likely(result == 0)) {
-		if (req->cmd_flags & REQ_SCSI_MPATH)
-			pr_err("%s4 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d calling scsi_mq_requeue_cmd\n",
-				__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
+	//	if (req->cmd_flags & REQ_SCSI_MPATH)
+	//		pr_err("%s4 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d calling scsi_mq_requeue_cmd\n",
+	//			__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
 		scsi_mq_requeue_cmd(cmd, 0);
 	}
 	else {
-		if (req->cmd_flags & REQ_SCSI_MPATH)
-			pr_err("%s5 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d calling scsi_io_completion_action\n",
-				__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
+	//	if (req->cmd_flags & REQ_SCSI_MPATH)
+	//		pr_err("%s5 cmd=%pS req=%pS bytes=%d bio=%pS result=%d good_bytes=%d calling scsi_io_completion_action\n",
+	//			__func__, cmd, req, blk_rq_bytes(req), req->bio, result, good_bytes);
 		scsi_io_completion_action(cmd, result);
 	}
 }
@@ -1583,11 +1583,9 @@ static void scsi_complete(struct request *rq)
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
 	enum scsi_disposition disposition;
-	bool is_flush = rq->rq_flags & RQF_FLUSH_SEQ;
-
 	if (rq->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS is_flush=%d\n",
-			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio, is_flush);
+		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio);
 	if (blk_mq_is_reserved_rq(rq)) {
 		/* Only pass-through requests are supported in this code path. */
 		WARN_ON_ONCE(!blk_rq_is_passthrough(scsi_cmd_to_rq(cmd)));
@@ -1598,6 +1596,9 @@ static void scsi_complete(struct request *rq)
 
 
 
+	if (cmd->result)
+		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS bi_size=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio, rq->bio->bi_iter.bi_size);
 	INIT_LIST_HEAD(&cmd->eh_entry);
 
 	atomic_inc(&cmd->device->iodone_cnt);
@@ -1886,7 +1887,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
 	int reason;
-	bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
+	__maybe_unused bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
 
 	pr_err_once("%s req=%pS part=%pS pos=%lld bytes=%d bio=%pS sdev=%pS is_flush=%d rq_flags=0x%x\n",
@@ -1947,15 +1948,16 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	cmd->submitter = SUBMITTED_BY_BLOCK_LAYER;
 
 	is_flush = req->rq_flags & RQF_FLUSH_SEQ;
-	if (req->cmd_flags & REQ_SCSI_MPATH) {
-		pr_err("%s1 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d  rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
-		scsi_mpath_start_request(req);
-		pr_err("%s1.1 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d  rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
-	}
+//	if (req->cmd_flags & REQ_SCSI_MPATH) {
+//		pr_err("%s1 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d  rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
+//		scsi_mpath_start_request(req);
+//		pr_err("%s1.1 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d  rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
+//	}
 
 	blk_mq_start_request(req);
 
 	is_flush = req->rq_flags & RQF_FLUSH_SEQ;
+
 	if (req->cmd_flags & REQ_SCSI_MPATH)
 		pr_err("%s2 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
 	if (blk_mq_is_reserved_rq(req)) {
@@ -1966,6 +1968,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 		}
 		return BLK_STS_OK;
 	}
+
 
 	reason = scsi_dispatch_cmd(cmd);
 	if (reason) {

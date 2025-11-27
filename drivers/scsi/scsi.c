@@ -163,11 +163,11 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 	struct scsi_driver *drv;
 	unsigned int good_bytes;
 	struct request *req = scsi_cmd_to_rq(cmd);
-	bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
+	__maybe_unused bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s cmd=%pS req=%pS bytes=%d bio=%pS is_flush=%d\n",
-			__func__, cmd, req, blk_rq_bytes(req), req->bio, is_flush);
+//	if (req->cmd_flags & REQ_SCSI_MPATH)
+//		pr_err("%s cmd=%pS req=%pS bytes=%d bio=%pS is_flush=%d\n",
+//			__func__, cmd, req, blk_rq_bytes(req), req->bio, is_flush);
 
 
 	scsi_device_unbusy(sdev, cmd);
