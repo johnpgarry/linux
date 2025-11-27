@@ -1197,7 +1197,7 @@ static blk_status_t nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(!nvme_check_ready(&dev->ctrl, req, true)))
 		return nvme_fail_nonready_command(&dev->ctrl, req);
 
-	pr_err("%s1 req=%pS calling nvme_prep_rq\n", __func__, req);
+	//pr_err("%s1 req=%pS calling nvme_prep_rq\n", __func__, req);
 	ret = nvme_prep_rq(req);
 	if (unlikely(ret))
 		return ret;
