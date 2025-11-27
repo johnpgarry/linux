@@ -306,7 +306,7 @@ static bool nvme_path_is_disabled(struct nvme_ns *ns)
 {
 	enum nvme_ctrl_state state = nvme_ctrl_state(ns->ctrl);
 
-	pr_err("%s ns=%pS\n", __func__, ns);
+	//pr_err("%s ns=%pS\n", __func__, ns);
 	/*
 	 * We don't treat NVME_CTRL_DELETING as a disabled path as I/O should
 	 * still be able to complete assuming that the controller is connected.
