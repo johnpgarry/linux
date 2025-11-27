@@ -1787,6 +1787,8 @@ static int __init init_scsi_mp(void)
 {
 	int err = class_register(&scsi_mpath_disk_class);
 
+	pr_err("%s scsi_multipath=%d\n", __func__, scsi_multipath);
+
 	if (err < 0)
 		return err;
 	err = __register_blkdev(0, "scsi-mpath-disk", scsi_mpath_disk_probe);
