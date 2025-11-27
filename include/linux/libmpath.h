@@ -9,6 +9,10 @@ struct mpath_disk {
 	struct srcu_struct 	srcu;
 };
 
+struct mpath_device {
+	struct list_head siblings;
+};
+
 #define cdev_to_mpath_disk(cdev) container_of(cdev, struct mpath_disk, cdev)
 
 #endif // _LIBMULTIPATH_H
