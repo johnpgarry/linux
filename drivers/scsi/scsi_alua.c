@@ -1,4 +1,6 @@
-//EXPORT_SYMBOL_NS_GPL(alua_bus_attach, "SCSI_DH_ALUA");
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ */
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_proto.h>
@@ -63,3 +65,5 @@ int scsi_alua_check_tpgs(struct scsi_device *sdev)
 	return tpgs;
 }
 EXPORT_SYMBOL_GPL(scsi_alua_check_tpgs);
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("scsi_alua");

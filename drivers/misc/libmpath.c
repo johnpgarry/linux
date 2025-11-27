@@ -1,4 +1,6 @@
-
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ */
 #include <linux/bio.h>
 #include <linux/moduleparam.h>
 #include <linux/topology.h>
@@ -26,3 +28,5 @@ static void __exit mpath_exit(void)
 
 module_init(mpath_init);
 module_exit(mpath_exit);
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("libmpath");

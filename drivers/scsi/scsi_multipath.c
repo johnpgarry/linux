@@ -35,7 +35,8 @@ static void scsi_mpath_cdev_rel(struct device *dev);
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
-bool scsi_multipath = true;
+bool scsi_multipath = false;
+EXPORT_SYMBOL_GPL(scsi_multipath);
 module_param(scsi_multipath, bool, 0444);
 MODULE_PARM_DESC(scsi_multipath,
     "turn on native support for multiple scsi devices set this value to false to disable multipath, \n");
@@ -1824,3 +1825,5 @@ static void __exit exit_scsi_mp(void)
 
 module_init(init_scsi_mp);
 module_exit(exit_scsi_mp);
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("scsi_multipath");
