@@ -472,6 +472,77 @@ void multipath_submit_bio(struct bio *bio)
 EXPORT_SYMBOL_GPL(multipath_submit_bio);
 
 
+static void mpath_free_disk(struct kref *ref)
+{
+	struct mpath_disk *mpath_disk =
+		container_of(ref, struct mpath_disk, ref);
+	//struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+
+	pr_err("%s mpath_disk=%pS ref=%pS\n", __func__, mpath_disk, ref);
+	#ifdef dsdsd
+	nvme_mpath_put_disk(head);
+	#else
+	pr_err("%s1 mpath_disk=%pS ref=%pS calling put_disk gd=%pS\n",
+		__func__, mpath_disk, ref, mpath_disk->gd);
+	put_disk(mpath_disk->gd);
+	#endif
+//	ida_free(&sd_mpath_index_ida, scsi_mpath_disk->index);
+	cleanup_srcu_struct(&mpath_disk->srcu);
+//	nvme_put_subsystem(head->subsys);
+//	mutex_lock(&scsi_mpath_disks_lock);
+//	list_del(&scsi_mpath_disk->entry);
+//	mutex_unlock(&scsi_mpath_disks_lock);
+
+	pr_err("%s2 mpath_disk=%pS calling device_del\n", __func__, mpath_disk);
+	device_del(&mpath_disk->dev);
+	pr_err("%s3 mpath_disk=%pS calling put_device\n", __func__, mpath_disk);
+	put_device(&mpath_disk->dev);
+//	kfree(head->plids);
+	pr_err("%s4 mpath_disk=%pS calling kfree\n", __func__, mpath_disk);
+	kfree(mpath_disk);
+}
+
+void mpath_put_disk(struct mpath_disk *mpath_disk)
+{
+	kref_put(&mpath_disk->ref, mpath_free_disk);
+}
+EXPORT_SYMBOL_GPL(mpath_put_disk);
+
+int mpath_get_disk(struct mpath_disk *mpath_disk)
+{
+	if (!kref_get_unless_zero(&mpath_disk->ref)) {
+		pr_err("%s1 mpath_disk=%pS ENXIO\n", __func__, mpath_disk);
+		return -ENXIO;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mpath_get_disk);
+
+static int mpath_open(struct gendisk *disk, blk_mode_t mode)
+{
+	struct mpath_disk *mpath_disk = disk->private_data;
+	pr_err("%s disk=%pS mpath_disk=%pS\n", __func__, disk, mpath_disk);
+
+	return mpath_get_disk(mpath_disk);
+}
+
+static void mpath_release(struct gendisk *disk)
+{
+	struct mpath_disk *mpath_disk = disk->private_data;
+
+	kref_put(&mpath_disk->ref, mpath_free_disk);
+}
+
+const struct block_device_operations mpath_ops = {
+	.owner          = THIS_MODULE,
+	.submit_bio	= multipath_submit_bio,
+	.open		= mpath_open,
+	.release	= mpath_release,
+//	.ioctl			= scsi_mpath_ioctl,
+//	.get_unique_id	= scsi_mpath_get_unique_id,
+};
+EXPORT_SYMBOL_GPL(mpath_ops);
+
 static int __init mpath_init(void)
 {
 	pr_err("%s\n", __func__);

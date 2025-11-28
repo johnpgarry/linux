@@ -28,6 +28,7 @@ struct mpath_disk {
 	struct gendisk		*gd;
 	enum mpath_iopolicy	iopolicy;
 	struct device		dev;
+	struct kref		ref;
 	struct	bio_list	requeue_list; /* list for requeing bio */
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work; /* work struct for requeue */
@@ -58,7 +59,10 @@ void mpath_requeue_work(struct work_struct *work);
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
 void multipath_submit_bio(struct bio *bio);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf);
+void mpath_put_disk(struct mpath_disk *mpath_disk);
+int mpath_get_disk(struct mpath_disk *mpath_disk);
 
 extern struct device_attribute mpath_iopolicy;
+extern const struct block_device_operations mpath_ops;
 
 #endif // _LIBMULTIPATH_H
