@@ -1182,7 +1182,7 @@ const struct attribute_group *scsi_device_groups[] = {
 
 static struct attribute *scsi_mpath_disk_attrs[] = {
 	&scsi_mpath_wwid.attr,
-	&scsi_mpath_iopolicy.attr,
+	&mpath_iopolicy.attr,
 	NULL
 };
 

@@ -154,7 +154,6 @@ struct scsi_mpath_device {
 //	struct work_struct		activate; /* Activate path work */
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
 
-	atomic_t nr_active;
 	atomic_t nr_total;
 
 
