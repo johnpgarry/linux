@@ -118,7 +118,6 @@ struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
 
 struct scsi_mpath_disk {
-	struct mpath_disk mpath_disk;
 	struct	bio_list	requeue_list; /* list for requeing bio */
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work; /* work struct for requeue */
@@ -137,6 +136,7 @@ struct scsi_mpath_disk {
 
 	struct cdev		cdev;
 	struct device		cdev_device;
+	struct mpath_disk mpath_disk;
 };
 
 #define to_scsi_mpath_disk(md) container_of(md, struct scsi_mpath_disk, mpath_disk)
