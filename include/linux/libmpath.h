@@ -57,6 +57,7 @@ struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node);
 void mpath_requeue_work(struct work_struct *work);
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
 void multipath_submit_bio(struct bio *bio);
+ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf);
 
 extern struct device_attribute mpath_iopolicy;
 
