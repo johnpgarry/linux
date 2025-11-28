@@ -129,7 +129,6 @@ struct scsi_mpath_disk {
 	struct list_head	entry; // for list of mpath disks
 	int					index;
 	unsigned long           flags;		/* flag for multipath devices*/
-	enum scsi_mpath_iopolicy	iopolicy;
 	struct kref		ref;
 	char wwid[40];
 
@@ -149,11 +148,10 @@ struct scsi_mpath_device {
 	//int				mpath_first_path; /* Indicate if this was first path */
 	//struct gendisk          	*mpath_disk;	/* Multipath disk */
 	
-	enum scsi_mpath_access_state	state;	/* Multipath State */
+//	enum scsi_mpath_access_state	state;	/* Multipath State */
 	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
 //	struct list_head		entry;	/* list of all mpath_sdevs */
 //	struct work_struct		activate; /* Activate path work */
-	int				numa_node; /* NUMA node for Path  */
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
 
 	atomic_t nr_active;
