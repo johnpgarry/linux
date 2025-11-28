@@ -2,8 +2,11 @@
 #ifndef _LIBMULTIPATH_H
 #define _LIBMULTIPATH_H
 
+#include <linux/bio.h>
+#include <linux/blkdev.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
+
 
 struct mpath_device;
 
@@ -25,6 +28,9 @@ struct mpath_disk {
 	struct gendisk		*gd;
 	enum mpath_iopolicy	iopolicy;
 	struct device		dev;
+	struct	bio_list	requeue_list; /* list for requeing bio */
+	spinlock_t		requeue_lock;
+	struct work_struct	requeue_work; /* work struct for requeue */
 	bool (*mpath_is_disabled)(struct mpath_device *);
 	bool (*mpath_is_optimized)(struct mpath_device *mpath_device);
 	struct mpath_device __rcu *current_path[]; /* scsi_device of current path */
@@ -35,14 +41,22 @@ struct mpath_device {
 	struct list_head siblings;
 	enum mpath_access_state	state;
 	atomic_t nr_active;
+	atomic_t nr_total;
+	struct gendisk *gd;
 	int				numa_node; /* NUMA node for Path  */
 };
+
+#define REQ_MPATH		REQ_DRV
+
 
 #define cdev_to_mpath_disk(cdev) container_of(cdev, struct mpath_disk, cdev)
 
 bool mpath_clear_current_path(struct mpath_device *);
 struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk);
 struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node);
+void mpath_requeue_work(struct work_struct *work);
+void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
+void multipath_submit_bio(struct bio *bio);
 
 extern struct device_attribute mpath_iopolicy;
 

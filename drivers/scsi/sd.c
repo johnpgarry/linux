@@ -3738,7 +3738,7 @@ static int sd_revalidate_mpath_disk(struct scsi_mpath_disk *scsi_mpath_disk, str
 		__func__, err);
 	pr_err("%s8.4.1 calling scsi_mpath_revalidate_path err=%d mpath_dev->gd=%pS\n",
 		__func__, err, scsi_mpath_disk);
-	scsi_mpath_revalidate_path(mpath_disk->gd,
+	mpath_revalidate_path(mpath_disk->gd,
 	    logical_to_sectors(sdp, sdkp->capacity));
 	pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
 	//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
@@ -4026,7 +4026,8 @@ static int sd_probe(struct device *dev)
 	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->scsi_mpath_dev=%pS index=%d scsi_device_tpgs=%d\n",
 		__func__, gd, gd->disk_name, gd->part0, sdp->scsi_mpath_dev, index, scsi_device_tpgs(sdp));
 	if (scsi_mpath_enabled() && scsi_device_tpgs(sdp)) {
-		struct scsi_mpath_device *mpath_dev;
+		struct scsi_mpath_device *scsi_mpath_dev;
+		struct mpath_device *mpath_device;
 		sdev_printk(KERN_INFO, sdp, "%s3.2 calling scsi_mpath_alloc_disk\n", __func__);
 		error = scsi_mpath_alloc_disk(sdp, gd);
 		sdev_printk(KERN_INFO, sdp, "%s3.3.1 called scsi_mpath_alloc_disk error=%d\n", __func__, error);
@@ -4034,7 +4035,8 @@ static int sd_probe(struct device *dev)
 			sdev_printk(KERN_WARNING, sdp, "could not alloc mpath disk\n");
 			goto out_free_index;
 		}
-		mpath_dev = sdp->scsi_mpath_dev;
+		scsi_mpath_dev = sdp->scsi_mpath_dev;
+		mpath_device = &scsi_mpath_dev->mpath_device;
 		pr_err("%s3.3.1 sdp->scsi_mpath_dev=%pS\n", __func__, sdp->scsi_mpath_dev);
 		if (sdp->scsi_mpath_dev)
 			pr_err("%s3.3.1 sdp->scsi_mpath_dev=%pS\n", __func__,
@@ -4043,8 +4045,8 @@ static int sd_probe(struct device *dev)
 			pr_err("%s3.3.2 sdp->scsi_mpath_dev=%pS mpath_disk=NULL\n", __func__, sdp->scsi_mpath_dev);
 
 		//snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "sd_mpath%d", mindex);
-		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd name=%pS mpath_dev->gd->disk_name=%s\n",
-			gd->disk_name, mpath_dev->gd->disk_name);
+		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd name=%pS mpath_device->gd->disk_name=%s\n",
+			gd->disk_name, mpath_device->gd->disk_name);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4.1 gd name=%pS scsi_is_sdev_multipath\n", gd->disk_name);
 		gd->flags |= GENHD_FL_HIDDEN;
 		pr_err("%s3.3.2\n", __func__);

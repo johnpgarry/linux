@@ -677,7 +677,7 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	 */
 	percpu_ref_get(&q->q_usage_counter);
 
-	if (req->cmd_flags & REQ_SCSI_MPATH) {
+	if (req->cmd_flags & REQ_MPATH) {
 	//	pr_err("%s req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH\n", __func__, req, req->bio, cmd);
 		scsi_mpath_end_request(req);
 	}
