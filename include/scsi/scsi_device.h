@@ -116,6 +116,7 @@ struct scsi_vpd {
 
 struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
+
 struct scsi_mpath_disk {
 	struct mpath_disk mpath_disk;
 	struct	bio_list	requeue_list; /* list for requeing bio */
@@ -128,7 +129,6 @@ struct scsi_mpath_disk {
 	struct device		dev;
 	struct work_struct	partition_scan_work;
 	struct list_head	entry; // for list of mpath disks
-	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	int					index;
 	unsigned long           flags;		/* flag for multipath devices*/
 	enum scsi_mpath_iopolicy	iopolicy;
@@ -137,12 +137,12 @@ struct scsi_mpath_disk {
 
 	struct cdev		cdev;
 	struct device		cdev_device;
-
-
-	struct scsi_mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
+#define to_scsi_mpath_disk(md) container_of(md, struct scsi_mpath_disk, mpath_disk)
+
 struct scsi_mpath_device {
+	struct mpath_device mpath_device;
 	struct scsi_device *sdev;
 	struct gendisk *gd;
 
@@ -152,7 +152,7 @@ struct scsi_mpath_device {
 	
 	enum scsi_mpath_access_state	state;	/* Multipath State */
 	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
-	struct list_head		entry;	/* list of all mpath_sdevs */
+//	struct list_head		entry;	/* list of all mpath_sdevs */
 //	struct work_struct		activate; /* Activate path work */
 	int				numa_node; /* NUMA node for Path  */
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
@@ -167,7 +167,6 @@ struct scsi_mpath_device {
 #define SCSI_MPATH_IO_STATS             2
 
 	unsigned long           flags;		/* flag for multipath devices*/
-	struct scsi_mpath_disk *scsi_mpath_disk;
 
 
 
@@ -180,6 +179,7 @@ struct scsi_mpath_device {
 	int	prefrence;		/* Path prefrence for Port Group from RTPG cmd */
 	int	is_active;		/* Current Sdev is active */
 };
+#define to_scsi_mpath_device(d) container_of(d, struct scsi_mpath_device, mpath_device)
 
 struct scsi_device {
 	struct Scsi_Host *host;
@@ -356,7 +356,6 @@ struct scsi_device {
 				sdev_dev;
 
 	struct scsi_mpath_device *scsi_mpath_dev;
-	struct mpath_device mpath_device;
 
 	struct work_struct	requeue_work;
 

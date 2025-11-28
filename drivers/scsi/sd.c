@@ -3703,7 +3703,7 @@ static void sd_read_block_zero(struct scsi_disk *sdkp)
 	kfree(buffer);
 }
 
-static int sd_revalidate_mpath_disk(struct scsi_mpath_disk *mpath_disk, struct scsi_disk *sdkp)
+static int sd_revalidate_mpath_disk(struct scsi_mpath_disk *scsi_mpath_disk, struct scsi_disk *sdkp)
 {
 	struct scsi_device *sdp = sdkp->device;
 	struct queue_limits *mpath_lim;
@@ -3712,32 +3712,32 @@ static int sd_revalidate_mpath_disk(struct scsi_mpath_disk *mpath_disk, struct s
 
 	//blk_mq_freeze_queue(sdp->mpath_disk->queue);
 
-	pr_err("%s mpath_disk=%pS\n", __func__, mpath_disk);
+	pr_err("%s scsi_mpath_disk=%pS\n", __func__, scsi_mpath_disk);
 
-	pr_err("%s1 mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
-	mpath_lim = &mpath_disk->gd->queue->limits;
+	pr_err("%s1 scsi_mpath_disk->gd=%pS\n", __func__, scsi_mpath_disk->gd);
+	mpath_lim = &scsi_mpath_disk->gd->queue->limits;
 
-	lim2 = queue_limits_start_update(mpath_disk->gd->queue);
+	lim2 = queue_limits_start_update(scsi_mpath_disk->gd->queue);
 	pr_err("%s8.1 called queue_limits_start_update calling queue_limits_stack_bdev\n", __func__);
 	lim2.logical_block_size = mpath_lim->logical_block_size;
 	lim2.physical_block_size = mpath_lim->physical_block_size;
 	lim2.io_min = mpath_lim->io_min;
 	lim2.io_opt = mpath_lim->io_opt;
-	queue_limits_stack_bdev(&lim2, mpath_disk->gd->part0, 0, mpath_disk->gd->disk_name);
+	queue_limits_stack_bdev(&lim2, scsi_mpath_disk->gd->part0, 0, scsi_mpath_disk->gd->disk_name);
 
 	//sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
 
 	pr_err("%s8.2 calling set_capacity_and_notify\n", __func__);
-	set_capacity_and_notify(mpath_disk->gd,
+	set_capacity_and_notify(scsi_mpath_disk->gd,
 	    logical_to_sectors(sdp, sdkp->capacity));
 
 	pr_err("%s8.3 calling queue_limits_commit_update\n", __func__);
-	err = queue_limits_commit_update(mpath_disk->gd->queue, &lim2);
+	err = queue_limits_commit_update(scsi_mpath_disk->gd->queue, &lim2);
 	pr_err("%s8.4 calling scsi_mpath_revalidate_path err=%d\n",
 		__func__, err);
 	pr_err("%s8.4.1 calling scsi_mpath_revalidate_path err=%d mpath_dev->gd=%pS\n",
-		__func__, err, mpath_disk);
-	scsi_mpath_revalidate_path(mpath_disk->gd,
+		__func__, err, scsi_mpath_disk);
+	scsi_mpath_revalidate_path(scsi_mpath_disk->gd,
 	    logical_to_sectors(sdp, sdkp->capacity));
 	pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
 	//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
@@ -4036,8 +4036,8 @@ static int sd_probe(struct device *dev)
 		mpath_dev = sdp->scsi_mpath_dev;
 		pr_err("%s3.3.1 sdp->scsi_mpath_dev=%pS\n", __func__, sdp->scsi_mpath_dev);
 		if (sdp->scsi_mpath_dev)
-			pr_err("%s3.3.1 sdp->scsi_mpath_dev=%pS mpath_dev dksk=%pS\n", __func__,
-				sdp->scsi_mpath_dev, sdp->scsi_mpath_dev->scsi_mpath_disk);
+			pr_err("%s3.3.1 sdp->scsi_mpath_dev=%pS\n", __func__,
+				sdp->scsi_mpath_dev);
 		else
 			pr_err("%s3.3.2 sdp->scsi_mpath_dev=%pS mpath_disk=NULL\n", __func__, sdp->scsi_mpath_dev);
 
@@ -4137,10 +4137,14 @@ static int sd_probe(struct device *dev)
 	scsi_autopm_put_device(sdp);
 
 	if (scsi_is_sdev_multipath(sdp) && 1/* sdp->is_shared */) {
+		struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
+		struct mpath_device *mpath_dev = &scsi_mpath_dev->mpath_device;
+		struct mpath_disk *mpath_disk = mpath_dev->mpath_disk;
+		struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 		pr_err("%s calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
 		scsi_mpath_add_disk(sdp);
-		sd_revalidate_mpath_disk(sdp->scsi_mpath_dev->scsi_mpath_disk, sdkp);
+		sd_revalidate_mpath_disk(scsi_mpath_disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
 
