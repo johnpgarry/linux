@@ -1213,7 +1213,7 @@ static bool multipath_sysfs_group_visible(struct kobject *kobj)
 	struct gendisk *disk = dev_to_disk(dev);
 
 	dev_err(dev, "%s dev=%pS disk=%pS fops=%pS\n", __func__, dev, disk, disk->fops);
-	return disk->fops == &scsi_mpath_ops;
+	return scsi_disk_is_multipath(disk);
 }
 
 static bool multipath_sysfs_attr_visible(struct kobject *kobj,

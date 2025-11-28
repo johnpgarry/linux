@@ -124,7 +124,6 @@ struct scsi_mpath_disk {
 	struct list_head	entry; // for list of mpath disks
 	int					index;
 	unsigned long           flags;		/* flag for multipath devices*/
-	struct kref		ref;
 	char wwid[40];
 
 	struct cdev		cdev;
@@ -386,7 +385,7 @@ static inline bool scsi_sdev_use_alua(struct scsi_device *sdev)
 
 static inline bool scsi_disk_is_multipath(struct gendisk *disk)
 {
-	return disk->fops == &scsi_mpath_ops;
+	return disk->fops == &mpath_ops;
 }
 
 static inline bool scsi_mpath_enabled(void)
