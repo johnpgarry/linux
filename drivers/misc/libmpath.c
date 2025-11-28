@@ -266,6 +266,36 @@ struct device_attribute mpath_iopolicy = \
 		__ATTR(iopolicy, S_IRUGO | S_IWUSR, mpath_iopolicy_show, mpath_iopolicy_store);
 EXPORT_SYMBOL_GPL(mpath_iopolicy);
 
+ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf)
+{
+	int node, srcu_idx;
+	nodemask_t numa_nodes;
+	struct mpath_device *current_mpath_dev;
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+
+	pr_err("%s mpath_device=%pS mpath_disk=%pS\n", __func__,
+		mpath_device, mpath_disk);
+
+	if (mpath_disk->iopolicy != MPATH_IOPOLICY_NUMA)
+		return 0;
+
+	nodes_clear(numa_nodes);
+
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	for_each_node(node) {
+		current_mpath_dev = srcu_dereference(mpath_disk->current_path[node],
+				&mpath_disk->srcu);
+		pr_err("%s3 node=%d current_mpath_dev=%pS mpath_device=%pS\n",
+			__func__, node, current_mpath_dev, mpath_device);
+		if (current_mpath_dev == mpath_device)
+			node_set(node, numa_nodes);
+	}
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+
+	return sysfs_emit(buf, "%*pbl\n", nodemask_pr_args(&numa_nodes));
+}
+EXPORT_SYMBOL_GPL(mpath_numa_nodes_show);
+
 static struct mpath_device *mpath_numa_path(struct mpath_disk *mpath_disk)
 {
 	int node = numa_node_id();
