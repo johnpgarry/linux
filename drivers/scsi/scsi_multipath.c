@@ -1699,6 +1699,11 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 		__func__, scsi_mpath_dev);
 	scsi_mpath_remove_sysfs_link(sdev->scsi_mpath_dev);
 
+	synchronize_srcu(&mpath_disk->srcu);
+
+	/* wait for concurrent submissions */
+	if (mpath_clear_current_path(mpath_device))
+		synchronize_srcu(&mpath_disk->srcu);
 
 	dev_err(&sdev->sdev_gendev, "%s2 scsi_mpath_dev=%pS called scsi_mpath_remove_sysfs_link\n",
 		__func__, scsi_mpath_dev);
