@@ -14,6 +14,26 @@
 #include <scsi/scsi_ioctl.h>
 
 
+bool mpath_clear_current_path(struct mpath_device *mpath_device)
+{
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	bool changed = false;
+	int node;
+
+	if (!mpath_disk)
+		return changed;
+
+	for_each_node(node) {
+		if (mpath_device == rcu_access_pointer(mpath_disk->current_path[node])) {
+			rcu_assign_pointer(mpath_disk->current_path[node], NULL);
+			changed = true;
+		}
+	}
+
+	return changed;
+}
+EXPORT_SYMBOL_GPL(mpath_clear_current_path);
+
 static int __init mpath_init(void)
 {
 	pr_err("%s\n", __func__);
