@@ -11,6 +11,8 @@ struct mpath_disk {
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	struct gendisk		*gd;
+	bool (*mpath_is_disabled)(struct mpath_device *);
+	bool (*mpath_is_optimized)(struct mpath_device *mpath_device);
 	struct mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
@@ -22,5 +24,7 @@ struct mpath_device {
 #define cdev_to_mpath_disk(cdev) container_of(cdev, struct mpath_disk, cdev)
 
 bool mpath_clear_current_path(struct mpath_device *);
+struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk);
+struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node);
 
 #endif // _LIBMULTIPATH_H
