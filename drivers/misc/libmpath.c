@@ -5,14 +5,47 @@
 #include <linux/moduleparam.h>
 #include <linux/topology.h>
 #include <linux/libmpath.h>
-#include <scsi/scsi_cmnd.h>
-#include <scsi/scsi_dh.h>
-#include <scsi/scsi_proto.h>
-#include <scsi/scsi_host.h>
-#include <scsi/scsi_device.h>
-#include <scsi/scsi_multipath.h>
-#include <scsi/scsi_ioctl.h>
 
+
+/*
+ * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
+ * In Future, if more apropriate IO-policy is introduced will be added
+ * based on community feedback.
+ */
+
+static const char *mpath_iopolicy_names[] = {
+	[MPATH_IOPOLICY_NUMA]	= "numa",
+	[MPATH_IOPOLICY_RR]	= "round-robin",
+	[MPATH_IOPOLICY_QD]	= "queue-depth",
+};
+
+static int iopolicy = MPATH_IOPOLICY_NUMA;
+static int mpath_set_iopolicy(const char *val, const struct kernel_param *kp)
+{
+	if (!val)
+		return -EINVAL;
+	if (!strncmp(val, "numa", 4))
+		iopolicy = MPATH_IOPOLICY_NUMA;
+	else if (!strncmp(val, "round-robin", 11))
+		iopolicy = MPATH_IOPOLICY_RR;
+	else if (!strncmp(val, "queue-depth", 11))
+		iopolicy = MPATH_IOPOLICY_QD;
+	else
+		return -EINVAL;
+
+	return 0;
+}
+
+
+static int mpath_get_iopolicy(char *buf, const struct kernel_param *kp)
+{
+	return sprintf(buf, "%s\n", mpath_iopolicy_names[iopolicy]);
+}
+
+module_param_call(iopolicy, mpath_set_iopolicy, mpath_get_iopolicy,
+	&iopolicy, 0644);
+MODULE_PARM_DESC(iopolicy,
+	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
 
 bool mpath_clear_current_path(struct mpath_device *mpath_device)
 {
@@ -99,7 +132,7 @@ static struct mpath_device *mpath_next_dev(struct mpath_disk *mpath_disk,
 static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk)
 {
 	struct mpath_device *mpath_device, *found = NULL;
-	struct scsi_mpath_device *scsi_mpath_dev;
+//	struct scsi_mpath_device *scsi_mpath_dev;
 	int node = numa_node_id();
 	struct mpath_device *old = srcu_dereference(mpath_disk->current_path[node],
 					       &mpath_disk->srcu);
@@ -127,7 +160,7 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk
 			found = mpath_device;
 	}
 
-	scsi_mpath_dev = to_scsi_mpath_device(old);
+//	scsi_mpath_dev = to_scsi_mpath_device(old);
 	if (!mpath_disk->mpath_is_disabled(mpath_device) &&
 	    (mpath_device->state == MPATH_STATE_OPTIMAL ||
 	    (!found && mpath_device->state == MPATH_STATE_ACTIVE)))
@@ -150,11 +183,11 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_disk *mpath_disk
 	pr_err("%s mpath_disk=%pS min_depth_nonopt=%d\n", __func__, mpath_disk, min_depth_nonopt);
 	list_for_each_entry_srcu(mpath_device, &mpath_disk->dev_list, siblings,
 				 srcu_read_lock_held(&mpath_disk->srcu)) {
-		struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	//	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	//	if (nvme_path_is_disabled(ns))
 	//		continue;
 
-		depth = atomic_read(&scsi_mpath_dev->nr_active);
+		depth = atomic_read(&mpath_device->nr_active);
 
 /*
 		switch (ns->ana_state) {
@@ -181,17 +214,70 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_disk *mpath_disk
 	return best_opt ? best_opt : best_nonopt;
 }
 
+static ssize_t mpath_iopolicy_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mpath_disk *mpath_disk =
+		container_of(dev, struct mpath_disk, dev);
+
+	return sysfs_emit(buf, "%s\n",
+			  mpath_iopolicy_names[READ_ONCE(mpath_disk->iopolicy)]);
+}
+
+static void mpath_iopolicy_update(struct mpath_disk *mpath_disk,
+		int iopolicy)
+{
+	int old_iopolicy = READ_ONCE(mpath_disk->iopolicy);
+
+	if (old_iopolicy == iopolicy)
+		return;
+
+	WRITE_ONCE(mpath_disk->iopolicy, iopolicy);
+
+	/* iopolicy changes clear the mpath by design */
+	//mutex_lock(&nvme_subsystems_lock);
+	//list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
+	//	scsi_mpath_disk_clear_ctrl_paths(ctrl);
+	//mutex_unlock(&nvme_subsystems_lock);
+
+	pr_notice("mpath_disk %d iopolicy changed from %s to %s\n",
+			-1/*scsi_mpath_disk->index*/,
+			mpath_iopolicy_names[old_iopolicy],
+			mpath_iopolicy_names[iopolicy]);
+}
+
+static ssize_t mpath_iopolicy_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct mpath_disk *mpath_disk =
+		container_of(dev, struct mpath_disk, dev);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
+		if (sysfs_streq(buf, mpath_iopolicy_names[i])) {
+			mpath_iopolicy_update(mpath_disk, i);
+			return count;
+		}
+	}
+
+	return -EINVAL;
+}
+
+struct device_attribute mpath_iopolicy = \
+		__ATTR(iopolicy, S_IRUGO | S_IWUSR, mpath_iopolicy_show, mpath_iopolicy_store);
+EXPORT_SYMBOL_GPL(mpath_iopolicy);
+
 static struct mpath_device *mpath_numa_path(struct mpath_disk *mpath_disk)
 {
 	int node = numa_node_id();
 	struct mpath_device *mpath_device;
-	struct scsi_mpath_device *scsi_mpath_dev;
+	//struct scsi_mpath_device *scsi_mpath_dev;
 
 	pr_err_once("%s mpath_disk=%pS\n", __func__, mpath_disk);
 	mpath_device = srcu_dereference(mpath_disk->current_path[node], &mpath_disk->srcu);
 	if (unlikely(!mpath_device))
 		return __mpath_find_path(mpath_disk, node);
-	scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	pr_err_once("%s1 mpath_disk=%pS mpath_device=%pS\n", __func__, mpath_disk, mpath_device);
 	if (unlikely(!mpath_disk->mpath_is_optimized(mpath_device)))
 		return __mpath_find_path(mpath_disk, node);
@@ -200,8 +286,8 @@ static struct mpath_device *mpath_numa_path(struct mpath_disk *mpath_disk)
 
 struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk)
 {
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	pr_err_once("%s mpath_disk=%pS iopolicy=%d\n", __func__, scsi_mpath_disk, READ_ONCE(mpath_disk->iopolicy));
+	//struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
+	pr_err_once("%s mpath_disk=%pS iopolicy=%d\n", __func__, mpath_disk, READ_ONCE(mpath_disk->iopolicy));
 	switch (READ_ONCE(mpath_disk->iopolicy)) {
 	case MPATH_IOPOLICY_QD:
 		return mpath_queue_depth_path(mpath_disk);

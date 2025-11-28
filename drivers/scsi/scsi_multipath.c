@@ -236,46 +236,6 @@ static int scsi_multipath_init(struct scsi_device *sdev)
 	return 0;
 }
 
-/*
- * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
- * In Future, if more apropriate IO-policy is introduced will be added
- * based on community feedback.
- */
-
-static const char *mpath_iopolicy_names[] = {
-	[MPATH_IOPOLICY_NUMA]	= "numa",
-	[MPATH_IOPOLICY_RR]	= "round-robin",
-	[MPATH_IOPOLICY_QD]	= "queue-depth",
-};
-
-static int iopolicy = MPATH_IOPOLICY_NUMA;
-static int scsi_mpath_set_iopolicy(const char *val, const struct kernel_param *kp)
-{
-	if (!val)
-		return -EINVAL;
-	if (!strncmp(val, "numa", 4))
-		iopolicy = MPATH_IOPOLICY_NUMA;
-	else if (!strncmp(val, "round-robin", 11))
-		iopolicy = MPATH_IOPOLICY_RR;
-	else if (!strncmp(val, "queue-depth", 11))
-		iopolicy = MPATH_IOPOLICY_QD;
-	else
-		return -EINVAL;
-
-	return 0;
-}
-
-
-static int scsi_mpath_get_iopolicy(char *buf, const struct kernel_param *kp)
-{
-	return sprintf(buf, "%s\n", mpath_iopolicy_names[iopolicy]);
-}
-
-module_param_call(iopolicy, scsi_mpath_set_iopolicy, scsi_mpath_get_iopolicy,
-	&iopolicy, 0644);
-MODULE_PARM_DESC(iopolicy,
-	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
-
 static __maybe_unused void nvme_mpath_unfreeze(struct scsi_mpath_disk *scsi_mpath_disk)
 {
 	pr_err("%s mpath_disk=%pS\n", __func__, scsi_mpath_disk);
@@ -374,7 +334,7 @@ void scsi_mpath_start_request(struct request *req)
 
 	if ((READ_ONCE(mpath_disk->iopolicy) == MPATH_IOPOLICY_QD) &&
 	    !(scmd->flags & SCMD_MPATH_CNT_ACTIVE)) {
-		atomic_inc(&scsi_mpath_dev->nr_active);
+		atomic_inc(&mpath_device->nr_active);
 		scmd->flags |= SCMD_MPATH_CNT_ACTIVE;
 	}
 
@@ -398,7 +358,7 @@ void scsi_mpath_end_request(struct request *req)
 
 	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
 	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE)
-		atomic_dec_if_positive(&scsi_mpath_dev->nr_active);
+		atomic_dec_if_positive(&mpath_device->nr_active);
 
 	if (!(scmd->flags & SCMD_MPATH_IO_STATS))
 		return;
@@ -1003,61 +963,6 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 	kfree(scsi_mpath_dev);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_dev_release);
-
-static ssize_t scsi_mpath_iopolicy_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct scsi_mpath_disk *scsi_mpath_disk =
-		container_of(dev, struct scsi_mpath_disk, dev);
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
-
-	return sysfs_emit(buf, "%s\n",
-			  mpath_iopolicy_names[READ_ONCE(mpath_disk->iopolicy)]);
-}
-
-static void scsi_mpath_iopolicy_update(struct scsi_mpath_disk *scsi_mpath_disk,
-		int iopolicy)
-{
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
-	int old_iopolicy = READ_ONCE(mpath_disk->iopolicy);
-
-	if (old_iopolicy == iopolicy)
-		return;
-
-	WRITE_ONCE(mpath_disk->iopolicy, iopolicy);
-
-	/* iopolicy changes clear the mpath by design */
-	//mutex_lock(&nvme_subsystems_lock);
-	//list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
-	//	scsi_mpath_disk_clear_ctrl_paths(ctrl);
-	//mutex_unlock(&nvme_subsystems_lock);
-
-	pr_notice("mpath_disk %d iopolicy changed from %s to %s\n",
-			scsi_mpath_disk->index,
-			mpath_iopolicy_names[old_iopolicy],
-			mpath_iopolicy_names[iopolicy]);
-}
-
-static ssize_t scsi_mpath_iopolicy_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct scsi_mpath_disk *scsi_mpath_disk =
-		container_of(dev, struct scsi_mpath_disk, dev);
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
-		if (sysfs_streq(buf, mpath_iopolicy_names[i])) {
-			scsi_mpath_iopolicy_update(scsi_mpath_disk, i);
-			return count;
-		}
-	}
-
-	return -EINVAL;
-}
-
-struct device_attribute scsi_mpath_iopolicy = \
-		__ATTR(iopolicy, S_IRUGO | S_IWUSR, scsi_mpath_iopolicy_show, scsi_mpath_iopolicy_store);
-
 
 static ssize_t scsi_mpath_wwid_show(struct device *dev,
 			struct device_attribute *attr,
