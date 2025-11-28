@@ -683,10 +683,10 @@ static struct mpath_device *mpath_numa_path(struct mpath_disk *mpath_disk)
 
 	pr_err_once("%s mpath_disk=%pS\n", __func__, mpath_disk);
 	mpath_device = srcu_dereference(mpath_disk->current_path[node], &mpath_disk->srcu);
-	scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-	pr_err_once("%s1 mpath_disk=%pS mpath_device=%pS\n", __func__, mpath_disk, mpath_device);
 	if (unlikely(!mpath_device))
 		return __mpath_find_path(mpath_disk, node);
+	scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	pr_err_once("%s1 mpath_disk=%pS mpath_device=%pS\n", __func__, mpath_disk, mpath_device);
 	if (unlikely(!scsi_mpath_is_optimized(scsi_mpath_dev)))
 		return __mpath_find_path(mpath_disk, node);
 	return mpath_device;
@@ -972,13 +972,14 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	}
 
 	size = sizeof(*scsi_mpath_disk);
-	size += num_possible_nodes() * sizeof(struct scsi_mpath_device *);
+	size += num_possible_nodes() * sizeof(struct mpath_device *);
 
 	scsi_mpath_disk = kzalloc(size, GFP_KERNEL);
-	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS\n",
-		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk);
+	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
+		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk, mpath_device);
 	if (!scsi_mpath_disk)
 		return -ENOMEM;
+	mpath_disk = &scsi_mpath_disk->mpath_disk;
 	mpath_device->mpath_disk = mpath_disk;
 
 	scsi_mpath_disk->index = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
