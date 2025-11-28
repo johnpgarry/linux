@@ -43,30 +43,28 @@ struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node)
 	int found_distance = INT_MAX, fallback_distance = INT_MAX, distance;
 	//struct scsi_device *sdev_found = NULL, *sdev_fallback = NULL, *sdev;
 	struct mpath_device *mpath_dev_found, *mpath_dev_fallback, *mpath_device;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 
 	//pr_err("%s mpath_disk=%pS\n", __func__, scsi_mpath_disk);
 	list_for_each_entry_rcu(mpath_device, &mpath_disk->dev_list, siblings) {
-		struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	//	pr_err("%s1 itering mpath_disk=%pS mpath_dev=%pS disabled=%d\n",
 	//		__func__, scsi_mpath_disk, scsi_mpath_dev, scsi_mpath_is_disabled(scsi_mpath_dev->sdev));
 		if (mpath_disk->mpath_is_disabled(mpath_device))
 			continue;
 
-		if (scsi_mpath_dev->numa_node != NUMA_NO_NODE &&
-		    (READ_ONCE(scsi_mpath_disk->iopolicy) == SCSI_MPATH_IOPOLICY_NUMA))
-			distance = node_distance(node, scsi_mpath_dev->numa_node);
+		if (mpath_device->numa_node != NUMA_NO_NODE &&
+		    (READ_ONCE(mpath_disk->iopolicy) == MPATH_IOPOLICY_NUMA))
+			distance = node_distance(node, mpath_device->numa_node);
 		else
 			distance = LOCAL_DISTANCE;
 
-		switch(scsi_mpath_dev->state) {
-		case SCSI_MPATH_OPTIMAL:
+		switch(mpath_device->state) {
+		case MPATH_STATE_OPTIMAL:
 		    if (distance < found_distance) {
 			    found_distance = distance;
 			    mpath_dev_found = mpath_device;
 		    }
 		    break;
-		case SCSI_MPATH_ACTIVE:
+		case MPATH_STATE_ACTIVE:
 		    if (distance < fallback_distance) {
 			    fallback_distance = distance;
 			    mpath_dev_fallback = mpath_device;
@@ -121,18 +119,18 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk
 
 		if (mpath_disk->mpath_is_disabled(mpath_device))
 			continue;
-		if (scsi_mpath_dev->state == SCSI_MPATH_OPTIMAL) {
+		if (mpath_device->state == MPATH_STATE_OPTIMAL) {
 			found = mpath_device;
 			goto out;
 		}
-		if (scsi_mpath_dev->state == SCSI_MPATH_ACTIVE)
+		if (mpath_device->state == MPATH_STATE_ACTIVE)
 			found = mpath_device;
 	}
 
 	scsi_mpath_dev = to_scsi_mpath_device(old);
 	if (!mpath_disk->mpath_is_disabled(mpath_device) &&
-	    (scsi_mpath_dev->state == SCSI_MPATH_OPTIMAL ||
-	    (!found && scsi_mpath_dev->state == SCSI_MPATH_ACTIVE)))
+	    (mpath_device->state == MPATH_STATE_OPTIMAL ||
+	    (!found && mpath_device->state == MPATH_STATE_ACTIVE)))
 		return old;
 
 	if (!found)
@@ -203,11 +201,11 @@ static struct mpath_device *mpath_numa_path(struct mpath_disk *mpath_disk)
 struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk)
 {
 	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	pr_err_once("%s mpath_disk=%pS iopolicy=%d\n", __func__, scsi_mpath_disk, READ_ONCE(scsi_mpath_disk->iopolicy));
-	switch (READ_ONCE(scsi_mpath_disk->iopolicy)) {
-	case SCSI_MPATH_IOPOLICY_QD:
+	pr_err_once("%s mpath_disk=%pS iopolicy=%d\n", __func__, scsi_mpath_disk, READ_ONCE(mpath_disk->iopolicy));
+	switch (READ_ONCE(mpath_disk->iopolicy)) {
+	case MPATH_IOPOLICY_QD:
 		return mpath_queue_depth_path(mpath_disk);
-	case SCSI_MPATH_IOPOLICY_RR:
+	case MPATH_IOPOLICY_RR:
 		return mpath_round_robin_path(mpath_disk);
 	default:
 		return mpath_numa_path(mpath_disk);

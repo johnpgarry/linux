@@ -64,15 +64,6 @@ static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
 	return false;
 }
 
-static inline bool scsi_mpath_state_is_live2(enum scsi_mpath_access_state state)
-{
-	if (state == SCSI_MPATH_OPTIMAL ||
-	    state == SCSI_MPATH_ACTIVE)
-		return true;
-
-	return false;
-}
-
 static const struct class scsi_mpath_generic_class = {
 	.name = "scsi_mpath_generic",
 };
@@ -226,6 +217,7 @@ static int scsi_multipath_init(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_mpath_device *scsi_mpath_dev;
+	struct mpath_device *mpath_device;
 	int ret = -ENOMEM;
 
 	pr_err("%s sdev=%pS\n", __func__, sdev);
@@ -238,7 +230,8 @@ static int scsi_multipath_init(struct scsi_device *sdev)
 	pr_err("%s2 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS\n",
 		__func__, sdev, sdev->scsi_mpath_dev, shost);
 
-	scsi_mpath_dev->numa_node = NUMA_NO_NODE;
+	mpath_device = &scsi_mpath_dev->mpath_device;
+	mpath_device->numa_node = dev_to_node(shost->dma_dev);
 
 	return 0;
 }
@@ -249,23 +242,23 @@ static int scsi_multipath_init(struct scsi_device *sdev)
  * based on community feedback.
  */
 
-static const char *scsi_mpath_iopolicy_names[] = {
-	[SCSI_MPATH_IOPOLICY_NUMA]	= "numa",
-	[SCSI_MPATH_IOPOLICY_RR]	= "round-robin",
-	[SCSI_MPATH_IOPOLICY_QD]	= "queue-depth",
+static const char *mpath_iopolicy_names[] = {
+	[MPATH_IOPOLICY_NUMA]	= "numa",
+	[MPATH_IOPOLICY_RR]	= "round-robin",
+	[MPATH_IOPOLICY_QD]	= "queue-depth",
 };
 
-static int iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
+static int iopolicy = MPATH_IOPOLICY_NUMA;
 static int scsi_mpath_set_iopolicy(const char *val, const struct kernel_param *kp)
 {
 	if (!val)
 		return -EINVAL;
 	if (!strncmp(val, "numa", 4))
-		iopolicy = SCSI_MPATH_IOPOLICY_NUMA;
+		iopolicy = MPATH_IOPOLICY_NUMA;
 	else if (!strncmp(val, "round-robin", 11))
-		iopolicy = SCSI_MPATH_IOPOLICY_RR;
+		iopolicy = MPATH_IOPOLICY_RR;
 	else if (!strncmp(val, "queue-depth", 11))
-		iopolicy = SCSI_MPATH_IOPOLICY_QD;
+		iopolicy = MPATH_IOPOLICY_QD;
 	else
 		return -EINVAL;
 
@@ -275,7 +268,7 @@ static int scsi_mpath_set_iopolicy(const char *val, const struct kernel_param *k
 
 static int scsi_mpath_get_iopolicy(char *buf, const struct kernel_param *kp)
 {
-	return sprintf(buf, "%s\n", scsi_mpath_iopolicy_names[iopolicy]);
+	return sprintf(buf, "%s\n", mpath_iopolicy_names[iopolicy]);
 }
 
 module_param_call(iopolicy, scsi_mpath_set_iopolicy, scsi_mpath_get_iopolicy,
@@ -376,11 +369,10 @@ void scsi_mpath_start_request(struct request *req)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	struct gendisk *disk = mpath_disk->gd;
 
 
-	if ((READ_ONCE(scsi_mpath_disk->iopolicy) == SCSI_MPATH_IOPOLICY_QD) &&
+	if ((READ_ONCE(mpath_disk->iopolicy) == MPATH_IOPOLICY_QD) &&
 	    !(scmd->flags & SCMD_MPATH_CNT_ACTIVE)) {
 		atomic_inc(&scsi_mpath_dev->nr_active);
 		scmd->flags |= SCMD_MPATH_CNT_ACTIVE;
@@ -486,6 +478,17 @@ void scsi_mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_revalidate_path);
 
+static bool scsi_mpath_state_is_live(enum mpath_access_state state)
+{
+	switch (state) {
+	case MPATH_STATE_OPTIMAL:
+	case MPATH_STATE_ACTIVE:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 {
 //	enum scsi_device_state sdev_state = sdev->sdev_state;
@@ -494,8 +497,8 @@ static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 	 * if device multipath state is not set to LIVE
 	 * then return true
 	 */
-//	if (!scsi_mpath_state_is_live2(sdev->scsi_mpath_dev->state))
-//		return true;
+	if (!scsi_mpath_state_is_live(mpath_device->state))
+		return true;
 
 	/*
 	 * Do not treat DELETING as a disabled path as I/O should
@@ -519,8 +522,8 @@ static inline bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 		return false;
 
 	return (!scsi_device_online(scsi_mpath_dev->sdev) &&
-	    ((scsi_mpath_dev->state == SCSI_MPATH_OPTIMAL) ||
-	     (scsi_mpath_dev->state == SCSI_MPATH_ACTIVE)));
+	    ((mpath_device->state == MPATH_STATE_OPTIMAL) ||
+	     (mpath_device->state == MPATH_STATE_ACTIVE)));
 }
 
 static bool scsi_available_path(struct mpath_disk *mpath_disk)
@@ -955,9 +958,10 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	case SCSI_DH_RES_TEMP_UNAVAIL:
 		sdev_printk(KERN_ERR, sdev,
 			"Device Handler Path Unavailable, Clear current path \n");
-		if ((scsi_mpath_dev->state == SCSI_ACCESS_STATE_OFFLINE) ||
-		    (scsi_mpath_dev->state == SCSI_ACCESS_STATE_UNAVAILABLE))
-			mpath_clear_current_path(mpath_device);
+		//if ((scsi_mpath_dev->state == SCSI_ACCESS_STATE_OFFLINE) ||
+		//   (scsi_mpath_dev->state == SCSI_ACCESS_STATE_UNAVAILABLE))
+		//	mpath_clear_current_path(mpath_device);
+		pr_err("%s FIXME\n", __func__);
 		err = 0;
 		break;
 	case SCSI_DH_DEV_OFFLINED:
@@ -970,23 +974,10 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	if (retry)
 		set_bit(SCSI_MPATH_DISK_IO_PENDING, &scsi_mpath_dev->flags);
 
-        if (scsi_mpath_state_is_live2(scsi_mpath_dev->state)) {
+        if (scsi_mpath_state_is_live(mpath_device->state)) {
 			pr_err("%s calling scsi_mpath_set_live\n", __func__);
 			scsi_mpath_set_live(scsi_mpath_dev);
         }
-}
-
-static bool scsi_mpath_state_is_live(unsigned int state)
-{
-	switch (state) {
-	case SCSI_ACCESS_STATE_OPTIMAL:
-	case SCSI_ACCESS_STATE_ACTIVE:
-	case SCSI_ACCESS_STATE_LBA:
-	case SCSI_ACCESS_STATE_TRANSITIONING:
-		return true;
-	default:
-		return false;
-	}
 }
 
 /*  called when shost is being freed */
@@ -1018,20 +1009,22 @@ static ssize_t scsi_mpath_iopolicy_show(struct device *dev,
 {
 	struct scsi_mpath_disk *scsi_mpath_disk =
 		container_of(dev, struct scsi_mpath_disk, dev);
+	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
 
 	return sysfs_emit(buf, "%s\n",
-			  scsi_mpath_iopolicy_names[READ_ONCE(scsi_mpath_disk->iopolicy)]);
+			  mpath_iopolicy_names[READ_ONCE(mpath_disk->iopolicy)]);
 }
 
 static void scsi_mpath_iopolicy_update(struct scsi_mpath_disk *scsi_mpath_disk,
 		int iopolicy)
 {
-	int old_iopolicy = READ_ONCE(scsi_mpath_disk->iopolicy);
+	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+	int old_iopolicy = READ_ONCE(mpath_disk->iopolicy);
 
 	if (old_iopolicy == iopolicy)
 		return;
 
-	WRITE_ONCE(scsi_mpath_disk->iopolicy, iopolicy);
+	WRITE_ONCE(mpath_disk->iopolicy, iopolicy);
 
 	/* iopolicy changes clear the mpath by design */
 	//mutex_lock(&nvme_subsystems_lock);
@@ -1041,8 +1034,8 @@ static void scsi_mpath_iopolicy_update(struct scsi_mpath_disk *scsi_mpath_disk,
 
 	pr_notice("mpath_disk %d iopolicy changed from %s to %s\n",
 			scsi_mpath_disk->index,
-			scsi_mpath_iopolicy_names[old_iopolicy],
-			scsi_mpath_iopolicy_names[iopolicy]);
+			mpath_iopolicy_names[old_iopolicy],
+			mpath_iopolicy_names[iopolicy]);
 }
 
 static ssize_t scsi_mpath_iopolicy_store(struct device *dev,
@@ -1052,8 +1045,8 @@ static ssize_t scsi_mpath_iopolicy_store(struct device *dev,
 		container_of(dev, struct scsi_mpath_disk, dev);
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(scsi_mpath_iopolicy_names); i++) {
-		if (sysfs_streq(buf, scsi_mpath_iopolicy_names[i])) {
+	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
+		if (sysfs_streq(buf, mpath_iopolicy_names[i])) {
 			scsi_mpath_iopolicy_update(scsi_mpath_disk, i);
 			return count;
 		}
@@ -1099,13 +1092,13 @@ static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attr
 
 	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	dev_err(dev, "%s2 mpath_disk->iopolicy=%d SCSI_MPATH_IOPOLICY_NUMA=%d\n", __func__,
-		scsi_mpath_disk->iopolicy, SCSI_MPATH_IOPOLICY_NUMA);
+		mpath_disk->iopolicy, MPATH_IOPOLICY_NUMA);
 
 //	struct nvme_ns *current_ns;
 //	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 //	struct nvme_ns_head *head = ns->head;
 
-	if (scsi_mpath_disk->iopolicy != SCSI_MPATH_IOPOLICY_NUMA)
+	if (mpath_disk->iopolicy != MPATH_IOPOLICY_NUMA)
 		return 0;
 
 	nodes_clear(numa_nodes);
@@ -1431,8 +1424,8 @@ void scsi_mpath_add_disk(struct scsi_device *sdev)
 
 	pr_err("%s1 mpath_disk=%pS\n", __func__, scsi_mpath_disk);
 
-	if (scsi_mpath_state_is_live(scsi_mpath_dev->state)) {
-		scsi_mpath_dev->state = SCSI_MPATH_OPTIMAL;
+	if (scsi_mpath_state_is_live(mpath_device->state)) {
+		mpath_device->state = MPATH_STATE_OPTIMAL;
 		pr_err("%s calling scsi_mpath_set_live\n", __func__);
 		scsi_mpath_set_live(scsi_mpath_dev);
 	}
@@ -1627,34 +1620,6 @@ __maybe_unused static void scsi_mpath_alua_activate_done(void *data, int errors)
 	//	fail_path(pgpath);
 	}
 
-}
-
-
-int scsi_mpath_update_state(struct scsi_mpath_device *scsi_mpath_dev)
-{
-		switch(scsi_mpath_dev->state) {
-		case SCSI_ACCESS_STATE_OPTIMAL:
-			scsi_mpath_dev->state = SCSI_MPATH_OPTIMAL;
-			break;
-		case SCSI_ACCESS_STATE_ACTIVE:
-			scsi_mpath_dev->state = SCSI_MPATH_ACTIVE;
-			break;
-		case SCSI_ACCESS_STATE_STANDBY:
-			scsi_mpath_dev->state = SCSI_MPATH_STANDBY;
-			break;
-		case SCSI_ACCESS_STATE_UNAVAILABLE:
-			scsi_mpath_dev->state = SCSI_MPATH_UNAVAILABLE;
-			break;
-		case SCSI_ACCESS_STATE_TRANSITIONING:
-			scsi_mpath_dev->state = SCSI_MPATH_TRANSITIONING;
-			break;
-		case SCSI_ACCESS_STATE_OFFLINE:
-		default:
-			scsi_mpath_dev->state = SCSI_MPATH_OFFLINE;
-		    break;
-	}
-
-	return scsi_mpath_dev->state;
 }
 
 static void scsi_mpath_disk_probe(dev_t devt)

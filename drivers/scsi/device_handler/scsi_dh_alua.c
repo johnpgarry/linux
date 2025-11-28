@@ -176,7 +176,8 @@ static void configure_scsi_mpath(struct scsi_device *sdev, struct scsi_alua_port
 
 	sdev->scsi_mpath_dev->group_id = pg->group_id;
 	sdev->scsi_mpath_dev->tpgs = pg->tpgs;
-	sdev->scsi_mpath_dev->state = pg->state;
+	//sdev->scsi_mpath_dev->state = pg->state;
+	pr_err("%s FIXME state\n", __func__);
 	sdev->scsi_mpath_dev->valid_states = pg->valid_states;
 	sdev->scsi_mpath_dev->prefrence = pg->pref;
 	sdev->scsi_mpath_dev->is_active = 1;
