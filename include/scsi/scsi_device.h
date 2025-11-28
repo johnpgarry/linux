@@ -124,7 +124,6 @@ struct scsi_mpath_disk {
 	struct mutex            lock;
 	unsigned long		start_time;
 	struct delayed_work	activate; /* Path Activation work */
-	struct gendisk		*gd;
 	struct device		dev;
 	struct work_struct	partition_scan_work;
 	struct list_head	entry; // for list of mpath disks
