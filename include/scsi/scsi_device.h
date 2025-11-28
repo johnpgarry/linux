@@ -107,8 +107,6 @@ struct scsi_vpd {
 /*
  * Mark bio as coming from scsi multipath node
  */
-#define REQ_SCSI_MPATH		REQ_DRV
-
 #define SCSI_MPATH_DISK_LIVE            0
 #define SCSI_MPATH_DISK_IO_PENDING      1
 #define SCSI_MPATH_IO_STATS             2
@@ -118,9 +116,6 @@ struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
 
 struct scsi_mpath_disk {
-	struct	bio_list	requeue_list; /* list for requeing bio */
-	spinlock_t		requeue_lock;
-	struct work_struct	requeue_work; /* work struct for requeue */
 	struct mutex            lock;
 	unsigned long		start_time;
 	struct delayed_work	activate; /* Path Activation work */
@@ -142,7 +137,6 @@ struct scsi_mpath_disk {
 struct scsi_mpath_device {
 	struct mpath_device mpath_device;
 	struct scsi_device *sdev;
-	struct gendisk *gd;
 
 		//int				is_shared; 	/* Set Multipath flag  */
 	//int				mpath_first_path; /* Indicate if this was first path */
@@ -154,7 +148,6 @@ struct scsi_mpath_device {
 //	struct work_struct		activate; /* Activate path work */
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
 
-	atomic_t nr_total;
 
 
 

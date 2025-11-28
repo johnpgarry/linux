@@ -277,7 +277,7 @@ void scsi_mpath_failover_req(struct request *req)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
+	//struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	unsigned long flags;
 	struct bio *bio;
 
@@ -297,14 +297,14 @@ void scsi_mpath_failover_req(struct request *req)
 		 * another path
 		 */
 		set_bit(SCSI_MPATH_DISK_IO_PENDING, &scsi_mpath_dev->flags);
-		queue_work(shost->work_q, &scsi_mpath_disk->requeue_work);
+		queue_work(shost->work_q, &mpath_disk->requeue_work);
 	}
 
 	/*
 	 * following logic tries to steal bio, check if the bio has polled
 	 * operation, if yes, then clear polled reqeust and reqeue bio
 	 */
-	spin_lock_irqsave(&scsi_mpath_disk->requeue_lock, flags);
+	spin_lock_irqsave(&mpath_disk->requeue_lock, flags);
 	for (bio = req->bio; bio; bio = bio->bi_next) {
 		bio_set_dev(bio, req->q->disk->part0);
 		if (bio->bi_opf & REQ_POLLED) {
@@ -312,14 +312,14 @@ void scsi_mpath_failover_req(struct request *req)
 			bio->bi_cookie = BLK_QC_T_NONE;
 		}
 	}
-	blk_steal_bios(&scsi_mpath_disk->requeue_list, req);
-	spin_unlock_irqrestore(&scsi_mpath_disk->requeue_lock, flags);
+	blk_steal_bios(&mpath_disk->requeue_list, req);
+	spin_unlock_irqrestore(&mpath_disk->requeue_lock, flags);
 
 	scmd->result = 0;
 
 	blk_mq_end_request(req, 0);
 
-	kblockd_schedule_work(&scsi_mpath_disk->requeue_work);
+	kblockd_schedule_work(&mpath_disk->requeue_work);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_failover_req);
 
@@ -381,63 +381,13 @@ void scsi_mpath_kick_requeue_lists(struct Scsi_Host *shost)
 		if (sdev->is_shared)
 			continue;
 
-		kblockd_schedule_work(&scsi_mpath_disk->requeue_lock);
+		kblockd_schedule_work(&mpath_disk->requeue_lock);
 		if (sdev->sdev_state == SDEV_RUNNING)
 			disk_uevent(sdev->scsi_mpath_dev, KOBJ_CHANGE);
 	}
 	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 }
 #endif
-
-static __maybe_unused void mpath_clear_paths(struct mpath_disk *mpath_disk)
-{
-	struct mpath_device *mpath_device;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	int srcu_idx;
-
-	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
-	list_for_each_entry_rcu(mpath_device, &mpath_disk->dev_list, siblings) {
-		mpath_clear_current_path(mpath_device);
-		kblockd_schedule_work(&scsi_mpath_disk->requeue_work);
-	}
-	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
-}
-
-void scsi_mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
-{
-	__maybe_unused struct scsi_mpath_disk *scsi_mpath_disk;
-	__maybe_unused struct scsi_device *sdev;
-	struct mpath_disk *mpath_disk;
-	int srcu_idx;
-	int node;
-
-	mpath_disk = disk->private_data;
-	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	pr_err("%s disk=%pS mpath_disk=%pS\n", __func__, disk, scsi_mpath_disk);
-
-	if (!scsi_mpath_disk)
-		return;
-
-	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
-	pr_err("%s3 srcu_idx=%d\n", __func__, srcu_idx);
-	#if 0
-	list_for_each_entry_rcu(sdev, &scsi_mpath_disk->dev_list, mpath_dev_entry) {
-		if (capacity != get_capacity(sdev->scsi_mpath_dev->gd))
-			clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_dev->flags);
-	}
-	#endif
-	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
-	pr_err("%s4 srcu_idx=%d\n", __func__, srcu_idx);
-
-	for_each_node(node) {
-		pr_err("%s5 node=%d\n", __func__, node);
-		rcu_assign_pointer(mpath_disk->current_path[node], NULL);
-	}
-	pr_err("%s6 calling kblockd_schedule_work\n", __func__);
-	kblockd_schedule_work(&scsi_mpath_disk->requeue_work);
-	pr_err("%s6.1 called kblockd_schedule_work\n", __func__);
-}
-EXPORT_SYMBOL_GPL(scsi_mpath_revalidate_path);
 
 static bool scsi_mpath_state_is_live(enum mpath_access_state state)
 {
@@ -486,96 +436,6 @@ static inline bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 	    ((mpath_device->state == MPATH_STATE_OPTIMAL) ||
 	     (mpath_device->state == MPATH_STATE_ACTIVE)));
 }
-
-static bool scsi_available_path(struct mpath_disk *mpath_disk)
-{
-	struct mpath_device *mpath_device;
-	struct scsi_device *sdev;
-
-	list_for_each_entry_rcu(mpath_device, &mpath_disk->dev_list, siblings) {
-		struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-		sdev = scsi_mpath_dev->sdev;
-		if (scsi_device_online(sdev))
-			return true;
-	}
-	return false;
-}
-
-static void scsi_multipath_submit_bio(struct bio *bio)
-{
-	struct mpath_disk *mpath_disk = bio->bi_bdev->bd_disk->private_data;
-	int srcu_idx;
-	bool special = false;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	struct mpath_device *mpath_device;
-
-	//WARN_ON_ONCE(1);
-	if (bio->bi_iter.bi_size == 16384) {
-		special = true;
-		special = false;
-	}
-
-	/*
-	 * The scsi device might be going away and the bio might be
-	 * moved to a difference queue via blk_steal_bios(), so we
-	 * need to use bio_split pool from the original queue to
-	 * allocate the bvecs from.
-	 */
-	if (special)
-		pr_err("%s bio=%pS bi size=%d mpath_disk=%pS bio->bi_bdev=%pS\n", __func__, bio, bio->bi_iter.bi_size, scsi_mpath_disk, bio->bi_bdev);
-	bio = bio_split_to_limits(bio);
-	if (special)
-		pr_err("%s1 bio=%pS mpath_disk=%pS called bio_split_to_limits\n", __func__, bio, scsi_mpath_disk);
-	if (!bio)
-		return;
-
-	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
-	mpath_device = mpath_find_path(mpath_disk);
-	if (likely(mpath_device)) {
-		struct scsi_mpath_device *scsi_mpath_dev;
-		struct scsi_device *sdev;
-
-		scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-		sdev = scsi_mpath_dev->sdev;
-
-		if (special) {
-			pr_err("%s2 bio=%pS bio->bi_bdev=%pS bio->bi_bdev->bd_disk=%pS bio->bi_bdev->bd_disk->part0=%pS mpath_disk=%pS mpath_dev=%pS\n",
-				__func__, bio, bio->bi_bdev, bio->bi_bdev->bd_disk, bio->bi_bdev->bd_disk->part0, scsi_mpath_disk, scsi_mpath_dev);
-			
-			pr_err("%s2.1 bio=%pS sdev=%pS request_queue=%pS request_queue=%pS\n",
-				__func__, bio, sdev, sdev->request_queue, sdev->request_queue);
-			pr_err("%s2.2 bio=%pS sdev=%pS request_queue=%pS request_queue->disk=%pS\n",
-				__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk);
-			pr_err("%s2.3 bio=%pS sdev=%pS request_queue=%pS request_queue->disk->part0=%pS\n",
-				__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk->part0);
-		}
-
-		bio_set_dev(bio, scsi_mpath_dev->sdev->request_queue->disk->part0);
-		bio->bi_opf |= REQ_SCSI_MPATH;
-		atomic_inc(&scsi_mpath_dev->nr_total);
-		if (special)
-			pr_err("%s3 bio=%pS bio->bi_bdev=%pS called bio_set_dev mpath_disk=%pS sdev=%pS calling submit_bio_noacct\n",
-				__func__, bio, bio->bi_bdev, scsi_mpath_disk, sdev);
-		submit_bio_noacct(bio);
-		if (special)
-			pr_err("%s4 bio=%pS mpath_disk=%pS sdev=%pS called submit_bio_noacct\n", __func__, bio, scsi_mpath_disk, sdev);
-	//	BUG();
-	} else if (scsi_available_path(mpath_disk)) {
-		sdev_printk(KERN_NOTICE, NULL,
-		    "No Usable Path - Requeing I/O \n");
-
-		spin_lock_irq(&scsi_mpath_disk->requeue_lock);
-		bio_list_add(&scsi_mpath_disk->requeue_list, bio);
-		spin_unlock_irq(&scsi_mpath_disk->requeue_lock);
-	} else {
-		sdev_printk(KERN_NOTICE, NULL,
-		    "No available path = Failing I/O \n");
-
-		bio_io_error(bio);
-	}
-	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
-}
-
 
 static int scsi_mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg)
@@ -663,26 +523,6 @@ static void scsi_multipath_partition_scan_work(struct work_struct *work)
 	//mutex_unlock(&head->disk->open_mutex);
 }
 
-static void scsi_requeue_work(struct work_struct *work)
-{
-	struct scsi_mpath_disk *scsi_mpath_disk =
-	    container_of(work, struct scsi_mpath_disk, requeue_work);
-	__maybe_unused
-	struct bio *bio, *next;
-
-	pr_err("%s mpath_disk=%pS\n", __func__, scsi_mpath_disk);
-
-	spin_lock_irq(&scsi_mpath_disk->requeue_lock);
-//	next = bio_list_get(&scsi_mpath_disk->requeue_list);
-	spin_unlock_irq(&scsi_mpath_disk->requeue_lock);
-
-//	while ((bio = next) != NULL) {
-//		next = bio->bi_next;
-//		bio->bi_next = NULL;
-//		submit_bio_noacct(bio);
-//	}
-}
-
 static __maybe_unused void scsi_mpath_disk_release(struct device *dev)
 {
 	struct mpath_disk *mpath_disk = container_of(dev, struct mpath_disk, dev);
@@ -729,9 +569,8 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s1.1 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS called scsi_multipath_init\n",
 		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev);
 
-	sdev->scsi_mpath_dev->gd = gd;
 	mpath_device = &sdev->scsi_mpath_dev->mpath_device;
-
+	mpath_device->gd = gd;
 
 	ret = scsi_mpath_unique_lun_id(sdev);
 	if (ret < 0) {
@@ -811,11 +650,11 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	if (ret)
 		return ret;
 
-	INIT_WORK(&scsi_mpath_disk->requeue_work, scsi_requeue_work);
+	INIT_WORK(&mpath_disk->requeue_work, mpath_requeue_work);
 	pr_err("%s12.1 ret=%d after INIT_WORK mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
-	spin_lock_init(&scsi_mpath_disk->requeue_lock);
+	spin_lock_init(&mpath_disk->requeue_lock);
 	pr_err("%s12.2 ret=%d after spin_lock_init mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
-	bio_list_init(&scsi_mpath_disk->requeue_list);
+	bio_list_init(&mpath_disk->requeue_list);
 	pr_err("%s12.3 ret=%d after bio_list_init mpath_disk=%pS sdev->scsi_mpath_dev=%pS\n",
 		__func__, ret, scsi_mpath_disk, sdev->scsi_mpath_dev);
 	pr_err("%s12.3.1 device_id_str=%s\n",
@@ -878,7 +717,7 @@ void scsi_mpath_set_live(struct scsi_mpath_device *scsi_mpath_dev)
 
 	#if 0
 	synchronize_srcu(&mpath_disk->srcu);
-	kblockd_schedule_work(&scsi_mpath_disk->requeue_lock);
+	kblockd_schedule_work(&mpath_disk->requeue_lock);
 	#endif
 }
 
@@ -955,7 +794,7 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 //	if (!mpath_disk)
 //		return;
 
-//	cancel_work_sync(&scsi_mpath_disk->requeue_work);
+//	cancel_work_sync(&mpath_disk->requeue_work);
 //	cleanup_srcu_struct(&mpath_disk->srcu);
 
 //	pr_err("%s2 sdev=%pS mpath_dev=%pS mpath_disk=%pS calling kfree mpath_dev\n",
@@ -1031,11 +870,13 @@ static ssize_t scsi_mpath_nr_total_show(struct device *dev, struct device_attrib
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct mpath_device *mpath_device;
 
 	if (!scsi_mpath_dev)
 		return 0;
+	mpath_device = &scsi_mpath_dev->mpath_device;
 
-	return sysfs_emit(buf, "%d\n", atomic_read(&scsi_mpath_dev->nr_total));
+	return sysfs_emit(buf, "%d\n", atomic_read(&mpath_device->nr_total));
 }
 
 struct device_attribute scsi_mpath_nr_total = \
@@ -1063,7 +904,7 @@ int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 	struct request *req = scsi_cmd_to_rq(scmd);
 
 	pr_err("%s scmd=%pS req=%pS\n", __func__, scmd, req);
-	if (req->cmd_flags & REQ_SCSI_MPATH) {
+	if (req->cmd_flags & REQ_MPATH) {
 		if (scsi_is_mpath_error(scmd) ||
 		    blk_queue_dying(req->q)) {
 			return NEEDS_RETRY;
@@ -1079,7 +920,7 @@ EXPORT_SYMBOL_GPL(scsi_mpath_failover_disposition);
 
 const struct block_device_operations scsi_mpath_ops = {
 	.owner          = THIS_MODULE,
-	.submit_bio	= scsi_multipath_submit_bio,
+	.submit_bio	= multipath_submit_bio,
 	.open		= scsi_mpath_open,
 	.release	= scsi_mpath_release,
 	.ioctl			= scsi_mpath_ioctl,
@@ -1202,9 +1043,10 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 		pr_err("%s6.1 itering mpath_dev=%pS sdev->request_queue=%pS\n", __func__, scsi_mpath_dev, sdev->request_queue);
 		if (!sdev->request_queue)
 			continue;
-		pr_err("%s6.2 itering mpath_dev=%pS mpath_dev->gd=%pS checking GD_ADDED=%d\n",
-			__func__, scsi_mpath_dev, scsi_mpath_dev->gd, test_bit(GD_ADDED, &scsi_mpath_dev->gd->state));
-		if (!test_bit(GD_ADDED, &scsi_mpath_dev->gd->state))
+		pr_err("%s6.2 itering mpath_dev=%pS mpath_device->gd=%pS checking GD_ADDED=%d\n",
+			__func__, scsi_mpath_dev, mpath_device->gd,
+			test_bit(GD_ADDED, &mpath_device->gd->state));
+		if (!test_bit(GD_ADDED, &mpath_device->gd->state))
 			continue;
 
 		/*
@@ -1219,16 +1061,18 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 		 * The test_and_set_bit() is used because it is protecting
 		 * against multiple nvme paths being simultaneously added.
 		 */
-		pr_err("%s6.3 itering mpath_dev=%pS mpath_dev->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
-			__func__, scsi_mpath_dev, scsi_mpath_dev->gd, test_bit(GD_ADDED, &scsi_mpath_dev->gd->state),
+		pr_err("%s6.3 itering mpath_dev=%pS mpath_device->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
+			__func__, scsi_mpath_dev, mpath_device->gd,
+			test_bit(GD_ADDED, &mpath_device->gd->state),
 			test_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags));
 		if (test_and_set_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags))
 			continue;
 
-		pr_err("%s7.3 itering scsi_mpath_dev=%pS scsi_mpath_dev->gd=%pS\n", __func__, scsi_mpath_dev, scsi_mpath_dev->gd);
-		target = disk_to_dev(scsi_mpath_dev->gd);
-		pr_err("%s7.4 itering scsi_mpath_dev=%pS mpath_dev->gd=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
-			__func__, scsi_mpath_dev, scsi_mpath_dev->gd, target, "multipath");
+		pr_err("%s7.3 itering scsi_mpath_dev=%pS mpath_device->gd=%pS\n",
+			__func__, scsi_mpath_dev, mpath_device->gd);
+		target = disk_to_dev(mpath_device->gd);
+		pr_err("%s7.4 itering scsi_mpath_dev=%pS mpath_device->gd=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
+			__func__, scsi_mpath_dev, mpath_device->gd, target, "multipath");
 		/*
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
@@ -1278,7 +1122,7 @@ static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *scsi_mpath_de
 	if (!test_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags))
 		return;
 
-	target = disk_to_dev(scsi_mpath_dev->gd);
+	target = disk_to_dev(mpath_device->gd);
 	mpath_gd_kobj = &disk_to_dev(mpath_disk->gd)->kobj;
 
 	pr_err("%s2 calling sysfs_remove_link_from_group mpath_gd_kobj=%pS dev_name(target)=%s\n",
@@ -1316,7 +1160,7 @@ void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
 	pr_err("%s clearing SCSI_MPATH_DISK_LIVE (if set) sdev=%pS\n", __func__, sdev);
 	if (test_and_clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags)) {
 		synchronize_srcu(&mpath_disk->srcu);
-		kblockd_schedule_work(&scsi_mpath_disk->requeue_work);
+		kblockd_schedule_work(&mpath_disk->requeue_work);
 	//	del_gendisk(sdev->scsi_mpath_dev);
 	}
 }
@@ -1432,8 +1276,8 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 //		return;
 
 	/* Make sure All pending bio's are cleaned up */
-	kblockd_schedule_work(&scsi_mpath_disk->requeue_work);
-	flush_work(&scsi_mpath_disk->requeue_work);
+	kblockd_schedule_work(&mpath_disk->requeue_work);
+	flush_work(&mpath_disk->requeue_work);
 	//put_disk(sdev->scsi_mpath_dev);
 
 	mutex_lock(&scsi_mpath_disk->lock);

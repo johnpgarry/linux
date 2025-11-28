@@ -6,7 +6,6 @@
 #include <linux/topology.h>
 #include <linux/libmpath.h>
 
-
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
  * In Future, if more apropriate IO-policy is introduced will be added
@@ -298,6 +297,149 @@ struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk)
 	}
 }
 EXPORT_SYMBOL_GPL(mpath_find_path);
+
+void mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
+{
+	struct mpath_disk *mpath_disk;
+	int srcu_idx;
+	int node;
+
+	mpath_disk = disk->private_data;
+	pr_err("%s disk=%pS mpath_disk=%pS\n", __func__, disk, mpath_disk);
+
+
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	pr_err("%s3 srcu_idx=%d\n", __func__, srcu_idx);
+	#if 0
+	list_for_each_entry_rcu(sdev, &scsi_mpath_disk->dev_list, mpath_dev_entry) {
+		if (capacity != get_capacity(sdev->scsi_mpath_dev->gd))
+			clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_dev->flags);
+	}
+	#endif
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+	pr_err("%s4 srcu_idx=%d\n", __func__, srcu_idx);
+
+	for_each_node(node) {
+		pr_err("%s5 node=%d\n", __func__, node);
+		rcu_assign_pointer(mpath_disk->current_path[node], NULL);
+	}
+	pr_err("%s6 calling kblockd_schedule_work\n", __func__);
+	kblockd_schedule_work(&mpath_disk->requeue_work);
+	pr_err("%s6.1 called kblockd_schedule_work\n", __func__);
+}
+EXPORT_SYMBOL_GPL(mpath_revalidate_path);
+
+void mpath_requeue_work(struct work_struct *work)
+{
+	struct mpath_disk *mpath_disk =
+	    container_of(work, struct mpath_disk, requeue_work);
+	__maybe_unused
+	struct bio *bio, *next;
+
+	pr_err("%s mpath_disk=%pS\n", __func__, mpath_disk);
+
+	spin_lock_irq(&mpath_disk->requeue_lock);
+	next = bio_list_get(&mpath_disk->requeue_list);
+	spin_unlock_irq(&mpath_disk->requeue_lock);
+
+	while ((bio = next) != NULL) {
+		next = bio->bi_next;
+		bio->bi_next = NULL;
+		submit_bio_noacct(bio);
+	}
+}
+EXPORT_SYMBOL_GPL(mpath_requeue_work);
+
+static bool mpath_available_path(struct mpath_disk *mpath_disk)
+{
+	struct mpath_device *mpath_device;
+	//struct scsi_device *sdev;
+
+	list_for_each_entry_rcu(mpath_device, &mpath_disk->dev_list, siblings) {
+	//	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	//	sdev = scsi_mpath_dev->sdev;
+	//	if (scsi_device_online(sdev))
+			return true;
+	}
+	return false;
+}
+
+void multipath_submit_bio(struct bio *bio)
+{
+	struct mpath_disk *mpath_disk = bio->bi_bdev->bd_disk->private_data;
+	int srcu_idx;
+	bool special = false;
+	//struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
+	struct mpath_device *mpath_device;
+
+	//WARN_ON_ONCE(1);
+	if (bio->bi_iter.bi_size == 16384) {
+		special = true;
+		special = false;
+	}
+
+	/*
+	 * The scsi device might be going away and the bio might be
+	 * moved to a difference queue via blk_steal_bios(), so we
+	 * need to use bio_split pool from the original queue to
+	 * allocate the bvecs from.
+	 */
+	if (special)
+		pr_err("%s bio=%pS bi size=%d mpath_disk=%pS bio->bi_bdev=%pS\n",
+			__func__, bio, bio->bi_iter.bi_size, mpath_disk, bio->bi_bdev);
+	bio = bio_split_to_limits(bio);
+	if (special)
+		pr_err("%s1 bio=%pS mpath_disk=%pS called bio_split_to_limits\n",
+			__func__, bio, mpath_disk);
+	if (!bio)
+		return;
+
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	mpath_device = mpath_find_path(mpath_disk);
+	if (likely(mpath_device)) {
+		//struct scsi_mpath_device *scsi_mpath_dev;
+		//struct scsi_device *sdev;
+
+		//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+		//sdev = scsi_mpath_dev->sdev;
+
+		if (special) {
+		//	pr_err("%s2 bio=%pS bio->bi_bdev=%pS bio->bi_bdev->bd_disk=%pS bio->bi_bdev->bd_disk->part0=%pS mpath_disk=%pS mpath_dev=%pS\n",
+		//		__func__, bio, bio->bi_bdev, bio->bi_bdev->bd_disk, bio->bi_bdev->bd_disk->part0, scsi_mpath_disk, scsi_mpath_dev);
+			
+		//	pr_err("%s2.1 bio=%pS sdev=%pS request_queue=%pS request_queue=%pS\n",
+		//		__func__, bio, sdev, sdev->request_queue, sdev->request_queue);
+		//	pr_err("%s2.2 bio=%pS sdev=%pS request_queue=%pS request_queue->disk=%pS\n",
+		//		__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk);
+		//	pr_err("%s2.3 bio=%pS sdev=%pS request_queue=%pS request_queue->disk->part0=%pS\n",
+		//		__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk->part0);
+		}
+
+		bio_set_dev(bio, mpath_device->gd->part0);
+		bio->bi_opf |= REQ_MPATH;
+		atomic_inc(&mpath_device->nr_total);
+		if (special)
+			pr_err("%s3 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct\n",
+				__func__, bio, bio->bi_bdev);
+		submit_bio_noacct(bio);
+		if (special)
+			pr_err("%s4 bio=%pS called submit_bio_noacct\n",
+				__func__, bio);
+	//	BUG();
+	} else if (mpath_available_path(mpath_disk)) {
+		pr_err("No Usable Path - Requeing I/O \n");
+
+		spin_lock_irq(&mpath_disk->requeue_lock);
+		bio_list_add(&mpath_disk->requeue_list, bio);
+		spin_unlock_irq(&mpath_disk->requeue_lock);
+	} else {
+		pr_err("No available path = Failing I/O \n");
+
+		bio_io_error(bio);
+	}
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+}
+EXPORT_SYMBOL_GPL(multipath_submit_bio);
 
 
 static int __init mpath_init(void)
