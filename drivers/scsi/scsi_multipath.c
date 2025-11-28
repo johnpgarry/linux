@@ -459,8 +459,8 @@ void scsi_mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 	int srcu_idx;
 	int node;
 
-	scsi_mpath_disk = disk->private_data;
-	mpath_disk = &scsi_mpath_disk->mpath_disk;
+	mpath_disk = disk->private_data;
+	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	pr_err("%s disk=%pS mpath_disk=%pS\n", __func__, disk, scsi_mpath_disk);
 
 	if (!scsi_mpath_disk)
@@ -722,10 +722,10 @@ static bool scsi_available_path(struct mpath_disk *mpath_disk)
 
 static void scsi_multipath_submit_bio(struct bio *bio)
 {
-	struct scsi_mpath_disk *scsi_mpath_disk = bio->bi_bdev->bd_disk->private_data;
+	struct mpath_disk *mpath_disk = bio->bi_bdev->bd_disk->private_data;
 	int srcu_idx;
 	bool special = false;
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	struct mpath_device *mpath_device;
 
 	//WARN_ON_ONCE(1);
@@ -800,8 +800,8 @@ static int scsi_mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg)
 {
 	struct gendisk *disk = bdev->bd_disk;
-	struct scsi_mpath_disk *scsi_mpath_disk = disk->private_data;
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+	struct mpath_disk *mpath_disk = disk->private_data;
+	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	struct scsi_mpath_device *scsi_mpath_dev;
 	struct mpath_device *mpath_device;
 	struct scsi_device *sdev;
@@ -847,8 +847,7 @@ out_unlock:
 static int scsi_mpath_get_unique_id(struct gendisk *disk, u8 id[16],
     enum blk_unique_id type)
 {
-	struct scsi_mpath_disk *scsi_mpath_disk = disk->private_data;
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+	struct mpath_disk *mpath_disk = disk->private_data;
 	__maybe_unused struct scsi_device *sdev;
 	int srcu_idx, ret = -EWOULDBLOCK;
 	struct mpath_device *mpath_device;
@@ -1011,7 +1010,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	if (IS_ERR(scsi_mpath_disk->gd))
 		return PTR_ERR(scsi_mpath_disk->gd);
 
-	scsi_mpath_disk->gd->private_data = scsi_mpath_disk;
+	scsi_mpath_disk->gd->private_data = mpath_disk;
 	scsi_mpath_disk->gd->fops = &scsi_mpath_ops;
 
 	set_bit(GD_SUPPRESS_PART_SCAN, &scsi_mpath_disk->gd->state);
@@ -1325,7 +1324,8 @@ struct device_attribute scsi_mpath_nr_total = \
 
 static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 {
-	struct scsi_mpath_disk *scsi_mpath_disk = disk->private_data;
+	struct mpath_disk *mpath_disk = disk->private_data;
+	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	pr_err("%s disk=%pS mpath_disk=%pS\n", __func__, disk, scsi_mpath_disk);
 
 	return scsi_mpath_get_disk(scsi_mpath_disk);
@@ -1333,7 +1333,9 @@ static int scsi_mpath_open(struct gendisk *disk, blk_mode_t mode)
 
 static void scsi_mpath_release(struct gendisk *disk)
 {
-	struct scsi_mpath_disk *scsi_mpath_disk = disk->private_data;
+	struct mpath_disk *mpath_disk = disk->private_data;
+	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
+
 	kref_put(&scsi_mpath_disk->ref, scsi_mpath_free);
 }
 
