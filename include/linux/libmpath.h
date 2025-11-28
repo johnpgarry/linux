@@ -10,6 +10,7 @@ struct mpath_device;
 struct mpath_disk {
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
+	struct gendisk		*gd;
 	struct mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
 

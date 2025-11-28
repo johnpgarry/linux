@@ -3708,36 +3708,37 @@ static int sd_revalidate_mpath_disk(struct scsi_mpath_disk *scsi_mpath_disk, str
 	struct scsi_device *sdp = sdkp->device;
 	struct queue_limits *mpath_lim;
 	struct queue_limits lim2;
+	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
 	int err;
 
 	//blk_mq_freeze_queue(sdp->mpath_disk->queue);
 
 	pr_err("%s scsi_mpath_disk=%pS\n", __func__, scsi_mpath_disk);
 
-	pr_err("%s1 scsi_mpath_disk->gd=%pS\n", __func__, scsi_mpath_disk->gd);
-	mpath_lim = &scsi_mpath_disk->gd->queue->limits;
+	pr_err("%s1 mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
+	mpath_lim = &mpath_disk->gd->queue->limits;
 
-	lim2 = queue_limits_start_update(scsi_mpath_disk->gd->queue);
+	lim2 = queue_limits_start_update(mpath_disk->gd->queue);
 	pr_err("%s8.1 called queue_limits_start_update calling queue_limits_stack_bdev\n", __func__);
 	lim2.logical_block_size = mpath_lim->logical_block_size;
 	lim2.physical_block_size = mpath_lim->physical_block_size;
 	lim2.io_min = mpath_lim->io_min;
 	lim2.io_opt = mpath_lim->io_opt;
-	queue_limits_stack_bdev(&lim2, scsi_mpath_disk->gd->part0, 0, scsi_mpath_disk->gd->disk_name);
+	queue_limits_stack_bdev(&lim2, mpath_disk->gd->part0, 0, mpath_disk->gd->disk_name);
 
 	//sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
 
 	pr_err("%s8.2 calling set_capacity_and_notify\n", __func__);
-	set_capacity_and_notify(scsi_mpath_disk->gd,
+	set_capacity_and_notify(mpath_disk->gd,
 	    logical_to_sectors(sdp, sdkp->capacity));
 
 	pr_err("%s8.3 calling queue_limits_commit_update\n", __func__);
-	err = queue_limits_commit_update(scsi_mpath_disk->gd->queue, &lim2);
+	err = queue_limits_commit_update(mpath_disk->gd->queue, &lim2);
 	pr_err("%s8.4 calling scsi_mpath_revalidate_path err=%d\n",
 		__func__, err);
 	pr_err("%s8.4.1 calling scsi_mpath_revalidate_path err=%d mpath_dev->gd=%pS\n",
 		__func__, err, scsi_mpath_disk);
-	scsi_mpath_revalidate_path(scsi_mpath_disk->gd,
+	scsi_mpath_revalidate_path(mpath_disk->gd,
 	    logical_to_sectors(sdp, sdkp->capacity));
 	pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
 	//blk_mq_unfreeze_queue(sdp->mpath_disk->queue);
