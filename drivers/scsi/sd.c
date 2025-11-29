@@ -4141,12 +4141,12 @@ static int sd_probe(struct device *dev)
 
 	if (scsi_is_sdev_multipath(sdp) && 1/* sdp->is_shared */) {
 		struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
-		struct mpath_device *mpath_dev = &scsi_mpath_dev->mpath_device;
-		struct mpath_disk *mpath_disk = mpath_dev->mpath_disk;
+		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+		struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
 		struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 		pr_err("%s calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
-		scsi_mpath_add_disk(sdp);
+		mpath_add_disk(mpath_device);
 		sd_revalidate_mpath_disk(scsi_mpath_disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
@@ -4179,12 +4179,14 @@ static int sd_remove(struct device *dev)
 {
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 	struct scsi_device *sdp = sdkp->device; // new code
+	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
+	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 
 	dev_err(dev, "%s scsi_is_sdev_multipath=%d sdp=%pS dev=%pS\n",
 		__func__, scsi_is_sdev_multipath(sdkp->device), sdp, dev);
 
 	if (scsi_is_sdev_multipath(sdkp->device))
-		scsi_mpath_remove_disk(sdkp->device);
+		mpath_remove_disk(mpath_device);
 	
 	scsi_autopm_get_device(sdkp->device);
 

@@ -185,7 +185,7 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
 
-void mpath_set_live(struct mpath_device *mpath_device)
+void mpath_device_set_live(struct mpath_device *mpath_device)
 {
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
 	int ret;
@@ -225,7 +225,7 @@ void mpath_set_live(struct mpath_device *mpath_device)
 	synchronize_srcu(&mpath_disk->srcu);
 	kblockd_schedule_work(&mpath_disk->requeue_work);
 }
-EXPORT_SYMBOL_GPL(mpath_set_live);
+EXPORT_SYMBOL_GPL(mpath_device_set_live);
 
 
 bool mpath_clear_current_path(struct mpath_device *mpath_device)
@@ -559,6 +559,31 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
+bool mpath_device_is_live(struct mpath_device *mpath_device)
+{
+	switch (READ_ONCE(mpath_device->state)) {
+	case MPATH_STATE_OPTIMAL:
+	case MPATH_STATE_ACTIVE:
+		return true;
+	default:
+		return false;
+	}
+}
+EXPORT_SYMBOL_GPL(mpath_device_is_live);
+
+void mpath_add_disk(struct mpath_device *mpath_device)
+{
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	pr_err("%s mpath_device=%pS mpath_disk=%pS\n", __func__, mpath_device, mpath_disk);
+
+	if (mpath_device_is_live(mpath_device)) {
+		mpath_device->state = MPATH_STATE_OPTIMAL;
+		pr_err("%s calling scsi_mpath_set_live\n", __func__);
+		mpath_device_set_live(mpath_device);
+	}
+}
+EXPORT_SYMBOL_GPL(mpath_add_disk);
+
 static bool mpath_available_path(struct mpath_disk *mpath_disk)
 {
 	struct mpath_device *mpath_device;
@@ -662,6 +687,76 @@ static void mpath_free_disk(struct kref *ref)
 	pr_err("%s4 mpath_disk=%pS calling kfree\n", __func__, mpath_disk);
 	kfree(mpath_disk);
 }
+
+void mpath_remove_disk(struct mpath_device *mpath_device)
+{
+	bool last_path = false;
+	struct mpath_disk *mpath_disk;
+	
+	pr_err("%s mpath_device=%pS\n", __func__, mpath_device);
+
+	mpath_disk = mpath_device->mpath_disk;
+
+	pr_err("%s1 mpath_device=%pS calling mpath_remove_sysfs_link\n",
+		__func__, mpath_device);
+	mpath_remove_sysfs_link(mpath_device);
+
+	synchronize_srcu(&mpath_disk->srcu);
+
+	/* wait for concurrent submissions */
+	if (mpath_clear_current_path(mpath_device))
+		synchronize_srcu(&mpath_disk->srcu);
+
+	pr_err("%s2 mpath_device=%pS called scsi_mpath_remove_sysfs_link\n",
+		__func__, mpath_device);
+//	put_disk(sdev->scsi_mpath_dev->scsi_mpath_disk->gd);
+//	if (!sdev->is_shared)
+//		return;
+
+	/* Make sure All pending bio's are cleaned up */
+	kblockd_schedule_work(&mpath_disk->requeue_work);
+	flush_work(&mpath_disk->requeue_work);
+	//put_disk(sdev->scsi_mpath_dev);
+
+	mutex_lock(&mpath_disk->lock);
+	
+	list_del_rcu(&mpath_device->siblings);
+	pr_err("%s3 list_empty=%d\n", __func__, list_empty(&mpath_disk->dev_list));
+	if (list_empty(&mpath_disk->dev_list)) {
+//		if (!nvme_mpath_queue_if_no_path(ns->head))
+//			list_del_init(&ns->head->entry);
+		last_path = true;
+	}
+	mutex_unlock(&mpath_disk->lock);
+
+	pr_err("%s4 last_path=%d\n",
+		__func__, last_path);
+
+	if (last_path) {
+		pr_err("%s5 MPATH_DISK_LIVE set=%d\n",
+			__func__, test_bit(MPATH_DISK_LIVE, &mpath_disk->flags));
+		if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_disk->flags)) {
+			/*
+			 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
+			 * to allow multipath to fail all I/O.
+			 */
+		//	kblockd_schedule_work(&head->requeue_work);
+
+			mpath_cdev_del(&mpath_disk->cdev, &mpath_disk->cdev_device);
+			synchronize_srcu(&mpath_disk->srcu);
+			pr_err("%s5.1 not calling device_del\n", __func__);
+		//	device_del(&scsi_mpath_disk->dev);
+			pr_err("%s5.2 calling del_gendisk\n", __func__);
+			del_gendisk(mpath_disk->gd);
+		}
+		pr_err("%s6 calling put_disk on mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
+		
+	}
+	mpath_put_disk(mpath_disk);
+
+	pr_err("%s10 mpath_device=%pS\n", __func__, mpath_device);
+}
+EXPORT_SYMBOL_GPL(mpath_remove_disk);
 
 void mpath_put_disk(struct mpath_disk *mpath_disk)
 {
