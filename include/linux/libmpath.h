@@ -90,6 +90,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_add_disk(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
+void mpath_cdev_rel(struct device *dev);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;

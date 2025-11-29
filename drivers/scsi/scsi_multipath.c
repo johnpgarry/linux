@@ -434,6 +434,11 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	kref_init(&mpath_disk->ref);
 
 	mpath_disk->dev.class = &scsi_mpath_disk_class;
+
+	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), scsi_mpath_disk->index);
+	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
+	mpath_disk->cdev_device.release = mpath_cdev_rel;
+
 //	scsi_mpath_disk->dev.release = scsi_mpath_disk_release;
 //	scsi_mpath_disk->dev.groups = scsi_mpath_groups;
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);

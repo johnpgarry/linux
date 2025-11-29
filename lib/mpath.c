@@ -914,11 +914,12 @@ out_unlock:
 	return err;
 }
 
-static void mpath_cdev_rel(struct device *dev)
+void mpath_cdev_rel(struct device *dev)
 {
 	dev_err(dev, "%s\n", __func__);
 //	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
 }
+EXPORT_SYMBOL_GPL(mpath_cdev_rel);
 
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
 {
@@ -941,6 +942,7 @@ int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
 {
 	int ret, minor = 0 /*mpath_disk->index*/;
 
+	// following can be moved to disk alloc code
 	mpath_disk->cdev_device.parent = &mpath_disk->dev;
 	ret = dev_set_name(&mpath_disk->cdev_device, "smpg%d",
 						minor);
@@ -950,7 +952,8 @@ int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
 
 	//mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), minor);
 	//mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
-	mpath_disk->cdev_device.release = mpath_cdev_rel;
+	//mpath_disk->cdev_device.release = mpath_cdev_rel;
+	// following can be moved to disk alloc code
 	device_initialize(&mpath_disk->cdev_device);
 	cdev_init(&mpath_disk->cdev, &mpath_generic_chr_fops);
 	mpath_disk->cdev.owner = THIS_MODULE;
