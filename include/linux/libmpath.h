@@ -32,6 +32,10 @@ struct mpath_disk {
 	struct	bio_list	requeue_list; /* list for requeing bio */
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work; /* work struct for requeue */
+
+	struct cdev		cdev;
+	struct device		cdev_device;
+
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
@@ -64,6 +68,8 @@ void multipath_submit_bio(struct bio *bio);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf);
 void mpath_put_disk(struct mpath_disk *mpath_disk);
 int mpath_get_disk(struct mpath_disk *mpath_disk);
+int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
+void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
