@@ -32,8 +32,9 @@ struct mpath_disk {
 	struct	bio_list	requeue_list; /* list for requeing bio */
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work; /* work struct for requeue */
-	bool (*mpath_is_disabled)(struct mpath_device *);
-	bool (*mpath_is_optimized)(struct mpath_device *mpath_device);
+	bool (*is_disabled)(struct mpath_device *);
+	bool (*is_optimized)(struct mpath_device *mpath_device);
+	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
 	struct mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
