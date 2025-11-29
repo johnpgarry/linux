@@ -550,12 +550,41 @@ static int mpath_get_unique_id(struct gendisk *disk, u8 id[16],
 	return ret;
 }
 
+static int mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
+		    unsigned int cmd, unsigned long arg)
+{
+	struct gendisk *disk = bdev->bd_disk;
+	struct mpath_disk *mpath_disk = disk->private_data;
+	struct mpath_device *mpath_device;
+	int srcu_idx, err;
+
+	pr_err("%s cmd=0x%x arg=%ld mpath_disk=%pS\n", __func__, cmd, arg, mpath_disk);
+	
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	mpath_device = mpath_find_path(mpath_disk);
+	pr_err("%s1 cmd=0x%x arg=%ld mpath_device=%pS called scsi_find_path srcu_idx=%d mpath_device=%pS\n",
+		__func__, cmd, arg, mpath_device, srcu_idx, mpath_device);
+	if (!mpath_device)
+		goto out_unlock;
+
+	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO)) {
+		err = -ENOIOCTLCMD;
+		goto out_unlock;
+	}
+
+	err = mpath_disk->ioctl(mpath_device, mode, cmd, arg);
+
+out_unlock:
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+	return err;
+}
+
 const struct block_device_operations mpath_ops = {
 	.owner          = THIS_MODULE,
 	.submit_bio	= multipath_submit_bio,
 	.open		= mpath_open,
 	.release	= mpath_release,
-//	.ioctl			= mpath_ioctl,
+	.ioctl			= mpath_ioctl,
 	.get_unique_id	= mpath_get_unique_id,
 };
 EXPORT_SYMBOL_GPL(mpath_ops);

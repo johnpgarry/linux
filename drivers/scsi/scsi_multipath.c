@@ -425,33 +425,12 @@ static inline bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 	     (mpath_device->state == MPATH_STATE_ACTIVE)));
 }
 
-static __maybe_unused int scsi_mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
+static int scsi_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg)
 {
-	struct gendisk *disk = bdev->bd_disk;
-	struct mpath_disk *mpath_disk = disk->private_data;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	struct scsi_mpath_device *scsi_mpath_dev;
-	struct mpath_device *mpath_device;
-	struct scsi_device *sdev;
-	int srcu_idx, err;
-
-	pr_err("%s cmd=0x%x arg=%ld mpath_disk=%pS\n", __func__, cmd, arg, scsi_mpath_disk);
-	
-	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
-	mpath_device = mpath_find_path(mpath_disk);
-	pr_err("%s1 cmd=0x%x arg=%ld mpath_disk=%pS called scsi_find_path srcu_idx=%d mpath_device=%pS\n",
-		__func__, cmd, arg, scsi_mpath_disk, srcu_idx, mpath_device);
-	if (!mpath_device)
-		goto out_unlock;
-	scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-	sdev = scsi_mpath_dev->sdev;
-	pr_err("%s2 cmd=0x%x arg=%ld sdev=%pS\n", __func__, cmd, arg, sdev);
-
-	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO)) {
-		err = -ENOIOCTLCMD;
-		goto out_unlock;
-	}
+	int err;
+	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 
 	/*
 	 * If we are in the middle of error recovery, don't let anyone
@@ -462,14 +441,12 @@ static __maybe_unused int scsi_mpath_ioctl(struct block_device *bdev, blk_mode_t
 	err = scsi_ioctl_block_when_processing_errors(sdev, cmd,
 			(mode & BLK_OPEN_NDELAY));
 	if (err)
-		goto out_unlock;
+		return err;
 
 	pr_err("%s3 cmd=0x%x arg=%ld sdev=%pS calling scsi_ioctl\n", __func__, cmd, arg, sdev);
 	err = scsi_ioctl(sdev, mode & BLK_OPEN_WRITE, cmd, (void __user *)arg);
 	pr_err("%s3.1 cmd=0x%x arg=%ld sdev=%pS called scsi_ioctl err=%d\n", __func__, cmd, arg, sdev, err);
 
-out_unlock:
-	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 	return err;
 }
 
@@ -580,6 +557,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	mpath_disk->is_disabled = scsi_mpath_is_disabled;
 	mpath_disk->is_optimized = scsi_mpath_is_optimized;
 	mpath_disk->get_unique_id = scsi_mpath_get_unique_id;
+	mpath_disk->ioctl = scsi_mpath_ioctl;
 
 	scsi_mpath_disk->index = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
 
