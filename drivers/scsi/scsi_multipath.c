@@ -902,7 +902,6 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 	return NULL;
 }
 
-
 static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 {
 	__maybe_unused struct device *target;
@@ -1121,7 +1120,6 @@ static void scsi_mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
 	dev_err(cdev_device, "%s2 calling put_device cdev_device=%pS\n", __func__, cdev_device);
 	put_device(cdev_device);
 }
-
 
 void scsi_mpath_remove_disk(struct scsi_device *sdev)
 {

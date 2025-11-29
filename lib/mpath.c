@@ -131,7 +131,6 @@ static struct mpath_device *mpath_next_dev(struct mpath_disk *mpath_disk,
 static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk)
 {
 	struct mpath_device *mpath_device, *found = NULL;
-//	struct scsi_mpath_device *scsi_mpath_dev;
 	int node = numa_node_id();
 	struct mpath_device *old = srcu_dereference(mpath_disk->current_path[node],
 					       &mpath_disk->srcu);
@@ -182,7 +181,6 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_disk *mpath_disk
 	pr_err("%s mpath_disk=%pS min_depth_nonopt=%d\n", __func__, mpath_disk, min_depth_nonopt);
 	list_for_each_entry_srcu(mpath_device, &mpath_disk->dev_list, siblings,
 				 srcu_read_lock_held(&mpath_disk->srcu)) {
-	//	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	//	if (nvme_path_is_disabled(ns))
 	//		continue;
 
@@ -300,7 +298,6 @@ static struct mpath_device *mpath_numa_path(struct mpath_disk *mpath_disk)
 {
 	int node = numa_node_id();
 	struct mpath_device *mpath_device;
-	//struct scsi_mpath_device *scsi_mpath_dev;
 
 	pr_err_once("%s mpath_disk=%pS\n", __func__, mpath_disk);
 	mpath_device = srcu_dereference(mpath_disk->current_path[node], &mpath_disk->srcu);
@@ -427,24 +424,6 @@ void multipath_submit_bio(struct bio *bio)
 	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
 	mpath_device = mpath_find_path(mpath_disk);
 	if (likely(mpath_device)) {
-		//struct scsi_mpath_device *scsi_mpath_dev;
-		//struct scsi_device *sdev;
-
-		//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-		//sdev = scsi_mpath_dev->sdev;
-
-		if (special) {
-		//	pr_err("%s2 bio=%pS bio->bi_bdev=%pS bio->bi_bdev->bd_disk=%pS bio->bi_bdev->bd_disk->part0=%pS mpath_disk=%pS mpath_dev=%pS\n",
-		//		__func__, bio, bio->bi_bdev, bio->bi_bdev->bd_disk, bio->bi_bdev->bd_disk->part0, scsi_mpath_disk, scsi_mpath_dev);
-			
-		//	pr_err("%s2.1 bio=%pS sdev=%pS request_queue=%pS request_queue=%pS\n",
-		//		__func__, bio, sdev, sdev->request_queue, sdev->request_queue);
-		//	pr_err("%s2.2 bio=%pS sdev=%pS request_queue=%pS request_queue->disk=%pS\n",
-		//		__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk);
-		//	pr_err("%s2.3 bio=%pS sdev=%pS request_queue=%pS request_queue->disk->part0=%pS\n",
-		//		__func__, bio, sdev, sdev->request_queue, sdev->request_queue->disk->part0);
-		}
-
 		bio_set_dev(bio, mpath_device->gd->part0);
 		bio->bi_opf |= REQ_MPATH;
 		atomic_inc(&mpath_device->nr_total);

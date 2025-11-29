@@ -9,12 +9,6 @@ config SENSORS_LIS3LV02D
 	tristate
 	depends on INPUT
 
-
-config LIBMULTIPATH
-	tristate "MULTIPATH LIBRARY"
-	help
-	  If you say yes here
-
 config AD525X_DPOT
 	tristate "Analog Devices Digital Potentiometers"
 	depends on (I2C || SPI) && SYSFS

@@ -646,3 +646,8 @@ config UNION_FIND
 
 config MIN_HEAP
 	bool
+
+config LIBMULTIPATH
+	tristate "MULTIPATH LIBRARY"
+	help
+	  If you say yes here
