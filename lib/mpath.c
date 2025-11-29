@@ -720,8 +720,11 @@ const struct attribute_group mpath_attr_group = {
 	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
 };
 
-EXPORT_SYMBOL_GPL(mpath_attr_group);
-
+const struct attribute_group *mpath_device_groups[] = {
+	&mpath_attr_group,
+	NULL
+};
+EXPORT_SYMBOL_GPL(mpath_device_groups);
 
 static int __init mpath_init(void)
 {

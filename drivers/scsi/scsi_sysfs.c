@@ -1198,11 +1198,6 @@ sdev_show_preferred_path(struct device *dev,
 static DEVICE_ATTR(preferred_path, S_IRUGO, sdev_show_preferred_path, NULL);
 #endif
 
-const struct attribute_group *scsi_device_groups[] = {
-	&mpath_attr_group,
-	NULL
-};
-
 static struct attribute *scsi_mpath_disk_attrs[] = {
 	&scsi_mpath_wwid.attr,
 	&mpath_iopolicy.attr,

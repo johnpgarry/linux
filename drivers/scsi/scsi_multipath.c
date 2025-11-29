@@ -521,7 +521,7 @@ void scsi_mpath_set_live(struct scsi_mpath_device *scsi_mpath_dev)
 
 	if (!test_and_set_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags)) {
 		pr_err("%s calling device_add_disk &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
-		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, scsi_device_groups);
+		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, mpath_device_groups);
 		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
 		if (ret) {
 			clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags);
