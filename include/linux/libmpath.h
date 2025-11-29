@@ -46,6 +46,7 @@ struct mpath_disk {
 	unsigned long           flags;		/* flag for multipath devices*/
 
 	struct work_struct	partition_scan_work;
+	struct mutex            lock;
 
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
@@ -85,6 +86,7 @@ void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 void multipath_partition_scan_work(struct work_struct *work);
 void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
+void mpath_set_live(struct mpath_device *mpath_device);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
