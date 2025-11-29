@@ -126,8 +126,6 @@ struct scsi_mpath_disk {
 	unsigned long           flags;		/* flag for multipath devices*/
 	char wwid[40];
 
-	struct cdev		cdev;
-	struct device		cdev_device;
 	struct mpath_disk mpath_disk;
 };
 

@@ -568,6 +568,123 @@ const struct block_device_operations mpath_ops = {
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 
+static int mpath_generic_chr_open(struct inode *inode, struct file *file)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct mpath_disk *mpath_disk = container_of(cdev, struct mpath_disk, cdev);
+
+	pr_err("%s cdev=%pS mpath_disk=%pS\n", __func__, cdev, mpath_disk);
+
+	return mpath_get_disk(mpath_disk);
+}
+
+static void mpath_free(struct kref *ref)
+{
+	struct mpath_disk *mpath_disk =
+		container_of(ref, struct mpath_disk, ref);
+	pr_err("%s mpath_disk=%pS\n", __func__, mpath_disk);
+}
+
+static int mpath_generic_chr_release(struct inode *inode, struct file *file)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct mpath_disk *mpath_disk = container_of(cdev, struct mpath_disk, cdev);
+
+	pr_err("%s cdev=%pS mpath_disk=%pS\n", __func__, cdev, mpath_disk);
+
+	kref_put(&mpath_disk->ref, mpath_free);
+	return 0;
+}
+
+static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
+		unsigned long arg)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct mpath_disk *mpath_disk = container_of(cdev, struct mpath_disk, cdev);
+	struct scsi_device *sdev;
+	struct mpath_device *mpath_device;
+	fmode_t mode = file->f_mode;
+	int srcu_idx, err;
+
+	pr_err("%s cdev=%pS cmd=0x%x arg=%ld mpath_disk=%pS\n",
+		__func__, cdev, cmd, arg, mpath_disk);
+
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	mpath_device = mpath_find_path(mpath_disk);
+	pr_err("%s1 cmd=0x%x arg=%ld mpath_disk=%pS called scsi_find_path srcu_idx=%d mpath_device=%pS\n",
+		__func__, cmd, arg, mpath_disk, srcu_idx, mpath_device);
+	if (!mpath_device)
+		goto out_unlock;
+	//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	//sdev = scsi_mpath_dev->sdev;
+	pr_err("%s2 cmd=0x%x arg=%ld sdev=%pS\n", __func__, cmd, arg, sdev);
+
+//	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO)) {
+//		err = -ENOIOCTLCMD;
+//		goto out_unlock;
+//	}
+
+	/*
+	 * If we are in the middle of error recovery, don't let anyone
+	 * else try and use this device.  Also, if error recovery fails, it
+	 * may try and take the device offline, in which case all further
+	 * access to the device is prohibited.
+	 */
+	err = mpath_disk->ioctl(mpath_device, mode, cmd, arg);
+
+out_unlock:
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+	return err;
+}
+
+static void mpath_cdev_rel(struct device *dev)
+{
+	dev_err(dev, "%s\n", __func__);
+//	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
+}
+
+void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
+{
+	dev_err(cdev_device, "%s cdev=%pS calling cdev_device_del\n", __func__, cdev);
+	cdev_device_del(cdev, cdev_device);
+	dev_err(cdev_device, "%s2 calling put_device cdev_device=%pS\n", __func__, cdev_device);
+	put_device(cdev_device);
+}
+EXPORT_SYMBOL_GPL(mpath_cdev_del);
+
+static const struct file_operations mpath_generic_chr_fops = {
+	.owner		= THIS_MODULE,
+	.open		= mpath_generic_chr_open,
+	.release	= mpath_generic_chr_release,
+	.unlocked_ioctl	= mpath_generic_chr_ioctl,
+	.compat_ioctl	= compat_ptr_ioctl,
+};
+
+int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
+{
+	int ret, minor = 0 /*mpath_disk->index*/;
+
+	mpath_disk->cdev_device.parent = &mpath_disk->dev;
+	ret = dev_set_name(&mpath_disk->cdev_device, "smpg%d",
+						minor);
+	pr_err("%s called dev_set_name ret=%d\n", __func__, ret);
+	if (ret)
+		return ret;
+
+	//mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), minor);
+	//mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
+	mpath_disk->cdev_device.release = mpath_cdev_rel;
+	device_initialize(&mpath_disk->cdev_device);
+	cdev_init(&mpath_disk->cdev, &mpath_generic_chr_fops);
+	mpath_disk->cdev.owner = THIS_MODULE;
+	ret = cdev_device_add(&mpath_disk->cdev, &mpath_disk->cdev_device);
+	pr_err("%s1 called cdev_device_add ret=%d\n", __func__, ret);
+	if (ret)
+		put_device(&mpath_disk->cdev_device);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mpath_disk_add_cdev);
+
 static struct attribute dummy_attr = {
 	.name = "dummy",
 };
