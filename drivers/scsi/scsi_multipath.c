@@ -29,7 +29,7 @@ static DEFINE_IDA(sd_mpath_index_ida);
 
 static dev_t scsi_mpath_disk_major;
 static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev);
-static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk);
+static void scsi_mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
 struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk);
 static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *scsi_mpath_dev);
 
@@ -536,7 +536,7 @@ void scsi_mpath_set_live(struct scsi_mpath_device *scsi_mpath_dev)
 
 	pr_info("Attached SCSI %s disk calling scsi_mpath_add_sysfs_link\n", "fixme");
 
-	scsi_mpath_add_sysfs_link(scsi_mpath_disk);
+	scsi_mpath_add_sysfs_link(mpath_disk);
 
 	mutex_lock(&scsi_mpath_disk->lock);
 	if (scsi_mpath_is_optimized(mpath_device)) {
@@ -780,19 +780,17 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 	return NULL;
 }
 
-static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
+static void scsi_mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
 {
 	__maybe_unused struct device *target;
 	__maybe_unused int rc, srcu_idx;
 	struct kobject *mpath_gd_kobj;
-	struct scsi_device *sdev;
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
 	struct device *mpath_disk_dev = &mpath_disk->dev;
 	struct kobject *mpath_device_kobj;
 	struct mpath_device *mpath_device;
 
 	pr_err("%s mpath_disk=%pS GD_ADDED=%d\n",
-		__func__, scsi_mpath_disk, test_bit(GD_ADDED, &mpath_disk->gd->state));
+		__func__, mpath_disk, test_bit(GD_ADDED, &mpath_disk->gd->state));
 	dev_err(mpath_disk_dev, "%s2\n", __func__);
 	pr_err("%s3 mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
 	/*
@@ -811,27 +809,29 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 	list_for_each_entry_srcu(mpath_device, &mpath_disk->dev_list, siblings,
 				 srcu_read_lock_held(&mpath_disk->srcu)) {
 		struct device *sdev_gendev;
-		struct scsi_mpath_device *scsi_mpath_dev;
+		//struct scsi_mpath_device *scsi_mpath_dev;
 
 		pr_err("%s5 mpath_device=%pS\n", __func__, mpath_device);
 		if (!mpath_device)
 			continue;
-		scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-		pr_err("%s5.1 mpath_dev=%pS mpath_dev->sdev=%pS\n", __func__, scsi_mpath_dev, scsi_mpath_dev->sdev);
-		if (!scsi_mpath_dev->sdev)
-			continue;
-		sdev = scsi_mpath_dev->sdev;
-		sdev_gendev = &sdev->sdev_gendev;
+		//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+		pr_err("%s5.1 mpath_device=%pS mpath_dev->sdev=%pS\n", __func__, mpath_device, NULL);
+	//	if (!scsi_mpath_dev->sdev)
+//			continue;
+	//	sdev = scsi_mpath_dev->sdev;
+		sdev_gendev = NULL;//&sdev->sdev_gendev; fixme
 		/*
 		 * Ensure that ns path disk node is already added otherwise we
 		 * may get invalid kobj name for target
 		 */
-		dev_err(sdev_gendev, "%s6 itering mpath_dev=%pS sdev=%pS\n", __func__, scsi_mpath_dev, sdev);
-		pr_err("%s6.1 itering mpath_dev=%pS sdev->request_queue=%pS\n", __func__, scsi_mpath_dev, sdev->request_queue);
-		if (!sdev->request_queue)
-			continue;
-		pr_err("%s6.2 itering mpath_dev=%pS mpath_device->gd=%pS checking GD_ADDED=%d\n",
-			__func__, scsi_mpath_dev, mpath_device->gd,
+		dev_err(sdev_gendev, "%s6 itering mpath_device=%pS sdev=%pS\n",
+			__func__, mpath_device, NULL);
+		pr_err("%s6.1 itering mpath_device=%pS sdev->request_queue=%pS\n",
+			__func__, mpath_device, NULL);
+	//	if (!sdev->request_queue)
+	//		continue;
+		pr_err("%s6.2 itering mpath_device=%pS mpath_device->gd=%pS checking GD_ADDED=%d\n",
+			__func__, mpath_device, mpath_device->gd,
 			test_bit(GD_ADDED, &mpath_device->gd->state));
 		if (!test_bit(GD_ADDED, &mpath_device->gd->state))
 			continue;
@@ -848,18 +848,18 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 		 * The test_and_set_bit() is used because it is protecting
 		 * against multiple nvme paths being simultaneously added.
 		 */
-		pr_err("%s6.3 itering mpath_dev=%pS mpath_device->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
-			__func__, scsi_mpath_dev, mpath_device->gd,
+		pr_err("%s6.3 itering mpath_device=%pS mpath_device->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
+			__func__, mpath_device, mpath_device->gd,
 			test_bit(GD_ADDED, &mpath_device->gd->state),
 			test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags));
 		if (test_and_set_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
 			continue;
 
-		pr_err("%s7.3 itering scsi_mpath_dev=%pS mpath_device->gd=%pS\n",
-			__func__, scsi_mpath_dev, mpath_device->gd);
+		pr_err("%s7.3 itering mpath_device=%pS mpath_device->gd=%pS\n",
+			__func__, mpath_device, mpath_device->gd);
 		target = disk_to_dev(mpath_device->gd);
-		pr_err("%s7.4 itering scsi_mpath_dev=%pS mpath_device->gd=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
-			__func__, scsi_mpath_dev, mpath_device->gd, target, "multipath");
+		pr_err("%s7.4 itering mpath_device=%pS mpath_device->gd=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
+			__func__, mpath_device, mpath_device->gd, target, "multipath");
 		/*
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
@@ -875,10 +875,10 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 		//	clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags);
 		}
 
-		rc = sysfs_create_link(mpath_device_kobj, &sdev_gendev->kobj,
-				dev_name(sdev_gendev));
+		rc = sysfs_create_link(mpath_device_kobj, NULL/* &sdev_gendev->kobj*/,
+				""/*dev_name(sdev_gendev)*/);
 		pr_err("%s7.6 called sysfs_create_link for mpath_device_kobj=%pS rc=%d &sdev_gendev->kobj=%pS dev_name(sdev_gendev)=%s\n",
-			__func__, mpath_device_kobj, rc, &sdev_gendev->kobj, dev_name(sdev_gendev));
+			__func__, mpath_device_kobj, rc, NULL /*&sdev_gendev->kobj*/, ""/*dev_name(sdev_gendev)*/);
 		if (unlikely(rc)) {
 			dev_err(disk_to_dev(mpath_disk->gd),
 					"failed to create link to %s rc=%d\n",
