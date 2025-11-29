@@ -253,17 +253,6 @@ void scsi_mpath_kick_requeue_lists(struct Scsi_Host *shost)
 }
 #endif
 
-static bool scsi_mpath_state_is_live(enum mpath_access_state state)
-{
-	switch (state) {
-	case MPATH_STATE_OPTIMAL:
-	case MPATH_STATE_ACTIVE:
-		return true;
-	default:
-		return false;
-	}
-}
-
 static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 {
 //	enum scsi_device_state sdev_state = sdev->sdev_state;
@@ -272,7 +261,7 @@ static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 	 * if device multipath state is not set to LIVE
 	 * then return true
 	 */
-	if (!scsi_mpath_state_is_live(mpath_device->state))
+	if (!mpath_device_is_live(mpath_device))
 		return true;
 
 	/*
@@ -560,9 +549,9 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	if (retry)
 		set_bit(SCSI_MPATH_DEVICE_IO_PENDING, &scsi_mpath_dev->flags);
 
-        if (scsi_mpath_state_is_live(mpath_device->state)) {
+        if (mpath_device_is_live(mpath_device)) {
 			pr_err("%s calling scsi_mpath_set_live\n", __func__);
-			scsi_mpath_set_live(scsi_mpath_dev);
+			mpath_device_set_live(mpath_device);
         }
 }
 
@@ -755,24 +744,6 @@ void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_shutdown_disk);
 
-void scsi_mpath_add_disk(struct scsi_device *sdev)
-{
-	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
-	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	pr_err("%s mpath_dev=%pS\n", __func__, scsi_mpath_dev);
-
-	pr_err("%s1 mpath_disk=%pS\n", __func__, scsi_mpath_disk);
-
-	if (scsi_mpath_state_is_live(mpath_device->state)) {
-		mpath_device->state = MPATH_STATE_OPTIMAL;
-		pr_err("%s calling scsi_mpath_set_live\n", __func__);
-		scsi_mpath_set_live(scsi_mpath_dev);
-	}
-}
-EXPORT_SYMBOL_GPL(scsi_mpath_add_disk);
-
 #ifdef dsdsd
 void scsi_mpath_put_disk(struct nvme_ns_head *head)
 {
@@ -786,83 +757,6 @@ void scsi_mpath_put_disk(struct nvme_ns_head *head)
 }
 
 #endif
-
-void scsi_mpath_remove_disk(struct scsi_device *sdev)
-{
-	bool last_path = false;
-	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	struct mpath_device *mpath_device;
-	struct mpath_disk *mpath_disk;
-	struct scsi_mpath_disk *scsi_mpath_disk;
-	
-	dev_err(&sdev->sdev_gendev, "%s scsi_mpath_dev=%pS\n", __func__, scsi_mpath_dev);
-
-	if (!sdev->scsi_mpath_dev)
-		return;
-	mpath_device = &scsi_mpath_dev->mpath_device;
-	mpath_disk = mpath_device->mpath_disk;
-	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-
-	dev_err(&sdev->sdev_gendev, "%s1 scsi_mpath_dev=%pS calling mpath_remove_sysfs_link\n",
-		__func__, scsi_mpath_dev);
-	mpath_remove_sysfs_link(mpath_device);
-
-	synchronize_srcu(&mpath_disk->srcu);
-
-	/* wait for concurrent submissions */
-	if (mpath_clear_current_path(mpath_device))
-		synchronize_srcu(&mpath_disk->srcu);
-
-	dev_err(&sdev->sdev_gendev, "%s2 scsi_mpath_dev=%pS called scsi_mpath_remove_sysfs_link\n",
-		__func__, scsi_mpath_dev);
-//	put_disk(sdev->scsi_mpath_dev->scsi_mpath_disk->gd);
-//	if (!sdev->is_shared)
-//		return;
-
-	/* Make sure All pending bio's are cleaned up */
-	kblockd_schedule_work(&mpath_disk->requeue_work);
-	flush_work(&mpath_disk->requeue_work);
-	//put_disk(sdev->scsi_mpath_dev);
-
-	mutex_lock(&mpath_disk->lock);
-	
-	list_del_rcu(&mpath_device->siblings);
-	dev_err(&sdev->sdev_gendev, "%s3 list_empty=%d\n", __func__, list_empty(&mpath_disk->dev_list));
-	if (list_empty(&mpath_disk->dev_list)) {
-//		if (!nvme_mpath_queue_if_no_path(ns->head))
-//			list_del_init(&ns->head->entry);
-		last_path = true;
-	}
-	mutex_unlock(&mpath_disk->lock);
-
-	dev_err(&sdev->sdev_gendev, "%s4 last_path=%d\n",
-		__func__, last_path);
-
-	if (last_path) {
-		dev_err(&sdev->sdev_gendev, "%s5 MPATH_DISK_LIVE set=%d\n",
-			__func__, test_bit(MPATH_DISK_LIVE, &mpath_disk->flags));
-		if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_disk->flags)) {
-			/*
-			 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
-			 * to allow multipath to fail all I/O.
-			 */
-		//	kblockd_schedule_work(&head->requeue_work);
-
-			mpath_cdev_del(&mpath_disk->cdev, &mpath_disk->cdev_device);
-			synchronize_srcu(&mpath_disk->srcu);
-			dev_err(&sdev->sdev_gendev, "%s5.1 not calling device_del\n", __func__);
-		//	device_del(&scsi_mpath_disk->dev);
-			dev_err(&sdev->sdev_gendev, "%s5.2 calling del_gendisk\n", __func__);
-			del_gendisk(mpath_disk->gd);
-		}
-		dev_err(&sdev->sdev_gendev, "%s6 calling put_disk on mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
-		
-	}
-	mpath_put_disk(mpath_disk);
-
-	dev_err(&sdev->sdev_gendev, "%s10 mpath_dev=%pS\n", __func__, sdev->scsi_mpath_dev);
-}
-EXPORT_SYMBOL_GPL(scsi_mpath_remove_disk);
 
 __maybe_unused static void scsi_mpath_alua_activate_done(void *data, int errors)
 {
