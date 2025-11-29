@@ -1198,43 +1198,8 @@ sdev_show_preferred_path(struct device *dev,
 static DEVICE_ATTR(preferred_path, S_IRUGO, sdev_show_preferred_path, NULL);
 #endif
 
-static struct attribute dummy_attr = {
-	.name = "dummy",
-};
-
-static struct attribute *scsi_mpath_attrs[] = {
-	&dummy_attr,
-	NULL
-};
-
-static bool multipath_sysfs_group_visible(struct kobject *kobj)
-{
-	struct device *dev = container_of(kobj, struct device, kobj);
-	struct gendisk *disk = dev_to_disk(dev);
-
-	dev_err(dev, "%s dev=%pS disk=%pS fops=%pS\n", __func__, dev, disk, disk->fops);
-	return scsi_disk_is_multipath(disk);
-}
-
-static bool multipath_sysfs_attr_visible(struct kobject *kobj,
-		struct attribute *attr, int n)
-{
-	struct device *dev = container_of(kobj, struct device, kobj);
-
-	dev_err(dev, "%s dev=%pS\n", __func__, dev);
-	return false;
-}
-
-DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
-
-const struct attribute_group scsi_mpath_attr_group = {
-	.name           = "multipath",
-	.attrs		= scsi_mpath_attrs,
-	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
-};
-
 const struct attribute_group *scsi_device_groups[] = {
-	&scsi_mpath_attr_group,
+	&mpath_attr_group,
 	NULL
 };
 

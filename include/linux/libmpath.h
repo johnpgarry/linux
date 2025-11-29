@@ -67,5 +67,6 @@ int mpath_get_disk(struct mpath_disk *mpath_disk);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
+extern const struct attribute_group mpath_attr_group;
 
 #endif // _LIBMULTIPATH_H

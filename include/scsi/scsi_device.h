@@ -383,11 +383,6 @@ static inline bool scsi_sdev_use_alua(struct scsi_device *sdev)
 	return sdev->handler_data != NULL;
 }
 
-static inline bool scsi_disk_is_multipath(struct gendisk *disk)
-{
-	return disk->fops == &mpath_ops;
-}
-
 static inline bool scsi_mpath_enabled(void)
 {
 	return IS_ENABLED(CONFIG_SCSI_MULTIPATH) && scsi_multipath;
@@ -398,10 +393,6 @@ static inline bool scsi_is_sdev_multipath(struct scsi_device *sdev)
 }
 #else
 #define scsi_multipath	false;
-static inline bool scsi_disk_is_multipath(struct gendisk *disk)
-{
-	return false;
-}
 static inline bool scsi_mpath_enabled(void)
 {
 	return false;
