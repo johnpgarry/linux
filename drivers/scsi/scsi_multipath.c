@@ -29,9 +29,9 @@ static DEFINE_IDA(sd_mpath_index_ida);
 
 static dev_t scsi_mpath_disk_major;
 static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev);
-static void scsi_mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
+static void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
 struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk);
-static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *scsi_mpath_dev);
+static void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
@@ -534,9 +534,9 @@ void scsi_mpath_set_live(struct scsi_mpath_device *scsi_mpath_dev)
 		kblockd_schedule_work(&mpath_disk->partition_scan_work);
 	}
 
-	pr_info("Attached SCSI %s disk calling scsi_mpath_add_sysfs_link\n", "fixme");
+	pr_info("Attached SCSI %s disk calling mpath_add_sysfs_link\n", "fixme");
 
-	scsi_mpath_add_sysfs_link(mpath_disk);
+	mpath_add_sysfs_link(mpath_disk);
 
 	mutex_lock(&scsi_mpath_disk->lock);
 	if (scsi_mpath_is_optimized(mpath_device)) {
@@ -780,7 +780,7 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 	return NULL;
 }
 
-static void scsi_mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
+static void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
 {
 	__maybe_unused struct device *target;
 	__maybe_unused int rc, srcu_idx;
@@ -891,11 +891,10 @@ static void scsi_mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
 	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 }
 
-static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *scsi_mpath_dev)
+static void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 {
 	struct device *target;
 	struct kobject *mpath_gd_kobj;
-	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
 	struct device *sdev_gendev;
 	struct scsi_device *sdev;
@@ -920,10 +919,10 @@ static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *scsi_mpath_de
 	pr_err("%s3 calling sysfs_delete_link mpath_gd_kobj=%pS dev_name(target)=%s\n",
 		__func__, mpath_gd_kobj, dev_name(target));
 
-	sdev = scsi_mpath_dev->sdev;
-	sdev_gendev = &sdev->sdev_gendev;
-	sysfs_delete_link(mpath_device_kobj, &sdev_gendev->kobj,
-			dev_name(sdev_gendev));
+	sdev = NULL;//scsi_mpath_dev->sdev;
+	sdev_gendev = NULL;//&sdev->sdev_gendev;
+	sysfs_delete_link(mpath_device_kobj, NULL /*&sdev_gendev->kobj*/,
+			""/*dev_name(sdev_gendev)*/);
 
 	clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
 }
@@ -999,9 +998,9 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 	mpath_disk = mpath_device->mpath_disk;
 	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 
-	dev_err(&sdev->sdev_gendev, "%s1 scsi_mpath_dev=%pS calling scsi_mpath_remove_sysfs_link\n",
+	dev_err(&sdev->sdev_gendev, "%s1 scsi_mpath_dev=%pS calling mpath_remove_sysfs_link\n",
 		__func__, scsi_mpath_dev);
-	scsi_mpath_remove_sysfs_link(sdev->scsi_mpath_dev);
+	mpath_remove_sysfs_link(mpath_device);
 
 	synchronize_srcu(&mpath_disk->srcu);
 
