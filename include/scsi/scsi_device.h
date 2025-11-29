@@ -108,7 +108,6 @@ struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
 
 struct scsi_mpath_disk {
-	struct mutex            lock;
 	unsigned long		start_time;
 	struct delayed_work	activate; /* Path Activation work */
 	//struct device		dev;

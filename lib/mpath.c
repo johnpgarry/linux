@@ -185,6 +185,48 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
 
+void mpath_set_live(struct mpath_device *mpath_device)
+{
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	int ret;
+
+	pr_err("%s disk=%pS MPATH_DISK_LIVE=%d\n",
+		__func__, mpath_disk, test_bit(MPATH_DISK_LIVE, &mpath_disk->flags));
+
+	if (!test_and_set_bit(MPATH_DISK_LIVE, &mpath_disk->flags)) {
+		pr_err("%s calling device_add_disk &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
+		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, mpath_device_groups);
+		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
+		if (ret) {
+			clear_bit(MPATH_DISK_LIVE, &mpath_disk->flags);
+			return;
+		}
+		pr_err("%s2 calling scsi_mpath_disk_add_cdev partition_scan_work\n", __func__);
+		mpath_disk_add_cdev(mpath_disk);
+		pr_err("%s3 calling kblockd_schedule_work partition_scan_work\n", __func__);
+		kblockd_schedule_work(&mpath_disk->partition_scan_work);
+	}
+
+	pr_info("Attached SCSI %s disk calling mpath_add_sysfs_link\n", "fixme");
+
+	mpath_add_sysfs_link(mpath_disk);
+
+	mutex_lock(&mpath_disk->lock);
+	if (mpath_disk->is_optimized(mpath_device)) { //checkme is proper CB
+		int node, srcu_idx;
+
+		srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+		for_each_online_node(node)
+			__mpath_find_path(mpath_disk, node);
+		srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+	}
+	mutex_unlock(&mpath_disk->lock);
+
+	synchronize_srcu(&mpath_disk->srcu);
+	kblockd_schedule_work(&mpath_disk->requeue_work);
+}
+EXPORT_SYMBOL_GPL(mpath_set_live);
+
 
 bool mpath_clear_current_path(struct mpath_device *mpath_device)
 {

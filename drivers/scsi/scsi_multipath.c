@@ -29,7 +29,6 @@ static DEFINE_IDA(sd_mpath_index_ida);
 
 static dev_t scsi_mpath_disk_major;
 static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev);
-struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk);
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
@@ -414,9 +413,9 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s4.1 called scsi_mpath_find_disk sdev=%pS mpath_disk=%pS\n", __func__, sdev, scsi_mpath_disk);
 	if (scsi_mpath_disk) {
 		mpath_disk = &scsi_mpath_disk->mpath_disk;
-		mutex_lock(&scsi_mpath_disk->lock);
+		mutex_lock(&mpath_disk->lock);
 		list_add_tail(&mpath_device->siblings, &mpath_disk->dev_list);
-		mutex_unlock(&scsi_mpath_disk->lock);
+		mutex_unlock(&mpath_disk->lock);
 		mpath_device->mpath_disk = mpath_disk;
 		return 0;
 	}
@@ -442,7 +441,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	INIT_LIST_HEAD(&mpath_disk->dev_list);
 	INIT_WORK(&mpath_disk->partition_scan_work, multipath_partition_scan_work);
 	pr_err("%s6\n", __func__);
-	mutex_init(&scsi_mpath_disk->lock);
+	mutex_init(&mpath_disk->lock);
 	kref_init(&mpath_disk->ref);
 
 	mpath_disk->dev.class = &scsi_mpath_disk_class;
@@ -507,51 +506,6 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_alloc_disk);
-
-void scsi_mpath_set_live(struct scsi_mpath_device *scsi_mpath_dev)
-{
-	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
-	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	int ret;
-
-	pr_err("%s mpath_disk=%pS MPATH_DISK_LIVE=%d\n",
-		__func__, scsi_mpath_disk, test_bit(MPATH_DISK_LIVE, &mpath_disk->flags));
-
-	if (!test_and_set_bit(MPATH_DISK_LIVE, &mpath_disk->flags)) {
-		pr_err("%s calling device_add_disk &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
-		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, mpath_device_groups);
-		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
-		if (ret) {
-			clear_bit(MPATH_DISK_LIVE, &mpath_disk->flags);
-			return;
-		}
-		pr_err("%s2 calling scsi_mpath_disk_add_cdev partition_scan_work\n", __func__);
-		mpath_disk_add_cdev(mpath_disk);
-		pr_err("%s3 calling kblockd_schedule_work partition_scan_work\n", __func__);
-		kblockd_schedule_work(&mpath_disk->partition_scan_work);
-	}
-
-	pr_info("Attached SCSI %s disk calling mpath_add_sysfs_link\n", "fixme");
-
-	mpath_add_sysfs_link(mpath_disk);
-
-	mutex_lock(&scsi_mpath_disk->lock);
-	if (scsi_mpath_is_optimized(mpath_device)) {
-		int node, srcu_idx;
-
-		srcu_idx = srcu_read_lock(&mpath_disk->srcu);
-		for_each_online_node(node)
-			__mpath_find_path(mpath_disk, node);
-		srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
-	}
-	mutex_unlock(&scsi_mpath_disk->lock);
-
-	#if 0
-	synchronize_srcu(&mpath_disk->srcu);
-	kblockd_schedule_work(&mpath_disk->requeue_lock);
-	#endif
-}
 
 /**
  * Callback function for activating multipath devices
@@ -870,7 +824,7 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 	flush_work(&mpath_disk->requeue_work);
 	//put_disk(sdev->scsi_mpath_dev);
 
-	mutex_lock(&scsi_mpath_disk->lock);
+	mutex_lock(&mpath_disk->lock);
 	
 	list_del_rcu(&mpath_device->siblings);
 	dev_err(&sdev->sdev_gendev, "%s3 list_empty=%d\n", __func__, list_empty(&mpath_disk->dev_list));
@@ -879,7 +833,7 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 //			list_del_init(&ns->head->entry);
 		last_path = true;
 	}
-	mutex_unlock(&scsi_mpath_disk->lock);
+	mutex_unlock(&mpath_disk->lock);
 
 	dev_err(&sdev->sdev_gendev, "%s4 last_path=%d\n",
 		__func__, last_path);
