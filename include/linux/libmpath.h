@@ -83,6 +83,8 @@ int mpath_get_disk(struct mpath_disk *mpath_disk);
 int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 void multipath_partition_scan_work(struct work_struct *work);
+void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
+void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
