@@ -80,7 +80,7 @@ struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node)
 	list_for_each_entry_rcu(mpath_device, &mpath_disk->dev_list, siblings) {
 	//	pr_err("%s1 itering mpath_disk=%pS mpath_dev=%pS disabled=%d\n",
 	//		__func__, scsi_mpath_disk, scsi_mpath_dev, scsi_mpath_is_disabled(scsi_mpath_dev->sdev));
-		if (mpath_disk->mpath_is_disabled(mpath_device))
+		if (mpath_disk->is_disabled(mpath_device))
 			continue;
 
 		if (mpath_device->numa_node != NUMA_NO_NODE &&
@@ -140,7 +140,7 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk
 		return __mpath_find_path(mpath_disk, node);
 
 	if (list_is_singular(&mpath_disk->dev_list)) {
-		if(mpath_disk->mpath_is_disabled(mpath_device))
+		if(mpath_disk->is_disabled(mpath_device))
 			return NULL;
 		return old;
 	}
@@ -149,7 +149,7 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk
 	    mpath_device && mpath_device != old;
 	    mpath_device = mpath_next_dev(mpath_disk, mpath_device)) {
 
-		if (mpath_disk->mpath_is_disabled(mpath_device))
+		if (mpath_disk->is_disabled(mpath_device))
 			continue;
 		if (mpath_device->state == MPATH_STATE_OPTIMAL) {
 			found = mpath_device;
@@ -160,7 +160,7 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk
 	}
 
 //	scsi_mpath_dev = to_scsi_mpath_device(old);
-	if (!mpath_disk->mpath_is_disabled(mpath_device) &&
+	if (!mpath_disk->is_disabled(mpath_device) &&
 	    (mpath_device->state == MPATH_STATE_OPTIMAL ||
 	    (!found && mpath_device->state == MPATH_STATE_ACTIVE)))
 		return old;
@@ -308,7 +308,7 @@ static struct mpath_device *mpath_numa_path(struct mpath_disk *mpath_disk)
 		return __mpath_find_path(mpath_disk, node);
 	//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	pr_err_once("%s1 mpath_disk=%pS mpath_device=%pS\n", __func__, mpath_disk, mpath_device);
-	if (unlikely(!mpath_disk->mpath_is_optimized(mpath_device)))
+	if (unlikely(!mpath_disk->is_optimized(mpath_device)))
 		return __mpath_find_path(mpath_disk, node);
 	return mpath_device;
 }
@@ -533,13 +533,30 @@ static void mpath_release(struct gendisk *disk)
 	kref_put(&mpath_disk->ref, mpath_free_disk);
 }
 
+
+static int mpath_get_unique_id(struct gendisk *disk, u8 id[16],
+    enum blk_unique_id type)
+{
+	struct mpath_disk *mpath_disk = disk->private_data;
+	int srcu_idx, ret = -EWOULDBLOCK;
+	struct mpath_device *mpath_device;
+
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	mpath_device = mpath_find_path(mpath_disk);
+	if (mpath_device)
+		ret = mpath_disk->get_unique_id(mpath_device, id, type);
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+
+	return ret;
+}
+
 const struct block_device_operations mpath_ops = {
 	.owner          = THIS_MODULE,
 	.submit_bio	= multipath_submit_bio,
 	.open		= mpath_open,
 	.release	= mpath_release,
-//	.ioctl			= scsi_mpath_ioctl,
-//	.get_unique_id	= scsi_mpath_get_unique_id,
+//	.ioctl			= mpath_ioctl,
+	.get_unique_id	= mpath_get_unique_id,
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 

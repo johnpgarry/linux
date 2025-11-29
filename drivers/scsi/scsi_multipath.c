@@ -473,25 +473,6 @@ out_unlock:
 	return err;
 }
 
-static __maybe_unused int scsi_mpath_get_unique_id(struct gendisk *disk, u8 id[16],
-    enum blk_unique_id type)
-{
-	struct mpath_disk *mpath_disk = disk->private_data;
-	__maybe_unused struct scsi_device *sdev;
-	int srcu_idx, ret = -EWOULDBLOCK;
-	struct mpath_device *mpath_device;
-
-	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
-	mpath_device = mpath_find_path(mpath_disk);
-	if (mpath_device) {
-		struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-		ret = scsi_mpath_unique_id(scsi_mpath_dev->sdev, id, type);
-	}
-	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
-
-	return ret;
-}
-
 static void scsi_multipath_partition_scan_work(struct work_struct *work)
 {
 	struct scsi_mpath_disk *scsi_mpath_disk =
@@ -515,6 +496,13 @@ static __maybe_unused void scsi_mpath_disk_release(struct device *dev)
 {
 	struct mpath_disk *mpath_disk = container_of(dev, struct mpath_disk, dev);
 	dev_err(dev, "%s dev=%pS mpath_disk=%pS\n", __func__, dev, mpath_disk);
+}
+
+static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16],
+	enum blk_unique_id type)
+{
+
+	return 0;
 }
 
 /*
@@ -589,8 +577,9 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		return -ENOMEM;
 	mpath_disk = &scsi_mpath_disk->mpath_disk;
 	mpath_device->mpath_disk = mpath_disk;
-	mpath_disk->mpath_is_disabled = scsi_mpath_is_disabled;
-	mpath_disk->mpath_is_optimized = scsi_mpath_is_optimized;
+	mpath_disk->is_disabled = scsi_mpath_is_disabled;
+	mpath_disk->is_optimized = scsi_mpath_is_optimized;
+	mpath_disk->get_unique_id = scsi_mpath_get_unique_id;
 
 	scsi_mpath_disk->index = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
 
