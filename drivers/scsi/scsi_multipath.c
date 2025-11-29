@@ -21,6 +21,8 @@
 
 #include <linux/sysfs.h>
 
+#define SCSI_MPATH_DEVICE_IO_PENDING      0
+
 MODULE_IMPORT_NS("SCSI_DH_ALUA");
 
 static DEFINE_IDA(sd_mpath_index_ida);
@@ -161,7 +163,7 @@ void scsi_mpath_failover_req(struct request *req)
 		 * Set flag as pending and requeue bio for retry on
 		 * another path
 		 */
-		set_bit(SCSI_MPATH_DISK_IO_PENDING, &scsi_mpath_dev->flags);
+		set_bit(SCSI_MPATH_DEVICE_IO_PENDING, &scsi_mpath_dev->flags);
 		queue_work(shost->work_q, &mpath_disk->requeue_work);
 	}
 
@@ -327,11 +329,10 @@ static int scsi_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	return err;
 }
 
-static void scsi_multipath_partition_scan_work(struct work_struct *work)
+static __maybe_unused void scsi_multipath_partition_scan_work(struct work_struct *work)
 {
-	struct scsi_mpath_disk *scsi_mpath_disk =
-		container_of(work, struct scsi_mpath_disk, partition_scan_work);
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+	struct scsi_mpath_disk *scsi_mpath_disk = NULL;
+	struct mpath_disk *mpath_disk = NULL;
 
 	pr_err("%s scsi_mpath_disk=%pS GD_SUPPRESS_PART_SCAN=%d\n",
 		__func__, scsi_mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
@@ -441,7 +442,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	INIT_LIST_HEAD(&scsi_mpath_disk->entry);
 	INIT_LIST_HEAD(&mpath_disk->dev_list);
-	INIT_WORK(&scsi_mpath_disk->partition_scan_work, scsi_multipath_partition_scan_work);
+	INIT_WORK(&mpath_disk->partition_scan_work, multipath_partition_scan_work);
 	pr_err("%s6\n", __func__);
 	mutex_init(&scsi_mpath_disk->lock);
 	kref_init(&mpath_disk->ref);
@@ -516,21 +517,21 @@ void scsi_mpath_set_live(struct scsi_mpath_device *scsi_mpath_dev)
 	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	int ret;
 
-	pr_err("%s mpath_disk=%pS SCSI_MPATH_DISK_LIVE=%d\n",
-		__func__, scsi_mpath_disk, test_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags));
+	pr_err("%s mpath_disk=%pS MPATH_DISK_LIVE=%d\n",
+		__func__, scsi_mpath_disk, test_bit(MPATH_DISK_LIVE, &mpath_disk->flags));
 
-	if (!test_and_set_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags)) {
+	if (!test_and_set_bit(MPATH_DISK_LIVE, &mpath_disk->flags)) {
 		pr_err("%s calling device_add_disk &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
 		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, mpath_device_groups);
 		pr_err("%s1 called device_add_disk ret=%d\n", __func__, ret);
 		if (ret) {
-			clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags);
+			clear_bit(MPATH_DISK_LIVE, &mpath_disk->flags);
 			return;
 		}
 		pr_err("%s2 calling scsi_mpath_disk_add_cdev partition_scan_work\n", __func__);
 		mpath_disk_add_cdev(mpath_disk);
 		pr_err("%s3 calling kblockd_schedule_work partition_scan_work\n", __func__);
-		kblockd_schedule_work(&scsi_mpath_disk->partition_scan_work);
+		kblockd_schedule_work(&mpath_disk->partition_scan_work);
 	}
 
 	pr_info("Attached SCSI %s disk calling scsi_mpath_add_sysfs_link\n", "fixme");
@@ -605,7 +606,7 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	}
 
 	if (retry)
-		set_bit(SCSI_MPATH_DISK_IO_PENDING, &scsi_mpath_dev->flags);
+		set_bit(SCSI_MPATH_DEVICE_IO_PENDING, &scsi_mpath_dev->flags);
 
         if (scsi_mpath_state_is_live(mpath_device->state)) {
 			pr_err("%s calling scsi_mpath_set_live\n", __func__);
@@ -850,8 +851,8 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 		pr_err("%s6.3 itering mpath_dev=%pS mpath_device->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
 			__func__, scsi_mpath_dev, mpath_device->gd,
 			test_bit(GD_ADDED, &mpath_device->gd->state),
-			test_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags));
-		if (test_and_set_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags))
+			test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags));
+		if (test_and_set_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
 			continue;
 
 		pr_err("%s7.3 itering scsi_mpath_dev=%pS mpath_device->gd=%pS\n",
@@ -882,7 +883,7 @@ static void scsi_mpath_add_sysfs_link(struct scsi_mpath_disk *scsi_mpath_disk)
 			dev_err(disk_to_dev(mpath_disk->gd),
 					"failed to create link to %s rc=%d\n",
 					dev_name(target), rc);
-			clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags);
+			clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
 		}
 
 	}
@@ -896,16 +897,15 @@ static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *scsi_mpath_de
 	struct kobject *mpath_gd_kobj;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
-	struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	struct device *sdev_gendev;
 	struct scsi_device *sdev;
 	struct device *mpath_disk_dev = &mpath_disk->dev;
 	struct kobject *mpath_device_kobj = &mpath_disk_dev->kobj;
 
-	pr_err("%s mpath_dev=%pS mpath_disk=%pS SCSI_MPATH_SYSFS_ATTR_LINK set=%d\n",
-		__func__, scsi_mpath_dev, scsi_mpath_disk,
-		test_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags));
-	if (!test_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags))
+	pr_err("%s mpath_device=%pS mpath_disk=%pS SCSI_MPATH_SYSFS_ATTR_LINK set=%d\n",
+		__func__, mpath_device, mpath_disk,
+		test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags));
+	if (!test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
 		return;
 
 	target = disk_to_dev(mpath_device->gd);
@@ -925,8 +925,7 @@ static void scsi_mpath_remove_sysfs_link(struct scsi_mpath_device *scsi_mpath_de
 	sysfs_delete_link(mpath_device_kobj, &sdev_gendev->kobj,
 			dev_name(sdev_gendev));
 
-	
-	clear_bit(SCSI_MPATH_SYSFS_ATTR_LINK, &scsi_mpath_dev->flags);
+	clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
 }
 
 void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
@@ -944,7 +943,7 @@ void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
 	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 
 	pr_err("%s clearing SCSI_MPATH_DISK_LIVE (if set) sdev=%pS\n", __func__, sdev);
-	if (test_and_clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags)) {
+	if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_disk->flags)) {
 		synchronize_srcu(&mpath_disk->srcu);
 		kblockd_schedule_work(&mpath_disk->requeue_work);
 	//	del_gendisk(sdev->scsi_mpath_dev);
@@ -1036,9 +1035,9 @@ void scsi_mpath_remove_disk(struct scsi_device *sdev)
 		__func__, last_path);
 
 	if (last_path) {
-		dev_err(&sdev->sdev_gendev, "%s5 SCSI_MPATH_DISK_LIVE set=%d\n",
-			__func__, test_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags));
-		if (test_and_clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_disk->flags)) {
+		dev_err(&sdev->sdev_gendev, "%s5 MPATH_DISK_LIVE set=%d\n",
+			__func__, test_bit(MPATH_DISK_LIVE, &mpath_disk->flags));
+		if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_disk->flags)) {
 			/*
 			 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
 			 * to allow multipath to fail all I/O.
