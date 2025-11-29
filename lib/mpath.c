@@ -65,6 +65,127 @@ void multipath_partition_scan_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(multipath_partition_scan_work);
 
+
+void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
+{
+	__maybe_unused struct device *target;
+	__maybe_unused int rc, srcu_idx;
+	struct kobject *mpath_gd_kobj;
+	struct device *mpath_disk_dev = &mpath_disk->dev;
+	struct kobject *mpath_device_kobj;
+	struct mpath_device *mpath_device;
+
+	pr_err("%s mpath_disk=%pS GD_ADDED=%d\n",
+		__func__, mpath_disk, test_bit(GD_ADDED, &mpath_disk->gd->state));
+	dev_err(mpath_disk_dev, "%s2\n", __func__);
+	pr_err("%s3 mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
+	/*
+	 * Ensure head disk node is already added otherwise we may get invalid
+	 * kobj for head disk node
+	 */
+	if (!test_bit(GD_ADDED, &mpath_disk->gd->state))
+		return;
+
+	mpath_gd_kobj = &disk_to_dev(mpath_disk->gd)->kobj;
+	mpath_device_kobj = &mpath_disk_dev->kobj;
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	pr_err("%s4 mpath_disk->gd=%pS srcu_idx=%d mpath_device_kobj=%pS\n",
+		__func__, mpath_disk->gd, srcu_idx, mpath_device_kobj);
+
+	list_for_each_entry_srcu(mpath_device, &mpath_disk->dev_list, siblings,
+				 srcu_read_lock_held(&mpath_disk->srcu)) {
+		pr_err("%s5 mpath_device=%pS\n", __func__, mpath_device);
+		if (!mpath_device)
+			continue;
+		//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+		pr_err("%s5.1 mpath_device=%pS mpath_dev->sdev=%pS\n", __func__, mpath_device, NULL);
+	//	if (!scsi_mpath_dev->sdev)
+//			continue;
+		/*
+		 * Ensure that ns path disk node is already added otherwise we
+		 * may get invalid kobj name for target
+		 */
+	//	if (!sdev->request_queue)
+	//		continue;
+		pr_err("%s6.2 itering mpath_device=%pS mpath_device->gd=%pS checking GD_ADDED=%d\n",
+			__func__, mpath_device, mpath_device->gd,
+			test_bit(GD_ADDED, &mpath_device->gd->state));
+		if (!test_bit(GD_ADDED, &mpath_device->gd->state))
+			continue;
+
+		/*
+		 * Avoid creating link if it already exists for the given path.
+		 * When path ana state transitions from optimized to non-
+		 * optimized or vice-versa, the nvme_mpath_set_live() is
+		 * invoked which in truns call this function. Now if the sysfs
+		 * link already exists for the given path and we attempt to re-
+		 * create the link then sysfs code would warn about it loudly.
+		 * So we evaluate NVME_NS_SYSFS_ATTR_LINK flag here to ensure
+		 * that we're not creating duplicate link.
+		 * The test_and_set_bit() is used because it is protecting
+		 * against multiple nvme paths being simultaneously added.
+		 */
+		pr_err("%s6.3 itering mpath_device=%pS mpath_device->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
+			__func__, mpath_device, mpath_device->gd,
+			test_bit(GD_ADDED, &mpath_device->gd->state),
+			test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags));
+		if (test_and_set_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
+			continue;
+
+		pr_err("%s7.3 itering mpath_device=%pS mpath_device->gd=%pS\n",
+			__func__, mpath_device, mpath_device->gd);
+		target = disk_to_dev(mpath_device->gd);
+		pr_err("%s7.4 itering mpath_device=%pS mpath_device->gd=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
+			__func__, mpath_device, mpath_device->gd, target, "multipath");
+		/*
+		 * Create sysfs link from head gendisk kobject @kobj to the
+		 * ns path gendisk kobject @target->kobj.
+		 */
+		rc = sysfs_add_link_to_group(mpath_gd_kobj, "multipath",
+				&target->kobj, dev_name(target));
+		pr_err("%s7.5 called sysfs_add_link_to_group rc=%d mpath_gd_kobj=%pS &target->kobj=%pS dev_name=%s\n",
+			__func__, rc, mpath_gd_kobj, &target->kobj, dev_name(target));
+		if (unlikely(rc)) {
+			dev_err(disk_to_dev(mpath_disk->gd),
+					"failed to create link to %s rc=%d\n",
+					dev_name(target), rc);
+			clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
+		}
+	}
+
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
+}
+EXPORT_SYMBOL_GPL(mpath_add_sysfs_link);
+
+void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
+{
+	struct device *target;
+	struct kobject *mpath_gd_kobj;
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+
+	pr_err("%s mpath_device=%pS mpath_disk=%pS SCSI_MPATH_SYSFS_ATTR_LINK set=%d\n",
+		__func__, mpath_device, mpath_disk,
+		test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags));
+	if (!test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
+		return;
+
+	target = disk_to_dev(mpath_device->gd);
+	mpath_gd_kobj = &disk_to_dev(mpath_disk->gd)->kobj;
+
+	pr_err("%s2 calling sysfs_remove_link_from_group mpath_gd_kobj=%pS dev_name(target)=%s\n",
+		__func__, mpath_gd_kobj, dev_name(target));
+
+	sysfs_remove_link_from_group(mpath_gd_kobj, "multipath",
+			dev_name(target));
+
+	pr_err("%s3 calling sysfs_delete_link mpath_gd_kobj=%pS dev_name(target)=%s\n",
+		__func__, mpath_gd_kobj, dev_name(target));
+
+	clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
+}
+EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
+
+
 bool mpath_clear_current_path(struct mpath_device *mpath_device)
 {
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
