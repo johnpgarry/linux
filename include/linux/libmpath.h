@@ -73,6 +73,6 @@ void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
-extern const struct attribute_group mpath_attr_group;
+extern const struct attribute_group *mpath_device_groups[];
 
 #endif // _LIBMULTIPATH_H
