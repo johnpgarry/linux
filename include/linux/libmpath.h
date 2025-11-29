@@ -22,6 +22,13 @@ enum mpath_iopolicy {
 	MPATH_IOPOLICY_QD,
 };
 
+/*
+ * Mark bio as coming from scsi multipath node
+ */
+#define MPATH_DISK_LIVE            0
+
+#define MPATH_DEVICE_SYSFS_ATTR_LINK      0
+
 struct mpath_disk {
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
@@ -35,6 +42,10 @@ struct mpath_disk {
 
 	struct cdev		cdev;
 	struct device		cdev_device;
+
+	unsigned long           flags;		/* flag for multipath devices*/
+
+	struct work_struct	partition_scan_work;
 
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
@@ -51,6 +62,7 @@ struct mpath_device {
 	atomic_t nr_active;
 	atomic_t nr_total;
 	struct gendisk *gd;
+	unsigned long           flags;		/* flag for multipath devices*/
 	int				numa_node; /* NUMA node for Path  */
 };
 
@@ -70,6 +82,7 @@ void mpath_put_disk(struct mpath_disk *mpath_disk);
 int mpath_get_disk(struct mpath_disk *mpath_disk);
 int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
+void multipath_partition_scan_work(struct work_struct *work);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;

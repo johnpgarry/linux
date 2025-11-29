@@ -46,6 +46,25 @@ module_param_call(iopolicy, mpath_set_iopolicy, mpath_get_iopolicy,
 MODULE_PARM_DESC(iopolicy,
 	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
 
+void multipath_partition_scan_work(struct work_struct *work)
+{
+	struct mpath_disk *mpath_disk =
+		container_of(work, struct mpath_disk, partition_scan_work);
+
+	pr_err("%s mpath_disk=%pS GD_SUPPRESS_PART_SCAN=%d\n",
+		__func__, mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
+	if (WARN_ON_ONCE(!test_and_clear_bit(GD_SUPPRESS_PART_SCAN,
+					     &mpath_disk->gd->state)))
+		return;
+
+	//mutex_lock(&head->disk->open_mutex);
+//	pr_err("%s2 mpath_disk=%pS GD_SUPPRESS_PART_SCAN=%d calling bdev_disk_changed\n",
+//		__func__, scsi_mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
+//	bdev_disk_changed(mpath_disk->gd, false);
+	//mutex_unlock(&head->disk->open_mutex);
+}
+EXPORT_SYMBOL_GPL(multipath_partition_scan_work);
+
 bool mpath_clear_current_path(struct mpath_device *mpath_device)
 {
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;

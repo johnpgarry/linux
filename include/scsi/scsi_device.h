@@ -104,14 +104,6 @@ struct scsi_vpd {
 	unsigned char	data[];
 };
 
-/*
- * Mark bio as coming from scsi multipath node
- */
-#define SCSI_MPATH_DISK_LIVE            0
-#define SCSI_MPATH_DISK_IO_PENDING      1
-#define SCSI_MPATH_IO_STATS             2
-#define SCSI_MPATH_SYSFS_ATTR_LINK      3
-
 struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
 
@@ -120,10 +112,8 @@ struct scsi_mpath_disk {
 	unsigned long		start_time;
 	struct delayed_work	activate; /* Path Activation work */
 	//struct device		dev;
-	struct work_struct	partition_scan_work;
 	struct list_head	entry; // for list of mpath disks
 	int					index;
-	unsigned long           flags;		/* flag for multipath devices*/
 	char wwid[40];
 
 	struct mpath_disk mpath_disk;
@@ -146,11 +136,6 @@ struct scsi_mpath_device {
 	//atomic_t			nr_mpath;	/* Number of Active mpath */
 
 
-
-
-#define SCSI_MPATH_DISK_LIVE            0
-#define SCSI_MPATH_DISK_IO_PENDING      1
-#define SCSI_MPATH_IO_STATS             2
 
 	unsigned long           flags;		/* flag for multipath devices*/
 
