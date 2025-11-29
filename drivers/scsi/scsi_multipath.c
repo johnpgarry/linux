@@ -478,8 +478,9 @@ static __maybe_unused void scsi_mpath_disk_release(struct device *dev)
 static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16],
 	enum blk_unique_id type)
 {
+	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 
-	return 0;
+	return scsi_mpath_unique_id(scsi_mpath_dev->sdev, id, type);
 }
 
 /*
