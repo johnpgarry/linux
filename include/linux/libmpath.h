@@ -54,6 +54,8 @@ struct mpath_disk {
 	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg);
+	unsigned long hostdata[]  /* Used for storage of host specific stuff */
+			__attribute__ ((aligned (sizeof(unsigned long))));
 };
 
 struct mpath_device {
@@ -68,6 +70,11 @@ struct mpath_device {
 };
 
 #define REQ_MPATH		REQ_DRV
+
+static inline struct mpath_disk *to_mpath_disk(void *d)
+{
+	return d - sizeof(struct mpath_disk);
+}
 
 
 #define cdev_to_mpath_disk(cdev) container_of(cdev, struct mpath_disk, cdev)

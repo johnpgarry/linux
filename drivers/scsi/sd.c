@@ -3708,7 +3708,7 @@ static int sd_revalidate_mpath_disk(struct scsi_mpath_disk *scsi_mpath_disk, str
 	struct scsi_device *sdp = sdkp->device;
 	struct queue_limits *mpath_lim;
 	struct queue_limits lim2;
-	struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+	struct mpath_disk *mpath_disk = to_mpath_disk(scsi_mpath_disk);
 	int err;
 
 	//blk_mq_freeze_queue(sdp->mpath_disk->queue);
