@@ -410,7 +410,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	}
 
 	size = sizeof(*scsi_mpath_disk);
-	size += num_possible_nodes() * sizeof(struct mpath_device *);
+	//size += num_possible_nodes() * sizeof(struct mpath_device *);
 
 	scsi_mpath_disk = kzalloc(size, GFP_KERNEL);
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",

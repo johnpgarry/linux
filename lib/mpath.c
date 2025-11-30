@@ -685,7 +685,7 @@ static void mpath_free_disk(struct kref *ref)
 	put_device(&mpath_disk->dev);
 //	kfree(head->plids);
 	pr_err("%s4 mpath_disk=%pS calling kfree\n", __func__, mpath_disk);
-	kfree(mpath_disk);
+//	kfree(mpath_disk);
 }
 
 void mpath_remove_disk(struct mpath_device *mpath_device)
@@ -747,11 +747,13 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 			pr_err("%s5.1 not calling device_del\n", __func__);
 		//	device_del(&scsi_mpath_disk->dev);
 			pr_err("%s5.2 calling del_gendisk\n", __func__);
-			del_gendisk(mpath_disk->gd);
+		//	del_gendisk(mpath_disk->gd);
 		}
 		pr_err("%s6 calling put_disk on mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
 		
 	}
+	pr_err("%s9 mpath_device=%pS calling mpath_put_disk\n", __func__, mpath_device);
+
 	mpath_put_disk(mpath_disk);
 
 	pr_err("%s10 mpath_device=%pS\n", __func__, mpath_device);
