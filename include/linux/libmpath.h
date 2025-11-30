@@ -48,12 +48,12 @@ struct mpath_disk {
 	struct work_struct	partition_scan_work;
 	struct mutex            lock;
 
+	struct mpath_device __rcu *current_path[MAX_NUMNODES]; /* scsi_device of current path */
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg);
-	struct mpath_device __rcu *current_path[]; /* scsi_device of current path */
 };
 
 struct mpath_device {
