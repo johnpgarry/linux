@@ -114,11 +114,10 @@ struct scsi_mpath_disk {
 	struct list_head	entry; // for list of mpath disks
 	int					index;
 	char wwid[40];
-
-	struct mpath_disk mpath_disk;
 };
 
-#define to_scsi_mpath_disk(md) container_of(md, struct scsi_mpath_disk, mpath_disk)
+//#define to_scsi_mpath_disk(md) container_of(md, struct scsi_mpath_disk, mpath_disk)
+#define to_scsi_mpath_disk(md) ((struct scsi_mpath_disk *)(md + 1))
 
 struct scsi_mpath_device {
 	struct mpath_device mpath_device;

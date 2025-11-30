@@ -401,7 +401,7 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	scsi_mpath_disk = scsi_mpath_find_disk(sdev);
 	pr_err("%s4.1 called scsi_mpath_find_disk sdev=%pS mpath_disk=%pS\n", __func__, sdev, scsi_mpath_disk);
 	if (scsi_mpath_disk) {
-		mpath_disk = &scsi_mpath_disk->mpath_disk;
+		mpath_disk = to_mpath_disk(scsi_mpath_disk);
 		mutex_lock(&mpath_disk->lock);
 		list_add_tail(&mpath_device->siblings, &mpath_disk->dev_list);
 		mutex_unlock(&mpath_disk->lock);
@@ -409,15 +409,15 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		return 0;
 	}
 
-	size = sizeof(*scsi_mpath_disk);
-	//size += num_possible_nodes() * sizeof(struct mpath_device *);
+	size = sizeof(*mpath_disk);
+	size += sizeof(struct scsi_mpath_device);
 
-	scsi_mpath_disk = kzalloc(size, GFP_KERNEL);
-	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
-		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk, mpath_device);
-	if (!scsi_mpath_disk)
+	mpath_disk = kzalloc(size, GFP_KERNEL);
+	pr_err("%s5 size=%zd sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
+		__func__, size, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk, mpath_device);
+	if (!mpath_disk)
 		return -ENOMEM;
-	mpath_disk = &scsi_mpath_disk->mpath_disk;
+	scsi_mpath_disk = (struct scsi_mpath_disk *)(mpath_disk + 1);
 	mpath_device->mpath_disk = mpath_disk;
 	mpath_disk->is_disabled = scsi_mpath_is_disabled;
 	mpath_disk->is_optimized = scsi_mpath_is_optimized;
@@ -705,7 +705,7 @@ static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev)
 
 	mutex_lock(&scsi_mpath_disks_lock);
 	list_for_each_entry(scsi_mpath_disk, &scsi_mpath_disks_list, entry) {
-		struct mpath_disk *mpath_disk = &scsi_mpath_disk->mpath_disk;
+		struct mpath_disk *mpath_disk = to_mpath_disk(scsi_mpath_disk);
 
 		pr_err("%s itering mpath_disk=%pS sdev->scsi_mpath_dev=%pS\n", __func__, scsi_mpath_disk, sdev->scsi_mpath_dev);
 		pr_err("%s1 wwid=%s\n", __func__, scsi_mpath_disk->wwid);
