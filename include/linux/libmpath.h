@@ -86,8 +86,10 @@ struct mpath_disk_template {
 		    unsigned int cmd, unsigned long arg);
 };
 
-struct mpath_disk *mpath_disk_alloc(const struct mpath_disk_template *mpdt,
-						int privsize);
+struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt,
+						int privsize, int node_id);
+
+ int __must_check mpath_disk_add(struct mpath_disk *);
 
 
 static inline struct mpath_disk *to_mpath_disk(void *d)
