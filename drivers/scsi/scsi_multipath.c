@@ -25,12 +25,9 @@
 
 MODULE_IMPORT_NS("SCSI_DH_ALUA");
 
-static DEFINE_IDA(sd_mpath_index_ida);
 
 static dev_t scsi_mpath_disk_major;
 static struct scsi_mpath_disk *scsi_mpath_find_disk(struct scsi_device *sdev);
-
-#define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
 bool scsi_multipath = false;
 EXPORT_SYMBOL_GPL(scsi_multipath);
@@ -38,8 +35,6 @@ module_param(scsi_multipath, bool, 0444);
 MODULE_PARM_DESC(scsi_multipath,
     "turn on native support for multiple scsi devices set this value to false to disable multipath, \n");
 
-//static DEFINE_IDA(nvme_ns_chr_minor_ida);
-static dev_t scsi_mpath_disk_chr_devt;
 
 static LIST_HEAD(scsi_mpath_disks_list);
 static DEFINE_MUTEX(scsi_mpath_disks_lock);
@@ -340,6 +335,7 @@ static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16]
 
 struct mpath_disk_template smpdt = {
 	.class = &scsi_mpath_disk_class,
+	.cdev_class = &scsi_mpath_generic_class,
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
 	.get_unique_id = scsi_mpath_get_unique_id,
@@ -421,22 +417,20 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 
 	mpath_device->mpath_disk = mpath_disk;
 
-	scsi_mpath_disk->index = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
-
 	INIT_LIST_HEAD(&scsi_mpath_disk->entry);
 	pr_err("%s6\n", __func__);
 
-	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), scsi_mpath_disk->index);
-	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
-	mpath_disk->cdev_device.release = mpath_cdev_rel;
+//	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), scsi_mpath_disk->index);
+//	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
+//	mpath_disk->cdev_device.release = mpath_cdev_rel;
 
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
-	dev_set_name(&mpath_disk->dev, "smpd%d", scsi_mpath_disk->index);
+	ret = dev_set_name(&mpath_disk->dev, "smpd%d", mpath_disk->index);
 
 
-	pr_err("%s8\n", __func__);
+	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
-	sprintf(mpath_disk->gd->disk_name, "smpd%d", scsi_mpath_disk->index);
+	sprintf(mpath_disk->gd->disk_name, "smpd%d", mpath_disk->index);
 
 	sprintf(scsi_mpath_disk->wwid, sdev->scsi_mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);
 
@@ -514,7 +508,7 @@ static __maybe_unused void activate_mpath(void *data, int err)
 
         if (mpath_device_is_live(mpath_device)) {
 			pr_err("%s calling scsi_mpath_set_live\n", __func__);
-			mpath_device_set_live(mpath_device);
+		//	mpath_device_set_live(mpath_device);
         }
 }
 
@@ -792,17 +786,11 @@ static int __init init_scsi_mp(void)
 	if (err < 0)
 		goto destroy_disk_class;
 	scsi_mpath_disk_major = err;
-	err = alloc_chrdev_region(&scsi_mpath_disk_chr_devt, 0, 1U << MINORBITS,
-				     "scsi-mpath-generic");
-	if (err < 0)
-		goto unregister_blkdev;
 	err = class_register(&scsi_mpath_generic_class);
 	if (err < 0)
-		goto unregister_chrdev;
+		goto unregister_blkdev;
 
 	return 0;
-unregister_chrdev:
-	unregister_chrdev_region(scsi_mpath_disk_chr_devt, 1U << MINORBITS);
 unregister_blkdev:
 	unregister_blkdev(0, "scsi-mpath-disk");
 destroy_disk_class:

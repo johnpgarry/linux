@@ -112,7 +112,6 @@ struct scsi_mpath_disk {
 	struct delayed_work	activate; /* Path Activation work */
 	//struct device		dev;
 	struct list_head	entry; // for list of mpath disks
-	int					index;
 	char wwid[SCSI_MPATH_DEVICE_ID_LEN];
 };
 
