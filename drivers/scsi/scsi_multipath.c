@@ -430,8 +430,8 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
 	ret = dev_set_name(&mpath_disk->dev, "smpd%d", scsi_mpath_disk->index);
-
-
+	if (ret)
+		goto out_free_disk;
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
 	sprintf(mpath_disk->gd->disk_name, "smpd%d", scsi_mpath_disk->index);
@@ -450,9 +450,17 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 
 	pr_err("%s17 calling mpath_disk_add\n", __func__);
 	ret = mpath_add_disk(mpath_disk);
+	if (ret)
+		goto out_put_dev;
 	pr_err("%s17.1 called mpath_disk_add ret=%d\n", __func__, ret);
 
 	pr_err("%s16 out\n", __func__);
+	return 0;
+
+out_put_dev:
+	put_device(&mpath_disk->dev);
+out_free_disk:
+	mpath_put_disk(mpath_disk);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_dev_alloc);
