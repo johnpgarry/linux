@@ -409,12 +409,13 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	mpath_disk = mpath_alloc_disk(&smpdt, sizeof(*scsi_mpath_disk), dev_to_node(shost_dev));
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
-		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk, mpath_device);
+		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, mpath_disk, mpath_device);
 	if (!mpath_disk)
 		return -ENOMEM;
-	//scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	pr_err("%s mpath_disk=%pS scsi_mpath_disk=%pS\n",
+	pr_err("%s6 mpath_disk=%pS scsi_mpath_disk=%pS\n",
 		__func__, mpath_disk, scsi_mpath_disk);
+	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
+
 	mpath_device->mpath_disk = mpath_disk;
 //	mpath_disk->is_disabled = scsi_mpath_is_disabled;
 //	mpath_disk->is_optimized = scsi_mpath_is_optimized;
@@ -461,11 +462,11 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 //	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state);
 	sprintf(mpath_disk->gd->disk_name, "smpd%d", scsi_mpath_disk->index);
 
-	dev_err(&mpath_disk->dev, "%s10 calling device_add for &mpath_disk->dev\n", __func__);
-	ret = device_add(&mpath_disk->dev); // see nvme_init_subsystem()
-	pr_err("%s11 called device_add ret=%d\n", __func__, ret);
-	if (ret)
-		return ret;
+//	dev_err(&mpath_disk->dev, "%s10 calling device_add for &mpath_disk->dev\n", __func__);
+//	ret = device_add(&mpath_disk->dev); // see nvme_init_subsystem()
+//	pr_err("%s11 called device_add ret=%d\n", __func__, ret);
+//	if (ret)
+//		return ret;
 
 //	ret = init_srcu_struct(&mpath_disk->srcu);
 //	pr_err("%s12 ret=%d after init_srcu_struct mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
@@ -495,6 +496,10 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 
 	pr_err("%s16\n", __func__);
 	mutex_unlock(&scsi_mpath_disks_lock);
+
+	pr_err("%s17 calling mpath_disk_add\n", __func__);
+	ret = mpath_disk_add(mpath_disk);
+	pr_err("%s17.1 called mpath_disk_add ret=%d\n", __func__, ret);
 
 	pr_err("%s16 out\n", __func__);
 	return 0;

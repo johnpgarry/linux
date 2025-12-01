@@ -1014,8 +1014,6 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	struct mpath_disk *mpath_disk;
 	struct queue_limits lim;
 	int ret;
-	static int disk_count;
-	__maybe_unused int index;
 	size_t size;
 
 	mpath_disk = kzalloc(sizeof(struct mpath_disk) + privsize, GFP_KERNEL);
@@ -1058,7 +1056,7 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 //	scsi_mpath_disk->dev.groups = scsi_mpath_groups;
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
 //	dev_set_name(&mpath_disk->dev, "smpd%d", 0/* fixme scsi_mpath_disk->index*/);
-	disk_count++;
+//	disk_count++;
 	device_initialize(&mpath_disk->dev);
 
 	blk_set_stacking_limits(&lim);
@@ -1119,6 +1117,16 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	return mpath_disk;
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_disk);
+
+
+int mpath_disk_add(struct mpath_disk *mpath_disk)
+{
+	int ret;
+	dev_err(&mpath_disk->dev, "%s alling device_add for &mpath_disk->dev\n", __func__);
+	ret = device_add(&mpath_disk->dev); // see nvme_init_subsystem()
+
+	return ret;
+}
 
 static struct attribute dummy_attr = {
 	.name = "dummy",
