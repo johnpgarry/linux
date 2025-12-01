@@ -9,6 +9,7 @@
 #include <linux/bio.h>
 #include <linux/moduleparam.h>
 #include <linux/topology.h>
+#include <linux/kmemleak.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_dh.h>
 #include <scsi/scsi_proto.h>
@@ -423,6 +424,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 		ret = -ENOMEM;
 		goto out_free_ida;
 	}
+	
 	pr_err("%s6 mpath_disk=%pS scsi_mpath_disk=%pS\n",
 		__func__, mpath_disk, scsi_mpath_disk);
 	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
