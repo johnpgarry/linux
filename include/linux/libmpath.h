@@ -87,6 +87,11 @@ static inline struct mpath_disk *to_mpath_disk(void *d)
 }
 
 
+static inline bool is_mpath_request(struct request *req)
+{
+	return req->cmd_flags & REQ_MPATH;
+}
+
 #define cdev_to_mpath_disk(cdev) container_of(cdev, struct mpath_disk, cdev)
 
 bool mpath_clear_current_path(struct mpath_device *);
