@@ -569,7 +569,7 @@ bool mpath_device_is_live(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_device_is_live);
 
-void mpath_add_disk(struct mpath_device *mpath_device)
+void mpath_add_device(struct mpath_device *mpath_device)
 {
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
 	pr_err("%s mpath_device=%pS mpath_disk=%pS\n", __func__, mpath_device, mpath_disk);
@@ -580,7 +580,7 @@ void mpath_add_disk(struct mpath_device *mpath_device)
 		mpath_device_set_live(mpath_device);
 	}
 }
-EXPORT_SYMBOL_GPL(mpath_add_disk);
+EXPORT_SYMBOL_GPL(mpath_add_device);
 
 static bool mpath_available_path(struct mpath_disk *mpath_disk)
 {
@@ -1119,7 +1119,7 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 EXPORT_SYMBOL_GPL(mpath_alloc_disk);
 
 
-int mpath_disk_add(struct mpath_disk *mpath_disk)
+int mpath_add_disk(struct mpath_disk *mpath_disk)
 {
 	int ret;
 	dev_err(&mpath_disk->dev, "%s alling device_add for &mpath_disk->dev\n", __func__);
@@ -1127,6 +1127,7 @@ int mpath_disk_add(struct mpath_disk *mpath_disk)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(mpath_add_disk);
 
 static struct attribute dummy_attr = {
 	.name = "dummy",

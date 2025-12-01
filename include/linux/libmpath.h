@@ -89,7 +89,7 @@ struct mpath_disk_template {
 struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt,
 						int privsize, int node_id);
 
- int __must_check mpath_disk_add(struct mpath_disk *);
+ int __must_check mpath_add_disk(struct mpath_disk *);
 
 
 static inline struct mpath_disk *to_mpath_disk(void *d)
@@ -120,7 +120,7 @@ void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 void mpath_device_set_live(struct mpath_device *mpath_device);
-void mpath_add_disk(struct mpath_device *mpath_device);
+void mpath_add_device(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
 void mpath_cdev_rel(struct device *dev);
