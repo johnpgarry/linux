@@ -666,16 +666,16 @@ static void kobject_cleanup(struct kobject *kobj)
 	const struct kobj_type *t = get_ktype(kobj);
 	const char *name = kobj->name;
 
-	pr_debug("'%s' (%p): %s, parent %p\n",
+	pr_err("'%s' (%p): %s, parent %p\n",
 		 kobject_name(kobj), kobj, __func__, kobj->parent);
 
 	if (t && !t->release)
-		pr_debug("'%s' (%p): does not have a release() function, it is broken and must be fixed. See Documentation/core-api/kobject.rst.\n",
+		pr_err("'%s' (%p): does not have a release() function, it is broken and must be fixed. See Documentation/core-api/kobject.rst.\n",
 			 kobject_name(kobj), kobj);
 
 	/* remove from sysfs if the caller did not do it */
 	if (kobj->state_in_sysfs) {
-		pr_debug("'%s' (%p): auto cleanup kobject_del\n",
+		pr_err("'%s' (%p): auto cleanup kobject_del\n",
 			 kobject_name(kobj), kobj);
 		__kobject_del(kobj);
 	} else {
@@ -684,14 +684,14 @@ static void kobject_cleanup(struct kobject *kobj)
 	}
 
 	if (t && t->release) {
-		pr_debug("'%s' (%p): calling ktype release\n",
+		pr_err("'%s' (%p): calling ktype release\n",
 			 kobject_name(kobj), kobj);
 		t->release(kobj);
 	}
 
 	/* free name if we allocated it */
 	if (name) {
-		pr_debug("'%s': free name\n", name);
+		pr_err("'%s': free name\n", name);
 		kfree_const(name);
 	}
 

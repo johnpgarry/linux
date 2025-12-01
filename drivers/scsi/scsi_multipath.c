@@ -89,11 +89,11 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	scsi_mpath_dev->sdev = sdev;
 	sdev->scsi_mpath_dev = scsi_mpath_dev;
 
-	pr_err("%s2 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS\n",
-		__func__, sdev, sdev->scsi_mpath_dev, shost);
 
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_device->numa_node = dev_to_node(shost->dma_dev);
+	pr_err("%s2 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS mpath_device=%pS\n",
+		__func__, sdev, sdev->scsi_mpath_dev, shost, mpath_device);
 
 	return 0;
 }
