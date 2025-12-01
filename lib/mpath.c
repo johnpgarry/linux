@@ -64,11 +64,11 @@ static void multipath_partition_scan_work(struct work_struct *work)
 					     &mpath_disk->gd->state)))
 		return;
 
-	//mutex_lock(&head->disk->open_mutex);
-//	pr_err("%s2 mpath_disk=%pS GD_SUPPRESS_PART_SCAN=%d calling bdev_disk_changed\n",
-//		__func__, scsi_mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
-//	bdev_disk_changed(mpath_disk->gd, false);
-	//mutex_unlock(&head->disk->open_mutex);
+	mutex_lock(&mpath_disk->gd->open_mutex);
+	pr_err("%s2 mpath_disk=%pS GD_SUPPRESS_PART_SCAN=%d calling bdev_disk_changed\n",
+		__func__, mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
+	bdev_disk_changed(mpath_disk->gd, false);
+	mutex_unlock(&mpath_disk->gd->open_mutex);
 }
 
 void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
