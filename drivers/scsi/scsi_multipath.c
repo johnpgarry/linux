@@ -423,6 +423,11 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s6\n", __func__);
 
 	scsi_mpath_disk->index = ida_alloc(&scsi_mpath_index_ida, GFP_KERNEL);
+	if (scsi_mpath_disk->index < 0) {
+		ret = scsi_mpath_disk->index;
+		goto out_free_disk;
+	}
+
 
 //	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), scsi_mpath_disk->index);
 //	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
@@ -431,7 +436,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
 	ret = dev_set_name(&mpath_disk->dev, "smpd%d", scsi_mpath_disk->index);
 	if (ret)
-		goto out_free_disk;
+		goto out_free_ida;
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
 	sprintf(mpath_disk->gd->disk_name, "smpd%d", scsi_mpath_disk->index);
@@ -459,6 +464,8 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 
 out_put_dev:
 	put_device(&mpath_disk->dev);
+out_put_free_ida:
+	ida_free(scsi_mpath_disk->index);
 out_free_disk:
 	mpath_put_disk(mpath_disk);
 	return ret;
