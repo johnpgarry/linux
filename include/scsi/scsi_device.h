@@ -113,6 +113,7 @@ struct scsi_mpath_disk {
 	//struct device		dev;
 	struct list_head	entry; // for list of mpath disks
 	int					index;
+	struct kref		ref;
 	char wwid[SCSI_MPATH_DEVICE_ID_LEN];
 };
 

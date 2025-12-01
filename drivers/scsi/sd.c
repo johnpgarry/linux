@@ -4180,13 +4180,13 @@ static int sd_remove(struct device *dev)
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 	struct scsi_device *sdp = sdkp->device; // new code
 	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
-	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 
 	dev_err(dev, "%s scsi_is_sdev_multipath=%d sdp=%pS dev=%pS\n",
 		__func__, scsi_is_sdev_multipath(sdkp->device), sdp, dev);
 
-	if (scsi_is_sdev_multipath(sdkp->device))
-		mpath_remove_device(mpath_device);
+	if (scsi_is_sdev_multipath(sdkp->device)) {
+		scsi_mpath_remove_device(scsi_mpath_dev);
+	}
 	
 	scsi_autopm_get_device(sdkp->device);
 
