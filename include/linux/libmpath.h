@@ -41,8 +41,6 @@ struct mpath_disk {
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work; /* work struct for requeue */
 
-	int					index;
-
 	struct cdev		cdev;
 	struct device		cdev_device;
 

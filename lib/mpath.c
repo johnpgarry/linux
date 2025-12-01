@@ -13,9 +13,6 @@ static dev_t mpath_disk_chr_devt;
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
-
-static DEFINE_IDA(mpath_index_ida);
-
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
  * In Future, if more apropriate IO-policy is introduced will be added
@@ -425,8 +422,7 @@ static void mpath_iopolicy_update(struct mpath_disk *mpath_disk,
 	//	scsi_mpath_disk_clear_ctrl_paths(ctrl);
 	//mutex_unlock(&nvme_subsystems_lock);
 
-	pr_notice("mpath_disk %d iopolicy changed from %s to %s\n",
-			-1/*scsi_mpath_disk->index*/,
+	pr_notice("iopolicy changed from %s to %s\n",
 			mpath_iopolicy_names[old_iopolicy],
 			mpath_iopolicy_names[iopolicy]);
 }
@@ -1042,8 +1038,6 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	//mpath_disk->get_unique_id = scsi_mpath_get_unique_id;
 	//mpath_disk->ioctl = scsi_mpath_ioctl;
 	mpath_disk->mpdt = mpdt;
-
-	mpath_disk->index = ida_alloc(&mpath_index_ida, GFP_KERNEL);
 
 	//INIT_LIST_HEAD(&scsi_mpath_disk->entry);
 	INIT_LIST_HEAD(&mpath_disk->dev_list);
