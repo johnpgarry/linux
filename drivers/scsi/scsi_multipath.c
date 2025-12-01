@@ -642,7 +642,7 @@ int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 	struct request *req = scsi_cmd_to_rq(scmd);
 
 	pr_err("%s scmd=%pS req=%pS\n", __func__, scmd, req);
-	if (req->cmd_flags & REQ_MPATH) {
+	if (is_mpath_request(req)) {
 		if (scsi_is_mpath_error(scmd) ||
 		    blk_queue_dying(req->q)) {
 			return NEEDS_RETRY;
