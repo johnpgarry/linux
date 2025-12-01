@@ -4186,7 +4186,7 @@ static int sd_remove(struct device *dev)
 		__func__, scsi_is_sdev_multipath(sdkp->device), sdp, dev);
 
 	if (scsi_is_sdev_multipath(sdkp->device))
-		mpath_remove_disk(mpath_device);
+		mpath_remove_device(mpath_device);
 	
 	scsi_autopm_get_device(sdkp->device);
 
