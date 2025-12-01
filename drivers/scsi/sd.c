@@ -4029,7 +4029,7 @@ static int sd_probe(struct device *dev)
 		struct scsi_mpath_device *scsi_mpath_dev;
 		struct mpath_device *mpath_device;
 		sdev_printk(KERN_INFO, sdp, "%s3.2 calling scsi_mpath_alloc_disk\n", __func__);
-		error = scsi_mpath_alloc_disk(sdp, gd);
+		error = scsi_mpath_dev_alloc(sdp, gd);
 		sdev_printk(KERN_INFO, sdp, "%s3.3.1 called scsi_mpath_alloc_disk error=%d\n", __func__, error);
 		if (error) {
 			sdev_printk(KERN_WARNING, sdp, "could not alloc mpath disk\n");
@@ -4146,7 +4146,7 @@ static int sd_probe(struct device *dev)
 		struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 		pr_err("%s calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
-		mpath_add_disk(mpath_device);
+		mpath_add_device(mpath_device);
 		sd_revalidate_mpath_disk(scsi_mpath_disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
