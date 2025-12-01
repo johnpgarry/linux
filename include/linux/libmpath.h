@@ -4,6 +4,7 @@
 
 #include <linux/bio.h>
 #include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
 
@@ -58,6 +59,15 @@ struct mpath_disk {
 			__attribute__ ((aligned (sizeof(unsigned long))));
 };
 
+#define MPATH_REQ_IO_STATS (1 << 0)
+#define MPATH_REQ_CNT_ACTIVE (1 << 1)
+
+struct mpath_request {
+	struct mpath_device  *mpath_device;
+	unsigned long		flags;
+	unsigned long		start_time;
+};
+
 struct mpath_device {
 	struct mpath_disk *mpath_disk;
 	struct list_head siblings;
@@ -98,6 +108,9 @@ void mpath_add_disk(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
 void mpath_cdev_rel(struct device *dev);
+
+void mpath_start_request(struct request *req);
+void mpath_end_request(struct request *req);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
