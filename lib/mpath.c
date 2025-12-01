@@ -685,7 +685,7 @@ static void mpath_free_disk(struct kref *ref)
 	put_device(&mpath_disk->dev);
 //	kfree(head->plids);
 	pr_err("%s4 mpath_disk=%pS calling kfree\n", __func__, mpath_disk);
-//	kfree(mpath_disk);
+	kfree(mpath_disk);
 }
 
 void mpath_remove_disk(struct mpath_device *mpath_device)
