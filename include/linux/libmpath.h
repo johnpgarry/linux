@@ -50,11 +50,7 @@ struct mpath_disk {
 	struct mutex            lock;
 
 	struct mpath_device __rcu *current_path[MAX_NUMNODES]; /* scsi_device of current path */
-	bool (*is_disabled)(struct mpath_device *);
-	bool (*is_optimized)(struct mpath_device *);
-	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
-	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
-		    unsigned int cmd, unsigned long arg);
+	const struct mpath_disk_template *mpdt;
 	unsigned long hostdata[]  /* Used for storage of host specific stuff */
 			__attribute__ ((aligned (sizeof(unsigned long))));
 };
@@ -81,6 +77,19 @@ struct mpath_device {
 
 #define REQ_MPATH		REQ_DRV
 
+struct mpath_disk_template {
+	const struct class *class;
+	bool (*is_disabled)(struct mpath_device *);
+	bool (*is_optimized)(struct mpath_device *);
+	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
+	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
+		    unsigned int cmd, unsigned long arg);
+};
+
+struct mpath_disk *mpath_disk_alloc(const struct mpath_disk_template *mpdt,
+						int privsize);
+
+
 static inline struct mpath_disk *to_mpath_disk(void *d)
 {
 	return d - sizeof(struct mpath_disk);
@@ -105,7 +114,7 @@ void mpath_put_disk(struct mpath_disk *mpath_disk);
 int mpath_get_disk(struct mpath_disk *mpath_disk);
 int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
-void multipath_partition_scan_work(struct work_struct *work);
+//void multipath_partition_scan_work(struct work_struct *work);
 void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 void mpath_device_set_live(struct mpath_device *mpath_device);
