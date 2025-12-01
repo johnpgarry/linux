@@ -41,6 +41,8 @@ struct mpath_disk {
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work; /* work struct for requeue */
 
+	int					index;
+
 	struct cdev		cdev;
 	struct device		cdev_device;
 
@@ -79,6 +81,7 @@ struct mpath_device {
 
 struct mpath_disk_template {
 	const struct class *class;
+	const struct class *cdev_class;
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
@@ -114,7 +117,7 @@ void multipath_submit_bio(struct bio *bio);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf);
 void mpath_put_disk(struct mpath_disk *mpath_disk);
 int mpath_get_disk(struct mpath_disk *mpath_disk);
-int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
+//int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 //void multipath_partition_scan_work(struct work_struct *work);
 void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
@@ -123,7 +126,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_add_device(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
-void mpath_cdev_rel(struct device *dev);
+//void mpath_cdev_rel(struct device *dev);
 
 void mpath_start_request(struct request *req);
 void mpath_end_request(struct request *req);

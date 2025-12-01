@@ -6,6 +6,15 @@
 #include <linux/topology.h>
 #include <linux/libmpath.h>
 
+static int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
+
+static dev_t mpath_disk_chr_devt;
+
+#define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
+
+
+static DEFINE_IDA(mpath_index_ida);
+
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
  * In Future, if more apropriate IO-policy is introduced will be added
@@ -914,12 +923,11 @@ out_unlock:
 	return err;
 }
 
-void mpath_cdev_rel(struct device *dev)
+static void mpath_cdev_rel(struct device *dev)
 {
 	dev_err(dev, "%s\n", __func__);
 //	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
 }
-EXPORT_SYMBOL_GPL(mpath_cdev_rel);
 
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
 {
@@ -950,9 +958,9 @@ int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
 	if (ret)
 		return ret;
 
-	//mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), minor);
-	//mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
-	//mpath_disk->cdev_device.release = mpath_cdev_rel;
+	mpath_disk->cdev_device.devt = MKDEV(MAJOR(mpath_disk_chr_devt), minor);
+	mpath_disk->cdev_device.class = mpath_disk->mpdt->cdev_class;
+	mpath_disk->cdev_device.release = mpath_cdev_rel;
 	// following can be moved to disk alloc code
 	device_initialize(&mpath_disk->cdev_device);
 	cdev_init(&mpath_disk->cdev, &mpath_generic_chr_fops);
@@ -963,7 +971,6 @@ int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
 		put_device(&mpath_disk->cdev_device);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(mpath_disk_add_cdev);
 
 void mpath_start_request(struct request *req)
 {
@@ -1037,7 +1044,7 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	//mpath_disk->ioctl = scsi_mpath_ioctl;
 	mpath_disk->mpdt = mpdt;
 
-	//scsi_mpath_disk->index = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
+	mpath_disk->index = ida_alloc(&mpath_index_ida, GFP_KERNEL);
 
 	//INIT_LIST_HEAD(&scsi_mpath_disk->entry);
 	INIT_LIST_HEAD(&mpath_disk->dev_list);
@@ -1048,9 +1055,7 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 
 	mpath_disk->dev.class = mpdt->class; //&scsi_mpath_disk_class;
 
-//	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), scsi_mpath_disk->index);
-//	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
-//	mpath_disk->cdev_device.release = mpath_cdev_rel;
+	// see mpath_disk_add_cdev()
 
 //	scsi_mpath_disk->dev.release = scsi_mpath_disk_release;
 //	scsi_mpath_disk->dev.groups = scsi_mpath_groups;
@@ -1172,14 +1177,18 @@ EXPORT_SYMBOL_GPL(mpath_device_groups);
 
 static int __init mpath_init(void)
 {
+	int err;
 	pr_err("%s\n", __func__);
-	
-	return 0;
+	err = alloc_chrdev_region(&mpath_disk_chr_devt, 0, 1U << MINORBITS,
+				     "mpath-generic");
+
+	return err;
 }
 
 static void __exit mpath_exit(void)
 {
 	pr_err("%s\n", __func__);
+	unregister_chrdev_region(mpath_disk_chr_devt, 1U << MINORBITS);
 }
 
 module_init(mpath_init);
