@@ -839,6 +839,7 @@ void del_gendisk(struct gendisk *disk)
 	struct blk_mq_tag_set *set;
 	unsigned int memflags;
 
+	pr_err("%s disk=%pS\n", __func__, disk);
 	if (!queue_is_mq(disk->queue)) {
 		__del_gendisk(disk);
 	} else {
