@@ -756,8 +756,6 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 	}
 	pr_err("%s9 mpath_device=%pS calling mpath_put_disk\n", __func__, mpath_device);
 
-	mpath_put_disk(mpath_disk);
-
 	pr_err("%s10 mpath_device=%pS\n", __func__, mpath_device);
 }
 EXPORT_SYMBOL_GPL(mpath_remove_device);
@@ -792,7 +790,6 @@ static void mpath_release(struct gendisk *disk)
 
 	kref_put(&mpath_disk->ref, mpath_free_disk);
 }
-
 
 static int mpath_get_unique_id(struct gendisk *disk, u8 id[16],
     enum blk_unique_id type)
@@ -1011,7 +1008,7 @@ void mpath_end_request(struct request *req)
 EXPORT_SYMBOL_GPL(mpath_end_request);
 
 
-struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int privsize, int node_id)
+struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int privsize, int node_id, char *name)
 {
 	struct mpath_disk *mpath_disk;
 	struct queue_limits lim;
@@ -1053,9 +1050,13 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 //	scsi_mpath_disk->dev.release = scsi_mpath_disk_release;
 //	scsi_mpath_disk->dev.groups = scsi_mpath_groups;
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
+
+	
 //	dev_set_name(&mpath_disk->dev, "smpd%d", 0/* fixme scsi_mpath_disk->index*/);
 //	disk_count++;
 	device_initialize(&mpath_disk->dev);
+	ret = dev_set_name(&mpath_disk->dev, name);
+	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
 	blk_set_stacking_limits(&lim);
 	pr_err("%s8\n", __func__);
@@ -1069,6 +1070,7 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	if (IS_ERR(mpath_disk->gd))
 		return NULL;
 
+	sprintf(mpath_disk->gd->disk_name, name);
 	mpath_disk->gd->private_data = mpath_disk;
 	mpath_disk->gd->fops = &mpath_ops;
 

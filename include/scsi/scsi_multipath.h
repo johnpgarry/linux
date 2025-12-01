@@ -34,6 +34,7 @@ extern void scsi_mpath_failover_req(struct request *);
 
 extern int scsi_mpath_failover_disposition(struct scsi_cmnd *);
 int scsi_mpath_dev_alloc(struct scsi_device *, struct gendisk *gd);
+void scsi_mpath_remove_device(struct scsi_mpath_device *scsi_mpath_dev);
 extern void scsi_mpath_remove_disk(struct scsi_device *);
 extern void scsi_mpath_shutdown_disk(struct scsi_device *sdev);
 extern void scsi_mpath_dev_release(struct scsi_device *);

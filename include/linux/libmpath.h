@@ -88,7 +88,7 @@ struct mpath_disk_template {
 };
 
 struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt,
-						int privsize, int node_id);
+						int privsize, int node_id, char *name);
 
  int __must_check mpath_add_disk(struct mpath_disk *);
 
