@@ -690,7 +690,7 @@ static void mpath_free_disk(struct kref *ref)
 	kfree(mpath_disk);
 }
 
-void mpath_remove_disk(struct mpath_device *mpath_device)
+void mpath_remove_device(struct mpath_device *mpath_device)
 {
 	bool last_path = false;
 	struct mpath_disk *mpath_disk;
@@ -760,7 +760,7 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 
 	pr_err("%s10 mpath_device=%pS\n", __func__, mpath_device);
 }
-EXPORT_SYMBOL_GPL(mpath_remove_disk);
+EXPORT_SYMBOL_GPL(mpath_remove_device);
 
 void mpath_put_disk(struct mpath_disk *mpath_disk)
 {

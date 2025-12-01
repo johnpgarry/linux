@@ -122,7 +122,7 @@ void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 void mpath_add_device(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
-void mpath_remove_disk(struct mpath_device *mpath_device);
+void mpath_remove_device(struct mpath_device *mpath_device);
 //void mpath_cdev_rel(struct device *dev);
 
 void mpath_start_request(struct request *req);
