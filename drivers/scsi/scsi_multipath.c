@@ -408,9 +408,9 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		__func__, size, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk, mpath_device);
 	if (!mpath_disk)
 		return -ENOMEM;
-	scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
+	//scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	pr_err("%s mpath_disk=%pS scsi_mpath_disk=%pS\n",
-		__func__, scsi_mpath_disk, mpath_disk);
+		__func__, mpath_disk, scsi_mpath_disk);
 	mpath_device->mpath_disk = mpath_disk;
 	mpath_disk->is_disabled = scsi_mpath_is_disabled;
 	mpath_disk->is_optimized = scsi_mpath_is_optimized;
