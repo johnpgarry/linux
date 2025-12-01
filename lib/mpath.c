@@ -1039,17 +1039,10 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	struct mpath_disk *mpath_disk;
 	struct queue_limits lim;
 	int ret;
-	size_t size;
 
-	mpath_disk = kzalloc(sizeof(struct mpath_disk) + privsize, GFP_KERNEL);
-	if (!mpath_disk)
-		return NULL;
-
-	size = sizeof(*mpath_disk) + privsize;
-
-	mpath_disk = kzalloc(size, GFP_KERNEL);
-	pr_err("%s5 size=%zd sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
-		__func__, size, NULL, NULL, NULL, NULL, NULL, NULL);
+	mpath_disk = kzalloc(sizeof(*mpath_disk) + privsize, GFP_KERNEL);
+	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
+		__func__, NULL, NULL, NULL, NULL, mpath_disk, NULL);
 	if (!mpath_disk)
 		return NULL;
 	//scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
