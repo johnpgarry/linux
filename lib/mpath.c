@@ -1009,7 +1009,7 @@ void mpath_end_request(struct request *req)
 EXPORT_SYMBOL_GPL(mpath_end_request);
 
 
-struct mpath_disk *mpath_disk_alloc(const struct mpath_disk_template *mpdt, int privsize)
+struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int privsize, int node_id)
 {
 	struct mpath_disk *mpath_disk;
 	struct queue_limits lim;
@@ -1057,7 +1057,7 @@ struct mpath_disk *mpath_disk_alloc(const struct mpath_disk_template *mpdt, int 
 //	scsi_mpath_disk->dev.release = scsi_mpath_disk_release;
 //	scsi_mpath_disk->dev.groups = scsi_mpath_groups;
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
-	dev_set_name(&mpath_disk->dev, "smpd%d", 0/* fixme scsi_mpath_disk->index*/);
+//	dev_set_name(&mpath_disk->dev, "smpd%d", 0/* fixme scsi_mpath_disk->index*/);
 	disk_count++;
 	device_initialize(&mpath_disk->dev);
 
@@ -1068,7 +1068,7 @@ struct mpath_disk *mpath_disk_alloc(const struct mpath_disk_template *mpdt, int 
 	lim.max_zone_append_sectors = 0;
 	lim.dma_alignment = 3;
 
-	mpath_disk->gd = blk_alloc_disk(&lim, 0/*fixme dev_to_node(shost_dev)*/);
+	mpath_disk->gd = blk_alloc_disk(&lim, node_id);
 	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_disk->gd=%pS\n", __func__, NULL, NULL, mpath_disk->gd);
 	if (IS_ERR(mpath_disk->gd))
 		return NULL;
@@ -1079,11 +1079,11 @@ struct mpath_disk *mpath_disk_alloc(const struct mpath_disk_template *mpdt, int 
 	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state);
 	//sprintf(mpath_disk->gd->disk_name, "smpd%d", scsi_mpath_disk->index);
 
-	dev_err(&mpath_disk->dev, "%s10 calling device_add for &mpath_disk->dev\n", __func__);
-	ret = device_add(&mpath_disk->dev); // see nvme_init_subsystem()
-	pr_err("%s11 called device_add ret=%d\n", __func__, ret);
-	if (ret)
-		return NULL;
+//	dev_err(&mpath_disk->dev, "%s10 calling device_add for &mpath_disk->dev\n", __func__);
+//	ret = device_add(&mpath_disk->dev); // see nvme_init_subsystem()
+//	pr_err("%s11 called device_add ret=%d\n", __func__, ret);
+//	if (ret)
+//		return NULL;
 
 	ret = init_srcu_struct(&mpath_disk->srcu);
 	pr_err("%s12 ret=%d after init_srcu_struct mpath_disk=%pS\n", __func__, ret, mpath_disk);
@@ -1118,8 +1118,7 @@ struct mpath_disk *mpath_disk_alloc(const struct mpath_disk_template *mpdt, int 
 
 	return mpath_disk;
 }
-EXPORT_SYMBOL_GPL(mpath_disk_alloc);
-
+EXPORT_SYMBOL_GPL(mpath_alloc_disk);
 
 static struct attribute dummy_attr = {
 	.name = "dummy",

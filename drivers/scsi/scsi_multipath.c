@@ -338,19 +338,26 @@ static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16]
 	return scsi_mpath_unique_id(scsi_mpath_dev->sdev, id, type);
 }
 
+struct mpath_disk_template smpdt = {
+	.class = &scsi_mpath_disk_class,
+	.is_disabled = scsi_mpath_is_disabled,
+	.is_optimized = scsi_mpath_is_optimized,
+	.get_unique_id = scsi_mpath_get_unique_id,
+	.ioctl = scsi_mpath_ioctl,
+};
+
 /*
  * Allocate Disk for Multipath Device
  */
 int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 {
-	struct queue_limits lim;
+//	struct queue_limits lim;
 	int ret;
 	static int disk_count;
 	struct scsi_mpath_disk *scsi_mpath_disk;
 	__maybe_unused int index;
 	struct Scsi_Host *shost = sdev->host;
 	struct device *shost_dev = &shost->shost_dev;
-	size_t size;
 	struct mpath_disk *mpath_disk;
 	struct mpath_device *mpath_device;
 
@@ -400,33 +407,30 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 		return 0;
 	}
 
-	size = sizeof(*mpath_disk);
-	size += sizeof(*scsi_mpath_disk);
-
-	mpath_disk = kzalloc(size, GFP_KERNEL);
-	pr_err("%s5 size=%zd sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
-		__func__, size, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk, mpath_device);
+	mpath_disk = mpath_alloc_disk(&smpdt, sizeof(*scsi_mpath_disk), dev_to_node(shost_dev));
+	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_disk=%pS mpath_device=%pS\n",
+		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, scsi_mpath_disk, mpath_device);
 	if (!mpath_disk)
 		return -ENOMEM;
 	//scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
 	pr_err("%s mpath_disk=%pS scsi_mpath_disk=%pS\n",
 		__func__, mpath_disk, scsi_mpath_disk);
 	mpath_device->mpath_disk = mpath_disk;
-	mpath_disk->is_disabled = scsi_mpath_is_disabled;
-	mpath_disk->is_optimized = scsi_mpath_is_optimized;
-	mpath_disk->get_unique_id = scsi_mpath_get_unique_id;
-	mpath_disk->ioctl = scsi_mpath_ioctl;
+//	mpath_disk->is_disabled = scsi_mpath_is_disabled;
+//	mpath_disk->is_optimized = scsi_mpath_is_optimized;
+//	mpath_disk->get_unique_id = scsi_mpath_get_unique_id;
+//	mpath_disk->ioctl = scsi_mpath_ioctl;
 
 	scsi_mpath_disk->index = ida_alloc(&sd_mpath_index_ida, GFP_KERNEL);
 
 	INIT_LIST_HEAD(&scsi_mpath_disk->entry);
-	INIT_LIST_HEAD(&mpath_disk->dev_list);
-	INIT_WORK(&mpath_disk->partition_scan_work, multipath_partition_scan_work);
+//	INIT_LIST_HEAD(&mpath_disk->dev_list);
+//	INIT_WORK(&mpath_disk->partition_scan_work, multipath_partition_scan_work);
 	pr_err("%s6\n", __func__);
-	mutex_init(&mpath_disk->lock);
-	kref_init(&mpath_disk->ref);
+//	mutex_init(&mpath_disk->lock);
+//	kref_init(&mpath_disk->ref);
 
-	mpath_disk->dev.class = &scsi_mpath_disk_class;
+//	mpath_disk->dev.class = &scsi_mpath_disk_class;
 
 	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), scsi_mpath_disk->index);
 	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
@@ -437,24 +441,24 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
 	dev_set_name(&mpath_disk->dev, "smpd%d", scsi_mpath_disk->index);
 	disk_count++;
-	device_initialize(&mpath_disk->dev);
+//	device_initialize(&mpath_disk->dev);
 
-	blk_set_stacking_limits(&lim);
+//	blk_set_stacking_limits(&lim);
 	pr_err("%s8\n", __func__);
 
-	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
-	lim.max_zone_append_sectors = 0;
-	lim.dma_alignment = 3;
+//	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
+//	lim.max_zone_append_sectors = 0;
+//	lim.dma_alignment = 3;
 
-	mpath_disk->gd = blk_alloc_disk(&lim, dev_to_node(shost_dev));
+//	mpath_disk->gd = blk_alloc_disk(&lim, dev_to_node(shost_dev));
 	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_disk->gd=%pS\n", __func__, sdev, sdev->scsi_mpath_dev, mpath_disk->gd);
-	if (IS_ERR(mpath_disk->gd))
-		return PTR_ERR(mpath_disk->gd);
+//	if (IS_ERR(mpath_disk->gd))
+//		return PTR_ERR(mpath_disk->gd);
 
-	mpath_disk->gd->private_data = mpath_disk;
-	mpath_disk->gd->fops = &mpath_ops;
+//	mpath_disk->gd->private_data = mpath_disk;
+//	mpath_disk->gd->fops = &mpath_ops;
 
-	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state);
+//	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state);
 	sprintf(mpath_disk->gd->disk_name, "smpd%d", scsi_mpath_disk->index);
 
 	dev_err(&mpath_disk->dev, "%s10 calling device_add for &mpath_disk->dev\n", __func__);
@@ -463,22 +467,22 @@ int scsi_mpath_alloc_disk(struct scsi_device *sdev, struct gendisk *gd)
 	if (ret)
 		return ret;
 
-	ret = init_srcu_struct(&mpath_disk->srcu);
-	pr_err("%s12 ret=%d after init_srcu_struct mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
-	if (ret)
-		return ret;
+//	ret = init_srcu_struct(&mpath_disk->srcu);
+//	pr_err("%s12 ret=%d after init_srcu_struct mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
+//	if (ret)
+//		return ret;
 
-	INIT_WORK(&mpath_disk->requeue_work, mpath_requeue_work);
-	pr_err("%s12.1 ret=%d after INIT_WORK mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
-	spin_lock_init(&mpath_disk->requeue_lock);
-	pr_err("%s12.2 ret=%d after spin_lock_init mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
-	bio_list_init(&mpath_disk->requeue_list);
-	pr_err("%s12.3 ret=%d after bio_list_init mpath_disk=%pS sdev->scsi_mpath_dev=%pS\n",
-		__func__, ret, scsi_mpath_disk, sdev->scsi_mpath_dev);
-	pr_err("%s12.3.1 device_id_str=%s len=%zd scsi_mpath_disk=%pS\n",
-		__func__, sdev->scsi_mpath_dev->device_id_str,
-		strlen(sdev->scsi_mpath_dev->device_id_str),
-		scsi_mpath_disk);
+//	INIT_WORK(&mpath_disk->requeue_work, mpath_requeue_work);
+//	pr_err("%s12.1 ret=%d after INIT_WORK mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
+//	spin_lock_init(&mpath_disk->requeue_lock);
+//	pr_err("%s12.2 ret=%d after spin_lock_init mpath_disk=%pS\n", __func__, ret, scsi_mpath_disk);
+//	bio_list_init(&mpath_disk->requeue_list);
+//	pr_err("%s12.3 ret=%d after bio_list_init mpath_disk=%pS sdev->scsi_mpath_dev=%pS\n",
+//		__func__, ret, scsi_mpath_disk, sdev->scsi_mpath_dev);
+//	pr_err("%s12.3.1 device_id_str=%s len=%zd scsi_mpath_disk=%pS\n",
+//		__func__, sdev->scsi_mpath_dev->device_id_str,
+//		strlen(sdev->scsi_mpath_dev->device_id_str),
+//		scsi_mpath_disk);
 
 	sprintf(scsi_mpath_disk->wwid, sdev->scsi_mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);
 
