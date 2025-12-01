@@ -60,8 +60,6 @@ struct scsi_pointer {
 #define SCMD_FAIL_IF_RECOVERING	(1 << 4)
 /* flags preserved across unprep / reprep */
 #define SCMD_PRESERVED_FLAGS	(SCMD_INITIALIZED | SCMD_FAIL_IF_RECOVERING)
-#define SCMD_MPATH_IO_STATS (1 << 5)
-#define SCMD_MPATH_CNT_ACTIVE (1 << 6)
 
 /* for scmd->state */
 #define SCMD_STATE_COMPLETE	0
@@ -74,6 +72,7 @@ enum scsi_cmnd_submitter {
 } __packed;
 
 struct scsi_cmnd {
+	struct mpath_request mpath_request;
 	struct scsi_device *device;
 	struct list_head eh_entry; /* entry for the host eh_abort_list/eh_cmd_q */
 	struct delayed_work abort_work;
@@ -90,10 +89,6 @@ struct scsi_cmnd {
 	 * been outstanding
 	 */
 	unsigned long jiffies_at_alloc;
-
-	#ifdef CONFIG_SCSI_MULTIPATH
-	unsigned long		mpath_start_time;
-	#endif
 
 	int retries;
 	int allowed;

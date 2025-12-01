@@ -29,8 +29,8 @@ struct scsi_mpath_disk;
 struct scsi_mpath_device;
 
 extern void scsi_mpath_failover_req(struct request *);
-extern void scsi_mpath_start_request(struct request *);
-extern void scsi_mpath_end_request(struct request *);
+//extern void scsi_mpath_start_request(struct request *);
+//extern void scsi_mpath_end_request(struct request *);
 
 extern int scsi_mpath_failover_disposition(struct scsi_cmnd *);
 int scsi_mpath_alloc_disk(struct scsi_device *, struct gendisk *gd);

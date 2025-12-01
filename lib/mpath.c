@@ -967,6 +967,50 @@ int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
 }
 EXPORT_SYMBOL_GPL(mpath_disk_add_cdev);
 
+void mpath_start_request(struct request *req)
+{
+	struct mpath_request *mpath_request = blk_mq_rq_to_pdu(req);
+	struct mpath_device *mpath_device = mpath_request->mpath_device;
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	struct gendisk *disk = mpath_disk->gd;
+
+	if ((READ_ONCE(mpath_disk->iopolicy) == MPATH_IOPOLICY_QD) &&
+	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
+		atomic_inc(&mpath_device->nr_active);
+		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
+	}
+
+	if (!blk_queue_io_stat(disk->queue) || blk_rq_is_passthrough(req) ||
+	    (mpath_request->flags & MPATH_REQ_IO_STATS))
+		return;
+
+	mpath_request->flags |= MPATH_REQ_IO_STATS;
+	mpath_request->start_time = bdev_start_io_acct(disk->part0, req_op(req),
+						      jiffies);
+}
+EXPORT_SYMBOL_GPL(mpath_start_request);
+
+
+void mpath_end_request(struct request *req)
+{
+	struct mpath_request *mpath_request = blk_mq_rq_to_pdu(req);
+	struct mpath_device *mpath_device = mpath_request->mpath_device;
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	struct gendisk *disk = mpath_disk->gd;
+
+	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
+	if (mpath_request->flags & MPATH_REQ_CNT_ACTIVE)
+		atomic_dec_if_positive(&mpath_device->nr_active);
+
+	if (!(mpath_request->flags & MPATH_REQ_IO_STATS))
+		return;
+	bdev_end_io_acct(disk->part0, req_op(req),
+			 blk_rq_bytes(req) >> SECTOR_SHIFT,
+			  mpath_request->start_time);
+}
+EXPORT_SYMBOL_GPL(mpath_end_request);
+
+
 static struct attribute dummy_attr = {
 	.name = "dummy",
 };

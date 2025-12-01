@@ -187,6 +187,7 @@ void scsi_mpath_failover_req(struct request *req)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_failover_req);
 
+#ifdef dsddd
 void scsi_mpath_start_request(struct request *req)
 {
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
@@ -194,22 +195,10 @@ void scsi_mpath_start_request(struct request *req)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
-	struct gendisk *disk = mpath_disk->gd;
+	__maybe_unused struct gendisk *disk = mpath_disk->gd;
+	__maybe_unused struct mpath_request *mpath_request = &scmd->mpath_request;
 
-
-	if ((READ_ONCE(mpath_disk->iopolicy) == MPATH_IOPOLICY_QD) &&
-	    !(scmd->flags & SCMD_MPATH_CNT_ACTIVE)) {
-		atomic_inc(&mpath_device->nr_active);
-		scmd->flags |= SCMD_MPATH_CNT_ACTIVE;
-	}
-
-	if (!blk_queue_io_stat(disk->queue) || blk_rq_is_passthrough(req) ||
-	    (scmd->flags & SCMD_MPATH_IO_STATS))
-		return;
-
-	scmd->flags |= SCMD_MPATH_IO_STATS;
-	scmd->mpath_start_time = bdev_start_io_acct(disk->part0, req_op(req),
-						      jiffies);
+	mpath_start_request(mpath_request, mpath_device, req);
 }
 
 void scsi_mpath_end_request(struct request *req)
@@ -217,20 +206,22 @@ void scsi_mpath_end_request(struct request *req)
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = scmd->device;
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
-	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
-	struct gendisk *disk = mpath_disk->gd;
+	__maybe_unused struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+	__maybe_unused struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	__maybe_unused struct gendisk *disk = mpath_disk->gd;
+	__maybe_unused struct mpath_request *mpath_request = &scmd->mpath_request;
 
 	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
-	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE)
+	if (scmd->flags & MPATH_REQ_CNT_ACTIVE)
 		atomic_dec_if_positive(&mpath_device->nr_active);
 
-	if (!(scmd->flags & SCMD_MPATH_IO_STATS))
+	if (!(scmd->flags & MPATH_REQ_IO_STATS))
 		return;
 	bdev_end_io_acct(disk->part0, req_op(req),
 			 blk_rq_bytes(req) >> SECTOR_SHIFT,
-			  scmd->mpath_start_time);
+			  mpath_request->start_time);
 }
+#endif
 
 
 #if 0
