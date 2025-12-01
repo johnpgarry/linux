@@ -21,6 +21,8 @@
 
 #include <linux/sysfs.h>
 
+static DEFINE_IDA(scsi_mpath_index_ida);
+
 #define SCSI_MPATH_DEVICE_IO_PENDING      0
 
 MODULE_IMPORT_NS("SCSI_DH_ALUA");
@@ -420,17 +422,19 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 	INIT_LIST_HEAD(&scsi_mpath_disk->entry);
 	pr_err("%s6\n", __func__);
 
+	scsi_mpath_disk->index = ida_alloc(&scsi_mpath_index_ida, GFP_KERNEL);
+
 //	mpath_disk->cdev_device.devt = MKDEV(MAJOR(scsi_mpath_disk_chr_devt), scsi_mpath_disk->index);
 //	mpath_disk->cdev_device.class = &scsi_mpath_generic_class;
 //	mpath_disk->cdev_device.release = mpath_cdev_rel;
 
 	pr_err("%s7 &mpath_disk->dev=%pS\n", __func__, &mpath_disk->dev);
-	ret = dev_set_name(&mpath_disk->dev, "smpd%d", mpath_disk->index);
+	ret = dev_set_name(&mpath_disk->dev, "smpd%d", scsi_mpath_disk->index);
 
 
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
-	sprintf(mpath_disk->gd->disk_name, "smpd%d", mpath_disk->index);
+	sprintf(mpath_disk->gd->disk_name, "smpd%d", scsi_mpath_disk->index);
 
 	sprintf(scsi_mpath_disk->wwid, sdev->scsi_mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);
 
