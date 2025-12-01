@@ -760,8 +760,8 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 			synchronize_srcu(&mpath_disk->srcu);
 			pr_err("%s5.1 not calling device_del\n", __func__);
 		//	device_del(&scsi_mpath_disk->dev);???
-			pr_err("%s5.2 calling del_gendisk\n", __func__);
-		//	del_gendisk(mpath_disk->gd);
+			pr_err("%s5.2 calling del_gendisk mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
+			del_gendisk(mpath_disk->gd);
 		}
 		pr_err("%s6 calling put_disk on mpath_disk->gd=%pS\n", __func__, mpath_disk->gd);
 		
