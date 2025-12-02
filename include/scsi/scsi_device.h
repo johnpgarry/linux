@@ -136,7 +136,7 @@ struct scsi_mpath_device {
 
 
 
-	unsigned long           flags;		/* flag for multipath devices*/
+	unsigned long           flags;		/* SCSI_MPATH_DEVICE_IO_PENDING et al */
 
 
 
@@ -147,7 +147,7 @@ struct scsi_mpath_device {
 	char device_id_str[SCSI_MPATH_DEVICE_ID_LEN];
 	int	valid_states;		/* states from RTPG cmd */
 	int	prefrence;		/* Path prefrence for Port Group from RTPG cmd */
-	int	is_active;		/* Current Sdev is active */
+	int	is_active;		/* Current Sdev is active from scsi_dh_alua */
 };
 #define to_scsi_mpath_device(d) container_of(d, struct scsi_mpath_device, mpath_device)
 
