@@ -632,8 +632,10 @@ static ssize_t scsi_mpath_nr_total_show(struct device *dev, struct device_attrib
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device;
 
-	if (!scsi_mpath_dev)
+	if (!scsi_mpath_dev) {
+		pr_err("%s scsi_mpath_dev is NULL sdev=%pS\n", __func__, sdev);
 		return 0;
+	}
 	mpath_device = &scsi_mpath_dev->mpath_device;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&mpath_device->nr_total));
