@@ -304,24 +304,6 @@ static int scsi_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	return err;
 }
 
-static __maybe_unused void scsi_multipath_partition_scan_work(struct work_struct *work)
-{
-	struct scsi_mpath_disk *scsi_mpath_disk = NULL;
-	struct mpath_disk *mpath_disk = NULL;
-
-	pr_err("%s scsi_mpath_disk=%pS GD_SUPPRESS_PART_SCAN=%d\n",
-		__func__, scsi_mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
-	if (WARN_ON_ONCE(!test_and_clear_bit(GD_SUPPRESS_PART_SCAN,
-					     &mpath_disk->gd->state)))
-		return;
-
-	//mutex_lock(&head->disk->open_mutex);
-	pr_err("%s2 mpath_disk=%pS GD_SUPPRESS_PART_SCAN=%d calling bdev_disk_changed\n",
-		__func__, scsi_mpath_disk, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->gd->state));
-	bdev_disk_changed(mpath_disk->gd, false);
-	//mutex_unlock(&head->disk->open_mutex);
-}
-
 static __maybe_unused void scsi_mpath_disk_release(struct device *dev)
 {
 	struct mpath_disk *mpath_disk = container_of(dev, struct mpath_disk, dev);
