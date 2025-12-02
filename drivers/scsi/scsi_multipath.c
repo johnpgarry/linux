@@ -275,7 +275,7 @@ static inline bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 		return false;
 
 	return (!scsi_device_online(scsi_mpath_dev->sdev) &&
-	    ((mpath_device->state == MPATH_STATE_OPTIMAL) ||
+	    ((mpath_device->state == MPATH_STATE_OPTIMIZED) ||
 	     (mpath_device->state == MPATH_STATE_ACTIVE)));
 }
 

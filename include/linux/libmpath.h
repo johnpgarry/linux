@@ -12,7 +12,7 @@
 struct mpath_device;
 
 enum mpath_access_state {
-	MPATH_STATE_OPTIMAL,
+	MPATH_STATE_OPTIMIZED,
 	MPATH_STATE_ACTIVE,
 	MPATH_STATE_INVALID	= 0xFF
 };
