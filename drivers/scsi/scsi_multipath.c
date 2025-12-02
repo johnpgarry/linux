@@ -244,7 +244,9 @@ void scsi_mpath_kick_requeue_lists(struct Scsi_Host *shost)
 
 static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 {
-//	enum scsi_device_state sdev_state = sdev->sdev_state;
+	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	enum scsi_device_state sdev_state = sdev->sdev_state;
 
 	/*
 	 * if device multipath state is not set to LIVE
@@ -260,10 +262,10 @@ static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 	 * Otherwise I/O will fail immeadiately and return to
 	 * requeue list
 	 */
-//	if (sdev_state != SDEV_RUNNING && sdev_state != SDEV_CANCEL)
-//		return true;
+	if (sdev_state == SDEV_RUNNING || sdev_state == SDEV_CANCEL)
+		return false;
 
-	return false;
+	return true;
 }
 
 static inline bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
