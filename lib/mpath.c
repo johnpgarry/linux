@@ -1040,6 +1040,7 @@ void mpath_end_request(struct request *req)
 	bdev_end_io_acct(disk->part0, req_op(req),
 			 blk_rq_bytes(req) >> SECTOR_SHIFT,
 			  mpath_request->start_time);
+	mpath_request->flags &= ~MPATH_REQ_IO_STATS;
 }
 EXPORT_SYMBOL_GPL(mpath_end_request);
 
