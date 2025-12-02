@@ -267,8 +267,10 @@ struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node)
 	list_for_each_entry_rcu(mpath_device, &mpath_disk->dev_list, siblings) {
 	//	pr_err("%s1 itering mpath_disk=%pS mpath_dev=%pS disabled=%d\n",
 	//		__func__, scsi_mpath_disk, scsi_mpath_dev, scsi_mpath_is_disabled(scsi_mpath_dev->sdev));
-		if (mpath_disk->mpdt->is_disabled(mpath_device))
+		if (mpath_disk->mpdt->is_disabled(mpath_device)) {
+
 			continue;
+		}
 
 		if (mpath_device->numa_node != NUMA_NO_NODE &&
 		    (READ_ONCE(mpath_disk->iopolicy) == MPATH_IOPOLICY_NUMA))
@@ -361,41 +363,49 @@ out:
 
 static struct mpath_device *mpath_queue_depth_path(struct mpath_disk *mpath_disk)
 {
-	struct mpath_device *best_opt = NULL, *best_nonopt = NULL, *mpath_device;
-	unsigned int min_depth_opt = UINT_MAX, min_depth_nonopt = UINT_MAX;
+	struct mpath_device *best_opt = NULL, *mpath_device;
+	__maybe_unused struct mpath_device *best_nonopt = NULL;
+	unsigned int min_depth_opt = UINT_MAX;//, min_depth_nonopt = UINT_MAX;
 	unsigned int depth;
 
-	pr_err("%s mpath_disk=%pS min_depth_nonopt=%d\n", __func__, mpath_disk, min_depth_nonopt);
+	//pr_err("%s mpath_disk=%pS min_depth_opt=%d\n", __func__, mpath_disk, min_depth_opt);
 	list_for_each_entry_srcu(mpath_device, &mpath_disk->dev_list, siblings,
 				 srcu_read_lock_held(&mpath_disk->srcu)) {
-	//	if (nvme_path_is_disabled(ns))
-	//		continue;
+		if (mpath_disk->mpdt->is_disabled(mpath_device)) {
+			pr_err("%s0 mpath_device=%pS ->state=%d is_disabled\n",
+				__func__, mpath_device, mpath_device->state);
+			continue;
+		}
 
 		depth = atomic_read(&mpath_device->nr_active);
 
-/*
-		switch (ns->ana_state) {
-		case NVME_ANA_OPTIMIZED:
+		switch (mpath_device->state) {
+		case MPATH_STATE_OPTIMIZED:
 			if (depth < min_depth_opt) {
 				min_depth_opt = depth;
-				best_opt = ns;
+				best_opt = mpath_device;
 			}
 			break;
-		case NVME_ANA_NONOPTIMIZED:
-			if (depth < min_depth_nonopt) {
-				min_depth_nonopt = depth;
-				best_nonopt = ns;
-			}
-			break;
+//		case NVME_ANA_NONOPTIMIZED:
+//			if (depth < min_depth_nonopt) {
+//				min_depth_nonopt = depth;
+//				best_nonopt = ns;
+//			}
+//			break;
 		default:
+			pr_err("%s1 mpath_device=%pS ->state=%d\n",
+				__func__, mpath_device, mpath_device->state);
 			break;
 		}
-*/
-		if (min_depth_opt == 0)
+
+		if (min_depth_opt == 0) {
+	//		pr_err_ratelimited("%s2 min_depth_opt=0 best_opt=%pS\n", __func__, best_opt);
 			return best_opt;
+		}
 	}
 
-	return best_opt ? best_opt : best_nonopt;
+//	pr_err_ratelimited("%s3 min_depth_opt=%d best_opt=%pS\n", __func__, min_depth_opt, best_opt);
+	return best_opt;
 }
 
 static ssize_t mpath_iopolicy_show(struct device *dev,
@@ -424,7 +434,7 @@ static void mpath_iopolicy_update(struct mpath_disk *mpath_disk,
 	//	scsi_mpath_disk_clear_ctrl_paths(ctrl);
 	//mutex_unlock(&nvme_subsystems_lock);
 
-	pr_notice("iopolicy changed from %s to %s\n",
+	dev_notice(&mpath_disk->dev, "iopolicy changed from %s to %s\n",
 			mpath_iopolicy_names[old_iopolicy],
 			mpath_iopolicy_names[iopolicy]);
 }
@@ -1020,8 +1030,10 @@ void mpath_end_request(struct request *req)
 	struct gendisk *disk = mpath_disk->gd;
 
 	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
-	if (mpath_request->flags & MPATH_REQ_CNT_ACTIVE)
+	if (mpath_request->flags & MPATH_REQ_CNT_ACTIVE) {
 		atomic_dec_if_positive(&mpath_device->nr_active);
+		mpath_request->flags &= ~MPATH_REQ_CNT_ACTIVE;
+	}
 
 	if (!(mpath_request->flags & MPATH_REQ_IO_STATS))
 		return;
