@@ -480,7 +480,12 @@ static void scsi_mpath_free_disk(struct kref *ref)
 		container_of(ref, struct scsi_mpath_disk, ref);
 	struct mpath_disk *mpath_disk = to_mpath_disk(scsi_mpath_disk);
 
-	pr_err("%s scsi_mpath_disk=%pS calling ida_free\n", __func__, scsi_mpath_disk);
+
+	mutex_lock(&scsi_mpath_disks_lock);
+	pr_err("%s0 scsi_mpath_disk=%pS calling list_del\n", __func__, scsi_mpath_disk);
+	list_del(&scsi_mpath_disk->entry);
+	mutex_unlock(&scsi_mpath_disks_lock);
+	pr_err("%s1 scsi_mpath_disk=%pS calling ida_free\n", __func__, scsi_mpath_disk);
 	ida_free(&scsi_mpath_index_ida, scsi_mpath_disk->index);
 	pr_err("%s2 scsi_mpath_disk=%pS calling mpath_put_disk\n", __func__, scsi_mpath_disk);
 	mpath_put_disk(mpath_disk);
