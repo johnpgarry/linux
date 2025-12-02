@@ -4144,10 +4144,12 @@ static int sd_probe(struct device *dev)
 		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 		struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
 		struct scsi_mpath_disk *scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-		pr_err("%s calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
+		pr_err("%s calling sd_revalidate_mpath_disk sdp=%pS sdkp=%pS\n",
+			__func__, sdp, sdkp);
+		sd_revalidate_mpath_disk(scsi_mpath_disk, sdkp);
+		pr_err("%s2 calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
 		mpath_add_device(mpath_device);
-		sd_revalidate_mpath_disk(scsi_mpath_disk, sdkp);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
 
