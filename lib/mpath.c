@@ -601,14 +601,17 @@ EXPORT_SYMBOL_GPL(mpath_add_device);
 static bool mpath_available_path(struct mpath_disk *mpath_disk)
 {
 	struct mpath_device *mpath_device;
-	//struct scsi_device *sdev;
 
-	list_for_each_entry_rcu(mpath_device, &mpath_disk->dev_list, siblings) {
-	//	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-	//	sdev = scsi_mpath_dev->sdev;
-	//	if (scsi_device_online(sdev))
+	//pr_err("%s mpath_disk=%pS MPATH_DISK_LIVE=%d\n", __func__, mpath_disk, test_bit(MPATH_DISK_LIVE, &mpath_disk->flags));
+	if (!test_bit(MPATH_DISK_LIVE, &mpath_disk->flags))
+		return false;
+
+	list_for_each_entry_srcu(mpath_device, &mpath_disk->dev_list, siblings,
+				 srcu_read_lock_held(&mpath_disk->srcu)) {
+		if (!mpath_disk->mpdt->is_disabled(mpath_device))
 			return true;
 	}
+
 	return false;
 }
 
@@ -657,13 +660,13 @@ static void multipath_submit_bio(struct bio *bio)
 				__func__, bio);
 	//	BUG();
 	} else if (mpath_available_path(mpath_disk)) {
-		pr_err("No Usable Path - Requeing I/O \n");
+		pr_err_ratelimited("No Usable Path - Requeing I/O \n");
 
 		spin_lock_irq(&mpath_disk->requeue_lock);
 		bio_list_add(&mpath_disk->requeue_list, bio);
 		spin_unlock_irq(&mpath_disk->requeue_lock);
 	} else {
-		pr_err("No available path = Failing I/O \n");
+		dev_err(&mpath_disk->dev, "No available path = Failing I/O \n");
 
 		bio_io_error(bio);
 	}
