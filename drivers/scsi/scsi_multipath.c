@@ -627,6 +627,29 @@ static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attr
 struct device_attribute scsi_mpath_numa_nodes = \
 		__ATTR(numa_nodes, S_IRUGO, scsi_mpath_numa_nodes_show, NULL);
 
+static ssize_t scsi_mpath_queue_depth_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct mpath_device *mpath_device;
+	struct scsi_mpath_device *scsi_mpath_dev;
+	struct mpath_disk *mpath_disk;
+
+	dev_err(dev, "%s sdev=%pS mpath_dev=%pS\n", __func__,
+		sdev, sdev->scsi_mpath_dev);
+
+	scsi_mpath_dev = sdev->scsi_mpath_dev;
+	mpath_device = &scsi_mpath_dev->mpath_device;
+	mpath_disk = mpath_device->mpath_disk;
+
+	if (mpath_disk->iopolicy != MPATH_IOPOLICY_QD)
+		return 0;
+
+	return sysfs_emit(buf, "%d\n", atomic_read(&mpath_device->nr_active));
+}
+struct device_attribute scsi_mpath_queue_depth = \
+		__ATTR(queue_depth, S_IRUGO, scsi_mpath_queue_depth_show, NULL);
+
 static ssize_t scsi_mpath_nr_total_show(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
