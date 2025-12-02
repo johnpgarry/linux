@@ -602,7 +602,7 @@ static bool mpath_available_path(struct mpath_disk *mpath_disk)
 	return false;
 }
 
-void multipath_submit_bio(struct bio *bio)
+static void multipath_submit_bio(struct bio *bio)
 {
 	struct mpath_disk *mpath_disk = bio->bi_bdev->bd_disk->private_data;
 	int srcu_idx;
@@ -659,8 +659,6 @@ void multipath_submit_bio(struct bio *bio)
 	}
 	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 }
-EXPORT_SYMBOL_GPL(multipath_submit_bio);
-
 
 static void mpath_free_disk(struct kref *ref)
 {

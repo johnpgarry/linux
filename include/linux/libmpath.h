@@ -111,7 +111,6 @@ struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk);
 struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node);
 void mpath_requeue_work(struct work_struct *work);
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
-void multipath_submit_bio(struct bio *bio);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf);
 void mpath_put_disk(struct mpath_disk *mpath_disk);
 int mpath_get_disk(struct mpath_disk *mpath_disk);
