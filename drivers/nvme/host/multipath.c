@@ -1415,8 +1415,8 @@ int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	size_t ana_log_size;
 	int error = 0;
 
-	pr_err("%s ctrl=%pS NVME_CTRL_CMIC_ANA=%d\n",
-		__func__, ctrl, !!(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA));
+	pr_err("%s ctrl=%pS NVME_CTRL_CMIC_ANA=%d ctrl->subsys->cmic=0x%x\n",
+		__func__, ctrl, !!(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA), ctrl->subsys->cmic);
 	/* check if multipath is enabled and we have the capability */
 	if (!multipath || !ctrl->subsys ||
 	    !(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA))
