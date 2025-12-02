@@ -277,7 +277,7 @@ struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node)
 			distance = LOCAL_DISTANCE;
 
 		switch(mpath_device->state) {
-		case MPATH_STATE_OPTIMAL:
+		case MPATH_STATE_OPTIMIZED:
 		    if (distance < found_distance) {
 			    found_distance = distance;
 			    mpath_dev_found = mpath_device;
@@ -337,7 +337,7 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk
 
 		if (mpath_disk->mpdt->is_disabled(mpath_device))
 			continue;
-		if (mpath_device->state == MPATH_STATE_OPTIMAL) {
+		if (mpath_device->state == MPATH_STATE_OPTIMIZED) {
 			found = mpath_device;
 			goto out;
 		}
@@ -347,7 +347,7 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_disk *mpath_disk
 
 //	scsi_mpath_dev = to_scsi_mpath_device(old);
 	if (!mpath_disk->mpdt->is_disabled(mpath_device) &&
-	    (mpath_device->state == MPATH_STATE_OPTIMAL ||
+	    (mpath_device->state == MPATH_STATE_OPTIMIZED ||
 	    (!found && mpath_device->state == MPATH_STATE_ACTIVE)))
 		return old;
 
@@ -566,7 +566,7 @@ EXPORT_SYMBOL_GPL(mpath_requeue_work);
 bool mpath_device_is_live(struct mpath_device *mpath_device)
 {
 	switch (READ_ONCE(mpath_device->state)) {
-	case MPATH_STATE_OPTIMAL:
+	case MPATH_STATE_OPTIMIZED:
 	case MPATH_STATE_ACTIVE:
 		return true;
 	default:
@@ -581,7 +581,7 @@ void mpath_add_device(struct mpath_device *mpath_device)
 	pr_err("%s mpath_device=%pS mpath_disk=%pS\n", __func__, mpath_device, mpath_disk);
 
 	if (mpath_device_is_live(mpath_device)) {
-		mpath_device->state = MPATH_STATE_OPTIMAL;
+		mpath_device->state = MPATH_STATE_OPTIMIZED;
 		pr_err("%s calling scsi_mpath_set_live\n", __func__);
 		mpath_device_set_live(mpath_device);
 	}
