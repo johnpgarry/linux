@@ -518,7 +518,9 @@ struct nvme_ns_head {
 	unsigned int		delayed_removal_secs;
 #define NVME_NSHEAD_DISK_LIVE		0
 #define NVME_NSHEAD_QUEUE_IF_NO_PATH	1
+#ifdef dsdsd
 	struct nvme_ns __rcu	*current_path[];
+#endif
 #endif
 };
 

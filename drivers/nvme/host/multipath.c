@@ -1207,8 +1207,11 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 {
 	int node, srcu_idx;
 	nodemask_t numa_nodes;
-	struct nvme_ns *current_ns;
+	struct mpath_device *current_device;
+
+	#ifdef dsdsd
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
+	struct mpath_device *mpath_device = &ns->mpath_device;
 	struct nvme_ns_head *head = ns_to_head(ns);
 	struct mpath_head *mpath_head = head_to_mpath_head(head);
 
@@ -1227,6 +1230,9 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return sysfs_emit(buf, "%*pbl\n", nodemask_pr_args(&numa_nodes));
+	#else
+	return mpath_numa_nodes_show(mpath_device, buf);
+	#endif
 }
 DEVICE_ATTR_RO(numa_nodes);
 
