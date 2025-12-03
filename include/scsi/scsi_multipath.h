@@ -25,7 +25,7 @@ enum scsi_mpath_access_state {
 	SCSI_MPATH_INVALID	= 0xFF
 };
 
-struct scsi_mpath_disk;
+struct scsi_mpath_head;
 struct scsi_mpath_device;
 
 extern void scsi_mpath_failover_req(struct request *);
@@ -46,6 +46,6 @@ int scsi_mpath_unique_lun_id(struct scsi_device *);
 extern void mpath_revalidate_path(struct gendisk *, sector_t);
 extern int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type);
 
-void scsi_mpath_wait_freeze(struct scsi_mpath_disk *mpath_disk);
-void scsi_mpath_start_freeze(struct scsi_mpath_disk *mpath_disk);
+void scsi_mpath_wait_freeze(struct scsi_mpath_head *mpath_disk);
+void scsi_mpath_start_freeze(struct scsi_mpath_head *mpath_disk);
 #endif /* _SCSI_SCSI_MULTIPATH_H */
