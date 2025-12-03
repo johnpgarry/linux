@@ -16,6 +16,7 @@
 #include <linux/rcupdate.h>
 #include <linux/wait.h>
 #include <linux/t10-pi.h>
+#include <linux/multipath.h>
 #include <linux/ratelimit_types.h>
 
 #include <trace/events/block.h>
@@ -187,6 +188,7 @@ enum nvme_quirks {
  * this structure as the first member of their request-private data.
  */
 struct nvme_request {
+	struct mpath_request mpath_request; /* me first */
 	struct nvme_command	*cmd;
 	union nvme_result	result;
 	u8			genctr;
@@ -497,7 +499,9 @@ struct nvme_ns_head {
 	struct cdev		cdev;
 	struct device		cdev_device;
 
+#ifdef dsddd
 	struct gendisk		*disk;
+#endif
 
 	u16			nr_plids;
 	u16			*plids;
@@ -516,9 +520,17 @@ struct nvme_ns_head {
 #endif
 };
 
+static inline struct mpath_disk *head_to_mpath_disk(void *priv)
+{
+	struct mpath_disk *mpath_disk = priv;
+
+	return mpath_disk - 1;
+}
+
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
 {
-	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->disk;
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
+	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && mpath_disk->gd;
 }
 
 enum nvme_ns_features {
@@ -994,8 +1006,10 @@ static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
 
-	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio)
-		trace_block_bio_complete(ns_to_head(ns)->disk->queue, req->bio);
+	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio) {
+		struct mpath_disk *mpath_disk = head_to_mpath_disk(ns_to_head(ns));
+		trace_block_bio_complete(mpath_disk->gd->queue, req->bio);
+	}
 }
 
 extern bool multipath;
@@ -1008,7 +1022,7 @@ extern struct device_attribute subsys_attr_iopolicy;
 
 static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
 {
-	return disk->fops == &nvme_ns_head_ops;
+	return is_mpath_disk(disk);
 }
 static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
 {
@@ -1164,7 +1178,7 @@ static inline void nvme_start_request(struct request *rq)
 	pr_err_once("%s REQ_NVME_MPATH set=%d (call nvme_mpath_start_request if set) rq=%pS (bio=%pS)\n",
 		__func__, !!(rq->cmd_flags & REQ_NVME_MPATH), rq, rq->bio);
 	if (rq->cmd_flags & REQ_NVME_MPATH)
-		nvme_mpath_start_request(rq);
+		mpath_start_request(rq);
 	blk_mq_start_request(rq);
 }
 

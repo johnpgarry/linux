@@ -697,6 +697,7 @@ int nvme_ns_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 	return 0;
 }
 #ifdef CONFIG_NVME_MULTIPATH
+#ifdef dsdd
 static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
 		void __user *argp, struct nvme_ns_head *head, int srcu_idx,
 		bool open_for_write)
@@ -780,6 +781,7 @@ out_unlock:
 	srcu_read_unlock(&head->srcu, srcu_idx);
 	return ret;
 }
+#endif
 
 int nvme_ns_head_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 		unsigned int issue_flags)
@@ -787,7 +789,7 @@ int nvme_ns_head_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
 	struct nvme_ns_head *head = container_of(cdev, struct nvme_ns_head, cdev);
 	int srcu_idx = srcu_read_lock(&head->srcu);
-	struct nvme_ns *ns = nvme_find_path(head);
+	struct nvme_ns *ns = NULL;//fixme nvme_find_path(head);
 	int ret = -EINVAL;
 
 	if (ns)

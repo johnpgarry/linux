@@ -443,7 +443,7 @@ static inline void __nvme_end_req(struct request *req)
 	nvme_end_req_zoned(req);
 	nvme_trace_bio_complete(req);
 	if (req->cmd_flags & REQ_NVME_MPATH)
-		nvme_mpath_end_request(req);
+		mpath_end_request(req);
 }
 
 void nvme_end_req(struct request *req)
@@ -2504,9 +2504,12 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
 		struct queue_limits lim;
 		unsigned int memflags;
+		struct nvme_ns_head *head = ns_to_head(ns);
+		struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
+		struct gendisk *disk = mpath_disk->gd;
 
-		lim = queue_limits_start_update(ns_to_head(ns)->disk->queue);
-		memflags = blk_mq_freeze_queue(ns_to_head(ns)->disk->queue);
+		lim = queue_limits_start_update(disk->queue);
+		memflags = blk_mq_freeze_queue(disk->queue);
 		/*
 		 * queue_limits mixes values that are the hardware limitations
 		 * for bio splitting with what is the device configuration.
@@ -2529,26 +2532,26 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 	//	pr_err("%s2 ns=%pS info=%pS calling queue_limits_stack_bdev lim.atomic_write_hw_unit_max=%d ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max=%d\n",
 	//		__func__, ns, info, lim.atomic_write_hw_unit_max, ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max);
 		queue_limits_stack_bdev(&lim, ns->disk->part0, 0,
-					ns_to_head(ns)->disk->disk_name);
+					disk->disk_name);
 	//	pr_err("%s2.1 ns=%pS info=%pS called queue_limits_stack_bdev lim.atomic_write_hw_unit_max=%d ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max=%d\n",
 	//		__func__, ns, info, lim.atomic_write_hw_unit_max, ns->disk->part0->bd_queue->limits.atomic_write_hw_unit_max);
 		if (unsupported)
-			ns_to_head(ns)->disk->flags |= GENHD_FL_HIDDEN;
+			disk->flags |= GENHD_FL_HIDDEN;
 		else
 			nvme_init_integrity(ns_to_head(ns), &lim, info);
 		lim.max_write_streams = ns_lim->max_write_streams;
 		lim.write_stream_granularity = ns_lim->write_stream_granularity;
-		ret = queue_limits_commit_update(ns_to_head(ns)->disk->queue, &lim);
+		ret = queue_limits_commit_update(disk->queue, &lim);
 
-		set_capacity_and_notify(ns_to_head(ns)->disk, get_capacity(ns->disk));
-		set_disk_ro(ns_to_head(ns)->disk, nvme_ns_is_readonly(ns, info));
+		set_capacity_and_notify(disk, get_capacity(ns->disk));
+		set_disk_ro(disk, nvme_ns_is_readonly(ns, info));
 	//	pr_err("%s3 ns=%pS info=%pS calling nvme_mpath_revalidate_paths\n",
 	//		__func__, ns, info);
 		nvme_mpath_revalidate_paths(ns);
 	//	pr_err("%s3.1 ns=%pS info=%pS called nvme_mpath_revalidate_paths\n",
 	//		__func__, ns, info);
 
-		blk_mq_unfreeze_queue(ns_to_head(ns)->disk->queue, memflags);
+		blk_mq_unfreeze_queue(disk->queue, memflags);
 	}
 
 	return ret;
@@ -3935,23 +3938,29 @@ static int nvme_add_ns_cdev(struct nvme_ns *ns)
 			     ns->ctrl->ops->module);
 }
 
+const struct mpath_disk_template mpdt = {
+
+};
+
 static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 		struct nvme_ns_info *info)
 {
 	struct nvme_ns_head *head;
 	size_t size = sizeof(*head);
 	int ret = -ENOMEM;
-
-#ifdef CONFIG_NVME_MULTIPATH
-	size += num_possible_nodes() * sizeof(struct nvme_ns *);
-#endif
-
-	head = kzalloc(size, GFP_KERNEL);
-	if (!head)
-		goto out;
+	struct mpath_disk *mpath_disk;
+	char name[256];
 	ret = ida_alloc_min(&ctrl->subsys->ns_ida, 1, GFP_KERNEL);
 	if (ret < 0)
-		goto out_free_head;
+		return ERR_PTR(ret);
+
+	sprintf(name, "nvme%dn%d",
+			ctrl->subsys->instance, ret);
+	mpath_disk = mpath_alloc_disk(&mpdt, size, ctrl->numa_node, name);
+	if (!mpath_disk)
+		goto out_free_ida;
+	head = (struct nvme_ns_head *)(mpath_disk + 1);
+
 	head->instance = ret;
 	INIT_LIST_HEAD(&head->list);
 	ret = init_srcu_struct(&head->srcu);
@@ -3986,10 +3995,11 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 out_cleanup_srcu:
 	cleanup_srcu_struct(&head->srcu);
 out_ida_remove:
+//out_free_head:
+	//kfree(head);
+out_free_ida:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
-out_free_head:
-	kfree(head);
-out:
+//out:
 	if (ret > 0)
 		ret = blk_status_to_errno(nvme_error_status(ret));
 	return ERR_PTR(ret);
@@ -4111,7 +4121,12 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	list_add_tail_rcu(&ns->mpath_device.siblings, &head->list);
 	// ns_to_head(ns) = head;
 	// ns->head = head;
-	BUG();
+	mpath_device = &ns->mpath_device;
+	mpath_disk = head_to_mpath_disk(head);
+	pr_err("%s22 mpath_disk=%pS ns=%pS head=%pS\n",
+		__func__, mpath_disk, ns, head);
+	mpath_device->mpath_disk = mpath_disk;
+	//BUG();
 	mutex_unlock(&ctrl->subsys->lock);
 
 #ifdef CONFIG_NVME_MULTIPATH
@@ -4286,7 +4301,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		 * we do not release the reference to nshead twice if head->disk
 		 * is not present.
 		 */
-		if (ns_to_head(ns)->disk)
+		if (head_to_mpath_disk(ns_to_head(ns))->gd)
 			last_path = true;
 	}
 	mutex_unlock(&ctrl->subsys->lock);
@@ -4335,7 +4350,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (!nvme_ns_head_multipath(ns_to_head(ns)))
 		nvme_cdev_del(&ns->cdev, &ns->cdev_device);
 
-	nvme_mpath_remove_sysfs_link(ns);
+	mpath_remove_sysfs_link(&ns->mpath_device);
 
 	del_gendisk(ns->disk);
 
