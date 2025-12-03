@@ -471,8 +471,10 @@ struct nvme_ns_ids {
  * only ever has a single entry for private namespaces.
  */
 struct nvme_ns_head {
+	#ifdef dsdsd
 	struct list_head	list;
 	struct srcu_struct      srcu;
+	#endif
 	struct nvme_subsystem	*subsys;
 	struct nvme_ns_ids	ids;
 	u8			lba_shift;
@@ -599,6 +601,9 @@ static inline struct nvme_ns_head *ns_to_head(struct nvme_ns *ns)
 {
 	struct mpath_device *mpath_device = &ns->mpath_device;
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+
+	pr_err("%s ns=%pS mpath_device=%pS mpath_disk=%pS\n",
+		__func__, ns, mpath_device, mpath_disk);
 
 	return (struct nvme_ns_head *)(mpath_disk + 1);
 }

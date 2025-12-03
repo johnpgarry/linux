@@ -607,8 +607,8 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	if (!mpath_disk)
 		return NULL;
 	//scsi_mpath_disk = to_scsi_mpath_disk(mpath_disk);
-	pr_err("%s mpath_disk=%pS scsi_mpath_disk=%pS\n",
-		__func__, NULL, mpath_disk);
+	//pr_err("%s mpath_disk=%pS scsi_mpath_disk=%pS\n",
+	//	__func__, NULL, mpath_disk);
 	//mpath_device->mpath_disk = mpath_disk;
 	//mpath_disk->is_disabled = scsi_mpath_is_disabled;
 	//mpath_disk->is_optimized = scsi_mpath_is_optimized;
@@ -664,7 +664,8 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 //		return NULL;
 
 	ret = init_srcu_struct(&mpath_disk->srcu);
-	pr_err("%s12 ret=%d after init_srcu_struct mpath_disk=%pS\n", __func__, ret, mpath_disk);
+	pr_err("%s12 ret=%d mpath_disk=%pS mpath_disk->gd->major=%d first_minor=%d minors=%d\n",
+		__func__, ret, mpath_disk, mpath_disk->gd->major, mpath_disk->gd->first_minor, mpath_disk->gd->minors);
 	if (ret)
 		return NULL;
 
@@ -697,7 +698,7 @@ struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt, int 
 	return mpath_disk;
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_disk);
-
+extern const struct attribute_group *nvme_ns_attr_groups[];
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {
 	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
@@ -710,7 +711,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 		struct device *dd1 = &mpath_disk->dev;
 		struct kobject *dd1_kobj = &dd1->kobj;
 		struct kref *dd1_kobj_kref = &dd1_kobj->kref;
-		pr_err("%s calling device_add_disk &mpath_disk->dev=%pS ref count=%d\n",
+		pr_err("%s0 calling device_add_disk &mpath_disk->dev=%pS ref count=%d\n",
 			__func__, &mpath_disk->dev, kref_read(dd1_kobj_kref));
 
 		ret = device_add_disk(&mpath_disk->dev, mpath_disk->gd, mpath_device_groups);
@@ -721,7 +722,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 			return;
 		}
 		pr_err("%s2 calling scsi_mpath_disk_add_cdev partition_scan_work\n", __func__);
-		mpath_disk_add_cdev(mpath_disk);
+		//mpath_disk_add_cdev(mpath_disk);
 		pr_err("%s3 calling kblockd_schedule_work partition_scan_work\n", __func__);
 		kblockd_schedule_work(&mpath_disk->partition_scan_work);
 	}
@@ -1141,7 +1142,7 @@ int mpath_get_disk(struct mpath_disk *mpath_disk)
 }
 EXPORT_SYMBOL_GPL(mpath_get_disk);
 
-int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
+__maybe_unused int mpath_disk_add_cdev(struct mpath_disk *mpath_disk)
 {
 	int ret, minor = 0 /*mpath_disk->index*/;
 

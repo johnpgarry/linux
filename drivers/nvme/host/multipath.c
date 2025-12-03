@@ -306,17 +306,17 @@ void nvme_mpath_revalidate_paths(struct nvme_ns *ns)
 	int srcu_idx;
 
 	pr_err("%s ns=%pS head=%pS\n", __func__, ns, head);
-	srcu_idx = srcu_read_lock(&head->srcu);
-	list_for_each_entry_srcu(mpath_device, &head->list, siblings,
-				 srcu_read_lock_held(&head->srcu)) {
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
+	list_for_each_entry_srcu(mpath_device, &mpath_disk->dev_list, siblings,
+				 srcu_read_lock_held(&mpath_disk->srcu)) {
 		ns = nvme_to_ns(mpath_device);
 		if (capacity != get_capacity(ns->disk))
 			clear_bit(NVME_NS_READY, &ns->flags);
 	}
-	srcu_read_unlock(&head->srcu, srcu_idx);
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 
 	for_each_node(node)
-		rcu_assign_pointer(head->current_path[node], NULL);
+		rcu_assign_pointer(mpath_disk->current_path[node], NULL);
 	kblockd_schedule_work(&head->requeue_work);
 }
 
@@ -521,7 +521,7 @@ inline struct nvme_ns *nvme_find_path(struct nvme_ns_head *head)
 		return nvme_numa_path(head);
 	}
 }
-
+#error
 static bool nvme_available_path(struct nvme_ns_head *head)
 {
 	struct nvme_ns *ns;
@@ -621,17 +621,18 @@ static __maybe_unused int nvme_ns_head_get_unique_id(struct gendisk *disk, u8 id
 		enum blk_unique_id type)
 {
 	struct nvme_ns_head *head = disk->private_data;
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
 	pr_err("%s head=%pS\n", __func__, head);
-	srcu_idx = srcu_read_lock(&head->srcu);
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
 	pr_err("%s1 head=%pS srcu_idx=%d calling nvme_find_path\n", __func__, head, srcu_idx);
 	ns = nvme_find_path(head);
 	pr_err("%s1.1 head=%pS srcu_idx=%d called nvme_find_path ns=%pS\n", __func__, head, srcu_idx, ns);
 	if (ns)
 		ret = nvme_ns_get_unique_id(ns, id, type);
-	srcu_read_unlock(&head->srcu, srcu_idx);
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 	return ret;
 }
 
@@ -747,7 +748,7 @@ static void nvme_requeue_work(struct work_struct *work)
 
 static void nvme_remove_head(struct nvme_ns_head *head)
 {
-	if (test_and_clear_bit(NVME_NSHEAD_DISK_LIVE, &head->flags)) {	
+	if (test_and_clear_bit(NVME_NSHEAD_DISK_LIVE, &head->flags)) {
 		struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
 		struct gendisk *disk = mpath_disk->gd;
 		/*
@@ -757,7 +758,7 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 		kblockd_schedule_work(&head->requeue_work);
 
 		nvme_cdev_del(&head->cdev, &head->cdev_device);
-		synchronize_srcu(&head->srcu);
+		synchronize_srcu(&mpath_disk->srcu);
 		del_gendisk(disk);
 	}
 	nvme_put_ns_head(head);
@@ -768,10 +769,11 @@ static void nvme_remove_head_work(struct work_struct *work)
 	struct nvme_ns_head *head = container_of(to_delayed_work(work),
 			struct nvme_ns_head, remove_work);
 	bool remove = false;
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
 
 	mutex_lock(&head->subsys->lock);
-	if (list_empty(&head->list)) {
-		list_del_init(&head->entry);
+	if (list_empty(&mpath_disk->dev_list)) {
+		list_del_init(&mpath_disk->dev_list);
 		remove = true;
 	}
 	mutex_unlock(&head->subsys->lock);
@@ -784,6 +786,8 @@ static void nvme_remove_head_work(struct work_struct *work)
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct queue_limits lim;
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
+	struct gendisk *gendisk = mpath_disk->gd;
 
 	mutex_init(&head->lock);
 	bio_list_init(&head->requeue_list);
@@ -840,8 +844,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	sprintf(head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
 #endif
-//	pr_err("%s9 head->disk=%pS called blk_alloc_disk name=%s\n",
-//		__func__, head->disk, head->disk->disk_name);
+	pr_err("%s9 gendisk name=%s\n", __func__, gendisk->disk_name);
 	nvme_tryget_ns_head(head);
 	return 0;
 }
@@ -890,7 +893,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	}
 	mutex_unlock(&head->lock);
 
-	synchronize_srcu(&head->srcu);
+	synchronize_srcu(&mpath_disk->srcu);
 	kblockd_schedule_work(&head->requeue_work);
 }
 #endif
@@ -1194,20 +1197,21 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 	struct nvme_ns *current_ns;
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 	struct nvme_ns_head *head = ns_to_head(ns);
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
 
 	if (head->subsys->iopolicy != NVME_IOPOLICY_NUMA)
 		return 0;
 
 	nodes_clear(numa_nodes);
 
-	srcu_idx = srcu_read_lock(&head->srcu);
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
 	for_each_node(node) {
 		current_ns = srcu_dereference(head->current_path[node],
-				&head->srcu);
+				&mpath_disk->srcu);
 		if (ns == current_ns)
 			node_set(node, numa_nodes);
 	}
-	srcu_read_unlock(&head->srcu, srcu_idx);
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 
 	return sysfs_emit(buf, "%*pbl\n", nodemask_pr_args(&numa_nodes));
 }
@@ -1231,6 +1235,7 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 {
 	struct gendisk *disk = dev_to_disk(dev);
 	struct nvme_ns_head *head = disk->private_data;
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
 	unsigned int sec;
 	int ret;
 
@@ -1249,7 +1254,7 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 	 * Ensure that update to NVME_NSHEAD_QUEUE_IF_NO_PATH is seen
 	 * by its reader.
 	 */
-	synchronize_srcu(&head->srcu);
+	synchronize_srcu(&mpath_disk->srcu);
 
 	return count;
 }
@@ -1414,7 +1419,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	 * head->list here. If it is no longer empty then we skip enqueuing the
 	 * delayed head removal work.
 	 */
-	if (!list_empty(&head->list))
+	if (!list_empty(&mpath_disk->dev_list))
 		goto out;
 
 	if (head->delayed_removal_secs) {
