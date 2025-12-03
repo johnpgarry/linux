@@ -6,7 +6,7 @@
 #include <linux/bio.h>
 #include <linux/moduleparam.h>
 #include <linux/topology.h>
-#include <linux/libmpath.h>
+#include <linux/multipath.h>
 
 static int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
 static void mpath_device_set_live(struct mpath_device *mpath_device);
