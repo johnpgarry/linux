@@ -4028,7 +4028,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	if (ret)
 		goto out_cleanup_srcu;
 
-	ret = mpath_add_disk(mpath_head);
+	ret = mpath_add_head(mpath_head);
 	pr_err("%s2 ret=%d from mpath_add_disk\n", __func__, ret);
 
 	list_add_tail(&head->entry, &ctrl->subsys->nsheads);
