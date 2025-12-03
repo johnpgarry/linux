@@ -9,7 +9,6 @@
 #include <linux/multipath.h>
 
 static int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
-static void mpath_device_set_live(struct mpath_device *mpath_device);
 static void mpath_free_disk(struct kref *ref);
 static dev_t mpath_disk_chr_devt;
 
@@ -745,6 +744,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 	synchronize_srcu(&mpath_disk->srcu);
 	kblockd_schedule_work(&mpath_disk->requeue_work);
 }
+EXPORT_SYMBOL_GPL(mpath_device_set_live);
 
 bool mpath_device_is_live(struct mpath_device *mpath_device)
 {

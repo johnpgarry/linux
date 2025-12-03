@@ -126,6 +126,7 @@ void mpath_remove_device(struct mpath_device *mpath_device);
 
 void mpath_start_request(struct request *req);
 void mpath_end_request(struct request *req);
+void mpath_device_set_live(struct mpath_device *mpath_device);
 
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
