@@ -4149,6 +4149,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	} else {
 
 		mpath_head = head_to_mpath_head(head);
+		mpath_device->mpath_head = mpath_head;
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
 		    !list_empty(&mpath_head->dev_list)) {
