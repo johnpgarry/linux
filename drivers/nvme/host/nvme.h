@@ -522,17 +522,17 @@ struct nvme_ns_head {
 #endif
 };
 
-static inline struct mpath_disk *head_to_mpath_disk(void *priv)
+static inline struct mpath_head *head_to_mpath_head(void *priv)
 {
-	struct mpath_disk *mpath_disk = priv;
+	struct mpath_head *mpath_head = priv;
 
-	return mpath_disk - 1;
+	return mpath_head - 1;
 }
 
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
 {
-	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
-	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && mpath_disk->gd;
+	struct mpath_head *mpath_head = head_to_mpath_head(head);
+	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && mpath_head->gd;
 }
 
 enum nvme_ns_features {
@@ -600,12 +600,12 @@ struct nvme_ctrl_ops {
 static inline struct nvme_ns_head *ns_to_head(struct nvme_ns *ns)
 {
 	struct mpath_device *mpath_device = &ns->mpath_device;
-	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 
-	pr_err("%s ns=%pS mpath_device=%pS mpath_disk=%pS\n",
-		__func__, ns, mpath_device, mpath_disk);
+//	pr_err("%s ns=%pS mpath_device=%pS mpath_head=%pS\n",
+//		__func__, ns, mpath_device, mpath_head);
 
-	return (struct nvme_ns_head *)(mpath_disk + 1);
+	return (struct nvme_ns_head *)(mpath_head + 1);
 }
 
 /*
@@ -1012,8 +1012,8 @@ static inline void nvme_trace_bio_complete(struct request *req)
 	struct nvme_ns *ns = req->q->queuedata;
 
 	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio) {
-		struct mpath_disk *mpath_disk = head_to_mpath_disk(ns_to_head(ns));
-		trace_block_bio_complete(mpath_disk->gd->queue, req->bio);
+		struct mpath_head *mpath_head = head_to_mpath_head(ns_to_head(ns));
+		trace_block_bio_complete(mpath_head->gd->queue, req->bio);
 	}
 }
 
@@ -1027,7 +1027,7 @@ extern struct device_attribute subsys_attr_iopolicy;
 
 static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
 {
-	return is_mpath_disk(disk);
+	return is_mpath_head(disk);
 }
 static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
 {

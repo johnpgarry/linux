@@ -2514,8 +2514,8 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		struct queue_limits lim;
 		unsigned int memflags;
 		struct nvme_ns_head *head = ns_to_head(ns);
-		struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
-		struct gendisk *disk = mpath_disk->gd;
+		struct mpath_head *mpath_head = head_to_mpath_head(head);
+		struct gendisk *disk = mpath_head->gd;
 
 		lim = queue_limits_start_update(disk->queue);
 		memflags = blk_mq_freeze_queue(disk->queue);
@@ -3969,8 +3969,8 @@ static int nvme_mpath_ioctl(struct mpath_device *, blk_mode_t mode,
 	return 0;
 }
 
-const struct mpath_disk_template mpdt = {
-//	.class = &scsi_mpath_disk_class,
+const struct mpath_head_template mpdt = {
+//	.class = &scsi_mpath_head_class,
 //	.cdev_class = &scsi_mpath_generic_class,
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
@@ -3984,7 +3984,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	struct nvme_ns_head *head;
 	size_t size = sizeof(*head);
 	int ret = -ENOMEM;
-	struct mpath_disk *mpath_disk;
+	struct mpath_head *mpath_head;
 	char name[256];
 	ret = ida_alloc_min(&ctrl->subsys->ns_ida, 1, GFP_KERNEL);
 	if (ret < 0)
@@ -3992,12 +3992,12 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 
 	sprintf(name, "nvme%dn%d",
 			ctrl->subsys->instance, ret);
-	mpath_disk = mpath_alloc_disk(&mpdt, size, ctrl->numa_node, name);
-	if (!mpath_disk)
+	mpath_head = mpath_alloc_head(&mpdt, size, ctrl->numa_node, name);
+	if (!mpath_head)
 		goto out_free_ida;
-	head = (struct nvme_ns_head *)(mpath_disk + 1);
+	head = (struct nvme_ns_head *)(mpath_head + 1);
 
-	pr_err("%s mpath_disk=%pS head=%pS\n", __func__, mpath_disk, head);
+	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 
 	head->instance = ret;
 	#ifdef dsdd
@@ -4028,7 +4028,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	if (ret)
 		goto out_cleanup_srcu;
 
-	ret = mpath_add_disk(mpath_disk);
+	ret = mpath_add_disk(mpath_head);
 	pr_err("%s2 ret=%d from mpath_add_disk\n", __func__, ret);
 
 	list_add_tail(&head->entry, &ctrl->subsys->nsheads);
@@ -4080,7 +4080,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	struct nvme_ctrl *ctrl = ns->ctrl;
 	struct nvme_ns_head *head = NULL;
 	struct mpath_device *mpath_device;
-	struct mpath_disk *mpath_disk;
+	struct mpath_head *mpath_head;
 	int ret;
 
 	mpath_device = &ns->mpath_device;
@@ -4144,14 +4144,14 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			goto out_unlock;
 		}
 
-		mpath_disk = head_to_mpath_disk(head);
-		mpath_device->mpath_disk = mpath_disk;
+		mpath_head = head_to_mpath_head(head);
+		mpath_device->mpath_head = mpath_head;
 	} else {
 
-		mpath_disk = head_to_mpath_disk(head);
+		mpath_head = head_to_mpath_head(head);
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
-		    !list_empty(&mpath_disk->dev_list)) {
+		    !list_empty(&mpath_head->dev_list)) {
 			dev_err(ctrl->device,
 				"Duplicate unshared namespace %d\n",
 				info->nsid);
@@ -4173,11 +4173,11 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	}
 
-	list_add_tail_rcu(&mpath_device->siblings, &mpath_disk->dev_list);
+	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
 	// ns_to_head(ns) = head;
 	// ns->head = head;
-	pr_err("%s22 mpath_disk=%pS ns=%pS head=%pS\n",
-		__func__, mpath_disk, ns, head);
+	pr_err("%s22 mpath_head=%pS ns=%pS head=%pS\n",
+		__func__, mpath_head, ns, head);
 	//BUG();
 	mutex_unlock(&ctrl->subsys->lock);
 
@@ -4359,7 +4359,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		 * we do not release the reference to nshead twice if head->disk
 		 * is not present.
 		 */
-		if (head_to_mpath_disk(ns_to_head(ns))->gd)
+		if (head_to_mpath_head(ns_to_head(ns))->gd)
 			last_path = true;
 	}
 	#endif
@@ -4377,7 +4377,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 {
 	bool last_path = false;
 	struct mpath_device *mpath_device = &ns->mpath_device;
-	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
 		return;
@@ -4390,15 +4390,15 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	 * Ensure that !NVME_NS_READY is seen by other threads to prevent
 	 * this ns going back into current_path.
 	 */
-	synchronize_srcu(&mpath_disk->srcu);
+	synchronize_srcu(&mpath_head->srcu);
 
 	/* wait for concurrent submissions */
 	if (nvme_mpath_clear_current_path(ns))
-		synchronize_srcu(&mpath_disk->srcu);
+		synchronize_srcu(&mpath_head->srcu);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
 	list_del_rcu(&ns->mpath_device.siblings);
-	if (list_empty(&mpath_disk->dev_list)) {
+	if (list_empty(&mpath_head->dev_list)) {
 		if (!nvme_mpath_queue_if_no_path(ns_to_head(ns)))
 			list_del_init(&ns_to_head(ns)->entry);
 		last_path = true;
@@ -4406,7 +4406,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	mutex_unlock(&ns->ctrl->subsys->lock);
 
 	/* guarantee not available in head->list */
-	synchronize_srcu(&mpath_disk->srcu);
+	synchronize_srcu(&mpath_head->srcu);
 
 	if (!nvme_ns_head_multipath(ns_to_head(ns)))
 		nvme_cdev_del(&ns->cdev, &ns->cdev_device);

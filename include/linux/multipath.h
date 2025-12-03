@@ -30,7 +30,7 @@ enum mpath_iopolicy {
 
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
 
-struct mpath_disk {
+struct mpath_head {
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	struct gendisk		*gd;
@@ -50,7 +50,7 @@ struct mpath_disk {
 	struct mutex            lock;
 
 	struct mpath_device __rcu *current_path[MAX_NUMNODES]; /* scsi_device of current path */
-	const struct mpath_disk_template *mpdt;
+	const struct mpath_head_template *mpdt;
 	unsigned long hostdata[]  /* Used for storage of host specific stuff */
 			__attribute__ ((aligned (sizeof(unsigned long))));
 };
@@ -65,7 +65,7 @@ struct mpath_request {
 };
 
 struct mpath_device {
-	struct mpath_disk *mpath_disk;
+	struct mpath_head *mpath_head;
 	struct list_head siblings;
 	enum mpath_access_state	state;
 	atomic_t nr_active;
@@ -77,7 +77,7 @@ struct mpath_device {
 
 #define REQ_MPATH		REQ_DRV
 
-struct mpath_disk_template {
+struct mpath_head_template {
 	const struct class *class;
 	const struct class *cdev_class;
 	bool (*is_disabled)(struct mpath_device *);
@@ -87,15 +87,15 @@ struct mpath_disk_template {
 		    unsigned int cmd, unsigned long arg);
 };
 
-struct mpath_disk *mpath_alloc_disk(const struct mpath_disk_template *mpdt,
+struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt,
 						int privsize, int node_id, char *name);
 
- int __must_check mpath_add_disk(struct mpath_disk *);
+ int __must_check mpath_add_disk(struct mpath_head *);
 
 
-static inline struct mpath_disk *to_mpath_disk(void *d)
+static inline struct mpath_head *to_mpath_head(void *d)
 {
-	return d - sizeof(struct mpath_disk);
+	return d - sizeof(struct mpath_head);
 }
 
 
@@ -104,20 +104,20 @@ static inline bool is_mpath_request(struct request *req)
 	return req->cmd_flags & REQ_MPATH;
 }
 
-#define cdev_to_mpath_disk(cdev) container_of(cdev, struct mpath_disk, cdev)
+#define cdev_to_mpath_head(cdev) container_of(cdev, struct mpath_head, cdev)
 
 bool mpath_clear_current_path(struct mpath_device *);
-struct mpath_device *mpath_find_path(struct mpath_disk *mpath_disk);
-struct mpath_device *__mpath_find_path(struct mpath_disk *mpath_disk, int node);
+struct mpath_device *mpath_find_path(struct mpath_head *mpath_head);
+struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head, int node);
 void mpath_requeue_work(struct work_struct *work);
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf);
-void mpath_put_disk(struct mpath_disk *mpath_disk);
-int mpath_get_disk(struct mpath_disk *mpath_disk);
-//int mpath_disk_add_cdev(struct mpath_disk *mpath_disk);
+void mpath_put_disk(struct mpath_head *mpath_head);
+int mpath_get_disk(struct mpath_head *mpath_head);
+//int mpath_head_add_cdev(struct mpath_head *mpath_head);
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 //void multipath_partition_scan_work(struct work_struct *work);
-void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
+void mpath_add_sysfs_link(struct mpath_head *mpath_head);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 void mpath_add_device(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
@@ -132,6 +132,6 @@ extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
 extern const struct attribute_group *mpath_device_groups[];
 
-bool is_mpath_disk(struct gendisk *disk);
+bool is_mpath_head(struct gendisk *disk);
 
 #endif // _LIBMULTIPATH_H

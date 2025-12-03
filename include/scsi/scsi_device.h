@@ -107,7 +107,7 @@ struct scsi_vpd {
 struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
 
-struct scsi_mpath_disk {
+struct scsi_mpath_head {
 	unsigned long		start_time;
 	struct delayed_work	activate; /* Path Activation work */
 	//struct device		dev;
@@ -117,8 +117,8 @@ struct scsi_mpath_disk {
 	char wwid[SCSI_MPATH_DEVICE_ID_LEN];
 };
 
-//#define to_scsi_mpath_disk(md) container_of(md, struct scsi_mpath_disk, mpath_disk)
-#define to_scsi_mpath_disk(md) ((struct scsi_mpath_disk *)(md + 1))
+//#define to_scsi_mpath_head(md) container_of(md, struct scsi_mpath_head, mpath_head)
+#define to_scsi_mpath_head(md) ((struct scsi_mpath_head *)(md + 1))
 
 struct scsi_mpath_device {
 	struct mpath_device mpath_device;
@@ -126,7 +126,7 @@ struct scsi_mpath_device {
 
 		//int				is_shared; 	/* Set Multipath flag  */
 	//int				mpath_first_path; /* Indicate if this was first path */
-	//struct gendisk          	*mpath_disk;	/* Multipath disk */
+	//struct gendisk          	*mpath_head;	/* Multipath disk */
 	
 //	enum scsi_mpath_access_state	state;	/* Multipath State */
 	//enum scsi_mpath_iopolicy	mpath_iopolicy;	/* IO Policy */
