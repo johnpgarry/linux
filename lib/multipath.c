@@ -59,7 +59,7 @@ void mpath_start_request(struct request *req)
 	struct mpath_request *mpath_request = blk_mq_rq_to_pdu(req);
 	struct mpath_device *mpath_device = mpath_request->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	struct gendisk *disk = mpath_head->gd;
+	struct gendisk *disk = mpath_head->disk;
 
 	if ((READ_ONCE(mpath_head->iopolicy) == MPATH_IOPOLICY_QD) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
@@ -82,7 +82,7 @@ void mpath_end_request(struct request *req)
 	struct mpath_request *mpath_request = blk_mq_rq_to_pdu(req);
 	struct mpath_device *mpath_device = mpath_request->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	struct gendisk *disk = mpath_head->gd;
+	struct gendisk *disk = mpath_head->disk;
 
 	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
 	if (mpath_request->flags & MPATH_REQ_CNT_ACTIVE) {
@@ -355,7 +355,7 @@ static void multipath_submit_bio(struct bio *bio)
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
 	if (likely(mpath_device)) {
-		bio_set_dev(bio, mpath_device->gd->part0);
+		bio_set_dev(bio, mpath_device->disk->part0);
 		bio->bi_opf |= REQ_MPATH;
 		atomic_inc(&mpath_device->nr_total);
 		if (special)
@@ -562,16 +562,16 @@ static void multipath_partition_scan_work(struct work_struct *work)
 		container_of(work, struct mpath_head, partition_scan_work);
 
 	pr_err("%s mpath_head=%pS GD_SUPPRESS_PART_SCAN=%d\n",
-		__func__, mpath_head, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->gd->state));
+		__func__, mpath_head, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->disk->state));
 	if (WARN_ON_ONCE(!test_and_clear_bit(GD_SUPPRESS_PART_SCAN,
-					     &mpath_head->gd->state)))
+					     &mpath_head->disk->state)))
 		return;
 
-	mutex_lock(&mpath_head->gd->open_mutex);
+	mutex_lock(&mpath_head->disk->open_mutex);
 	pr_err("%s2 mpath_head=%pS GD_SUPPRESS_PART_SCAN=%d calling bdev_disk_changed\n",
-		__func__, mpath_head, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->gd->state));
-	bdev_disk_changed(mpath_head->gd, false);
-	mutex_unlock(&mpath_head->gd->open_mutex);
+		__func__, mpath_head, test_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->disk->state));
+	bdev_disk_changed(mpath_head->disk, false);
+	mutex_unlock(&mpath_head->disk->open_mutex);
 }
 
 void mpath_requeue_work(struct work_struct *work)
@@ -676,17 +676,17 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	lim.max_zone_append_sectors = 0;
 	lim.dma_alignment = 3;
 
-	mpath_head->gd = blk_alloc_disk(&lim, dev_to_node(&mpath_head->dev));
-	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->gd=%pS\n", __func__, NULL, NULL, mpath_head->gd);
-	if (IS_ERR(mpath_head->gd))
+	mpath_head->disk = blk_alloc_disk(&lim, dev_to_node(&mpath_head->dev));
+	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS\n", __func__, NULL, NULL, mpath_head->disk);
+	if (IS_ERR(mpath_head->disk))
 		return -ENOMEM;
 
-	sprintf(mpath_head->gd->disk_name, dev_name(&mpath_head->dev));
-	mpath_head->gd->private_data = mpath_head;
-	mpath_head->gd->fops = &mpath_ops;
+	sprintf(mpath_head->disk->disk_name, dev_name(&mpath_head->dev));
+	mpath_head->disk->private_data = mpath_head;
+	mpath_head->disk->fops = &mpath_ops;
 
-	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->gd->state);
-	//sprintf(mpath_head->gd->disk_name, "smpd%d", scsi_mpath_head->index);
+	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->disk->state);
+	//sprintf(mpath_head->disk->disk_name, "smpd%d", scsi_mpath_head->index);
 
 //	dev_err(&mpath_head->dev, "%s10 calling device_add for &mpath_head->dev\n", __func__);
 //	ret = device_add(&mpath_head->dev); // see nvme_init_subsystem()
@@ -695,8 +695,8 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 //		return NULL;
 
 	ret = init_srcu_struct(&mpath_head->srcu);
-	pr_err("%s12 ret=%d mpath_head=%pS mpath_head->gd->major=%d first_minor=%d minors=%d\n",
-		__func__, ret, mpath_head, mpath_head->gd->major, mpath_head->gd->first_minor, mpath_head->gd->minors);
+	pr_err("%s12 ret=%d mpath_head=%pS mpath_head->disk->major=%d first_minor=%d minors=%d\n",
+		__func__, ret, mpath_head, mpath_head->disk->major, mpath_head->disk->first_minor, mpath_head->disk->minors);
 	if (ret)
 		return ret;
 
@@ -726,8 +726,8 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 		pr_err("%s0 calling device_add_disk &mpath_head->dev=%pS ref count=%d\n",
 			__func__, &mpath_head->dev, kref_read(dd1_kobj_kref));
 
-		ret = device_add_disk(&mpath_head->dev, mpath_head->gd, mpath_device_groups);
-		//ret = device_add_disk(NULL, mpath_head->gd, mpath_device_groups);
+		ret = device_add_disk(&mpath_head->dev, mpath_head->disk, mpath_device_groups);
+		//ret = device_add_disk(NULL, mpath_head->disk, mpath_device_groups);
 		pr_err("%s1 called device_add_disk ret=%d ref count=%d\n", __func__, ret, kref_read(dd1_kobj_kref));
 		if (ret) {
 			clear_bit(MPATH_DISK_LIVE, &mpath_head->flags);
@@ -861,19 +861,19 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 	struct mpath_device *mpath_device;
 
 	pr_err("%s mpath_head=%pS GD_ADDED=%d\n",
-		__func__, mpath_head, test_bit(GD_ADDED, &mpath_head->gd->state));
-	pr_err("%s3 mpath_head->gd=%pS\n", __func__, mpath_head->gd);
+		__func__, mpath_head, test_bit(GD_ADDED, &mpath_head->disk->state));
+	pr_err("%s3 mpath_head->disk=%pS\n", __func__, mpath_head->disk);
 	/*
 	 * Ensure head disk node is already added otherwise we may get invalid
 	 * kobj for head disk node
 	 */
-	if (!test_bit(GD_ADDED, &mpath_head->gd->state))
+	if (!test_bit(GD_ADDED, &mpath_head->disk->state))
 		return;
 
-	mpath_gd_kobj = &disk_to_dev(mpath_head->gd)->kobj;
+	mpath_gd_kobj = &disk_to_dev(mpath_head->disk)->kobj;
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	pr_err("%s4 mpath_head->gd=%pS srcu_idx=%d\n",
-		__func__, mpath_head->gd, srcu_idx);
+	pr_err("%s4 mpath_head->disk=%pS srcu_idx=%d\n",
+		__func__, mpath_head->disk, srcu_idx);
 
 	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
 				 srcu_read_lock_held(&mpath_head->srcu)) {
@@ -890,10 +890,10 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 		 */
 	//	if (!sdev->request_queue)
 	//		continue;
-		pr_err("%s6.2 itering mpath_device=%pS mpath_device->gd=%pS checking GD_ADDED=%d\n",
-			__func__, mpath_device, mpath_device->gd,
-			test_bit(GD_ADDED, &mpath_device->gd->state));
-		if (!test_bit(GD_ADDED, &mpath_device->gd->state))
+		pr_err("%s6.2 itering mpath_device=%pS mpath_device->disk=%pS checking GD_ADDED=%d\n",
+			__func__, mpath_device, mpath_device->disk,
+			test_bit(GD_ADDED, &mpath_device->disk->state));
+		if (!test_bit(GD_ADDED, &mpath_device->disk->state))
 			continue;
 
 		/*
@@ -908,18 +908,18 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 		 * The test_and_set_bit() is used because it is protecting
 		 * against multiple nvme paths being simultaneously added.
 		 */
-		pr_err("%s6.3 itering mpath_device=%pS mpath_device->gd=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
-			__func__, mpath_device, mpath_device->gd,
-			test_bit(GD_ADDED, &mpath_device->gd->state),
+		pr_err("%s6.3 itering mpath_device=%pS mpath_device->disk=%pS GD_ADDED=%d checking SCSI_MPATH_SYSFS_ATTR_LINK=%d\n",
+			__func__, mpath_device, mpath_device->disk,
+			test_bit(GD_ADDED, &mpath_device->disk->state),
 			test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags));
 		if (test_and_set_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
 			continue;
 
-		pr_err("%s7.3 itering mpath_device=%pS mpath_device->gd=%pS\n",
-			__func__, mpath_device, mpath_device->gd);
-		target = disk_to_dev(mpath_device->gd);
-		pr_err("%s7.4 itering mpath_device=%pS mpath_device->gd=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
-			__func__, mpath_device, mpath_device->gd, target, "multipath");
+		pr_err("%s7.3 itering mpath_device=%pS mpath_device->disk=%pS\n",
+			__func__, mpath_device, mpath_device->disk);
+		target = disk_to_dev(mpath_device->disk);
+		pr_err("%s7.4 itering mpath_device=%pS mpath_device->disk=%pS target=%pS scsi_mpath_attr_group.name=%s\n",
+			__func__, mpath_device, mpath_device->disk, target, "multipath");
 		/*
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
@@ -929,7 +929,7 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 		pr_err("%s7.5 called sysfs_add_link_to_group rc=%d mpath_gd_kobj=%pS &target->kobj=%pS dev_name=%s\n",
 			__func__, rc, mpath_gd_kobj, &target->kobj, dev_name(target));
 		if (unlikely(rc)) {
-			dev_err(disk_to_dev(mpath_head->gd),
+			dev_err(disk_to_dev(mpath_head->disk),
 					"failed to create link to %s rc=%d\n",
 					dev_name(target), rc);
 			clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
@@ -952,8 +952,8 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 	if (!test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
 		return;
 
-	target = disk_to_dev(mpath_device->gd);
-	mpath_gd_kobj = &disk_to_dev(mpath_head->gd)->kobj;
+	target = disk_to_dev(mpath_device->disk);
+	mpath_gd_kobj = &disk_to_dev(mpath_head->disk)->kobj;
 
 	pr_err("%s2 calling sysfs_remove_link_from_group mpath_gd_kobj=%pS dev_name(target)=%s\n",
 		__func__, mpath_gd_kobj, dev_name(target));
@@ -1049,10 +1049,10 @@ static void mpath_free_disk(struct kref *ref)
 	nvme_mpath_put_disk(head);
 	#else
 	pr_err("%s1 mpath_head=%pS ref=%pS calling put_disk gd=%pS ref count=%d dd1=%pS\n",
-		__func__, mpath_head, ref, mpath_head->gd, kref_read(dd1_kobj_kref), dd1);
-	put_disk(mpath_head->gd);
+		__func__, mpath_head, ref, mpath_head->disk, kref_read(dd1_kobj_kref), dd1);
+	put_disk(mpath_head->disk);
 	pr_err("%s1.1 mpath_head=%pS ref=%pS called put_disk gd=%pS ref count=%d dd1=%pS\n",
-		__func__, mpath_head, ref, mpath_head->gd, kref_read(dd1_kobj_kref), dd1);
+		__func__, mpath_head, ref, mpath_head->disk, kref_read(dd1_kobj_kref), dd1);
 	#endif
 //	ida_free(&sd_mpath_index_ida, scsi_mpath_head->index);
 	cleanup_srcu_struct(&mpath_head->srcu);
@@ -1095,7 +1095,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 
 	pr_err("%s2 mpath_device=%pS called scsi_mpath_remove_sysfs_link\n",
 		__func__, mpath_device);
-//	put_disk(sdev->scsi_mpath_dev->scsi_mpath_head->gd);
+//	put_disk(sdev->scsi_mpath_dev->scsi_mpath_head->disk);
 //	if (!sdev->is_shared)
 //		return;
 
@@ -1132,10 +1132,10 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 			synchronize_srcu(&mpath_head->srcu);
 			pr_err("%s5.1 not calling device_del\n", __func__);
 		//	device_del(&scsi_mpath_head->dev);???
-			pr_err("%s5.2 calling del_gendisk mpath_head->gd=%pS\n", __func__, mpath_head->gd);
-			del_gendisk(mpath_head->gd);
+			pr_err("%s5.2 calling del_gendisk mpath_head->disk=%pS\n", __func__, mpath_head->disk);
+			del_gendisk(mpath_head->disk);
 		}
-		pr_err("%s6 calling put_disk on mpath_head->gd=%pS\n", __func__, mpath_head->gd);
+		pr_err("%s6 calling put_disk on mpath_head->disk=%pS\n", __func__, mpath_head->disk);
 		
 	}
 	pr_err("%s9 mpath_device=%pS calling mpath_put_disk\n", __func__, mpath_device);

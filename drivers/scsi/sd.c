@@ -3715,30 +3715,30 @@ static int sd_revalidate_mpath_head(struct scsi_mpath_head *scsi_mpath_head, str
 
 	pr_err("%s scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 
-	pr_err("%s1 mpath_head->gd=%pS\n", __func__, mpath_head->gd);
-	mpath_lim = &mpath_head->gd->queue->limits;
+	pr_err("%s1 mpath_head->disk=%pS\n", __func__, mpath_head->disk);
+	mpath_lim = &mpath_head->disk->queue->limits;
 
-	lim2 = queue_limits_start_update(mpath_head->gd->queue);
+	lim2 = queue_limits_start_update(mpath_head->disk->queue);
 	pr_err("%s8.1 called queue_limits_start_update calling queue_limits_stack_bdev\n", __func__);
 	lim2.logical_block_size = mpath_lim->logical_block_size;
 	lim2.physical_block_size = mpath_lim->physical_block_size;
 	lim2.io_min = mpath_lim->io_min;
 	lim2.io_opt = mpath_lim->io_opt;
-	queue_limits_stack_bdev(&lim2, mpath_head->gd->part0, 0, mpath_head->gd->disk_name);
+	queue_limits_stack_bdev(&lim2, mpath_head->disk->part0, 0, mpath_head->disk->disk_name);
 
 	//sdp->mpath_disk->flags |= GENHD_FL_HIDDEN;
 
 	pr_err("%s8.2 calling set_capacity_and_notify\n", __func__);
-	set_capacity_and_notify(mpath_head->gd,
+	set_capacity_and_notify(mpath_head->disk,
 	    logical_to_sectors(sdp, sdkp->capacity));
 
 	pr_err("%s8.3 calling queue_limits_commit_update\n", __func__);
-	err = queue_limits_commit_update(mpath_head->gd->queue, &lim2);
+	err = queue_limits_commit_update(mpath_head->disk->queue, &lim2);
 	pr_err("%s8.4 calling scsi_mpath_revalidate_path err=%d\n",
 		__func__, err);
 	pr_err("%s8.4.1 calling scsi_mpath_revalidate_path err=%d mpath_dev->gd=%pS\n",
 		__func__, err, scsi_mpath_head);
-	mpath_revalidate_path(mpath_head->gd,
+	mpath_revalidate_path(mpath_head->disk,
 	    logical_to_sectors(sdp, sdkp->capacity));
 	pr_err("%s8.5 called scsi_mpath_revalidate_path\n", __func__);
 	//blk_mq_unfreeze_queue(sdp->mpath_head->queue);
@@ -4045,8 +4045,8 @@ static int sd_probe(struct device *dev)
 			pr_err("%s3.3.2 sdp->scsi_mpath_dev=%pS mpath_disk=NULL\n", __func__, sdp->scsi_mpath_dev);
 
 		//snprintf(sdp->mpath_disk->disk_name, DISK_NAME_LEN, "sd_mpath%d", mindex);
-		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd name=%pS mpath_device->gd->disk_name=%s\n",
-			gd->disk_name, mpath_device->gd->disk_name);
+		sdev_printk(KERN_INFO, sdp, "sd_probe4 gd name=%pS mpath_device->disk->disk_name=%s\n",
+			gd->disk_name, mpath_device->disk->disk_name);
 		sdev_printk(KERN_INFO, sdp, "sd_probe4.1 gd name=%pS scsi_is_sdev_multipath\n", gd->disk_name);
 		gd->flags |= GENHD_FL_HIDDEN;
 		pr_err("%s3.3.2\n", __func__);

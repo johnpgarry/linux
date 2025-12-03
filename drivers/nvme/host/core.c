@@ -2515,7 +2515,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		unsigned int memflags;
 		struct nvme_ns_head *head = ns_to_head(ns);
 		struct mpath_head *mpath_head = head_to_mpath_head(head);
-		struct gendisk *disk = mpath_head->gd;
+		struct gendisk *disk = mpath_head->disk;
 
 		lim = queue_limits_start_update(disk->queue);
 		memflags = blk_mq_freeze_queue(disk->queue);
@@ -4260,7 +4260,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	disk->private_data = ns;
 
 	mpath_device = &ns->mpath_device;
-	mpath_device->gd = ns->disk = disk;
+	mpath_device->disk = ns->disk = disk;
 	ns->queue = disk->queue;
 	ns->ctrl = ctrl;
 	kref_init(&ns->kref);

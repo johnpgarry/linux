@@ -33,7 +33,7 @@ enum mpath_iopolicy {
 struct mpath_head {
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
-	struct gendisk		*gd;
+	struct gendisk		*disk;
 	enum mpath_iopolicy	iopolicy;
 	struct device		dev;
 	struct kref		ref;
@@ -70,7 +70,7 @@ struct mpath_device {
 	enum mpath_access_state	state;
 	atomic_t nr_active;
 	atomic_t nr_total;
-	struct gendisk *gd;
+	struct gendisk *disk;
 	unsigned long           flags;		/* flag for multipath devices*/
 	int				numa_node; /* NUMA node for Path  */
 };
