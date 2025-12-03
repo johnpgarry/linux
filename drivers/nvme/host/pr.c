@@ -53,7 +53,8 @@ static int nvme_send_ns_head_pr_command(struct block_device *bdev,
 		struct nvme_command *c, void *data, unsigned int data_len)
 {
 	struct nvme_ns_head *head = bdev->bd_disk->private_data;
-	int srcu_idx = srcu_read_lock(&head->srcu);
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
+	int srcu_idx = srcu_read_lock(&mpath_disk->srcu);
 	struct nvme_ns *ns = NULL; //fixme nvme_find_path(head);
 	int ret = -EWOULDBLOCK;
 
@@ -61,7 +62,7 @@ static int nvme_send_ns_head_pr_command(struct block_device *bdev,
 		c->common.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
 		ret = nvme_submit_sync_cmd(ns->queue, c, data, data_len);
 	}
-	srcu_read_unlock(&head->srcu, srcu_idx);
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 	return ret;
 }
 

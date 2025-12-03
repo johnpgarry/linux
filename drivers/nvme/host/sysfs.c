@@ -198,12 +198,13 @@ static int ns_head_update_nuse(struct nvme_ns_head *head)
 	struct nvme_id_ns *id;
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
+	struct mpath_disk *mpath_disk = head_to_mpath_disk(head);
 
 	/* Avoid issuing commands too often by rate limiting the update */
 	if (!__ratelimit(&head->rs_nuse))
 		return 0;
 
-	srcu_idx = srcu_read_lock(&head->srcu);
+	srcu_idx = srcu_read_lock(&mpath_disk->srcu);
 	ns = NULL;// fixme nvme_find_path(head);
 	if (!ns)
 		goto out_unlock;
@@ -216,7 +217,7 @@ static int ns_head_update_nuse(struct nvme_ns_head *head)
 	kfree(id);
 
 out_unlock:
-	srcu_read_unlock(&head->srcu, srcu_idx);
+	srcu_read_unlock(&mpath_disk->srcu, srcu_idx);
 	return ret;
 }
 
