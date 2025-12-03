@@ -10,7 +10,7 @@
 #include <linux/atomic.h>
 #include <linux/sbitmap.h>
 #include <linux/cdev.h>
-#include <linux/libmpath.h>
+#include <linux/multipath.h>
 #include <scsi/scsi_multipath.h>
 #include <scsi/scsi_host.h>
 
