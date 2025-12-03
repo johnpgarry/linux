@@ -513,7 +513,7 @@ struct nvme_ns_head {
 	struct work_struct	requeue_work;
 	struct work_struct	partition_scan_work;
 	struct mutex		lock;
-	unsigned long		flags;
+	unsigned long		flags1;
 	struct delayed_work	remove_work;
 	unsigned int		delayed_removal_secs;
 #define NVME_NSHEAD_DISK_LIVE		0
@@ -1031,7 +1031,7 @@ static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
 }
 static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
 {
-	if (test_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags))
+	if (test_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags1))
 		return true;
 	return false;
 }

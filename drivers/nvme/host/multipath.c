@@ -748,7 +748,9 @@ static void nvme_requeue_work(struct work_struct *work)
 
 static void nvme_remove_head(struct nvme_ns_head *head)
 {
-	if (test_and_clear_bit(NVME_NSHEAD_DISK_LIVE, &head->flags)) {
+	struct mpath_head *mpath_head = head_to_mpath_head(head);
+
+	if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
 		struct mpath_head *mpath_head = head_to_mpath_head(head);
 		struct gendisk *disk = mpath_head->disk;
 		/*
@@ -959,6 +961,8 @@ static inline bool nvme_state_is_live(enum nvme_ana_state state)
 static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		struct nvme_ns *ns)
 {
+	struct nvme_ns_head *head = ns_to_head(ns);
+	struct mpath_head *mpath_head = head_to_mpath_head(head);
 	ns->ana_grpid = le32_to_cpu(desc->grpid);
 	ns->ana_state = desc->state;
 	clear_bit(NVME_NS_ANA_PENDING, &ns->flags);
@@ -992,7 +996,7 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		 * is not live but still create the sysfs link to this path from
 		 * head node if head node of the path has already come alive.
 		 */
-		if (test_bit(NVME_NSHEAD_DISK_LIVE, &ns_to_head(ns)->flags))
+		if (test_bit(MPATH_DISK_LIVE, &mpath_head->flags))
 			mpath_add_sysfs_link((&ns->mpath_device)->mpath_head);
 	}
 }
@@ -1255,9 +1259,9 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 	mutex_lock(&head->subsys->lock);
 	head->delayed_removal_secs = sec;
 	if (sec)
-		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
+		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags1);
 	else
-		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
+		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags1);
 	mutex_unlock(&head->subsys->lock);
 	/*
 	 * Ensure that update to NVME_NSHEAD_QUEUE_IF_NO_PATH is seen
