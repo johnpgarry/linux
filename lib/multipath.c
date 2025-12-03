@@ -1176,13 +1176,18 @@ static struct attribute *mpath_attrs[] = {
 	NULL
 };
 
+bool is_mpath_disk(struct gendisk *disk)
+{
+	return disk->fops == &mpath_ops;
+}
+
 static bool multipath_sysfs_group_visible(struct kobject *kobj)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct gendisk *disk = dev_to_disk(dev);
 
 	dev_err(dev, "%s dev=%pS disk=%pS fops=%pS\n", __func__, dev, disk, disk->fops);
-	return disk->fops == &mpath_ops;
+	return is_mpath_disk(disk);
 }
 
 static bool multipath_sysfs_attr_visible(struct kobject *kobj,

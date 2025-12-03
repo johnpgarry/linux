@@ -132,4 +132,6 @@ extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
 extern const struct attribute_group *mpath_device_groups[];
 
+bool is_mpath_disk(struct gendisk *disk);
+
 #endif // _LIBMULTIPATH_H
