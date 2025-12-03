@@ -20,6 +20,8 @@
 
 #include <trace/events/block.h>
 
+#include <linux/multipath.h>
+
 extern const struct pr_ops nvme_pr_ops;
 
 extern unsigned int nvme_io_timeout;
