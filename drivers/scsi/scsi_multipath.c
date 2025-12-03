@@ -332,7 +332,7 @@ struct mpath_head_template smpdt = {
 /*
  * Allocate Disk for Multipath Device
  */
-int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
+int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 {
 //	struct queue_limits lim;
 	int ret;
@@ -373,7 +373,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 
 	scsi_mpath_dev = sdev->scsi_mpath_dev;
 	mpath_device = &scsi_mpath_dev->mpath_device;
-	mpath_device->gd = gd;
+	mpath_device->disk = disk;
 
 	ret = scsi_mpath_unique_lun_id(sdev);
 	if (ret < 0) {
