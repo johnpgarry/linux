@@ -1427,7 +1427,7 @@ static int nvme_rdma_map_sg_pi(struct nvme_rdma_queue *queue,
 	if (unlikely(nr))
 		goto mr_put;
 
-	nvme_rdma_set_sig_attrs(bi, c, req->mr->sig_attrs, ns->head->pi_type);
+	nvme_rdma_set_sig_attrs(bi, c, req->mr->sig_attrs, ns_to_head(ns)->pi_type);
 	nvme_rdma_set_prot_checks(c, &req->mr->sig_attrs->check_mask);
 
 	ib_update_fast_reg_key(req->mr, ib_inc_rkey(req->mr->rkey));
@@ -1448,7 +1448,7 @@ static int nvme_rdma_map_sg_pi(struct nvme_rdma_queue *queue,
 	xfer_len = req->mr->length;
 	/* Check if PI is added by the HW */
 	if (!pi_count)
-		xfer_len += (xfer_len >> bi->interval_exp) * ns->head->pi_size;
+		xfer_len += (xfer_len >> bi->interval_exp) * ns_to_head(ns)->pi_size;
 	put_unaligned_le24(xfer_len, sg->length);
 	put_unaligned_le32(req->mr->rkey, sg->key);
 	sg->type = NVME_KEY_SGL_FMT_DATA_DESC << 4;
@@ -2030,7 +2030,7 @@ static blk_status_t nvme_rdma_queue_rq(struct blk_mq_hw_ctx *hctx,
 	    queue->pi_support &&
 	    (c->common.opcode == nvme_cmd_write ||
 	     c->common.opcode == nvme_cmd_read) &&
-	    nvme_ns_has_pi(ns->head))
+	    nvme_ns_has_pi(ns_to_head(ns)))
 		req->use_sig_mr = true;
 	else
 		req->use_sig_mr = false;
