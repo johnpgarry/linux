@@ -6,7 +6,6 @@
 #include <linux/backing-dev.h>
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
-#include <linux/libmpath.h>
 #include <trace/events/block.h>
 #include "nvme.h"
 
