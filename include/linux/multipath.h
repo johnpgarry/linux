@@ -90,7 +90,8 @@ struct mpath_head_template {
 struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt,
 						int privsize, int node_id, char *name);
 
- int __must_check mpath_add_disk(struct mpath_head *);
+int mpath_alloc_head_disk(struct mpath_head *mpath_head);
+int __must_check mpath_add_head(struct mpath_head *);
 
 
 static inline struct mpath_head *to_mpath_head(void *d)

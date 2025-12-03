@@ -70,8 +70,8 @@ static __maybe_unused void scsi_mpath_head_release1(struct device *dev)
 
 }
 
-static const struct class scsi_mpath_head_class = {
-	.name = "scsi_mpath_head",
+static const struct class scsi_mpath_disk_class = {
+	.name = "scsi_mpath_disk",
 	.dev_release	= scsi_mpath_head_release1,
 	.dev_groups = scsi_mpath_groups,
 };
@@ -321,7 +321,7 @@ static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16]
 }
 
 struct mpath_head_template smpdt = {
-	.class = &scsi_mpath_head_class,
+	.class = &scsi_mpath_disk_class,
 	.cdev_class = &scsi_mpath_generic_class,
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
@@ -401,7 +401,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 	snprintf(name, sizeof(name), "smpd%d", index);
 
 	pr_err("%s4.2 calling mpath_alloc_disk\n", __func__);
-	mpath_head = mpath_alloc_disk(&smpdt, sizeof(*scsi_mpath_head), dev_to_node(shost_dev), name);
+	mpath_head = mpath_alloc_head(&smpdt, sizeof(*scsi_mpath_head), dev_to_node(shost_dev), name);
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_head=%pS mpath_device=%pS\n",
 		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, mpath_head, mpath_device);
 	if (!mpath_head) {
@@ -426,7 +426,11 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 //	mpath_head->cdev_device.release = mpath_cdev_rel;
 
 	pr_err("%s7 &mpath_head->dev=%pS\n", __func__, &mpath_head->dev);
+
+	ret = mpath_alloc_head_disk(mpath_head);
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
+	if (ret)
+		return ret;
 
 
 	sprintf(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);
@@ -442,7 +446,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *gd)
 	mutex_unlock(&scsi_mpath_heads_lock);
 
 	pr_err("%s17 calling mpath_head_add\n", __func__);
-	ret = mpath_add_disk(mpath_head);
+	ret = mpath_add_head(mpath_head);
 	if (ret)
 		goto out_free_disk;
 	pr_err("%s17.1 called mpath_head_add ret=%d\n", __func__, ret);
@@ -851,7 +855,7 @@ static void scsi_mpath_head_probe(dev_t devt)
 
 static int __init init_scsi_mp(void)
 {
-	int err = class_register(&scsi_mpath_head_class);
+	int err = class_register(&scsi_mpath_disk_class);
 
 	pr_err("%s scsi_multipath=%d\n", __func__, scsi_multipath);
 
@@ -869,7 +873,7 @@ static int __init init_scsi_mp(void)
 unregister_blkdev:
 	unregister_blkdev(0, "scsi-mpath-disk");
 destroy_disk_class:
-	class_unregister(&scsi_mpath_head_class);
+	class_unregister(&scsi_mpath_disk_class);
 	return err;
 }
 
@@ -881,7 +885,7 @@ destroy_disk_class:
 static void __exit exit_scsi_mp(void)
 {
 	pr_err("%s\n", __func__);
-	class_unregister(&scsi_mpath_head_class);
+	class_unregister(&scsi_mpath_disk_class);
 	unregister_blkdev(0, "scsi-mpath-disk");
 }
 

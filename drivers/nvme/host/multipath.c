@@ -785,9 +785,12 @@ static void nvme_remove_head_work(struct work_struct *work)
 
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
+	#ifdef dsddsd
 	struct queue_limits lim;
+	#endif
 	struct mpath_head *mpath_head = head_to_mpath_head(head);
 	struct gendisk *gendisk = mpath_head->gd;
+	int ret;
 
 	mutex_init(&head->lock);
 	bio_list_init(&head->requeue_list);
@@ -818,12 +821,18 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	if (!nvme_is_unique_nsid(ctrl, head))
 		return 0;
 
+	#ifdef fdfdfd
 	blk_set_stacking_limits(&lim);
 	lim.dma_alignment = 3;
 	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT |
 		BLK_FEAT_POLL | BLK_FEAT_ATOMIC_WRITES;
 	if (head->ids.csi == NVME_CSI_ZNS)
 		lim.features |= BLK_FEAT_ZONED;
+	#endif
+
+	ret = mpath_alloc_head_disk(mpath_head);
+	if (ret)
+		return ret;
 
 #ifdef fdfdfd
 	head->disk = blk_alloc_disk(&lim, ctrl->numa_node);

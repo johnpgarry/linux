@@ -598,7 +598,6 @@ EXPORT_SYMBOL_GPL(mpath_requeue_work);
 struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int privsize, int node_id, char *name)
 {
 	struct mpath_head *mpath_head;
-	struct queue_limits lim;
 	int ret;
 
 	mpath_head = kzalloc(sizeof(*mpath_head) + privsize, GFP_KERNEL);
@@ -635,47 +634,12 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 //	dev_set_name(&mpath_head->dev, "smpd%d", 0/* fixme scsi_mpath_head->index*/);
 //	disk_count++;
 	device_initialize(&mpath_head->dev);
+	set_dev_node(&mpath_head->dev, node_id);
 	ret = dev_set_name(&mpath_head->dev, name);
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
-	blk_set_stacking_limits(&lim);
-	pr_err("%s8\n", __func__);
 
-	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
-	lim.max_zone_append_sectors = 0;
-	lim.dma_alignment = 3;
 
-	mpath_head->gd = blk_alloc_disk(&lim, node_id);
-	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->gd=%pS\n", __func__, NULL, NULL, mpath_head->gd);
-	if (IS_ERR(mpath_head->gd))
-		return NULL;
-
-	sprintf(mpath_head->gd->disk_name, name);
-	mpath_head->gd->private_data = mpath_head;
-	mpath_head->gd->fops = &mpath_ops;
-
-	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->gd->state);
-	//sprintf(mpath_head->gd->disk_name, "smpd%d", scsi_mpath_head->index);
-
-//	dev_err(&mpath_head->dev, "%s10 calling device_add for &mpath_head->dev\n", __func__);
-//	ret = device_add(&mpath_head->dev); // see nvme_init_subsystem()
-//	pr_err("%s11 called device_add ret=%d\n", __func__, ret);
-//	if (ret)
-//		return NULL;
-
-	ret = init_srcu_struct(&mpath_head->srcu);
-	pr_err("%s12 ret=%d mpath_head=%pS mpath_head->gd->major=%d first_minor=%d minors=%d\n",
-		__func__, ret, mpath_head, mpath_head->gd->major, mpath_head->gd->first_minor, mpath_head->gd->minors);
-	if (ret)
-		return NULL;
-
-	INIT_WORK(&mpath_head->requeue_work, mpath_requeue_work);
-	pr_err("%s12.1 ret=%d after INIT_WORK mpath_head=%pS\n", __func__, ret, mpath_head);
-	spin_lock_init(&mpath_head->requeue_lock);
-	pr_err("%s12.2 ret=%d after spin_lock_init mpath_head=%pS\n", __func__, ret, mpath_head);
-	bio_list_init(&mpath_head->requeue_list);
-	pr_err("%s12.3 ret=%d after bio_list_init mpath_head=%pS sdev->scsi_mpath_dev=%pS\n",
-		__func__, ret, NULL, NULL);
 	//pr_err("%s12.3.1 device_id_str=%s len=%zd scsi_mpath_head=%pS\n",
 	//	__func__, sdev->scsi_mpath_dev->device_id_str,
 	//	strlen(sdev->scsi_mpath_dev->device_id_str),
@@ -698,6 +662,54 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 	return mpath_head;
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_head);
+
+
+int mpath_alloc_head_disk(struct mpath_head *mpath_head)
+{
+	struct queue_limits lim;
+	int ret;
+
+	blk_set_stacking_limits(&lim);
+	pr_err("%s8\n", __func__);
+
+	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
+	lim.max_zone_append_sectors = 0;
+	lim.dma_alignment = 3;
+
+	mpath_head->gd = blk_alloc_disk(&lim, dev_to_node(&mpath_head->dev));
+	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->gd=%pS\n", __func__, NULL, NULL, mpath_head->gd);
+	if (IS_ERR(mpath_head->gd))
+		return -ENOMEM;
+
+	sprintf(mpath_head->gd->disk_name, dev_name(&mpath_head->dev));
+	mpath_head->gd->private_data = mpath_head;
+	mpath_head->gd->fops = &mpath_ops;
+
+	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->gd->state);
+	//sprintf(mpath_head->gd->disk_name, "smpd%d", scsi_mpath_head->index);
+
+//	dev_err(&mpath_head->dev, "%s10 calling device_add for &mpath_head->dev\n", __func__);
+//	ret = device_add(&mpath_head->dev); // see nvme_init_subsystem()
+//	pr_err("%s11 called device_add ret=%d\n", __func__, ret);
+//	if (ret)
+//		return NULL;
+
+	ret = init_srcu_struct(&mpath_head->srcu);
+	pr_err("%s12 ret=%d mpath_head=%pS mpath_head->gd->major=%d first_minor=%d minors=%d\n",
+		__func__, ret, mpath_head, mpath_head->gd->major, mpath_head->gd->first_minor, mpath_head->gd->minors);
+	if (ret)
+		return ret;
+
+	INIT_WORK(&mpath_head->requeue_work, mpath_requeue_work);
+	pr_err("%s12.1 ret=%d after INIT_WORK mpath_head=%pS\n", __func__, ret, mpath_head);
+	spin_lock_init(&mpath_head->requeue_lock);
+	pr_err("%s12.2 ret=%d after spin_lock_init mpath_head=%pS\n", __func__, ret, mpath_head);
+	bio_list_init(&mpath_head->requeue_list);
+	pr_err("%s12.3 ret=%d after bio_list_init mpath_head=%pS sdev->scsi_mpath_dev=%pS\n",
+		__func__, ret, NULL, NULL);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mpath_alloc_head_disk);
 
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {
@@ -956,7 +968,7 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
 
-int mpath_add_disk(struct mpath_head *mpath_head)
+int mpath_add_head(struct mpath_head *mpath_head)
 {
 	int ret;
 	struct device *dd1 = &mpath_head->dev;
@@ -970,7 +982,7 @@ int mpath_add_disk(struct mpath_head *mpath_head)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(mpath_add_disk);
+EXPORT_SYMBOL_GPL(mpath_add_head);
 
 void mpath_put_disk(struct mpath_head *mpath_head)
 {
