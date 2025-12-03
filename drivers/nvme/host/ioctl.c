@@ -227,10 +227,10 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
 		return -EINVAL;
 	}
 
-	length = (io.nblocks + 1) << ns->head->lba_shift;
+	length = (io.nblocks + 1) << ns_to_head(ns)->lba_shift;
 
 	if ((io.control & NVME_RW_PRINFO_PRACT) &&
-	    (ns->head->ms == ns->head->pi_size)) {
+	    (ns_to_head(ns)->ms == ns_to_head(ns)->pi_size)) {
 		/*
 		 * Protection information is stripped/inserted by the
 		 * controller.
@@ -240,11 +240,11 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
 		meta_len = 0;
 		metadata = NULL;
 	} else {
-		meta_len = (io.nblocks + 1) * ns->head->ms;
+		meta_len = (io.nblocks + 1) * ns_to_head(ns)->ms;
 		metadata = nvme_to_user_ptr(io.metadata);
 	}
 
-	if (ns->head->features & NVME_NS_EXT_LBAS) {
+	if (ns_to_head(ns)->features & NVME_NS_EXT_LBAS) {
 		length += meta_len;
 		meta_len = 0;
 	} else if (meta_len) {
@@ -255,7 +255,7 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
 	memset(&c, 0, sizeof(c));
 	c.rw.opcode = io.opcode;
 	c.rw.flags = io.flags;
-	c.rw.nsid = cpu_to_le32(ns->head->ns_id);
+	c.rw.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
 	c.rw.slba = cpu_to_le64(io.slba);
 	c.rw.length = cpu_to_le16(io.nblocks);
 	c.rw.control = cpu_to_le16(io.control);
@@ -271,10 +271,10 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
 static bool nvme_validate_passthru_nsid(struct nvme_ctrl *ctrl,
 					struct nvme_ns *ns, __u32 nsid)
 {
-	if (ns && nsid != ns->head->ns_id) {
+	if (ns && nsid != ns_to_head(ns)->ns_id) {
 		dev_err(ctrl->device,
 			"%s: nsid (%u) in cmd does not match nsid (%u) of namespace\n",
-			current->comm, nsid, ns->head->ns_id);
+			current->comm, nsid, ns_to_head(ns)->ns_id);
 		return false;
 	}
 
@@ -586,7 +586,7 @@ static int nvme_ns_ioctl(struct nvme_ns *ns, unsigned int cmd,
 	case NVME_IOCTL_ID:
 		pr_err("%s2 NVME_IOCTL_ID\n", __func__);
 		force_successful_syscall_return();
-		return ns->head->ns_id;
+		return ns_to_head(ns)->ns_id;
 	case NVME_IOCTL_IO_CMD:
 		pr_err("%s3 NVME_IOCTL_IO_CMD\n", __func__);
 		return nvme_user_cmd(ns->ctrl, ns, argp, flags, open_for_write);

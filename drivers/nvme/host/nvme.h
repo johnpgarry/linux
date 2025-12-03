@@ -528,6 +528,7 @@ enum nvme_ns_features {
 };
 
 struct nvme_ns {
+	struct mpath_device mpath_device;
 	struct list_head list;
 
 	struct nvme_ctrl *ctrl;
@@ -537,9 +538,7 @@ struct nvme_ns {
 	enum nvme_ana_state ana_state;
 	u32 ana_grpid;
 #endif
-	struct list_head siblings;
 	struct kref kref;
-	struct nvme_ns_head *head;
 
 	unsigned long flags;
 #define NVME_NS_REMOVING		0
@@ -553,6 +552,8 @@ struct nvme_ns {
 
 	struct nvme_fault_inject fault_inject;
 };
+
+#define nvme_to_ns(mpd) container_of(mpd, struct nvme_ns, mpath_device)
 
 /* NVMe ns supports metadata actions by the controller (generate/strip) */
 static inline bool nvme_ns_has_pi(struct nvme_ns_head *head)
@@ -581,6 +582,14 @@ struct nvme_ctrl_ops {
 	void (*print_device_info)(struct nvme_ctrl *ctrl);
 	bool (*supports_pci_p2pdma)(struct nvme_ctrl *ctrl);
 };
+
+static inline struct nvme_ns_head *ns_to_head(struct nvme_ns *ns)
+{
+	struct mpath_device *mpath_device = &ns->mpath_device;
+	struct mpath_disk *mpath_disk = mpath_device->mpath_disk;
+
+	return (struct nvme_ns_head *)(mpath_disk + 1);
+}
 
 /*
  * nvme command_id is constructed as such:
@@ -986,7 +995,7 @@ static inline void nvme_trace_bio_complete(struct request *req)
 	struct nvme_ns *ns = req->q->queuedata;
 
 	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio)
-		trace_block_bio_complete(ns->head->disk->queue, req->bio);
+		trace_block_bio_complete(ns_to_head(ns)->disk->queue, req->bio);
 }
 
 extern bool multipath;

@@ -66,7 +66,7 @@ static inline struct nvme_ns_head *dev_to_ns_head(struct device *dev)
 
 	if (nvme_disk_is_ns_head(disk))
 		return disk->private_data;
-	return nvme_get_ns_from_dev(dev)->head;
+	return ns_to_head(nvme_get_ns_from_dev(dev));
 }
 
 static ssize_t nvme_io_passthru_err_log_enabled_show(struct device *dev,
@@ -226,14 +226,14 @@ static int ns_update_nuse(struct nvme_ns *ns)
 	int ret;
 
 	/* Avoid issuing commands too often by rate limiting the update. */
-	if (!__ratelimit(&ns->head->rs_nuse))
+	if (!__ratelimit(&ns_to_head(ns)->rs_nuse))
 		return 0;
 
-	ret = nvme_identify_ns(ns->ctrl, ns->head->ns_id, &id);
+	ret = nvme_identify_ns(ns->ctrl, ns_to_head(ns)->ns_id, &id);
 	if (ret)
 		return ret;
 
-	ns->head->nuse = le64_to_cpu(id->nuse);
+	ns_to_head(ns)->nuse = le64_to_cpu(id->nuse);
 	kfree(id);
 	return 0;
 }
