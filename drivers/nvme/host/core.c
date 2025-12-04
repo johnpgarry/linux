@@ -3998,6 +3998,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	if (!mpath_head)
 		goto out_free_ida;
 	head = (struct nvme_ns_head *)(mpath_head + 1);
+	mpath_head->mpath_subsys = &subsys->mpath_subsys;
 
 	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 

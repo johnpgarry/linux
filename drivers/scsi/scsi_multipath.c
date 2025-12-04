@@ -414,6 +414,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 	
 
 	scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	mpath_head->mpath_subsys = &scsi_mpath_head->mpath_subsys;
 
 	device_initialize(&scsi_mpath_head->dev);
 	set_dev_node(&scsi_mpath_head->dev, dev_to_node(shost_dev));
@@ -641,7 +642,7 @@ static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attr
 
 	scsi_mpath_head = to_scsi_mpath_head(mpath_head);
 	dev_err(dev, "%s2 mpath_head->iopolicy=%d SCSI_MPATH_IOPOLICY_NUMA=%d\n", __func__,
-		mpath_head->iopolicy, MPATH_IOPOLICY_NUMA);
+		mpath_head->mpath_subsys->iopolicy, MPATH_IOPOLICY_NUMA);
 
 	return mpath_numa_nodes_show(mpath_device, buf);
 }
@@ -664,7 +665,7 @@ static ssize_t scsi_mpath_nr_active_show(struct device *dev,
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_head = mpath_device->mpath_head;
 
-	if (mpath_head->iopolicy != MPATH_IOPOLICY_QD)
+	if (mpath_head->mpath_subsys->iopolicy != MPATH_IOPOLICY_QD)
 		return 0;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&mpath_device->nr_active));
@@ -690,6 +691,32 @@ static ssize_t scsi_mpath_nr_total_show(struct device *dev, struct device_attrib
 
 struct device_attribute scsi_mpath_nr_total = \
 		__ATTR(nr_total, S_IRUGO, scsi_mpath_nr_total_show, NULL);
+
+static ssize_t scsi_mpath_iopolicy_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = to_mpath_head(scsi_mpath_head);
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
+
+	return mpath_iopolicy_store(mpath_subsys, buf, count);
+}
+
+static __maybe_unused ssize_t scsi_mpath_iopolicy_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = to_mpath_head(scsi_mpath_head);
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
+
+	return mpath_iopolicy_show(mpath_subsys, buf);
+}
+
+struct device_attribute scsi_mpath_iopolicy = \
+		__ATTR(iopolicy, S_IRUGO | S_IWUSR, scsi_mpath_iopolicy_show, scsi_mpath_iopolicy_store);
+EXPORT_SYMBOL_GPL(scsi_mpath_iopolicy);
 
 int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 {

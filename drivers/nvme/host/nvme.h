@@ -430,6 +430,7 @@ enum nvme_iopolicy {
 struct nvme_subsystem {
 	int			instance;
 	struct device		dev;
+	struct mpath_subsys mpath_subsys;
 	/*
 	 * Because we unregister the device on the last put we need
 	 * a separate refcount.

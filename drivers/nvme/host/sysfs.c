@@ -888,7 +888,7 @@ static struct attribute *nvme_subsys_attrs[] = {
 	&subsys_attr_subsysnqn.attr,
 	&subsys_attr_subsystype.attr,
 #ifdef CONFIG_NVME_MULTIPATH
-	&mpath_iopolicy.attr,
+	&subsys_attr_iopolicy.attr,
 #endif
 	NULL,
 };

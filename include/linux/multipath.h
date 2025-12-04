@@ -30,11 +30,15 @@ enum mpath_iopolicy {
 
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
 
+struct mpath_subsys {
+	enum mpath_iopolicy	iopolicy;
+};
+
 struct mpath_head {
+	struct mpath_subsys *mpath_subsys;
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	struct gendisk		*disk;
-	enum mpath_iopolicy	iopolicy;
 	struct kref		ref;
 	struct	bio_list	requeue_list; /* list for requeing bio */
 	spinlock_t		requeue_lock;
@@ -129,11 +133,14 @@ void mpath_remove_device(struct mpath_device *mpath_device);
 int mpath_set_iopolicy(const char *val, const struct kernel_param *kp);
 int mpath_get_iopolicy(char *buf, const struct kernel_param *kp);
 
+ssize_t mpath_iopolicy_show(struct mpath_subsys *mpath_subsys, char *buf);
+ssize_t mpath_iopolicy_store(struct mpath_subsys *mpath_subsys, const char *buf, size_t count);
+
 void mpath_start_request(struct request *req);
 void mpath_end_request(struct request *req);
 void mpath_device_set_live(struct mpath_device *mpath_device);
 
-extern struct device_attribute mpath_iopolicy;
+//extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
 extern const struct attribute_group *mpath_device_groups[];
 extern const struct attribute_group mpath_attr_group;
