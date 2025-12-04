@@ -3987,13 +3987,14 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	int ret = -ENOMEM;
 	struct mpath_head *mpath_head;
 	char name[256];
+	struct nvme_subsystem *subsys = ctrl->subsys;
 	ret = ida_alloc_min(&ctrl->subsys->ns_ida, 1, GFP_KERNEL);
 	if (ret < 0)
 		return ERR_PTR(ret);
 
 	sprintf(name, "nvme%dn%d",
 			ctrl->subsys->instance, ret);
-	mpath_head = mpath_alloc_head(&mpdt, size, ctrl->numa_node, name);
+	mpath_head = mpath_alloc_head(&mpdt, size);
 	if (!mpath_head)
 		goto out_free_ida;
 	head = (struct nvme_ns_head *)(mpath_head + 1);
@@ -4001,6 +4002,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 
 	head->instance = ret;
+	mpath_head->parent = &subsys->dev;
 	#ifdef dsdd
 	INIT_LIST_HEAD(&head->list);
 	ret = init_srcu_struct(&head->srcu);
@@ -4028,6 +4030,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	pr_err("%s1 ctrl=%pS head=%pS called nvme_mpath_alloc_disk ret=%d\n", __func__, ctrl, head, ret);
 	if (ret)
 		goto out_cleanup_srcu;
+	sprintf(mpath_head->disk->disk_name, name);
 
 	ret = mpath_add_head(mpath_head);
 	pr_err("%s2 ret=%d from mpath_add_disk\n", __func__, ret);

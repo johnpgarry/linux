@@ -110,7 +110,7 @@ struct scsi_mpath_device;
 struct scsi_mpath_head {
 	unsigned long		start_time;
 	struct delayed_work	activate; /* Path Activation work */
-	//struct device		dev;
+	struct device		dev;
 	struct list_head	entry; // for list of mpath disks
 	int					index;
 	struct kref		ref;
