@@ -64,14 +64,14 @@ module_param_cb(multipath_always_on, &multipath_always_on_ops,
 		&multipath_always_on, 0444);
 MODULE_PARM_DESC(multipath_always_on,
 	"create multipath node always except for private namespace with non-unique nsid; note that this also implicitly enables native multipath support");
-
+static int iopolicy = NVME_IOPOLICY_NUMA;
+#ifdef dsdsd
 static const char *nvme_iopolicy_names[] = {
 	[NVME_IOPOLICY_NUMA]	= "numa",
 	[NVME_IOPOLICY_RR]	= "round-robin",
 	[NVME_IOPOLICY_QD]      = "queue-depth",
 };
 
-static int iopolicy = NVME_IOPOLICY_NUMA;
 
 static int nvme_set_iopolicy(const char *val, const struct kernel_param *kp)
 {
@@ -88,13 +88,13 @@ static int nvme_set_iopolicy(const char *val, const struct kernel_param *kp)
 
 	return 0;
 }
-
 static int nvme_get_iopolicy(char *buf, const struct kernel_param *kp)
 {
 	return sprintf(buf, "%s\n", nvme_iopolicy_names[iopolicy]);
 }
+#endif
 
-module_param_call(iopolicy, nvme_set_iopolicy, nvme_get_iopolicy,
+module_param_call(iopolicy, mpath_set_iopolicy, mpath_get_iopolicy,
 	&iopolicy, 0644);
 MODULE_PARM_DESC(iopolicy,
 	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
@@ -643,6 +643,7 @@ void nvme_mpath_stop(struct nvme_ctrl *ctrl)
 	struct device_attribute subsys_attr_##_name =	\
 		__ATTR(_name, _mode, _show, _store)
 
+#ifdef dsddsd
 static ssize_t nvme_subsys_iopolicy_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -694,6 +695,7 @@ static ssize_t nvme_subsys_iopolicy_store(struct device *dev,
 }
 SUBSYS_ATTR_RW(iopolicy, S_IRUGO | S_IWUSR,
 		      nvme_subsys_iopolicy_show, nvme_subsys_iopolicy_store);
+#endif
 
 static ssize_t ana_grpid_show(struct device *dev, struct device_attribute *attr,
 		char *buf)

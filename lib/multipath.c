@@ -27,7 +27,7 @@ static const char *mpath_iopolicy_names[] = {
 };
 
 static int iopolicy = MPATH_IOPOLICY_NUMA;
-static int mpath_set_iopolicy(const char *val, const struct kernel_param *kp)
+int mpath_set_iopolicy(const char *val, const struct kernel_param *kp)
 {
 	if (!val)
 		return -EINVAL;
@@ -42,12 +42,13 @@ static int mpath_set_iopolicy(const char *val, const struct kernel_param *kp)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(mpath_set_iopolicy);
 
-
-static int mpath_get_iopolicy(char *buf, const struct kernel_param *kp)
+int mpath_get_iopolicy(char *buf, const struct kernel_param *kp)
 {
 	return sprintf(buf, "%s\n", mpath_iopolicy_names[iopolicy]);
 }
+EXPORT_SYMBOL_GPL(mpath_get_iopolicy);
 
 module_param_call(iopolicy, mpath_set_iopolicy, mpath_get_iopolicy,
 	&iopolicy, 0644);
@@ -1219,6 +1220,7 @@ const struct attribute_group mpath_attr_group = {
 	.attrs		= mpath_attrs,
 	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
 };
+EXPORT_SYMBOL_GPL(mpath_attr_group);
 
 const struct attribute_group *mpath_device_groups[] = {
 	&mpath_attr_group,
