@@ -4394,7 +4394,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	synchronize_srcu(&mpath_head->srcu);
 
 	/* wait for concurrent submissions */
-	if (nvme_mpath_clear_current_path(ns))
+	if (mpath_clear_current_path(mpath_device))
 		synchronize_srcu(&mpath_head->srcu);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
