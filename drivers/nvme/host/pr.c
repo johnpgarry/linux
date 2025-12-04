@@ -53,7 +53,7 @@ static int nvme_send_ns_head_pr_command(struct block_device *bdev,
 		struct nvme_command *c, void *data, unsigned int data_len)
 {
 	struct nvme_ns_head *head = bdev->bd_disk->private_data;
-	struct mpath_head *mpath_head = head_to_mpath_head(head);
+	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 	int srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	struct nvme_ns *ns = NULL; //fixme nvme_find_path(head);
 	int ret = -EWOULDBLOCK;

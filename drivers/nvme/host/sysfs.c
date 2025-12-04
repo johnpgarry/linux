@@ -198,7 +198,7 @@ static int ns_head_update_nuse(struct nvme_ns_head *head)
 	struct nvme_id_ns *id;
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
-	struct mpath_head *mpath_head = head_to_mpath_head(head);
+	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 
 	/* Avoid issuing commands too often by rate limiting the update */
 	if (!__ratelimit(&head->rs_nuse))
