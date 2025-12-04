@@ -293,7 +293,7 @@ static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
 
 struct mpath_device *mpath_find_path(struct mpath_head *mpath_head)
 {
-	//struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	//struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	pr_err_once("%s mpath_head=%pS iopolicy=%d\n", __func__, mpath_head, READ_ONCE(mpath_head->mpath_subsys->iopolicy));
 	switch (READ_ONCE(mpath_head->mpath_subsys->iopolicy)) {
 	case MPATH_IOPOLICY_QD:
@@ -328,7 +328,7 @@ static void multipath_submit_bio(struct bio *bio)
 	struct mpath_head *mpath_head = bio->bi_bdev->bd_disk->private_data;
 	int srcu_idx;
 	bool special = false;
-	//struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	//struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	struct mpath_device *mpath_device;
 
 	//WARN_ON_ONCE(1);
@@ -606,7 +606,7 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 		__func__, NULL, NULL, NULL, NULL, mpath_head, NULL);
 	if (!mpath_head)
 		return NULL;
-	//scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	//scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	//pr_err("%s mpath_head=%pS scsi_mpath_head=%pS\n",
 	//	__func__, NULL, mpath_head);
 	//mpath_device->mpath_head = mpath_head;

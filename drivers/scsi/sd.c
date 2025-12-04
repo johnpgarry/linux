@@ -4143,7 +4143,7 @@ static int sd_probe(struct device *dev)
 		struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 		struct mpath_head *mpath_head = mpath_device->mpath_head;
-		struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+		struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 		pr_err("%s calling sd_revalidate_mpath_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
 		sd_revalidate_mpath_head(scsi_mpath_head, sdkp);
