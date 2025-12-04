@@ -65,7 +65,7 @@ static const struct class scsi_mpath_generic_class = {
 
 static __maybe_unused void scsi_mpath_head_release1(struct device *dev)
 {
-	struct mpath_head *mpath_head = container_of(dev, struct mpath_head, dev);
+	struct mpath_head *mpath_head = NULL;//container_of(dev, struct mpath_head, dev);
 	dev_err(dev, "%s dev=%pS mpath_head=%pS\n", __func__, dev, mpath_head);
 
 }
@@ -308,7 +308,7 @@ static int scsi_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 
 static __maybe_unused void scsi_mpath_head_release(struct device *dev)
 {
-	struct mpath_head *mpath_head = container_of(dev, struct mpath_head, dev);
+	struct mpath_head *mpath_head = NULL;//container_of(dev, struct mpath_head, dev);
 	dev_err(dev, "%s dev=%pS mpath_head=%pS\n", __func__, dev, mpath_head);
 }
 
@@ -321,7 +321,7 @@ static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16]
 }
 
 struct mpath_head_template smpdt = {
-	.class = &scsi_mpath_disk_class,
+//	.class = &scsi_mpath_disk_class,
 	.cdev_class = &scsi_mpath_generic_class,
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
@@ -401,8 +401,10 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		return scsi_mpath_head->index;
 	snprintf(name, sizeof(name), "smpd%d", index);
 
+
+
 	pr_err("%s4.2 calling mpath_alloc_disk\n", __func__);
-	mpath_head = mpath_alloc_head(&smpdt, sizeof(*scsi_mpath_head), dev_to_node(shost_dev), name);
+	mpath_head = mpath_alloc_head(&smpdt, sizeof(*scsi_mpath_head));
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_head=%pS mpath_device=%pS\n",
 		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, mpath_head, mpath_device);
 	if (!mpath_head) {
@@ -410,9 +412,23 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		goto out_free_ida;
 	}
 	
-	pr_err("%s6 mpath_head=%pS scsi_mpath_head=%pS\n",
-		__func__, mpath_head, scsi_mpath_head);
+
 	scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+
+	device_initialize(&scsi_mpath_head->dev);
+	set_dev_node(&scsi_mpath_head->dev, dev_to_node(shost_dev));
+	ret = dev_set_name(&scsi_mpath_head->dev, name);
+
+	scsi_mpath_head->dev.class = &scsi_mpath_disk_class;
+
+	dev_err(&scsi_mpath_head->dev, "%s6 mpath_head=%pS scsi_mpath_head=%pS called dev_set_name ret=%d, calling device_add\n",
+		__func__, mpath_head, scsi_mpath_head, ret);
+	ret = device_add(&scsi_mpath_head->dev);
+	dev_err(&scsi_mpath_head->dev, "%s6.1 mpath_head=%pS scsi_mpath_head=%pS called device_add ret=%d\n",
+		__func__, mpath_head, scsi_mpath_head, ret);
+	if (ret)
+		return ret;
+	mpath_head->parent = &scsi_mpath_head->dev;
 
 	scsi_mpath_head->index = index;
 	mpath_device->mpath_head = mpath_head;
@@ -426,13 +442,13 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 //	mpath_head->cdev_device.class = &scsi_mpath_generic_class;
 //	mpath_head->cdev_device.release = mpath_cdev_rel;
 
-	pr_err("%s7 &mpath_head->dev=%pS\n", __func__, &mpath_head->dev);
+	pr_err("%s7 &scsi_mpath_head->dev=%pS\n", __func__, &scsi_mpath_head->dev);
 
 	ret = mpath_alloc_head_disk(mpath_head);
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 	if (ret)
 		return ret;
-	mpath_head->parent = &mpath_head->dev;
+	sprintf(mpath_head->disk->disk_name, name);
 
 
 	sprintf(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);
@@ -597,8 +613,8 @@ static ssize_t scsi_mpath_wwid_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
-	struct mpath_head *mpath_head =
-		container_of(dev, struct mpath_head, dev);
+	struct mpath_head *mpath_head = NULL;
+	//	container_of(dev, struct mpath_head, dev);
 	struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
 
 	return sysfs_emit(buf, "%s\n", scsi_mpath_head->wwid);

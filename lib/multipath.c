@@ -374,7 +374,7 @@ static void multipath_submit_bio(struct bio *bio)
 		bio_list_add(&mpath_head->requeue_list, bio);
 		spin_unlock_irq(&mpath_head->requeue_lock);
 	} else {
-		dev_err(&mpath_head->dev, "No available path = Failing I/O \n");
+		dev_err(mpath_head->parent, "No available path = Failing I/O \n");
 
 		bio_io_error(bio);
 	}
@@ -596,7 +596,7 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
-struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int privsize, int node_id, char *name)
+struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int privsize)
 {
 	struct mpath_head *mpath_head;
 	int ret;
@@ -623,20 +623,20 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 	mutex_init(&mpath_head->lock);
 	kref_init(&mpath_head->ref);
 
-	mpath_head->dev.class = mpdt->class; //&scsi_mpath_head_class;
+	//mpath_head->dev.class = mpdt->class; //&scsi_mpath_head_class;
 
 	// see mpath_head_add_cdev()
 
 //	scsi_mpath_head->dev.release = scsi_mpath_head_release;
 //	scsi_mpath_head->dev.groups = scsi_mpath_groups;
-	pr_err("%s7 &mpath_head->dev=%pS name=%s\n", __func__, &mpath_head->dev, name);
+//	pr_err("%s7 &mpath_head->dev=%pS name=%s\n", __func__, &mpath_head->dev, name);
 
 	
 //	dev_set_name(&mpath_head->dev, "smpd%d", 0/* fixme scsi_mpath_head->index*/);
 //	disk_count++;
-	device_initialize(&mpath_head->dev);
-	set_dev_node(&mpath_head->dev, node_id);
-	ret = dev_set_name(&mpath_head->dev, name);
+//	device_initialize(&mpath_head->dev);
+//	set_dev_node(&mpath_head->dev, node_id);
+//	ret = dev_set_name(&mpath_head->dev, name);
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
 
@@ -671,18 +671,18 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	int ret;
 
 	blk_set_stacking_limits(&lim);
-	pr_err("%s8\n", __func__);
+	pr_err("%s8 mpath_head->parent=%pS\n", __func__, mpath_head->parent);
 
 	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
 	lim.max_zone_append_sectors = 0;
 	lim.dma_alignment = 3;
 
-	mpath_head->disk = blk_alloc_disk(&lim, dev_to_node(&mpath_head->dev));
+	mpath_head->disk = blk_alloc_disk(&lim, dev_to_node(mpath_head->parent));
 	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS\n", __func__, NULL, NULL, mpath_head->disk);
 	if (IS_ERR(mpath_head->disk))
 		return -ENOMEM;
 
-	sprintf(mpath_head->disk->disk_name, dev_name(&mpath_head->dev));
+//	sprintf(mpath_head->disk->disk_name, dev_name(&mpath_head->dev));
 	mpath_head->disk->private_data = mpath_head;
 	mpath_head->disk->fops = &mpath_ops;
 
@@ -721,15 +721,15 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 		__func__, mpath_head, test_bit(MPATH_DISK_LIVE, &mpath_head->flags));
 
 	if (!test_and_set_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
-		struct device *dd1 = &mpath_head->dev;
-		struct kobject *dd1_kobj = &dd1->kobj;
-		struct kref *dd1_kobj_kref = &dd1_kobj->kref;
+//		struct device *dd1 = &mpath_head->dev;
+//		struct kobject *dd1_kobj = &dd1->kobj;
+//		struct kref *dd1_kobj_kref = &dd1_kobj->kref;
 		struct device *parent = mpath_head->parent;
 		dev_err(parent, "%s0 calling device_add_disk &mpath_head->dev=%pS ref count=%d parent=%pS\n",
-			__func__, dd1->parent, kref_read(dd1_kobj_kref), parent);
+			__func__, NULL /* dd1->parent */, 0 /* kref_read(dd1_kobj_kref) */, parent);
 
 		ret = device_add_disk(parent, mpath_head->disk, mpath_head->mpdt->device_groups);
-		pr_err("%s1 called device_add_disk ret=%d ref count=%d\n", __func__, ret, kref_read(dd1_kobj_kref));
+		pr_err("%s1 called device_add_disk ret=%d ref count=%d\n", __func__, ret, 0/*kref_read(dd1_kobj_kref)*/);
 		if (ret) {
 			clear_bit(MPATH_DISK_LIVE, &mpath_head->flags);
 			return;
@@ -775,11 +775,12 @@ EXPORT_SYMBOL_GPL(mpath_device_is_live);
 static ssize_t mpath_iopolicy_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	struct mpath_head *mpath_head =
-		container_of(dev, struct mpath_head, dev);
+//	struct mpath_head *mpath_head =
+//		container_of(dev, struct mpath_head, dev);
 
-	return sysfs_emit(buf, "%s\n",
-			  mpath_iopolicy_names[READ_ONCE(mpath_head->iopolicy)]);
+//	return sysfs_emit(buf, "%s\n",
+//			  mpath_iopolicy_names[READ_ONCE(mpath_head->iopolicy)]);
+	return 0;
 }
 
 static void mpath_iopolicy_update(struct mpath_head *mpath_head,
@@ -798,7 +799,7 @@ static void mpath_iopolicy_update(struct mpath_head *mpath_head,
 	//	scsi_mpath_head_clear_ctrl_paths(ctrl);
 	//mutex_unlock(&nvme_subsystems_lock);
 
-	dev_notice(&mpath_head->dev, "iopolicy changed from %s to %s\n",
+	pr_err("iopolicy changed from %s to %s\n",
 			mpath_iopolicy_names[old_iopolicy],
 			mpath_iopolicy_names[iopolicy]);
 }
@@ -806,8 +807,9 @@ static void mpath_iopolicy_update(struct mpath_head *mpath_head,
 static ssize_t mpath_iopolicy_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct mpath_head *mpath_head =
-		container_of(dev, struct mpath_head, dev);
+//	struct mpath_head *mpath_head =
+//		container_of(dev, struct mpath_head, dev);
+	struct mpath_head *mpath_head = NULL;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
@@ -971,15 +973,15 @@ EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
 
 int mpath_add_head(struct mpath_head *mpath_head)
 {
-	int ret;
-	struct device *dd1 = &mpath_head->dev;
-	struct kobject *dd1_kobj = &dd1->kobj;
-	struct kref *dd1_kobj_kref = &dd1_kobj->kref;
+	int ret = 0;
+//	struct device *dd1 = &mpath_head->dev;
+//	struct kobject *dd1_kobj = &dd1->kobj;
+//	struct kref *dd1_kobj_kref = &dd1_kobj->kref;
 
-	dev_err(&mpath_head->dev, "%s calling device_add for &mpath_head->dev ref count=%d dd1=%pS mpath_head->parent=%pS\n",
-		__func__, kref_read(dd1_kobj_kref), dd1, mpath_head->parent);
-	ret = device_add(&mpath_head->dev); // see nvme_init_subsystem()
-	dev_err(&mpath_head->dev, "%s2 called device_add for &mpath_head->dev ref count=%d\n", __func__, kref_read(dd1_kobj_kref));
+//	dev_err(&mpath_head->dev, "%s calling device_add for &mpath_head->dev ref count=%d dd1=%pS mpath_head->parent=%pS\n",
+//		__func__, kref_read(dd1_kobj_kref), dd1, mpath_head->parent);
+//	ret = device_add(&mpath_head->dev); // see nvme_init_subsystem()
+//	dev_err(&mpath_head->dev, "%s2 called device_add for &mpath_head->dev ref count=%d\n", __func__, kref_read(dd1_kobj_kref));
 
 	return ret;
 }
@@ -1040,20 +1042,20 @@ static void mpath_free_disk(struct kref *ref)
 	struct mpath_head *mpath_head =
 		container_of(ref, struct mpath_head, ref);
 	//struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
-	struct device *dd1 = &mpath_head->dev;
-	struct kobject *dd1_kobj = &dd1->kobj;
-	struct kref *dd1_kobj_kref = &dd1_kobj->kref;
+	//struct device *dd1 = &mpath_head->dev;
+	//struct kobject *dd1_kobj = &dd1->kobj;
+	//struct kref *dd1_kobj_kref = &dd1_kobj->kref;
 
 	pr_err("%s mpath_head=%pS dd1_kobj=%pS dd1_kobj_kref=%pS\n",
-		__func__, mpath_head, dd1_kobj, dd1_kobj_kref);
+		__func__, mpath_head, NULL/* dd1_kobj */, NULL /* dd1_kobj_kref */);
 	#ifdef dsdsd
 	nvme_mpath_put_disk(head);
 	#else
 	pr_err("%s1 mpath_head=%pS ref=%pS calling put_disk gd=%pS ref count=%d dd1=%pS\n",
-		__func__, mpath_head, ref, mpath_head->disk, kref_read(dd1_kobj_kref), dd1);
+		__func__, mpath_head, ref, mpath_head->disk, 0 /* kref_read(dd1_kobj_kref) */, NULL /*dd1*/);
 	put_disk(mpath_head->disk);
 	pr_err("%s1.1 mpath_head=%pS ref=%pS called put_disk gd=%pS ref count=%d dd1=%pS\n",
-		__func__, mpath_head, ref, mpath_head->disk, kref_read(dd1_kobj_kref), dd1);
+		__func__, mpath_head, ref, mpath_head->disk, 0 /* kref_read(dd1_kobj_kref) */, NULL /* dd1*/);
 	#endif
 //	ida_free(&sd_mpath_index_ida, scsi_mpath_head->index);
 	cleanup_srcu_struct(&mpath_head->srcu);
@@ -1062,14 +1064,14 @@ static void mpath_free_disk(struct kref *ref)
 //	list_del(&scsi_mpath_head->entry);
 //	mutex_unlock(&scsi_mpath_heads_lock);
 
-	pr_err("%s2 mpath_head=%pS calling device_del ref count=%d dd1=%pS\n",
-		__func__, mpath_head, kref_read(dd1_kobj_kref), dd1);
-	device_del(&mpath_head->dev);
-	pr_err("%s3 mpath_head=%pS calling put_device ref count=%d dd1=%pS\n",
-		__func__, mpath_head, kref_read(dd1_kobj_kref), dd1);
-	put_device(&mpath_head->dev);
-	pr_err("%s3.1 mpath_head=%pS called put_device dd1=%pS\n",
-		__func__, mpath_head, dd1);
+//	pr_err("%s2 mpath_head=%pS calling device_del ref count=%d dd1=%pS\n",
+//		__func__, mpath_head, kref_read(dd1_kobj_kref), dd1);
+//	device_del(&mpath_head->dev);
+//	pr_err("%s3 mpath_head=%pS calling put_device ref count=%d dd1=%pS\n",
+//		__func__, mpath_head, kref_read(dd1_kobj_kref), dd1);
+//	put_device(&mpath_head->dev);
+//	pr_err("%s3.1 mpath_head=%pS called put_device dd1=%pS\n",
+//		__func__, mpath_head, dd1);
 //	kfree(head->plids);
 	pr_err("%s4 mpath_head=%pS calling kfree\n", __func__, mpath_head);
 	kfree(mpath_head);
@@ -1160,7 +1162,7 @@ __maybe_unused int mpath_head_add_cdev(struct mpath_head *mpath_head)
 	int ret, minor = 0 /*mpath_head->index*/;
 
 	// following can be moved to disk alloc code
-	mpath_head->cdev_device.parent = &mpath_head->dev;
+	mpath_head->cdev_device.parent = mpath_head->parent;
 	ret = dev_set_name(&mpath_head->cdev_device, "smpg%d",
 						minor);
 	pr_err("%s called dev_set_name ret=%d\n", __func__, ret);

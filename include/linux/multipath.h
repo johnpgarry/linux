@@ -35,7 +35,6 @@ struct mpath_head {
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	struct gendisk		*disk;
 	enum mpath_iopolicy	iopolicy;
-	struct device		dev;
 	struct kref		ref;
 	struct	bio_list	requeue_list; /* list for requeing bio */
 	spinlock_t		requeue_lock;
@@ -80,7 +79,7 @@ struct mpath_device {
 #define REQ_MPATH		REQ_DRV
 
 struct mpath_head_template {
-	const struct class *class;
+	//const struct class *class;
 	const struct class *cdev_class;
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
@@ -91,7 +90,7 @@ struct mpath_head_template {
 };
 
 struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt,
-						int privsize, int node_id, char *name);
+						int privsize);
 
 int mpath_alloc_head_disk(struct mpath_head *mpath_head);
 int __must_check mpath_add_head(struct mpath_head *);
