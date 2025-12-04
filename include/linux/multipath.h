@@ -49,6 +49,8 @@ struct mpath_head {
 	struct work_struct	partition_scan_work;
 	struct mutex            lock;
 
+	struct device *parent;
+
 	struct mpath_device __rcu *current_path[MAX_NUMNODES]; /* scsi_device of current path */
 	const struct mpath_head_template *mpdt;
 	unsigned long hostdata[]  /* Used for storage of host specific stuff */
@@ -85,6 +87,7 @@ struct mpath_head_template {
 	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg);
+	const struct attribute_group **device_groups;
 };
 
 struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt,

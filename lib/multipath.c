@@ -724,11 +724,11 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 		struct device *dd1 = &mpath_head->dev;
 		struct kobject *dd1_kobj = &dd1->kobj;
 		struct kref *dd1_kobj_kref = &dd1_kobj->kref;
-		pr_err("%s0 calling device_add_disk &mpath_head->dev=%pS ref count=%d\n",
-			__func__, &mpath_head->dev, kref_read(dd1_kobj_kref));
+		struct device *parent = mpath_head->parent;
+		dev_err(parent, "%s0 calling device_add_disk &mpath_head->dev=%pS ref count=%d parent=%pS\n",
+			__func__, dd1->parent, kref_read(dd1_kobj_kref), parent);
 
-		ret = device_add_disk(&mpath_head->dev, mpath_head->disk, mpath_device_groups);
-		//ret = device_add_disk(NULL, mpath_head->disk, mpath_device_groups);
+		ret = device_add_disk(parent, mpath_head->disk, mpath_head->mpdt->device_groups);
 		pr_err("%s1 called device_add_disk ret=%d ref count=%d\n", __func__, ret, kref_read(dd1_kobj_kref));
 		if (ret) {
 			clear_bit(MPATH_DISK_LIVE, &mpath_head->flags);
@@ -976,8 +976,8 @@ int mpath_add_head(struct mpath_head *mpath_head)
 	struct kobject *dd1_kobj = &dd1->kobj;
 	struct kref *dd1_kobj_kref = &dd1_kobj->kref;
 
-	dev_err(&mpath_head->dev, "%s calling device_add for &mpath_head->dev ref count=%d dd1=%pS\n",
-		__func__, kref_read(dd1_kobj_kref), dd1);
+	dev_err(&mpath_head->dev, "%s calling device_add for &mpath_head->dev ref count=%d dd1=%pS mpath_head->parent=%pS\n",
+		__func__, kref_read(dd1_kobj_kref), dd1, mpath_head->parent);
 	ret = device_add(&mpath_head->dev); // see nvme_init_subsystem()
 	dev_err(&mpath_head->dev, "%s2 called device_add for &mpath_head->dev ref count=%d\n", __func__, kref_read(dd1_kobj_kref));
 
