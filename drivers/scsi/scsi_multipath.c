@@ -411,8 +411,12 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 	}
 	
 
-	scsi_mpath_head = to_scsi_mpath_head(mpath_head);
-	mpath_head->mpath_subsys = &scsi_mpath_head->mpath_subsys;
+	scsi_mpath_head = mpath_to_priv_head(mpath_head);
+	mpath_head->mpath_subsys = kzalloc(sizeof(struct mpath_subsys), GFP_KERNEL);
+	if (!mpath_head->mpath_subsys) {
+		ret = -ENOMEM;
+		goto out_free_ida;
+	}
 
 	device_initialize(&scsi_mpath_head->dev);
 	set_dev_node(&scsi_mpath_head->dev, dev_to_node(shost_dev));
