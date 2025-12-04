@@ -100,18 +100,22 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head);
 int __must_check mpath_add_head(struct mpath_head *);
 
 
-static inline struct mpath_head *to_mpath_head(void *d)
+static inline struct mpath_head *mpath_priv_to_head(void *d)
 {
 	return d - sizeof(struct mpath_head);
 }
 
+static inline void *mpath_to_priv_head(struct mpath_head *mpath_head)
+{
+	return mpath_head + 1;
+}
 
 static inline bool is_mpath_request(struct request *req)
 {
 	return req->cmd_flags & REQ_MPATH;
 }
 
-#define cdev_to_mpath_head(cdev) container_of(cdev, struct mpath_head, cdev)
+#define cdev_mpath_priv_to_head(cdev) container_of(cdev, struct mpath_head, cdev)
 
 bool mpath_clear_current_path(struct mpath_device *);
 struct mpath_device *mpath_find_path(struct mpath_head *mpath_head);

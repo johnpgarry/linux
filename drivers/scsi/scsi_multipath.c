@@ -387,7 +387,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 	scsi_mpath_head = scsi_mpath_find_disk(sdev);
 	pr_err("%s4.1 called scsi_mpath_find_disk sdev=%pS mpath_head=%pS\n", __func__, sdev, scsi_mpath_head);
 	if (scsi_mpath_head) {
-		mpath_head = to_mpath_head(scsi_mpath_head);
+		mpath_head = mpath_priv_to_head(scsi_mpath_head);
 		mutex_lock(&mpath_head->lock);
 		list_add_tail(&mpath_device->siblings, &mpath_head->dev_list);
 		mutex_unlock(&mpath_head->lock);
@@ -485,7 +485,7 @@ static void scsi_mpath_free_disk(struct kref *ref)
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(ref, struct scsi_mpath_head, ref);
-	struct mpath_head *mpath_head = to_mpath_head(scsi_mpath_head);
+	struct mpath_head *mpath_head = mpath_priv_to_head(scsi_mpath_head);
 
 
 	mutex_lock(&scsi_mpath_heads_lock);
@@ -697,7 +697,7 @@ static ssize_t scsi_mpath_iopolicy_store(struct device *dev,
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
-	struct mpath_head *mpath_head = to_mpath_head(scsi_mpath_head);
+	struct mpath_head *mpath_head = mpath_priv_to_head(scsi_mpath_head);
 	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 
 	return mpath_iopolicy_store(mpath_subsys, buf, count);
@@ -708,7 +708,7 @@ static __maybe_unused ssize_t scsi_mpath_iopolicy_show(struct device *dev,
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
-	struct mpath_head *mpath_head = to_mpath_head(scsi_mpath_head);
+	struct mpath_head *mpath_head = mpath_priv_to_head(scsi_mpath_head);
 	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 
 	return mpath_iopolicy_show(mpath_subsys, buf);

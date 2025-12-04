@@ -527,16 +527,9 @@ struct nvme_ns_head {
 #endif
 };
 
-static inline struct mpath_head *head_to_mpath_head(void *priv)
-{
-	struct mpath_head *mpath_head = priv;
-
-	return mpath_head - 1;
-}
-
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head = head_to_mpath_head(head);
+	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && mpath_head->disk;
 }
 
@@ -1017,7 +1010,7 @@ static inline void nvme_trace_bio_complete(struct request *req)
 	struct nvme_ns *ns = req->q->queuedata;
 
 	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio) {
-		struct mpath_head *mpath_head = head_to_mpath_head(ns_to_head(ns));
+		struct mpath_head *mpath_head = mpath_priv_to_head(ns_to_head(ns));
 		trace_block_bio_complete(mpath_head->disk->queue, req->bio);
 	}
 }

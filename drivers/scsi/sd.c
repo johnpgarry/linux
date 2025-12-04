@@ -3708,7 +3708,7 @@ static int sd_revalidate_mpath_head(struct scsi_mpath_head *scsi_mpath_head, str
 	struct scsi_device *sdp = sdkp->device;
 	struct queue_limits *mpath_lim;
 	struct queue_limits lim2;
-	struct mpath_head *mpath_head = to_mpath_head(scsi_mpath_head);
+	struct mpath_head *mpath_head = mpath_priv_to_head(scsi_mpath_head);
 	int err;
 
 	//blk_mq_freeze_queue(sdp->mpath_disk->queue);

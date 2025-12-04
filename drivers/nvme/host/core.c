@@ -2514,7 +2514,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		struct queue_limits lim;
 		unsigned int memflags;
 		struct nvme_ns_head *head = ns_to_head(ns);
-		struct mpath_head *mpath_head = head_to_mpath_head(head);
+		struct mpath_head *mpath_head = mpath_priv_to_head(head);
 		struct gendisk *disk = mpath_head->disk;
 
 		lim = queue_limits_start_update(disk->queue);
@@ -3997,7 +3997,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	mpath_head = mpath_alloc_head(&mpdt, size);
 	if (!mpath_head)
 		goto out_free_ida;
-	head = (struct nvme_ns_head *)(mpath_head + 1);
+	head = mpath_to_priv_head(mpath_head);
 	mpath_head->mpath_subsys = &subsys->mpath_subsys;
 
 	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
@@ -4149,11 +4149,11 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			goto out_unlock;
 		}
 
-		mpath_head = head_to_mpath_head(head);
+		mpath_head = mpath_priv_to_head(head);
 		mpath_device->mpath_head = mpath_head;
 	} else {
 
-		mpath_head = head_to_mpath_head(head);
+		mpath_head = mpath_priv_to_head(head);
 		mpath_device->mpath_head = mpath_head;
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
@@ -4365,7 +4365,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		 * we do not release the reference to nshead twice if head->disk
 		 * is not present.
 		 */
-		if (head_to_mpath_head(ns_to_head(ns))->gd)
+		if (mpath_priv_to_head(ns_to_head(ns))->gd)
 			last_path = true;
 	}
 	#endif
