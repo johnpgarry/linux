@@ -124,6 +124,8 @@ void mpath_add_device(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
 void mpath_remove_device(struct mpath_device *mpath_device);
 //void mpath_cdev_rel(struct device *dev);
+int mpath_set_iopolicy(const char *val, const struct kernel_param *kp);
+int mpath_get_iopolicy(char *buf, const struct kernel_param *kp);
 
 void mpath_start_request(struct request *req);
 void mpath_end_request(struct request *req);
@@ -132,6 +134,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device);
 extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
 extern const struct attribute_group *mpath_device_groups[];
+extern const struct attribute_group mpath_attr_group;
 
 bool is_mpath_head(struct gendisk *disk);
 
