@@ -616,9 +616,8 @@ static ssize_t scsi_mpath_wwid_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
-	struct mpath_head *mpath_head = NULL;
-	//	container_of(dev, struct mpath_head, dev);
-	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
 
 	return sysfs_emit(buf, "%s\n", scsi_mpath_head->wwid);
 }
