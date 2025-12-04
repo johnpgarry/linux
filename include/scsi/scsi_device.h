@@ -118,8 +118,6 @@ struct scsi_mpath_head {
 	char wwid[SCSI_MPATH_DEVICE_ID_LEN];
 };
 
-//#define to_scsi_mpath_head(md) container_of(md, struct scsi_mpath_head, mpath_head)
-#define to_scsi_mpath_head(md) ((struct scsi_mpath_head *)(md + 1))
 
 struct scsi_mpath_device {
 	struct mpath_device mpath_device;

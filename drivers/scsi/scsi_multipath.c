@@ -139,7 +139,7 @@ void scsi_mpath_failover_req(struct request *req)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	//struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	//struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	unsigned long flags;
 	struct bio *bio;
 
@@ -401,8 +401,6 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		return scsi_mpath_head->index;
 	snprintf(name, sizeof(name), "smpd%d", index);
 
-
-
 	pr_err("%s4.2 calling mpath_alloc_disk\n", __func__);
 	mpath_head = mpath_alloc_head(&smpdt, sizeof(*scsi_mpath_head));
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_head=%pS mpath_device=%pS\n",
@@ -532,7 +530,7 @@ static __maybe_unused void activate_mpath(void *data, int err)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	bool retry = false;
 
 	pr_err("%s sdev=%pS mpath_head=%pS mpath_dev=%pS\n",
@@ -588,7 +586,7 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
 	pr_err("%s sdev=%pS mpath_dev=%pS mpath_head=%pS\n",
 		__func__, sdev, scsi_mpath_dev, scsi_mpath_head);
@@ -616,7 +614,7 @@ static ssize_t scsi_mpath_wwid_show(struct device *dev,
 {
 	struct mpath_head *mpath_head = NULL;
 	//	container_of(dev, struct mpath_head, dev);
-	struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
 	return sysfs_emit(buf, "%s\n", scsi_mpath_head->wwid);
 }
@@ -640,7 +638,7 @@ static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attr
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_head = mpath_device->mpath_head;
 
-	scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	dev_err(dev, "%s2 mpath_head->iopolicy=%d SCSI_MPATH_IOPOLICY_NUMA=%d\n", __func__,
 		mpath_head->mpath_subsys->iopolicy, MPATH_IOPOLICY_NUMA);
 
@@ -814,7 +812,7 @@ void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
 
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_head = mpath_device->mpath_head;
-	scsi_mpath_head = to_scsi_mpath_head(mpath_head);
+	scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
 	pr_err("%s clearing SCSI_MPATH_DISK_LIVE (if set) sdev=%pS\n", __func__, sdev);
 	if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
