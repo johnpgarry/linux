@@ -327,6 +327,7 @@ struct mpath_head_template smpdt = {
 	.is_optimized = scsi_mpath_is_optimized,
 	.get_unique_id = scsi_mpath_get_unique_id,
 	.ioctl = scsi_mpath_ioctl,
+	.device_groups = mpath_device_groups,
 };
 
 /*
@@ -431,6 +432,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 	if (ret)
 		return ret;
+	mpath_head->parent = &mpath_head->dev;
 
 
 	sprintf(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str, SCSI_MPATH_DEVICE_ID_LEN);

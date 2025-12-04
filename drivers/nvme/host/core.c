@@ -3976,6 +3976,7 @@ const struct mpath_head_template mpdt = {
 	.is_optimized = nvme_mpath_is_optimized,
 	.get_unique_id = nvme_mpath_get_unique_id,
 	.ioctl = nvme_mpath_ioctl,
+	.device_groups = nvme_ns_attr_groups,
 };
 
 static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
