@@ -1126,7 +1126,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 			 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
 			 * to allow multipath to fail all I/O.
 			 */
-		//	kblockd_schedule_work(&head->requeue_work);
+			kblockd_schedule_work(&mpath_head->requeue_work);
 
 			mpath_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
 			synchronize_srcu(&mpath_head->srcu);

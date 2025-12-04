@@ -508,11 +508,13 @@ struct nvme_ns_head {
 	u16			nr_plids;
 	u16			*plids;
 #ifdef CONFIG_NVME_MULTIPATH
+#ifdef dsdsdd
 	struct bio_list		requeue_list;
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work;
 	struct work_struct	partition_scan_work;
 	struct mutex		lock;
+#endif
 	unsigned long		flags1;
 	struct delayed_work	remove_work;
 	unsigned int		delayed_removal_secs;
