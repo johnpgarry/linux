@@ -114,7 +114,6 @@ struct scsi_mpath_head {
 	struct list_head	entry; // for list of mpath disks
 	int					index;
 	struct kref		ref;
-	struct mpath_subsys mpath_subsys;
 	char wwid[SCSI_MPATH_DEVICE_ID_LEN];
 };
 
