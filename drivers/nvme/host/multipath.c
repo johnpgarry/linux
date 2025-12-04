@@ -645,38 +645,14 @@ void nvme_mpath_stop(struct nvme_ctrl *ctrl)
 	struct device_attribute subsys_attr_##_name =	\
 		__ATTR(_name, _mode, _show, _store)
 
-#ifdef dsddsd
 static ssize_t nvme_subsys_iopolicy_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 
-	return sysfs_emit(buf, "%s\n",
-			  nvme_iopolicy_names[READ_ONCE(subsys->iopolicy)]);
-}
-
-static void nvme_subsys_iopolicy_update(struct nvme_subsystem *subsys,
-		int iopolicy)
-{
-	struct nvme_ctrl *ctrl;
-	int old_iopolicy = READ_ONCE(subsys->iopolicy);
-
-	if (old_iopolicy == iopolicy)
-		return;
-
-	WRITE_ONCE(subsys->iopolicy, iopolicy);
-
-	/* iopolicy changes clear the mpath by design */
-	mutex_lock(&nvme_subsystems_lock);
-	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
-		nvme_mpath_clear_ctrl_paths(ctrl);
-	mutex_unlock(&nvme_subsystems_lock);
-
-	pr_notice("subsysnqn %s iopolicy changed from %s to %s\n",
-			subsys->subnqn,
-			nvme_iopolicy_names[old_iopolicy],
-			nvme_iopolicy_names[iopolicy]);
+	return mpath_iopolicy_show(mpath_subsys, buf);
 }
 
 static ssize_t nvme_subsys_iopolicy_store(struct device *dev,
@@ -684,20 +660,12 @@ static ssize_t nvme_subsys_iopolicy_store(struct device *dev,
 {
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(nvme_iopolicy_names); i++) {
-		if (sysfs_streq(buf, nvme_iopolicy_names[i])) {
-			nvme_subsys_iopolicy_update(subsys, i);
-			return count;
-		}
-	}
-
-	return -EINVAL;
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
+	
+	return mpath_iopolicy_store(mpath_subsys, buf, count);
 }
 SUBSYS_ATTR_RW(iopolicy, S_IRUGO | S_IWUSR,
 		      nvme_subsys_iopolicy_show, nvme_subsys_iopolicy_store);
-#endif
 
 static ssize_t ana_grpid_show(struct device *dev, struct device_attribute *attr,
 		char *buf)

@@ -62,7 +62,7 @@ void mpath_start_request(struct request *req)
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	struct gendisk *disk = mpath_head->disk;
 
-	if ((READ_ONCE(mpath_head->iopolicy) == MPATH_IOPOLICY_QD) &&
+	if ((READ_ONCE(mpath_head->mpath_subsys->iopolicy) == MPATH_IOPOLICY_QD) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
 		atomic_inc(&mpath_device->nr_active);
 		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
@@ -140,7 +140,7 @@ struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head, int node)
 		}
 
 		if (mpath_device->numa_node != NUMA_NO_NODE &&
-		    (READ_ONCE(mpath_head->iopolicy) == MPATH_IOPOLICY_NUMA))
+		    (READ_ONCE(mpath_head->mpath_subsys->iopolicy) == MPATH_IOPOLICY_NUMA))
 			distance = node_distance(node, mpath_device->numa_node);
 		else
 			distance = LOCAL_DISTANCE;
@@ -294,8 +294,8 @@ static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
 struct mpath_device *mpath_find_path(struct mpath_head *mpath_head)
 {
 	//struct scsi_mpath_head *scsi_mpath_head = to_scsi_mpath_head(mpath_head);
-	pr_err_once("%s mpath_head=%pS iopolicy=%d\n", __func__, mpath_head, READ_ONCE(mpath_head->iopolicy));
-	switch (READ_ONCE(mpath_head->iopolicy)) {
+	pr_err_once("%s mpath_head=%pS iopolicy=%d\n", __func__, mpath_head, READ_ONCE(mpath_head->mpath_subsys->iopolicy));
+	switch (READ_ONCE(mpath_head->mpath_subsys->iopolicy)) {
 	case MPATH_IOPOLICY_QD:
 		return mpath_queue_depth_path(mpath_head);
 	case MPATH_IOPOLICY_RR:
@@ -772,60 +772,6 @@ bool mpath_device_is_live(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_device_is_live);
 
-static ssize_t mpath_iopolicy_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-//	struct mpath_head *mpath_head =
-//		container_of(dev, struct mpath_head, dev);
-
-//	return sysfs_emit(buf, "%s\n",
-//			  mpath_iopolicy_names[READ_ONCE(mpath_head->iopolicy)]);
-	return 0;
-}
-
-static void mpath_iopolicy_update(struct mpath_head *mpath_head,
-		int iopolicy)
-{
-	int old_iopolicy = READ_ONCE(mpath_head->iopolicy);
-
-	if (old_iopolicy == iopolicy)
-		return;
-
-	WRITE_ONCE(mpath_head->iopolicy, iopolicy);
-
-	/* iopolicy changes clear the mpath by design */
-	//mutex_lock(&nvme_subsystems_lock);
-	//list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
-	//	scsi_mpath_head_clear_ctrl_paths(ctrl);
-	//mutex_unlock(&nvme_subsystems_lock);
-
-	pr_err("iopolicy changed from %s to %s\n",
-			mpath_iopolicy_names[old_iopolicy],
-			mpath_iopolicy_names[iopolicy]);
-}
-
-static ssize_t mpath_iopolicy_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-//	struct mpath_head *mpath_head =
-//		container_of(dev, struct mpath_head, dev);
-	struct mpath_head *mpath_head = NULL;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
-		if (sysfs_streq(buf, mpath_iopolicy_names[i])) {
-			mpath_iopolicy_update(mpath_head, i);
-			return count;
-		}
-	}
-
-	return -EINVAL;
-}
-
-struct device_attribute mpath_iopolicy = \
-		__ATTR(iopolicy, S_IRUGO | S_IWUSR, mpath_iopolicy_show, mpath_iopolicy_store);
-EXPORT_SYMBOL_GPL(mpath_iopolicy);
-
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf)
 {
 	int node, srcu_idx;
@@ -836,7 +782,7 @@ ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf)
 	pr_err("%s mpath_device=%pS mpath_head=%pS\n", __func__,
 		mpath_device, mpath_head);
 
-	if (mpath_head->iopolicy != MPATH_IOPOLICY_NUMA)
+	if (mpath_head->mpath_subsys->iopolicy != MPATH_IOPOLICY_NUMA)
 		return 0;
 
 	nodes_clear(numa_nodes);
@@ -1183,6 +1129,7 @@ __maybe_unused int mpath_head_add_cdev(struct mpath_head *mpath_head)
 	return ret;
 }
 
+
 static struct attribute dummy_attr = {
 	.name = "dummy",
 };
@@ -1229,6 +1176,49 @@ const struct attribute_group *mpath_device_groups[] = {
 	NULL
 };
 EXPORT_SYMBOL_GPL(mpath_device_groups);
+
+ssize_t mpath_iopolicy_show(struct mpath_subsys *mpath_subsys, char *buf)
+{
+	return sysfs_emit(buf, "%s\n",
+			  mpath_iopolicy_names[READ_ONCE(mpath_subsys->iopolicy)]);
+}
+EXPORT_SYMBOL_GPL(mpath_iopolicy_show);
+
+static void mpath_iopolicy_update(struct mpath_subsys *mpath_subsys,
+		int iopolicy)
+{
+	int old_iopolicy = READ_ONCE(mpath_subsys->iopolicy);
+
+	if (old_iopolicy == iopolicy)
+		return;
+
+	WRITE_ONCE(mpath_subsys->iopolicy, iopolicy);
+
+	/* iopolicy changes clear the mpath by design */
+	//mutex_lock(&nvme_subsystems_lock);
+	//list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
+	//	scsi_mpath_head_clear_ctrl_paths(ctrl);
+	//mutex_unlock(&nvme_subsystems_lock);
+
+	pr_err("iopolicy changed from %s to %s\n",
+			mpath_iopolicy_names[old_iopolicy],
+			mpath_iopolicy_names[iopolicy]);
+}
+
+ssize_t mpath_iopolicy_store(struct mpath_subsys *mpath_subsys, const char *buf, size_t count)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
+		if (sysfs_streq(buf, mpath_iopolicy_names[i])) {
+			mpath_iopolicy_update(mpath_subsys, i);
+			return count;
+		}
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(mpath_iopolicy_store);
 
 static int __init mpath_init(void)
 {
