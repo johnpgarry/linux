@@ -185,45 +185,9 @@ void scsi_mpath_failover_req(struct request *req)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_failover_req);
 
-#ifdef dsddd
-void scsi_mpath_start_request(struct request *req)
-{
-	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
-	struct scsi_device *sdev = scmd->device;
-	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
-	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	__maybe_unused struct gendisk *disk = mpath_head->gd;
-	__maybe_unused struct mpath_request *mpath_request = &scmd->mpath_request;
-
-	mpath_start_request(mpath_request, mpath_device, req);
-}
-
-void scsi_mpath_end_request(struct request *req)
-{
-	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
-	struct scsi_device *sdev = scmd->device;
-	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	__maybe_unused struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
-	__maybe_unused struct mpath_head *mpath_head = mpath_device->mpath_head;
-	__maybe_unused struct gendisk *disk = mpath_head->gd;
-	__maybe_unused struct mpath_request *mpath_request = &scmd->mpath_request;
-
-	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
-	if (scmd->flags & MPATH_REQ_CNT_ACTIVE)
-		atomic_dec_if_positive(&mpath_device->nr_active);
-
-	if (!(scmd->flags & MPATH_REQ_IO_STATS))
-		return;
-	bdev_end_io_acct(disk->part0, req_op(req),
-			 blk_rq_bytes(req) >> SECTOR_SHIFT,
-			  mpath_request->start_time);
-}
-#endif
-
-
 #if 0
 void scsi_mpath_kick_requeue_lists(struct Scsi_Host *shost)
+
 {
 	struct scsi_mpath_head *scsi_mpath_head = shost->mpath_dev;
 	struct scsi_device *sdev;
@@ -241,7 +205,6 @@ void scsi_mpath_kick_requeue_lists(struct Scsi_Host *shost)
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 }
 #endif
-
 static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 {
 	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
