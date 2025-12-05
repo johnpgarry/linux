@@ -1,3 +1,5 @@
+cp  /home/john/buildroot/output/images/rootfs.cpio /home/john/buildroot/output/images/rootfs_ini.cpio
+
 qemu-system-x86_64 -name guest=qemu-ini-test,debug-threads=on \
 			-smp cpus=4 \
 			-object memory-backend-ram,size=3G,id=m0 \
@@ -8,8 +10,8 @@ qemu-system-x86_64 -name guest=qemu-ini-test,debug-threads=on \
 			-machine q35,usb=off,dump-guest-core=off \
 			-accel kvm -cpu host,migratable=on,hv-time=on,hv-relaxed=on,hv-vapic=on,hv-spinlocks=0x1fff  \
 			-smp 4,sockets=2,cores=2,threads=1 -boot strict=on -kernel arch/x86_64/boot/bzImage \
-			-initrd /home/john/mnt2/john/buildroot2/output/images/rootfs.cpio -nographic  \
-			-append 'mode:1024x768 numa=fake=4 console=ttyS0 null_blk.bs=1024 scsi_multipath.scsi_multipath=1' -m 3G  \
+			-initrd /home/john/buildroot/output/images/rootfs_ini.cpio -nographic  \
+			-append 'mode:1024x768 numa=fake=4 console=ttyS0 null_blk.bs=1024 scsi_multipath.multipath=1' -m 3G  \
 			\
 			-L /home/john/mnt_sda4/john/qemu-1/ \
        			-device virtio-net-pci,netdev=user0,mac=52:54:00:00:69:01 \
