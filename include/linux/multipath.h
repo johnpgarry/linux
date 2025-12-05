@@ -140,8 +140,6 @@ int mpath_get_iopolicy(char *buf, const struct kernel_param *kp);
 ssize_t mpath_iopolicy_show(struct mpath_subsys *mpath_subsys, char *buf);
 ssize_t mpath_iopolicy_store(struct mpath_subsys *mpath_subsys, const char *buf, size_t count);
 
-void mpath_start_request(struct request *req);
-void mpath_end_request(struct request *req);
 void mpath_device_set_live(struct mpath_device *mpath_device);
 
 //extern struct device_attribute mpath_iopolicy;

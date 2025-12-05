@@ -42,6 +42,8 @@ void scsi_mpath_kick_requeue_lists(struct Scsi_Host *);
 extern void scsi_mpath_add_disk(struct scsi_device *);
 void scsi_multipath_iopolicy_update(struct scsi_device *, int);
 int scsi_mpath_unique_lun_id(struct scsi_device *);
+void scsi_mpath_start_request(struct request *);
+void scsi_mpath_end_request(struct request *);
 
 extern void mpath_revalidate_path(struct gendisk *, sector_t);
 extern int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type);
