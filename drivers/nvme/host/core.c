@@ -1096,10 +1096,6 @@ blk_status_t nvme_setup_cmd(struct nvme_ns *ns, struct request *req)
 	if (!(req->rq_flags & RQF_DONTPREP))
 		nvme_clear_nvme_request(req);
 
-	if (is_mpath_request(req))
-		nvme_req(req)->mpath_request.mpath_device = &ns->mpath_device;
-
-
 	switch (req_op(req)) {
 	case REQ_OP_DRV_IN:
 	case REQ_OP_DRV_OUT:
