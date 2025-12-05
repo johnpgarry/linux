@@ -64,7 +64,6 @@ struct mpath_head {
 #define MPATH_REQ_CNT_ACTIVE (1 << 1)
 
 struct mpath_request {
-	struct mpath_device  *mpath_device;
 	unsigned long		flags;
 	unsigned long		start_time;
 };
