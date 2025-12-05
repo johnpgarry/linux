@@ -194,6 +194,48 @@ void nvme_failover_req(struct request *req)
 	kblockd_schedule_work(&mpath_head->requeue_work);
 }
 
+void nvme_mpath_start_request(struct request *rq)
+{
+	struct nvme_ns *ns = rq->q->queuedata;
+	struct mpath_request *mpath_request = &nvme_req(rq)->mpath_request;
+	struct nvme_ns_head *head = ns_to_head(ns);
+	struct mpath_head *mpath_head = mpath_priv_to_head(head);
+	struct gendisk *disk = mpath_head->disk;
+
+	if ((READ_ONCE(head->subsys->mpath_subsys.iopolicy) == NVME_IOPOLICY_QD) &&
+	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
+		atomic_inc(&ns->ctrl->nr_active);
+		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
+	}
+
+	if (!blk_queue_io_stat(disk->queue) || blk_rq_is_passthrough(rq) ||
+	    (mpath_request->flags & MPATH_REQ_IO_STATS))
+		return;
+
+	mpath_request->flags |= NVME_MPATH_IO_STATS;
+	mpath_request->start_time = bdev_start_io_acct(disk->part0, req_op(rq),
+						      jiffies);
+}
+EXPORT_SYMBOL_GPL(nvme_mpath_start_request);
+
+void nvme_mpath_end_request(struct request *rq)
+{
+	struct nvme_ns *ns = rq->q->queuedata;
+	struct mpath_request *mpath_request = &nvme_req(rq)->mpath_request;
+	struct mpath_device *mpath_device = &ns->mpath_device;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
+
+	if (mpath_request->flags & MPATH_REQ_CNT_ACTIVE)
+		atomic_dec_if_positive(&ns->ctrl->nr_active);
+
+	if (!(mpath_request->flags & MPATH_REQ_IO_STATS))
+		return;
+	bdev_end_io_acct(disk->part0, req_op(rq),
+			 blk_rq_bytes(rq) >> SECTOR_SHIFT,
+			 nvme_req(rq)->start_time);
+}
+
 void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 {
 	struct nvme_ns *ns;

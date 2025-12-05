@@ -443,7 +443,7 @@ static inline void __nvme_end_req(struct request *req)
 	nvme_end_req_zoned(req);
 	nvme_trace_bio_complete(req);
 	if (req->cmd_flags & REQ_NVME_MPATH)
-		mpath_end_request(req);
+		nvme_mpath_end_request(req);
 }
 
 void nvme_end_req(struct request *req)

@@ -679,7 +679,7 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 
 	if (is_mpath_request(req)) {
 	//	pr_err("%s req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH\n", __func__, req, req->bio, cmd);
-		mpath_end_request(req);
+		scsi_mpath_end_request(req);
 	}
 
 	//if (req->cmd_flags & REQ_SCSI_MPATH)
@@ -1758,9 +1758,6 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 	cmd->allowed = 0;
 	memset(cmd->cmnd, 0, sizeof(cmd->cmnd));
 
-	if (is_mpath_request(req))
-		cmd->mpath_request.mpath_device = &sdev->scsi_mpath_dev->mpath_device;
-
 	return scsi_cmd_to_driver(cmd)->init_command(cmd);
 }
 
@@ -1927,7 +1924,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 	if (req->cmd_flags & REQ_MPATH) {
 //		pr_err("%s1 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d  rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
-		mpath_start_request(req);
+		scsi_mpath_start_request(req);
 //		pr_err("%s1.1 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d  rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
 	}
 

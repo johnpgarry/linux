@@ -131,6 +131,57 @@ void scsi_mpath_start_freeze(struct scsi_mpath_head *scsi_mpath_head)
 //			blk_freeze_queue_start(h->disk->queue);
 }
 
+void scsi_mpath_start_request(struct request *req)
+{
+	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
+	struct mpath_request *mpath_request = &scmd->mpath_request;
+	struct scsi_device *sdev = scmd->device;
+	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
+
+	if ((READ_ONCE(mpath_head->mpath_subsys->iopolicy) == MPATH_IOPOLICY_QD) &&
+	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
+		atomic_inc(&mpath_device->nr_active);
+		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
+	}
+
+	if (!blk_queue_io_stat(disk->queue) || blk_rq_is_passthrough(req) ||
+	    (mpath_request->flags & MPATH_REQ_IO_STATS))
+		return;
+
+	mpath_request->flags |= MPATH_REQ_IO_STATS;
+	mpath_request->start_time = bdev_start_io_acct(disk->part0, req_op(req),
+						      jiffies);
+}
+EXPORT_SYMBOL_GPL(scsi_mpath_start_request);
+
+void scsi_mpath_end_request(struct request *req)
+{
+	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
+	struct mpath_request *mpath_request = &scmd->mpath_request;
+	struct scsi_device *sdev = scmd->device;
+	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
+
+	//pr_err("%s req=%pS bio=%pS cmd=%pS sdev=%pS\n", __func__, req, req->bio, scmd, sdev);
+	if (mpath_request->flags & MPATH_REQ_CNT_ACTIVE) {
+		atomic_dec_if_positive(&mpath_device->nr_active);
+		mpath_request->flags &= ~MPATH_REQ_CNT_ACTIVE;
+	}
+
+	if (!(mpath_request->flags & MPATH_REQ_IO_STATS))
+		return;
+	bdev_end_io_acct(disk->part0, req_op(req),
+			 blk_rq_bytes(req) >> SECTOR_SHIFT,
+			  mpath_request->start_time);
+	mpath_request->flags &= ~MPATH_REQ_IO_STATS;
+}
+EXPORT_SYMBOL_GPL(scsi_mpath_end_request);
+
 void scsi_mpath_failover_req(struct request *req)
 {
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
