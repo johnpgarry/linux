@@ -29,15 +29,64 @@ static DEFINE_IDA(scsi_mpath_index_ida);
 MODULE_IMPORT_NS("SCSI_DH_ALUA");
 
 
+bool scsi_multipath = false; //todo: turn off
+static bool scsi_multipath_always_on;
+
+static int multipath_param_set(const char *val, const struct kernel_param *kp)
+{
+	int ret;
+	bool *arg = kp->arg;
+
+	ret = param_set_bool(val, kp);
+	if (ret)
+		return ret;
+
+	if (scsi_multipath_always_on && !*arg) {
+		pr_err("Can't disable multipath when multipath_always_on is configured.\n");
+		*arg = true;
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static const struct kernel_param_ops multipath_param_ops = {
+	.set = multipath_param_set,
+	.get = param_get_bool,
+};
+
+module_param_cb(multipath, &multipath_param_ops, &scsi_multipath, 0444);
+MODULE_PARM_DESC(multipath,
+	"turn on native multipath support");
+
+static int multipath_always_on_set(const char *val,
+		const struct kernel_param *kp)
+{
+	int ret;
+	bool *arg = kp->arg;
+
+	ret = param_set_bool(val, kp);
+	if (ret < 0)
+		return ret;
+
+	if (*arg)
+		scsi_multipath = true;
+
+	return 0;
+}
+
+static const struct kernel_param_ops multipath_always_on_ops = {
+	.set = multipath_always_on_set,
+	.get = param_get_bool,
+};
+
+module_param_cb(multipath_always_on, &multipath_always_on_ops,
+		&scsi_multipath_always_on, 0444);
+MODULE_PARM_DESC(multipath_always_on,
+	"create multipath node always even for no ALUA support");
+
 static dev_t scsi_mpath_head_major;
 static struct scsi_mpath_head *scsi_mpath_find_disk(struct scsi_device *sdev);
-
-bool scsi_multipath = false;
-EXPORT_SYMBOL_GPL(scsi_multipath);
-module_param(scsi_multipath, bool, 0444);
-MODULE_PARM_DESC(scsi_multipath,
-    "turn on native support for multiple scsi devices set this value to false to disable multipath, \n");
-
 
 static LIST_HEAD(scsi_mpath_heads_list);
 static DEFINE_MUTEX(scsi_mpath_heads_lock);
@@ -373,7 +422,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		return 0;
 	}
 
-	if (!scsi_device_tpgs(sdev)) {
+	if (!scsi_device_tpgs(sdev) && !scsi_multipath_always_on) {
 		sdev_printk(KERN_NOTICE, sdev, "tpgs are required for mpath support\n");
 		return -ENODEV;
 	}
