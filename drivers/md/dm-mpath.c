@@ -375,6 +375,7 @@ static void __switch_pg(struct multipath *m, struct priority_group *pg)
 		set_bit(MPATHF_QUEUE_IO, &m->flags);
 	} else {
 		clear_bit(MPATHF_PG_INIT_REQUIRED, &m->flags);
+		pr_err("%s clearing MPATHF_QUEUE_IO m=%pS\n", __func__, m);
 		clear_bit(MPATHF_QUEUE_IO, &m->flags);
 	}
 
@@ -415,6 +416,7 @@ static struct pgpath *choose_pgpath(struct multipath *m, size_t nr_bytes)
 
 	if (!atomic_read(&m->nr_valid_paths)) {
 		spin_lock_irqsave(&m->lock, flags);
+		pr_err("%s clearing MPATHF_QUEUE_IO m=%pS\n", __func__, m);
 		clear_bit(MPATHF_QUEUE_IO, &m->flags);
 		spin_unlock_irqrestore(&m->lock, flags);
 		goto failed;
@@ -603,8 +605,11 @@ static void __multipath_queue_bio(struct multipath *m, struct bio *bio)
 {
 	/* Queue for the daemon to resubmit */
 	bio_list_add(&m->queued_bios, bio);
-	if (!test_bit(MPATHF_QUEUE_IO, &m->flags))
+	if (!test_bit(MPATHF_QUEUE_IO, &m->flags)) {
+		pr_err("%s m=%pS bio=%pS MPATHF_QUEUE_IO not set, calling queue_work process_queued_bios\n",
+			__func__, m, bio);
 		queue_work(kmultipathd, &m->process_queued_bios);
+	}
 }
 
 static void multipath_queue_bio(struct multipath *m, struct bio *bio)
@@ -626,6 +631,12 @@ static struct pgpath *__map_bio(struct multipath *m, struct bio *bio)
 		pgpath = choose_pgpath(m, bio->bi_iter.bi_size);
 
 	if (!pgpath) {
+		bio->printed++;
+		if (bio->printed < 5 || ((bio->printed % 500) == 0)) {
+			if (bio->printed < 10000)
+				pr_err("%s1 dm-mpath.c !pgpath m=%pS calling pg_init_all_paths bio=%pS MPATHF_QUEUE_IF_NO_PATH=%d printed=%d\n",
+					__func__, m, bio, test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags), bio->printed);
+		}
 		spin_lock_irq(&m->lock);
 		if (test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags)) {
 			__multipath_queue_bio(m, bio);
@@ -636,7 +647,7 @@ static struct pgpath *__map_bio(struct multipath *m, struct bio *bio)
 	} else if (mpath_double_check_test_bit(MPATHF_QUEUE_IO, m) ||
 		   mpath_double_check_test_bit(MPATHF_PG_INIT_REQUIRED, m)) {
 		multipath_queue_bio(m, bio);
-		pr_err("%s m=%pS calling pg_init_all_paths\n", __func__, m);
+		pr_err("%s2 dm-mpath.c m=%pS calling pg_init_all_paths bio=%pS\n", __func__, m, bio);
 		pg_init_all_paths(m);
 		return ERR_PTR(-EAGAIN);
 	}
@@ -653,8 +664,10 @@ static int __multipath_map_bio(struct multipath *m, struct bio *bio,
 		return DM_MAPIO_SUBMITTED;
 
 	if (!pgpath) {
-		if (__must_push_back(m))
+		if (__must_push_back(m)) {
+			pr_err("%s __must_push_back passed so setting DM_MAPIO_REQUEUE\n", __func__);
 			return DM_MAPIO_REQUEUE;
+		}
 		dm_report_EIO(m);
 		return DM_MAPIO_KILL;
 	}
@@ -702,10 +715,12 @@ static void process_queued_bios(struct work_struct *work)
 	struct multipath *m =
 		container_of(work, struct multipath, process_queued_bios);
 
-	pr_err("%s m=%pS\n", __func__, m);
+	
 	bio_list_init(&bios);
 
 	spin_lock_irq(&m->lock);
+
+	pr_err("%s m=%pS bio_list_empty=%d\n", __func__, m, bio_list_empty(&m->queued_bios));
 
 	if (bio_list_empty(&m->queued_bios)) {
 		spin_unlock_irq(&m->lock);
@@ -719,15 +734,19 @@ static void process_queued_bios(struct work_struct *work)
 	blk_start_plug(&plug);
 	while ((bio = bio_list_pop(&bios))) {
 		struct dm_mpath_io *mpio = get_mpio_from_bio(bio);
+		pr_err("%s0 m=%pS bio=%pS\n", __func__, m, bio);
 
 		dm_bio_restore(get_bio_details_from_mpio(mpio), bio);
 		r = __multipath_map_bio(m, bio, mpio);
+		pr_err("%s0.1 called __multipath_map_bio m=%pS bio=%pS r=%d DM_MAPIO_REMAPPED=%d\n", __func__, m, bio, r, DM_MAPIO_REMAPPED);
 		switch (r) {
 		case DM_MAPIO_KILL:
+			pr_err("%s1 DM_MAPIO_KILL bio=%pS\n", __func__, bio);
 			bio->bi_status = BLK_STS_IOERR;
 			bio_endio(bio);
 			break;
 		case DM_MAPIO_REQUEUE:
+			pr_err("%s2 DM_MAPIO_REQUEUE bio=%pS\n", __func__, bio);
 			bio->bi_status = BLK_STS_DM_REQUEUE;
 			bio_endio(bio);
 			break;
@@ -1365,11 +1384,14 @@ static int fail_path(struct pgpath *pgpath)
 	unsigned long flags;
 	struct multipath *m = pgpath->pg->m;
 
+	//WARN_ON_ONCE(1);
+
 	spin_lock_irqsave(&m->lock, flags);
 
-	pr_err("%s pgpath=%pS\n", __func__, pgpath);
+	
 	if (!pgpath->is_active)
 		goto out;
+	pr_err("%s pgpath=%pS pgpath->is_active=%d\n", __func__, pgpath, pgpath->is_active);
 
 	DMWARN("%s: Failing path %s.",
 	       dm_table_device_name(m->ti->table),
@@ -1458,10 +1480,14 @@ static int action_dev(struct multipath *m, dev_t dev, action_fn action)
 	struct pgpath *pgpath;
 	struct priority_group *pg;
 
+
+
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(pgpath, &pg->pgpaths, list) {
-			if (pgpath->path.dev->bdev->bd_dev == dev)
+			if (pgpath->path.dev->bdev->bd_dev == dev) {
+				pr_err("%s calling action=%pS\n", __func__, action);
 				r = action(pgpath);
+			}
 		}
 	}
 
@@ -1601,6 +1627,7 @@ static void pg_init_done(void *data, int errors)
 		/*
 		 * Fail path for now, so we do not ping pong
 		 */
+		pr_err("%s1 calling SCSI_DH_NOSYS fail_path\n", __func__);
 		fail_path(pgpath);
 		break;
 	case SCSI_DH_DEV_TEMP_BUSY:
@@ -1618,8 +1645,10 @@ static void pg_init_done(void *data, int errors)
 		fallthrough;
 	case SCSI_DH_IMM_RETRY:
 	case SCSI_DH_RES_TEMP_UNAVAIL:
-		if (pg_init_limit_reached(m, pgpath))
+		if (pg_init_limit_reached(m, pgpath)) {
+			pr_err("%s3x calling fail_path\n", __func__);
 			fail_path(pgpath);
+		}
 		errors = 0;
 		break;
 	case SCSI_DH_DEV_OFFLINED:
@@ -1631,6 +1660,7 @@ static void pg_init_done(void *data, int errors)
 		 * error, but this is what the old dm did. In future
 		 * patches we can do more advanced handling.
 		 */
+		pr_err("%s2 calling default fail_path\n", __func__);
 		fail_path(pgpath);
 	}
 
@@ -1658,6 +1688,7 @@ static void pg_init_done(void *data, int errors)
 		if (__pg_init_all_paths(m))
 			goto out;
 	}
+	pr_err("%s7 clearing MPATHF_QUEUE_IO m=%pS\n", __func__, m);
 	clear_bit(MPATHF_QUEUE_IO, &m->flags);
 
 	process_queued_io_list(m);
@@ -1719,8 +1750,10 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 		else
 			r = DM_ENDIO_REQUEUE;
 
-		if (pgpath)
+		if (pgpath) {
+			pr_err("%s calling default fail_path\n", __func__);
 			fail_path(pgpath);
+		}
 
 		if (!atomic_read(&m->nr_valid_paths) &&
 		    !must_push_back_rq(m)) {
@@ -1751,11 +1784,16 @@ static int multipath_end_io_bio(struct dm_target *ti, struct bio *clone,
 	unsigned long flags;
 	int r = DM_ENDIO_DONE;
 
+	if (*error && blk_path_error(*error))
+		pr_err("%s1 *error=%d blk_path_error=%d clone=%pS pgpath=%pS BLK_STS_IOERR=%d\n",
+			__func__, *error, blk_path_error(*error), clone, pgpath, BLK_STS_IOERR);
 	if (!*error || !blk_path_error(*error))
 		goto done;
 
-	if (pgpath)
+	if (pgpath) {
+		pr_err("%s2 calling fail_path clone=%pS pgpath=%pS *error=%d\n", __func__, clone, pgpath, *error);
 		fail_path(pgpath);
+	}
 
 	if (!atomic_read(&m->nr_valid_paths)) {
 		spin_lock_irqsave(&m->lock, flags);
@@ -1863,6 +1901,8 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 	unsigned int pg_num;
 	char state;
 
+	pr_err_once("%s\n", __func__);
+
 	spin_lock_irq(&m->lock);
 
 	/* Features */
@@ -1921,6 +1961,7 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 
 			DMEMIT("%c ", state);
 
+			pr_err_once("%s2 STATUSTYPE_INFO pg->ps.type->status=%pS\n", __func__, pg->ps.type->status);
 			if (pg->ps.type->status)
 				sz += pg->ps.type->status(&pg->ps, NULL, type,
 							  result + sz,
@@ -1947,6 +1988,7 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 		list_for_each_entry(pg, &m->priority_groups, list) {
 			DMEMIT("%s ", pg->ps.type->name);
 
+			pr_err_once("%s3 STATUSTYPE_TABLE pg->ps.type->status=%pS\n", __func__, pg->ps.type->status);
 			if (pg->ps.type->status)
 				sz += pg->ps.type->status(&pg->ps, NULL, type,
 							  result + sz,
@@ -1973,8 +2015,10 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 		DMEMIT_TARGET_NAME_VERSION(ti->type);
 		DMEMIT(",nr_priority_groups=%u", m->nr_priority_groups);
 
+		
 		pg_counter = 0;
 		list_for_each_entry(pg, &m->priority_groups, list) {
+			pr_err("%s4 STATUSTYPE_IMA pg->ps.type->status=%pS\n", __func__, pg->ps.type->status);
 			if (pg->bypassed)
 				state = 'D';	/* Disabled */
 			else if (pg == m->current_pg)
@@ -2018,6 +2062,8 @@ static int multipath_message(struct dm_target *ti, unsigned int argc, char **arg
 	action_fn action;
 
 	mutex_lock(&m->work_mutex);
+
+	pr_err("%s argv[0]=%s\n", __func__, argv[0]);
 
 	if (dm_suspended(ti)) {
 		r = -EBUSY;
@@ -2108,8 +2154,10 @@ static int probe_path(struct pgpath *pgpath)
 	status = bio->bi_status;
 	bio_put(bio);
 
-	if (status && blk_path_error(status))
+	if (status && blk_path_error(status)) {
+		pr_err("%s calling default fail_path bio=%pS\n", __func__, bio);
 		fail_path(pgpath);
+	}
 
 out:
 	__free_page(page);

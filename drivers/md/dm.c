@@ -1434,6 +1434,7 @@ static void __map_bio(struct bio *clone)
 		break;
 	case DM_MAPIO_KILL:
 	case DM_MAPIO_REQUEUE:
+		pr_err("%s dm.c DM_MAPIO_KILL or DM_MAPIO_REQUEUE clone=%pS\n", __func__, clone);
 		if (static_branch_unlikely(&swap_bios_enabled) &&
 		    unlikely(swap_bios_limit(ti, clone)))
 			up(&md->swap_bios_semaphore);

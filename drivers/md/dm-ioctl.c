@@ -1265,8 +1265,10 @@ static int dev_status(struct file *filp, struct dm_ioctl *param, size_t param_si
 	struct mapped_device *md;
 
 	md = find_device(param);
-	if (!md)
+	if (!md) {
+		pr_err("%s could not find device\n", __func__);
 		return -ENXIO;
+	}
 
 	__dev_status(md, param);
 	dm_put(md);
@@ -1327,6 +1329,7 @@ static void retrieve_status(struct dm_table *table,
 		if (ti->type->status) {
 			if (param->flags & DM_NOFLUSH_FLAG)
 				status_flags |= DM_STATUS_NOFLUSH_FLAG;
+			pr_err_once("%s dm-ioctl.c calling ti->type->status=%pS\n", __func__, ti->type->status);
 			ti->type->status(ti, type, status_flags, outptr, remaining);
 		} else
 			outptr[0] = '\0';
@@ -1714,8 +1717,10 @@ static int table_status(struct file *filp, struct dm_ioctl *param, size_t param_
 	int srcu_idx;
 
 	md = find_device(param);
-	if (!md)
+	if (!md) {
+		pr_err("%s could not find device\n", __func__);
 		return -ENXIO;
+	}
 
 	__dev_status(md, param);
 
@@ -1775,6 +1780,7 @@ static int target_message(struct file *filp, struct dm_ioctl *param, size_t para
 	int srcu_idx;
 
 	md = find_device(param);
+	pr_err("%s md=%pS\n", __func__, md);
 	if (!md)
 		return -ENXIO;
 
@@ -2079,6 +2085,7 @@ static int ctl_ioctl(struct file *file, uint command, struct dm_ioctl __user *us
 		return 0;
 
 	fn = lookup_ioctl(cmd, &ioctl_flags);
+	pr_err_once("%s cmd=0x%x fn=%pS\n", __func__, cmd, fn);
 	if (!fn) {
 		DMERR("dm_ctl_ioctl: unknown command 0x%x", command);
 		return -ENOTTY;
