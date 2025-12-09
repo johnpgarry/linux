@@ -38,6 +38,7 @@ static int multipath_param_set(const char *val, const struct kernel_param *kp)
 	bool *arg = kp->arg;
 
 	ret = param_set_bool(val, kp);
+	pr_err("%s val=%s\n", __func__, val);
 	if (ret)
 		return ret;
 
@@ -55,7 +56,7 @@ static const struct kernel_param_ops multipath_param_ops = {
 	.get = param_get_bool,
 };
 
-module_param_cb(multipath, &multipath_param_ops, &scsi_multipath, 0444);
+module_param_cb(enable, &multipath_param_ops, &scsi_multipath, 0444);
 MODULE_PARM_DESC(multipath,
 	"turn on native multipath support");
 
@@ -80,7 +81,7 @@ static const struct kernel_param_ops multipath_always_on_ops = {
 	.get = param_get_bool,
 };
 
-module_param_cb(multipath_always_on, &multipath_always_on_ops,
+module_param_cb(enable_always, &multipath_always_on_ops,
 		&scsi_multipath_always_on, 0444);
 MODULE_PARM_DESC(multipath_always_on,
 	"create multipath node always even for no ALUA support");
