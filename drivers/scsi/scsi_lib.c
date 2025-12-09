@@ -1347,11 +1347,17 @@ static blk_status_t scsi_setup_scsi_cmnd(struct scsi_device *sdev,
 static blk_status_t
 scsi_device_state_check(struct scsi_device *sdev, struct request *req)
 {
+	//WARN_ON_ONCE(sdev->sdev_state == SDEV_TRANSPORT_OFFLINE);
+	if (sdev->sdev_state == SDEV_TRANSPORT_OFFLINE) {
+		pr_err_once("%s SDEV_TRANSPORT_OFFLINE req=%pS bio=%pS\n",
+			__func__, req, req->bio);
+	}
 	switch (sdev->sdev_state) {
 	case SDEV_CREATED:
 		return BLK_STS_OK;
 	case SDEV_OFFLINE:
 	case SDEV_TRANSPORT_OFFLINE:
+		pr_err_once("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE\n", __func__);
 		/*
 		 * If the device is offline we refuse to process any
 		 * commands.  The device must be brought online
@@ -1602,6 +1608,8 @@ static void scsi_complete(struct request *rq)
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 		break;
 	case FAILOVER:
+		pr_err("%s calling scsi_mpath_failover_req rq=%pS bio=%pS\n",
+			__func__, rq, rq->bio);
 		scsi_mpath_failover_req(rq);
 		break;
 	default:
@@ -2503,6 +2511,9 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 {
 	enum scsi_device_state oldstate = sdev->sdev_state;
 
+	WARN_ON_ONCE(state == SDEV_TRANSPORT_OFFLINE);
+
+
 	if (state == oldstate)
 		return 0;
 
@@ -2900,14 +2911,15 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
-	if (scsi_is_sdev_multipath(sdev)) {
 
+	if (scsi_is_sdev_multipath(sdev)) {
+		pr_err("%s sdev=%pS call scsi_mpath_clear_current_path?\n", __func__, sdev);
 		//scsi_mpath_clear_current_path(sdev);
 	}
 
 	if (scsi_device_set_state(sdev, SDEV_BLOCK)) {
 
-		pr_err("%s calling scsi_device_set_state SDEV_CREATED_BLOCK\n", __func__);
+		pr_err("%s2 calling scsi_device_set_state SDEV_CREATED_BLOCK sdev=%pS\n", __func__, sdev);
 		return scsi_device_set_state(sdev, SDEV_CREATED_BLOCK);
 	}
 
@@ -3016,6 +3028,8 @@ static void scsi_device_block(struct scsi_device *sdev, void *data)
 int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 					enum scsi_device_state new_state)
 {
+	pr_err("%s new_state=%d SDEV_TRANSPORT_OFFLINE=%d\n",
+		__func__, new_state, SDEV_TRANSPORT_OFFLINE);
 	switch (new_state) {
 	case SDEV_RUNNING:
 	case SDEV_TRANSPORT_OFFLINE:
@@ -3026,7 +3040,7 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 
 	/* For multipath device set the path live */
 	if (scsi_is_sdev_multipath(sdev)) {
-	//	pr_err("%s sdev=%pS calling scsi_mpath_set_live\n", __func__, sdev);
+		pr_err("%s sdev=%pS call scsi_mpath_set_live?\n", __func__, sdev);
 	//	scsi_mpath_set_live(NULL);
 	}
 

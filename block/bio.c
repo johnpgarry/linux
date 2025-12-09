@@ -259,6 +259,7 @@ void bio_init(struct bio *bio, struct block_device *bdev, struct bio_vec *table,
 	bio->bi_iter.bi_bvec_done = 0;
 	bio->bi_end_io = NULL;
 	bio->bi_private = NULL;
+	bio->printed = 0;
 #ifdef CONFIG_BLK_CGROUP
 	bio->bi_blkg = NULL;
 	bio->issue_time_ns = 0;

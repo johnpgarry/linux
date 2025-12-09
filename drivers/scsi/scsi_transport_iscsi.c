@@ -1880,6 +1880,8 @@ static void session_recovery_timedout(struct work_struct *work)
 				 session->recovery_tmo);
 
 	spin_lock_irqsave(&session->lock, flags);
+	pr_err("%s session->state=%d ISCSI_SESSION_FREE=%d\n",
+		__func__, session->state, ISCSI_SESSION_FREE);
 	switch (session->state) {
 	case ISCSI_SESSION_FAILED:
 		session->state = ISCSI_SESSION_FREE;
