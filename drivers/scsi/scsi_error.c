@@ -2100,8 +2100,12 @@ maybe_retry:
 	 * trigger failover to available path
 	 */
 	if (scsi_is_sdev_multipath(scmd->device)) {
-		pr_err("%s9.1 calling scsi_mpath_failover_disposition\n", __func__);
-		return scsi_mpath_failover_disposition(scmd);
+		enum scsi_disposition smpd_dis;
+		pr_err("%s9.1 calling scsi_mpath_failover_disposition scmd=%pS req=%pS bio=%pS\n", __func__, scmd, req, req->bio);
+		smpd_dis = scsi_mpath_failover_disposition(scmd);
+		pr_err("%s9.1.0 called scsi_mpath_failover_disposition smpd_dis=%d scmd=%pS req=%pS bio=%pS\n",
+			__func__, smpd_dis, scmd, req, req->bio);
+		return smpd_dis;
 	}
 
 	/* we requeue for retry because the error was retryable, and
@@ -2109,11 +2113,15 @@ maybe_retry:
 	 * even if the request is marked fast fail, we still requeue
 	 * for queue congestion conditions (QUEUE_FULL or BUSY) */
 	if (scsi_cmd_retry_allowed(scmd) && !scsi_noretry_cmd(scmd)) {
+		pr_err("%s9.2 returning NEEDS_RETRY scmd=%pS req=%pS bio=%pS\n",
+			__func__, scmd, req, req->bio);
 		return NEEDS_RETRY;
 	} else {
 		/*
 		 * no more retries - report this one back to upper level.
 		 */
+		pr_err("%s9.3 returning SUCCESS scmd=%pS req=%pS bio=%pS\n",
+			__func__, scmd, req, req->bio);
 		return SUCCESS;
 	}
 }
