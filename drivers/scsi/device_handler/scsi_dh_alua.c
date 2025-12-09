@@ -143,6 +143,7 @@ static int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 		cdb[1] = MI_REPORT_TARGET_PGS;
 	put_unaligned_be32(bufflen, &cdb[6]);
 
+	pr_err("%s\n", __func__);
 	return scsi_execute_cmd(sdev, cdb, opf, buff, bufflen,
 				ALUA_FAILOVER_TIMEOUT * HZ,
 				ALUA_FAILOVER_RETRIES, &exec_args);
@@ -179,6 +180,7 @@ static int submit_stpg(struct scsi_device *sdev, int group_id,
 	cdb[1] = MO_SET_TARGET_PGS;
 	put_unaligned_be32(stpg_len, &cdb[6]);
 
+	pr_err("%s\n", __func__);
 	return scsi_execute_cmd(sdev, cdb, opf, stpg_data,
 				stpg_len, ALUA_FAILOVER_TIMEOUT * HZ,
 				ALUA_FAILOVER_RETRIES, &exec_args);
