@@ -11,7 +11,7 @@ qemu-system-x86_64 -name guest=qemu-ini-test,debug-threads=on \
 			-accel kvm -cpu host,migratable=on,hv-time=on,hv-relaxed=on,hv-vapic=on,hv-spinlocks=0x1fff  \
 			-smp 4,sockets=2,cores=2,threads=1 -boot strict=on -kernel arch/x86_64/boot/bzImage \
 			-initrd /home/john/buildroot/output/images/rootfs_ini.cpio -nographic  \
-			-append 'mode:1024x768 numa=fake=4 console=ttyS0 null_blk.bs=1024 scsi_multipath.multipath=1' -m 3G  \
+			-append 'mode:1024x768 numa=fake=4 console=ttyS0 null_blk.bs=1024 scsi_multipath.enable=1' -m 3G  \
 			\
 			-L /home/john/mnt_sda4/john/qemu-1/ \
     			-netdev bridge,id=user0,br=br0 \
