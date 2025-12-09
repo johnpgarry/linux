@@ -14,8 +14,10 @@ qemu-system-x86_64 -name guest=qemu-ini-test,debug-threads=on \
 			-append 'mode:1024x768 numa=fake=4 console=ttyS0 null_blk.bs=1024 scsi_multipath.multipath=1' -m 3G  \
 			\
 			-L /home/john/mnt_sda4/john/qemu-1/ \
-       			-device virtio-net-pci,netdev=user0,mac=52:54:00:00:69:01 \
     			-netdev bridge,id=user0,br=br0 \
+       			-device virtio-net-pci,netdev=user0,mac=56:78:00:00:00:00 \
+    			-netdev bridge,id=user1,br=br0 \
+       			-device virtio-net-pci,netdev=user1,mac=56:78:01:01:01:01 \
     			
     			
     			
