@@ -310,6 +310,10 @@ static void multipath_submit_bio(struct bio *bio)
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
+	if (!mpath_device) {
+		pr_err("%s2 bio=%pS mpath_device=NULL mpath_head=%pS mpath_available_path=%d\n",
+			__func__, bio, mpath_head, mpath_available_path(mpath_head));
+	}
 	if (likely(mpath_device)) {
 		bio_set_dev(bio, mpath_device->disk->part0);
 		bio->bi_opf |= REQ_MPATH;
@@ -323,7 +327,7 @@ static void multipath_submit_bio(struct bio *bio)
 				__func__, bio);
 	//	BUG();
 	} else if (mpath_available_path(mpath_head)) {
-		pr_err_ratelimited("No Usable Path - Requeing I/O \n");
+		pr_err("No Usable Path - Requeing I/O calling bio_list_add requeue_list bio=%pS\n", bio);
 
 		spin_lock_irq(&mpath_head->requeue_lock);
 		bio_list_add(&mpath_head->requeue_list, bio);
@@ -537,15 +541,17 @@ void mpath_requeue_work(struct work_struct *work)
 	__maybe_unused
 	struct bio *bio, *next;
 
-	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
 
 	spin_lock_irq(&mpath_head->requeue_lock);
 	next = bio_list_get(&mpath_head->requeue_list);
+	pr_err("%s mpath_head=%pS next=%pS\n", __func__, mpath_head, next);
 	spin_unlock_irq(&mpath_head->requeue_lock);
 
 	while ((bio = next) != NULL) {
 		next = bio->bi_next;
 		bio->bi_next = NULL;
+		pr_err("%s2 mpath_head=%pS bio=%pS calling submit_bio_noacct bio->bi_bdev=%pS\n",
+			__func__, mpath_head, bio, bio->bi_bdev);
 		submit_bio_noacct(bio);
 	}
 }

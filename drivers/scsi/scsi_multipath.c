@@ -96,6 +96,7 @@ static DEFINE_MUTEX(scsi_mpath_heads_lock);
 /* Check for path error */
 static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
 {
+	#ifdef dsdsdsd
 	struct request *req = scsi_cmd_to_rq(scmd);
 	struct scsi_device *sdev = req->q->queuedata;
 
@@ -107,6 +108,9 @@ static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
 	}
 
 	return false;
+	#else
+	return true;
+	#endif
 }
 
 static const struct class scsi_mpath_generic_class = {
@@ -240,9 +244,13 @@ void scsi_mpath_failover_req(struct request *req)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
 	//struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	unsigned long flags;
 	struct bio *bio;
+
+	pr_err("%s req=%pS bio=%pS scsi_device_online=%d sdev->was_reset=%d sdev->locked=%d mpath_device=%pS shost=%pS\n",
+		__func__, req, req->bio, scsi_device_online(sdev), sdev->was_reset, sdev->locked, mpath_device, shost);
 
 	if (!scsi_device_online(sdev) || sdev->was_reset || sdev->locked)
 		return;
@@ -254,13 +262,19 @@ void scsi_mpath_failover_req(struct request *req)
 	 * ready to process command. kick off a requeue of scsi command and try
 	 * other available path
 	 */
+	pr_err("%s2 req=%pS bio=%pS scsi_is_mpath_error=%d mpath_device=%pS\n",
+		__func__, req, req->bio, scsi_is_mpath_error(scmd), mpath_device);
 	if (scsi_is_mpath_error(scmd)) {
 		/*
 		 * Set flag as pending and requeue bio for retry on
 		 * another path
 		 */
-		set_bit(SCSI_MPATH_DEVICE_IO_PENDING, &scsi_mpath_dev->flags);
-		queue_work(shost->work_q, &mpath_head->requeue_work);
+		pr_err("%s3 req=%pS bio=%pS scsi_is_mpath_error=%d mpath_device=%pS mpath_head=%pS\n",
+		__func__, req, req->bio, scsi_is_mpath_error(scmd), mpath_device, mpath_head);
+	//	set_bit(SCSI_MPATH_DEVICE_IO_PENDING, &scsi_mpath_dev->flags);
+		pr_err("%s3.1 req=%pS bio=%pS scsi_is_mpath_error=%d mpath_device=%pS shost->work_q=%pS\n",
+		__func__, req, req->bio, scsi_is_mpath_error(scmd), mpath_device, shost->work_q);
+	//	queue_work(shost->work_q, &mpath_head->requeue_work);
 	}
 
 	/*
@@ -269,7 +283,9 @@ void scsi_mpath_failover_req(struct request *req)
 	 */
 	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
 	for (bio = req->bio; bio; bio = bio->bi_next) {
-		bio_set_dev(bio, req->q->disk->part0);
+		pr_err("%s4 looping bio=%pS bio->bi_bdev=%pS req->q->disk->part0=%pS disk->part0=%pS\n",
+			__func__, bio, bio->bi_bdev, req->q->disk->part0, disk->part0);
+		bio_set_dev(bio, disk->part0);
 		if (bio->bi_opf & REQ_POLLED) {
 			bio->bi_opf &= ~REQ_POLLED;
 			bio->bi_cookie = BLK_QC_T_NONE;
@@ -787,17 +803,25 @@ int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 {
 	struct request *req = scsi_cmd_to_rq(scmd);
 
-	pr_err("%s scmd=%pS req=%pS\n", __func__, scmd, req);
+	pr_err("%s scmd=%pS req=%pS bio=%pS is_mpath_request=%d blk_queue_dying=%d\n",
+		__func__, scmd, req, req->bio, is_mpath_request(req),  blk_queue_dying(req->q));
 	if (is_mpath_request(req)) {
 		if (scsi_is_mpath_error(scmd) ||
 		    blk_queue_dying(req->q)) {
-			return NEEDS_RETRY;
+			pr_err("%s2 scmd=%pS req=%pS bio=%pS returning FAILOVER\n",
+				__func__, scmd, req, req->bio);
+			return FAILOVER;
 		}
 	} else {
-		if (blk_queue_dying(req->q))
+		if (blk_queue_dying(req->q)) {
+			pr_err("%s3 scmd=%pS req=%pS bio=%pS returning SUCCESS\n",
+				__func__, scmd, req, req->bio);
 			return SUCCESS;
+		}
 	}
 
+	pr_err("%s10 scmd=%pS req=%pS bio=%pS returning SUCCESS\n",
+				__func__, scmd, req, req->bio);
 	return SUCCESS;
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_failover_disposition);
