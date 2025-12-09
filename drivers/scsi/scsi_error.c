@@ -1846,6 +1846,8 @@ bool scsi_noretry_cmd(struct scsi_cmnd *scmd)
 {
 	struct request *req = scsi_cmd_to_rq(scmd);
 
+//	pr_err("%s scmd=%pS req=%pS bio=%pS host_byte(scmd->result)=%d REQ_FAILFAST_DRIVER set=%d\n",
+//		__func__, scmd, req, req->bio, host_byte(scmd->result), !!(req->cmd_flags & REQ_FAILFAST_DRIVER));
 	switch (host_byte(scmd->result)) {
 	case DID_OK:
 		break;
@@ -1898,12 +1900,17 @@ check_type:
 enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 {
 	enum scsi_disposition rtn;
+	struct request *req = scsi_cmd_to_rq(scmd);
+
 
 	/*
 	 * if the device is offline, then we clearly just pass the result back
 	 * up to the top level.
 	 */
 	if (!scsi_device_online(scmd->device)) {
+		pr_err("%s scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
+
 		SCSI_LOG_ERROR_RECOVERY(5, scmd_printk(KERN_INFO, scmd,
 			"%s: device offline - report as SUCCESS\n", __func__));
 		return SUCCESS;
@@ -1928,6 +1935,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		break;
 	case DID_ABORT:
+		pr_err("%s0 DID_ABORT scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
 		if (scmd->eh_eflags & SCSI_EH_ABORT_SCHEDULED) {
 			set_host_byte(scmd, DID_TIME_OUT);
 			return SUCCESS;
@@ -1942,6 +1951,9 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		return SUCCESS;
 	case DID_SOFT_ERROR:
+
+		pr_err("%s1 DID_SOFT_ERROR scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
 		/*
 		 * when the low level driver returns did_soft_error,
 		 * it is responsible for keeping an internal retry counter
@@ -1949,9 +1961,14 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		goto maybe_retry;
 	case DID_IMM_RETRY:
+
+		pr_err("%s2 DID_IMM_RETRY scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
 		return NEEDS_RETRY;
 
 	case DID_REQUEUE:
+		pr_err("%s3 DID_REQUEUE scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
 		return ADD_TO_MLQUEUE;
 	case DID_TRANSPORT_DISRUPTED:
 		/*
@@ -1961,12 +1978,16 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 * based on its timers and recovery capablilities if
 		 * there are enough retries.
 		 */
+		pr_err("%s4 DID_TRANSPORT_DISRUPTED scmd=%pS req=%pS bio=%pS\n", __func__,
+			scmd, req, req->bio);
 		goto maybe_retry;
 	case DID_TRANSPORT_FAILFAST:
 		/*
 		 * The transport decided to failfast the IO (most likely
 		 * the fast io fail tmo fired), so send IO directly upwards.
 		 */
+		pr_err("%s5 DID_TRANSPORT_FAILFAST scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
 		return SUCCESS;
 	case DID_TRANSPORT_MARGINAL:
 		/*
@@ -1975,6 +1996,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		return SUCCESS;
 	case DID_ERROR:
+		pr_err("%s6 DID_ERROR scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
 		if (get_status_byte(scmd) == SAM_STAT_RESERVATION_CONFLICT)
 			/*
 			 * execute reservation conflict processing code
@@ -1984,6 +2007,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		fallthrough;
 	case DID_BUS_BUSY:
 	case DID_PARITY:
+		pr_err("%s7 DID_BUS_BUSY or DID_PARITY scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
+			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
 		goto maybe_retry;
 	case DID_TIME_OUT:
 		/*
@@ -2066,6 +2091,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 	return FAILED;
 
 maybe_retry:
+	pr_err("%s9 maybe_retry: scmd=%pS req=%pS bio=%pS host_byte()=%d status_byte()=%d FAILFAST_DRIVER=%d retry_allowed=%d\n", "decide_dis",
+			scmd, req, req->bio, host_byte(scmd->result), get_status_byte(scmd), !!(req->cmd_flags & REQ_FAILFAST_DRIVER), scsi_cmd_retry_allowed(scmd));
 
 	/* we requeue for retry because the error was retryable, and
 	 * the request was not marked fast fail.  Note that above,
