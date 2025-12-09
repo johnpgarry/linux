@@ -1306,11 +1306,17 @@ static blk_status_t scsi_setup_scsi_cmnd(struct scsi_device *sdev,
 static blk_status_t
 scsi_device_state_check(struct scsi_device *sdev, struct request *req)
 {
+	//WARN_ON_ONCE(sdev->sdev_state == SDEV_TRANSPORT_OFFLINE);
+	if (sdev->sdev_state == SDEV_TRANSPORT_OFFLINE) {
+		pr_err_once("%s SDEV_TRANSPORT_OFFLINE req=%pS bio=%pS\n",
+			__func__, req, req->bio);
+	}
 	switch (sdev->sdev_state) {
 	case SDEV_CREATED:
 		return BLK_STS_OK;
 	case SDEV_OFFLINE:
 	case SDEV_TRANSPORT_OFFLINE:
+		pr_err_once("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE\n", __func__);
 		/*
 		 * If the device is offline we refuse to process any
 		 * commands.  The device must be brought online
@@ -2501,6 +2507,9 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 {
 	enum scsi_device_state oldstate = sdev->sdev_state;
 
+	WARN_ON_ONCE(state == SDEV_TRANSPORT_OFFLINE);
+
+
 	if (state == oldstate)
 		return 0;
 
@@ -3006,6 +3015,8 @@ static void scsi_device_block(struct scsi_device *sdev, void *data)
 int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 					enum scsi_device_state new_state)
 {
+	pr_err("%s new_state=%d SDEV_TRANSPORT_OFFLINE=%d\n",
+		__func__, new_state, SDEV_TRANSPORT_OFFLINE);
 	switch (new_state) {
 	case SDEV_RUNNING:
 	case SDEV_TRANSPORT_OFFLINE:
