@@ -2103,7 +2103,7 @@ maybe_retry:
 		enum scsi_disposition smpd_dis;
 		pr_err("%s9.1 calling scsi_mpath_failover_disposition scmd=%pS req=%pS bio=%pS\n", __func__, scmd, req, req->bio);
 		smpd_dis = scsi_mpath_failover_disposition(scmd);
-		pr_err("%s9.1.0 called scsi_mpath_failover_disposition smpd_dis=%d scmd=%pS req=%pS bio=%pS\n",
+		pr_err("%s9.1.0 called scsi_mpath_failover_disposition smpd_dis=0x%x scmd=%pS req=%pS bio=%pS\n",
 			__func__, smpd_dis, scmd, req, req->bio);
 		return smpd_dis;
 	}

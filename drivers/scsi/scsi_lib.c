@@ -682,9 +682,9 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 		scsi_mpath_end_request(req);
 	}
 
-	//if (req->cmd_flags & REQ_SCSI_MPATH)
-	//	pr_err("%s2 cmd=%pS req=%pS bytes=%d bio=%pS error=%d calling __blk_mq_end_request\n",
-	//			__func__, cmd, req, blk_rq_bytes(req), req->bio, error);
+	if (is_mpath_request(req) && error)
+		pr_err("%s2 cmd=%pS req=%pS bytes=%d bio=%pS error=%d calling __blk_mq_end_request\n",
+				__func__, cmd, req, blk_rq_bytes(req), req->bio, error);
 	__blk_mq_end_request(req, error);
 
 	scsi_run_queue_async(sdev);
@@ -1357,7 +1357,8 @@ scsi_device_state_check(struct scsi_device *sdev, struct request *req)
 		return BLK_STS_OK;
 	case SDEV_OFFLINE:
 	case SDEV_TRANSPORT_OFFLINE:
-		pr_err_once("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE\n", __func__);
+		pr_err("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE req is mpath=%d req=%pS bio=%pS\n",
+			__func__, is_mpath_request(req), req, req->bio);
 		/*
 		 * If the device is offline we refuse to process any
 		 * commands.  The device must be brought online
@@ -2513,7 +2514,6 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 
 	WARN_ON_ONCE(state == SDEV_TRANSPORT_OFFLINE);
 
-
 	if (state == oldstate)
 		return 0;
 
@@ -2911,10 +2911,13 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
-
+	pr_err("%s sdev=%pS scsi_is_sdev_multipath=%d\n", __func__, sdev, scsi_is_sdev_multipath(sdev));
 	if (scsi_is_sdev_multipath(sdev)) {
-		pr_err("%s sdev=%pS call scsi_mpath_clear_current_path?\n", __func__, sdev);
+		struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+		pr_err("%s1 sdev=%pS mpath_device=%pS calling scsi_mpath_clear_current_path?\n", __func__, sdev, mpath_device);
 		//scsi_mpath_clear_current_path(sdev);
+	//	mpath_clear_current_path(mpath_device);
 	}
 
 	if (scsi_device_set_state(sdev, SDEV_BLOCK)) {
@@ -2960,7 +2963,11 @@ static void scsi_stop_queue(struct scsi_device *sdev)
  */
 int scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
-	int ret = __scsi_internal_device_block_nowait(sdev);
+	int ret;
+
+	pr_err("%s calling __scsi_internal_device_block_nowait sdev=%pS\n",
+		__func__, sdev);
+	ret = __scsi_internal_device_block_nowait(sdev);
 
 	/*
 	 * The device has transitioned to SDEV_BLOCK.  Stop the
@@ -2994,6 +3001,8 @@ static void scsi_device_block(struct scsi_device *sdev, void *data)
 	enum scsi_device_state state;
 
 	mutex_lock(&sdev->state_mutex);
+	pr_err("%s calling __scsi_internal_device_block_nowait sdev=%pS\n",
+		__func__, sdev);
 	err = __scsi_internal_device_block_nowait(sdev);
 	state = sdev->sdev_state;
 	if (err == 0)
@@ -3040,7 +3049,7 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 
 	/* For multipath device set the path live */
 	if (scsi_is_sdev_multipath(sdev)) {
-		pr_err("%s sdev=%pS call scsi_mpath_set_live?\n", __func__, sdev);
+		pr_err("%s2 sdev=%pS call scsi_mpath_set_live?\n", __func__, sdev);
 	//	scsi_mpath_set_live(NULL);
 	}
 
@@ -3048,8 +3057,22 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 	 * Try to transition the scsi device to SDEV_RUNNING or one of the
 	 * offlined states and goose the device queue if successful.
 	 */
+	pr_err("%s3 new_state=%d SDEV_TRANSPORT_OFFLINE=%d sdev->sdev_state=%d\n",
+		__func__, new_state, SDEV_TRANSPORT_OFFLINE, sdev->sdev_state);
 	switch (sdev->sdev_state) {
 	case SDEV_BLOCK:
+		if (new_state == SDEV_TRANSPORT_OFFLINE) {
+			pr_err("%s4 new_state=%d SDEV_TRANSPORT_OFFLINE=%d sdev->sdev_state=%d\n",
+				__func__, new_state, SDEV_TRANSPORT_OFFLINE, sdev->sdev_state);
+				if (scsi_is_sdev_multipath(sdev)) {
+					struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+					struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+					pr_err("%s5 sdev=%pS call mpath_clear_current_path mpath_device=%pS\n",
+						__func__, sdev, mpath_device);
+					mpath_clear_current_path(mpath_device);
+				}
+		}
+		fallthrough;
 	case SDEV_TRANSPORT_OFFLINE:
 		sdev->sdev_state = new_state;
 		break;
