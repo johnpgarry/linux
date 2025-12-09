@@ -859,14 +859,15 @@ static void blk_print_req_error(struct request *req, blk_status_t status)
 {
 	printk_ratelimited(KERN_ERR
 		"%s error, dev %s, sector %llu op 0x%x:(%s) flags 0x%x "
-		"phys_seg %u prio class %u\n",
+		"phys_seg %u prio class %u req=%pS bio=%pS\n",
 		blk_status_to_str(status),
 		req->q->disk ? req->q->disk->disk_name : "?",
 		blk_rq_pos(req), (__force u32)req_op(req),
 		blk_op_str(req_op(req)),
 		(__force u32)(req->cmd_flags & ~REQ_OP_MASK),
 		req->nr_phys_segments,
-		IOPRIO_PRIO_CLASS(req_get_ioprio(req)));
+		IOPRIO_PRIO_CLASS(req_get_ioprio(req)),
+		req, req->bio);
 }
 
 /*

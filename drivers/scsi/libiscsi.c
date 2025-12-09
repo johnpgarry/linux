@@ -74,7 +74,7 @@ MODULE_PARM_DESC(debug_libiscsi_eh,
 
 #define ISCSI_DBG_EH(_session, dbg_fmt, arg...)				\
 	do {								\
-		if (iscsi_dbg_lib_eh)					\
+		if (1)					\
 			iscsi_session_printk(KERN_INFO, _session,	\
 					     "%s " dbg_fmt,		\
 					     __func__, ##arg);		\
@@ -629,8 +629,18 @@ static void __fail_scsi_task(struct iscsi_task *task, int err)
 		conn->session->queued_cmdsn--;
 		/* it was never sent so just complete like normal */
 		state = ISCSI_TASK_COMPLETED;
-	} else if (err == DID_TRANSPORT_DISRUPTED)
+	} else if (err == DID_TRANSPORT_DISRUPTED) {
+		sc = task->sc;
+		struct request *req = NULL;
+		struct bio *bio = NULL;
+		if (sc)
+			req = scsi_cmd_to_rq(sc);
+		if (req)
+			bio = req->bio;
+		pr_err("%s setting ISCSI_TASK_ABRT_SESS_RECOV task->sc=%pS req=%pS bio=%pS\n",
+		__func__, task->sc, req, bio);
 		state = ISCSI_TASK_ABRT_SESS_RECOV;
+	}
 	else
 		state = ISCSI_TASK_ABRT_TMF;
 
@@ -1760,6 +1770,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	iscsi_cmd(sc)->task = NULL;
 
 	ihost = shost_priv(host);
+	//pr_err_ratelimited("%s\n", __func__);
 
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
@@ -2350,11 +2361,13 @@ int iscsi_eh_abort(struct scsi_cmnd *sc)
 	struct iscsi_task *task;
 	struct iscsi_tm *hdr;
 	int age;
+	struct request *req = blk_mq_rq_from_pdu(sc);
 
+	pr_err("%s\n", __func__);
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
 
-	ISCSI_DBG_EH(session, "aborting sc %p\n", sc);
+	ISCSI_DBG_EH(session, "aborting sc %pS req=%pS bio=%pS\n", sc, req, req->bio);
 
 completion_check:
 	mutex_lock(&session->eh_mutex);
@@ -2514,6 +2527,8 @@ int iscsi_eh_device_reset(struct scsi_cmnd *sc)
 	struct iscsi_conn *conn;
 	struct iscsi_tm *hdr;
 	int rc = FAILED;
+	struct request *req = blk_mq_rq_from_pdu(sc);
+	pr_err("%s sc=%pS req=%pS bio=%pS\n", __func__, sc, req, req->bio);
 
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
@@ -2752,6 +2767,9 @@ done:
 int iscsi_eh_recover_target(struct scsi_cmnd *sc)
 {
 	int rc;
+	struct request *req = blk_mq_rq_from_pdu(sc);
+
+	pr_err("%s sc=%pS req=%pS bio=%pS\n", __func__, sc, req, req->bio);
 
 	rc = iscsi_eh_target_reset(sc);
 	if (rc == FAILED)
@@ -3440,6 +3458,8 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	 * flush queues.
 	 */
 	spin_lock_bh(&session->frwd_lock);
+	pr_err("%s calling fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
+		__func__);
 	fail_scsi_tasks(conn, -1, DID_TRANSPORT_DISRUPTED);
 	fail_mgmt_tasks(session, conn);
 	memset(&session->tmhdr, 0, sizeof(session->tmhdr));

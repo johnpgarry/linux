@@ -242,6 +242,7 @@ struct bio {
 	};
 	bio_end_io_t		*bi_end_io;
 	void			*bi_private;
+	unsigned int printed;
 #ifdef CONFIG_BLK_CGROUP
 	/*
 	 * Represents the association of the css and request_queue for the bio.
