@@ -61,6 +61,7 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device)
 	bool changed = false;
 	int node;
 
+	pr_err("%s mpath_device=%pS\n", __func__, mpath_device);
 	if (!mpath_head)
 		return changed;
 
@@ -292,6 +293,9 @@ static void multipath_submit_bio(struct bio *bio)
 		special = false;
 	}
 
+	if (bio->printed)
+		special = true;
+
 	/*
 	 * The scsi device might be going away and the bio might be
 	 * moved to a difference queue via blk_steal_bios(), so we
@@ -319,8 +323,8 @@ static void multipath_submit_bio(struct bio *bio)
 		bio->bi_opf |= REQ_MPATH;
 		atomic_inc(&mpath_device->nr_total);
 		if (special)
-			pr_err("%s3 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct\n",
-				__func__, bio, bio->bi_bdev);
+			pr_err("%s3 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS\n",
+				__func__, bio, bio->bi_bdev, mpath_device);
 		submit_bio_noacct(bio);
 		if (special)
 			pr_err("%s4 bio=%pS called submit_bio_noacct\n",
@@ -550,6 +554,7 @@ void mpath_requeue_work(struct work_struct *work)
 	while ((bio = next) != NULL) {
 		next = bio->bi_next;
 		bio->bi_next = NULL;
+		bio->printed = 1;
 		pr_err("%s2 mpath_head=%pS bio=%pS calling submit_bio_noacct bio->bi_bdev=%pS\n",
 			__func__, mpath_head, bio, bio->bi_bdev);
 		submit_bio_noacct(bio);

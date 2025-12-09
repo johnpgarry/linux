@@ -3409,6 +3409,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	struct iscsi_session *session = conn->session;
 	int old_stop_stage;
 
+	pr_err("%s\n", __func__);
 	mutex_lock(&session->eh_mutex);
 	spin_lock_bh(&session->frwd_lock);
 	if (conn->stop_stage == STOP_CONN_TERM) {
@@ -3435,6 +3436,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	iscsi_suspend_tx(conn);
 
 	spin_lock_bh(&session->frwd_lock);
+	pr_err("%s2\n", __func__);
 	conn->c_stage = ISCSI_CONN_STOPPED;
 	spin_unlock_bh(&session->frwd_lock);
 
@@ -3458,7 +3460,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	 * flush queues.
 	 */
 	spin_lock_bh(&session->frwd_lock);
-	pr_err("%s calling fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
+	pr_err("%s3 calling fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
 		__func__);
 	fail_scsi_tasks(conn, -1, DID_TRANSPORT_DISRUPTED);
 	fail_mgmt_tasks(session, conn);

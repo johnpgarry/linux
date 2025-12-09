@@ -808,9 +808,9 @@ int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 	if (is_mpath_request(req)) {
 		if (scsi_is_mpath_error(scmd) ||
 		    blk_queue_dying(req->q)) {
-			pr_err("%s2 scmd=%pS req=%pS bio=%pS returning FAILOVER\n",
+			pr_err("%s2 scmd=%pS req=%pS bio=%pS returning NEEDS_RETRY\n",
 				__func__, scmd, req, req->bio);
-			return FAILOVER;
+			return NEEDS_RETRY;
 		}
 	} else {
 		if (blk_queue_dying(req->q)) {

@@ -1875,6 +1875,7 @@ static void session_recovery_timedout(struct work_struct *work)
 			     recovery_work.work);
 	unsigned long flags;
 
+	pr_err("%s\n", __func__);
 	iscsi_cls_session_printk(KERN_INFO, session,
 				 "session recovery timed out after %d secs\n",
 				 session->recovery_tmo);
@@ -1911,6 +1912,7 @@ static void __iscsi_unblock_session(struct work_struct *work)
 
 	ISCSI_DBG_TRANS_SESSION(session, "Unblocking session\n");
 
+	pr_err("%s\n", __func__);
 	cancel_delayed_work_sync(&session->recovery_work);
 	spin_lock_irqsave(&session->lock, flags);
 	session->state = ISCSI_SESSION_LOGGED_IN;
@@ -1928,9 +1930,13 @@ static void __iscsi_unblock_session(struct work_struct *work)
  */
 void iscsi_unblock_session(struct iscsi_cls_session *session)
 {
-	if (!cancel_work_sync(&session->block_work))
+	pr_err("%s\n", __func__);
+	if (!cancel_work_sync(&session->block_work)) {
+		pr_err("%s2\n", __func__);
 		cancel_delayed_work_sync(&session->recovery_work);
+	}
 
+	pr_err("%s1\n", __func__);
 	queue_work(session->workq, &session->unblock_work);
 	/*
 	 * Blocking the session can be done from any context so we only
@@ -1949,20 +1955,25 @@ static void __iscsi_block_session(struct work_struct *work)
 	struct Scsi_Host *shost = iscsi_session_to_shost(session);
 	unsigned long flags;
 
+	pr_err("%s\n", __func__);
 	ISCSI_DBG_TRANS_SESSION(session, "Blocking session\n");
 	spin_lock_irqsave(&session->lock, flags);
 	session->state = ISCSI_SESSION_FAILED;
 	spin_unlock_irqrestore(&session->lock, flags);
 	scsi_block_targets(shost, &session->dev);
 	ISCSI_DBG_TRANS_SESSION(session, "Completed SCSI target blocking\n");
-	if (session->recovery_tmo >= 0)
+	if (session->recovery_tmo >= 0) {
+		 session->recovery_tmo = 5;
+		pr_err("%s2 session->recovery_tmo=%d\n", __func__, session->recovery_tmo);
 		queue_delayed_work(session->workq,
 				   &session->recovery_work,
 				   session->recovery_tmo * HZ);
+	}
 }
 
 void iscsi_block_session(struct iscsi_cls_session *session)
 {
+	pr_err("%s\n", __func__);
 	queue_work(session->workq, &session->block_work);
 }
 EXPORT_SYMBOL_GPL(iscsi_block_session);
@@ -2162,8 +2173,11 @@ void iscsi_remove_session(struct iscsi_cls_session *session)
 		list_del(&session->sess_list);
 	spin_unlock_irqrestore(&sesslock, flags);
 
-	if (!cancel_work_sync(&session->block_work))
+	pr_err("%s\n", __func__);
+	if (!cancel_work_sync(&session->block_work)) {
+		pr_err("%s2\n", __func__);
 		cancel_delayed_work_sync(&session->recovery_work);
+	}
 	cancel_work_sync(&session->unblock_work);
 	/*
 	 * If we are blocked let commands flow again. The lld or iscsi
@@ -3015,8 +3029,10 @@ iscsi_if_set_param(struct iscsi_transport *transport, struct iscsi_uevent *ev, u
 	switch (ev->u.set_param.param) {
 	case ISCSI_PARAM_SESS_RECOVERY_TMO:
 		sscanf(data, "%d", &value);
-		if (!session->recovery_tmo_sysfs_override)
+		if (!session->recovery_tmo_sysfs_override) {
+			pr_err("%s setting recovery_tmo=%d\n", __func__, value);
 			session->recovery_tmo = value;
+		}
 		break;
 	default:
 		state = READ_ONCE(conn->state);
@@ -4469,6 +4485,7 @@ store_priv_session_##field(struct device *dev,				\
 		session->field##_sysfs_override = true;			\
 	} else {							\
 		val = simple_strtoul(buf, &cp, 0);			\
+		pr_err("%s %s val=%d\n", __func__, #field, val);	\
 		if (*cp != '\0' && *cp != '\n')				\
 			return -EINVAL;					\
 		session->field = val;					\
