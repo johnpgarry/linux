@@ -360,6 +360,8 @@ enum blk_eh_timer_return scsi_timeout(struct request *req)
 	 * If scsi_done() has already set SCMD_STATE_COMPLETE, do not modify
 	 * *scmd.
 	 */
+	pr_err("%s req=%pS scmd=%pS SCMD_STATE_COMPLETE set=%d\n",
+		__func__, req, scmd, test_bit(SCMD_STATE_COMPLETE, &scmd->state));
 	if (test_and_set_bit(SCMD_STATE_COMPLETE, &scmd->state))
 		return BLK_EH_DONE;
 	atomic_inc(&scmd->device->iodone_cnt);
