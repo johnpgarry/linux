@@ -42,23 +42,23 @@ struct scsi_mode_data {
 enum scsi_device_state {
 	SDEV_CREATED = 1,	/* device created but not added to sysfs
 				 * Only internal commands allowed (for inq) */
-	SDEV_RUNNING,		/* device properly configured
+	SDEV_RUNNING = 2,		/* device properly configured
 				 * All commands allowed */
-	SDEV_CANCEL,		/* beginning to delete device
+	SDEV_CANCEL = 3,		/* beginning to delete device
 				 * Only error handler commands allowed */
-	SDEV_DEL,		/* device deleted 
+	SDEV_DEL = 4,		/* device deleted 
 				 * no commands allowed */
-	SDEV_QUIESCE,		/* Device quiescent.  No block commands
+	SDEV_QUIESCE = 5,		/* Device quiescent.  No block commands
 				 * will be accepted, only specials (which
 				 * originate in the mid-layer) */
-	SDEV_OFFLINE,		/* Device offlined (by error handling or
+	SDEV_OFFLINE = 6,		/* Device offlined (by error handling or
 				 * user request */
-	SDEV_TRANSPORT_OFFLINE,	/* Offlined by transport class error handler */
-	SDEV_BLOCK,		/* Device blocked by scsi lld.  No
+	SDEV_TRANSPORT_OFFLINE = 7,	/* Offlined by transport class error handler */
+	SDEV_BLOCK = 8,		/* Device blocked by scsi lld.  No
 				 * scsi commands from user or midlayer
 				 * should be issued to the scsi
 				 * lld. */
-	SDEV_CREATED_BLOCK,	/* same as above but for created devices */
+	SDEV_CREATED_BLOCK = 9,	/* same as above but for created devices */
 };
 
 enum scsi_scan_mode {
