@@ -638,8 +638,8 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	__maybe_unused bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
 //	if (req->cmd_flags & REQ_SCSI_MPATH)
-	//	pr_err("%s cmd=%pS req=%pS bytes=%d bio=%pS good=%d error=%d calling blk_update_request is_flush=%d\n",
-	//			__func__, cmd, req, blk_rq_bytes(req), req->bio, bytes, error, is_flush);
+//		pr_err_ratelimited("%s cmd=%pS req=%pS bytes=%d bio=%pS good=%d error=%d calling blk_update_request is_flush=%d\n",
+//				__func__, cmd, req, blk_rq_bytes(req), req->bio, bytes, error, is_flush);
 
 	if (blk_update_request(req, error, bytes))
 		return true;
@@ -1796,8 +1796,8 @@ static void scsi_done_internal(struct scsi_cmnd *cmd, bool complete_directly)
 	struct bio *bio = req->bio;
 
 	if (is_mpath_request(req) && cmd->result)
-		pr_err("%s cmd=%pS req=%pS complete_directly=%d bio=%pS\n",
-			__func__, cmd, req, complete_directly, bio);
+		pr_err("%s cmd=%pS req=%pS complete_directly=%d bio=%pS cmd->result=0x%x\n",
+			__func__, cmd, req, complete_directly, bio, cmd->result);
 
 	switch (cmd->submitter) {
 	case SUBMITTED_BY_BLOCK_LAYER:
@@ -1913,11 +1913,12 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
 	int reason;
+	struct bio *bio = req->bio;
 	__maybe_unused bool is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
 
-	pr_err_once("%s req=%pS part=%pS pos=%lld bytes=%d bio=%pS sdev=%pS is_flush=%d rq_flags=0x%x\n",
-		__func__, req, req->part, blk_rq_pos(req), blk_rq_bytes(req), req->bio, sdev, is_flush, req->rq_flags);
+	pr_err_once("%s req=%pS part=%pS pos=%lld bytes=%d bio=%pS sdev=%pS bi_size=%d rq_flags=0x%x\n",
+		__func__, req, req->part, blk_rq_pos(req), blk_rq_bytes(req), req->bio, sdev, bio->bi_iter.bi_size, req->rq_flags);
 	WARN_ON_ONCE(cmd->budget_token < 0);
 
 	/*
@@ -1927,8 +1928,8 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(sdev->sdev_state != SDEV_RUNNING)) {
 		ret = scsi_device_state_check(sdev, req);
 		if (ret != BLK_STS_OK) {
-			pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bio=%pS req->rq_flags & RQF_DONTPREP=%d\n",
-				__func__, ret, req, req->bio, !!(req->rq_flags & RQF_DONTPREP));
+			pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bytes=%d bio=%pS req->rq_flags & RQF_DONTPREP=%d\n",
+				__func__, ret, req, blk_rq_bytes(req), req->bio, !!(req->rq_flags & RQF_DONTPREP));
 			goto out_put_budget;
 		}
 	}

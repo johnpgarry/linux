@@ -277,8 +277,8 @@ void scsi_mpath_failover_req(struct request *req)
 		pr_err("%s3 req=%pS bio=%pS scsi_is_mpath_error=%d mpath_device=%pS mpath_head=%pS\n",
 		__func__, req, req->bio, scsi_is_mpath_error(scmd), mpath_device, mpath_head);
 	//	set_bit(SCSI_MPATH_DEVICE_IO_PENDING, &scsi_mpath_dev->flags);
-		pr_err("%s3.1 req=%pS bio=%pS scsi_is_mpath_error=%d mpath_device=%pS shost->work_q=%pS\n",
-		__func__, req, req->bio, scsi_is_mpath_error(scmd), mpath_device, shost->work_q);
+		pr_err("%s3.1 req=%pS bytes=%d bio=%pS bi_size=%d scsi_is_mpath_error=%d mpath_device=%pS shost->work_q=%pS\n",
+		__func__, req, blk_rq_bytes(req), req->bio, req->bio->bi_iter.bi_size, scsi_is_mpath_error(scmd), mpath_device, shost->work_q);
 	//	queue_work(shost->work_q, &mpath_head->requeue_work);
 	}
 
@@ -288,8 +288,8 @@ void scsi_mpath_failover_req(struct request *req)
 	 */
 	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
 	for (bio = req->bio; bio; bio = bio->bi_next) {
-		pr_err("%s4 looping bio=%pS bio->bi_bdev=%pS req->q->disk->part0=%pS disk->part0=%pS\n",
-			__func__, bio, bio->bi_bdev, req->q->disk->part0, disk->part0);
+		pr_err("%s4 looping bio=%pS bi_size=%d bio->bi_bdev=%pS req->q->disk->part0=%pS disk->part0=%pS\n",
+			__func__, bio, bio->bi_iter.bi_size, bio->bi_bdev, req->q->disk->part0, disk->part0);
 		bio_set_dev(bio, disk->part0);
 		if (bio->bi_opf & REQ_POLLED) {
 			bio->bi_opf &= ~REQ_POLLED;
