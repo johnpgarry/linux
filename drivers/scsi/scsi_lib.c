@@ -2008,10 +2008,14 @@ out_put_budget:
 			scsi_mq_uninit_cmd(cmd);
 		scsi_run_queue_async(sdev);
 		if (!scsi_device_online(sdev) && is_mpath_request(req)) {
-			pr_err("%s10.7 calling scsi_mpath_failover_req ret=%d req=%pS bio=%pS\n",
-				__func__, ret, req, req->bio);
-			scsi_mpath_failover_req(req);
+			pr_err("%s10.7 calling scsi_done\n", __func__);
+			clear_bit(SCMD_STATE_COMPLETE, &cmd->state);
+			scsi_done(cmd);
 			return 0;
+		//	pr_err("%s10.7 calling scsi_mpath_failover_req ret=%d req=%pS bio=%pS\n",
+		//		__func__, ret, req, req->bio);
+		//	scsi_mpath_failover_req(req);
+		//	return 0;
 		}
 		break;
 	}
