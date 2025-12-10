@@ -247,10 +247,12 @@ void scsi_mpath_failover_req(struct request *req)
 	struct gendisk *disk = mpath_head->disk;
 	//struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	unsigned long flags;
-	struct bio *bio;
+	struct bio *bio = req->bio;
 
 	pr_err("%s req=%pS bio=%pS scsi_device_online=%d sdev->was_reset=%d sdev->locked=%d mpath_device=%pS shost=%pS\n",
 		__func__, req, req->bio, scsi_device_online(sdev), sdev->was_reset, sdev->locked, mpath_device, shost);
+	pr_err("%s1 req=%pS blk_rq_bytes=%d bio=%pS bi_iter.bi_size=%d bio->bi_next=%pS\n",
+		__func__, req, blk_rq_bytes(req), bio, bio->bi_iter.bi_size, bio->bi_next);
 
 //	if (!scsi_device_online(sdev) || sdev->was_reset || sdev->locked)
 //		return;

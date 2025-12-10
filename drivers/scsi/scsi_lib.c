@@ -1593,10 +1593,18 @@ static void scsi_complete(struct request *rq)
 		atomic_inc(&cmd->device->ioerr_cnt);
 
 	disposition = scsi_decide_disposition(cmd);
+	if (disposition != SUCCESS && is_mpath_request(rq))
+		pr_err("%s0 disposition=0x%x rq=%pS bio=%pS\n",
+			__func__, disposition, rq, rq->bio);
 	if (disposition != SUCCESS && scsi_cmd_runtime_exceeced(cmd))
 		disposition = SUCCESS;
 
 	scsi_log_completion(cmd, disposition);
+
+	if (disposition != SUCCESS) {
+		pr_err("%s1 disposition=0x%x rq=%pS bio=%pS\n",
+			__func__, disposition, rq, rq->bio);		
+	}
 
 	switch (disposition) {
 	case SUCCESS:
@@ -1609,7 +1617,7 @@ static void scsi_complete(struct request *rq)
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 		break;
 	case FAILOVER:
-		pr_err("%s calling scsi_mpath_failover_req rq=%pS bio=%pS\n",
+		pr_err("%s2 calling scsi_mpath_failover_req rq=%pS bio=%pS\n",
 			__func__, rq, rq->bio);
 		scsi_mpath_failover_req(rq);
 		break;
@@ -1774,6 +1782,9 @@ static void scsi_done_internal(struct scsi_cmnd *cmd, bool complete_directly)
 {
 	struct request *req = scsi_cmd_to_rq(cmd);
 
+	if (is_mpath_request(req) && cmd->result)
+		pr_err("%s cmd=%pS req=%pS complete_directly=%d\n", __func__, cmd, req, complete_directly);
+
 	switch (cmd->submitter) {
 	case SUBMITTED_BY_BLOCK_LAYER:
 		break;
@@ -1782,11 +1793,17 @@ static void scsi_done_internal(struct scsi_cmnd *cmd, bool complete_directly)
 	case SUBMITTED_BY_SCSI_RESET_IOCTL:
 		return;
 	}
-
+	if (is_mpath_request(req) && cmd->result)
+			pr_err("%s2 cmd=%pS req=%pS\n", __func__, cmd, req);
 	if (unlikely(blk_should_fake_timeout(scsi_cmd_to_rq(cmd)->q)))
 		return;
+	if (is_mpath_request(req) && cmd->result)
+		pr_err("%s3 cmd=%pS req=%pS SCMD_STATE_COMPLETE set=%d\n",
+			__func__, cmd, req, test_bit(SCMD_STATE_COMPLETE, &cmd->state));
 	if (unlikely(test_and_set_bit(SCMD_STATE_COMPLETE, &cmd->state)))
 		return;
+	if (is_mpath_request(req) && cmd->result)
+		pr_err("%s4 cmd=%pS req=%pS\n", __func__, cmd, req);
 	trace_scsi_dispatch_cmd_done(cmd);
 
 	if (complete_directly)
@@ -1890,7 +1907,8 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(sdev->sdev_state != SDEV_RUNNING)) {
 		ret = scsi_device_state_check(sdev, req);
 		if (ret != BLK_STS_OK) {
-			pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bio=%pS\n", __func__, ret, req, req->bio);
+			pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bio=%pS req->rq_flags & RQF_DONTPREP=%d\n",
+				__func__, ret, req, req->bio, !!(req->rq_flags & RQF_DONTPREP));
 			goto out_put_budget;
 		}
 	}
