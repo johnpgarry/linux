@@ -303,8 +303,12 @@ static void multipath_submit_bio(struct bio *bio)
 	 * allocate the bvecs from.
 	 */
 	if (special)
-		pr_err("%s bio=%pS bi size=%d mpath_head=%pS bio->bi_bdev=%pS\n",
+		pr_err("%s bio=%pS bi_size=%d mpath_head=%pS bio->bi_bdev=%pS\n",
 			__func__, bio, bio->bi_iter.bi_size, mpath_head, bio->bi_bdev);
+	if (special && bio->bi_iter.bi_size != SZ_16K)
+		pr_err("%s0 bio=%pS bi_size=%d mpath_head=%pS bio->bi_bdev=%pS\n",
+			__func__, bio, bio->bi_iter.bi_size, mpath_head, bio->bi_bdev);
+
 	bio = bio_split_to_limits(bio);
 	if (special)
 		pr_err("%s1 bio=%pS mpath_head=%pS called bio_split_to_limits\n",

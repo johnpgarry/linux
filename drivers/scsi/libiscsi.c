@@ -364,6 +364,8 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_task *task)
 		task->protected = true;
 
 	transfer_length = scsi_transfer_length(sc);
+//	pr_err_ratelimited("%s transfer_length=%d underflow=%d\n",
+//		__func__, transfer_length, sc->underflow);
 	hdr->data_length = cpu_to_be32(transfer_length);
 	if (sc->sc_data_direction == DMA_TO_DEVICE) {
 		struct iscsi_r2t_info *r2t = &task->unsol_r2t;
@@ -637,8 +639,8 @@ static void __fail_scsi_task(struct iscsi_task *task, int err)
 			req = scsi_cmd_to_rq(sc);
 		if (req)
 			bio = req->bio;
-		pr_err("%s setting ISCSI_TASK_ABRT_SESS_RECOV task->sc=%pS req=%pS bio=%pS\n",
-		__func__, task->sc, req, bio);
+		pr_err("%s setting ISCSI_TASK_ABRT_SESS_RECOV task->sc=%pS req=%pS bytes=%d bio=%pS bi_size=%d\n",
+		__func__, task->sc, req, blk_rq_bytes(req), bio, bio->bi_iter.bi_size);
 		state = ISCSI_TASK_ABRT_SESS_RECOV;
 	}
 	else
