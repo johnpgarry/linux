@@ -1900,16 +1900,22 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	 * Bypass the SCSI device, SCSI target and SCSI host checks for
 	 * reserved commands.
 	 */
+
 	if (!blk_mq_is_reserved_rq(req)) {
 		/*
 		 * If the device is not in running state we will reject some or
 		 * all commands.
 		 */
+
+
 		if (unlikely(sdev->sdev_state != SDEV_RUNNING)) {
 			ret = scsi_device_state_check(sdev, req);
-			if (ret != BLK_STS_OK)
+			if (ret != BLK_STS_OK) {
+				pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bio=%pS\n", __func__, ret, req, req->bio);
 				goto out_put_budget;
+			}
 		}
+
 
 		ret = BLK_STS_RESOURCE;
 		if (!scsi_target_queue_ready(shost, sdev))
@@ -1987,6 +1993,7 @@ out_dec_target_busy:
 	if (scsi_target(sdev)->can_queue > 0)
 		atomic_dec(&scsi_target(sdev)->target_busy);
 out_put_budget:
+	pr_err("%s10.0 out_put_budget: ret=%d req=%pS bio=%pS\n", __func__, ret, req, req->bio);
 	scsi_mq_put_budget(q, cmd->budget_token);
 	cmd->budget_token = -1;
 	switch (ret) {
@@ -2002,6 +2009,8 @@ out_put_budget:
 			scsi_mq_uninit_cmd(cmd);
 		break;
 	default:
+		pr_err("%s10.6 default: ret=%d req=%pS bio=%pS scsi_device_online=%d\n",
+			__func__, ret, req, req->bio, scsi_device_online(sdev));
 		if (unlikely(!scsi_device_online(sdev)))
 			cmd->result = DID_NO_CONNECT << 16;
 		else
@@ -2014,6 +2023,12 @@ out_put_budget:
 		if (req->rq_flags & RQF_DONTPREP)
 			scsi_mq_uninit_cmd(cmd);
 		scsi_run_queue_async(sdev);
+		if (!scsi_device_online(sdev) && is_mpath_request(req)) {
+			pr_err("%s10.7 calling scsi_mpath_failover_req ret=%d req=%pS bio=%pS\n",
+				__func__, ret, req, req->bio);
+			scsi_mpath_failover_req(req);
+			return 0;
+		}
 		break;
 	}
 	return ret;
@@ -3000,8 +3015,10 @@ static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 
 void scsi_start_queue(struct scsi_device *sdev)
 {
-	if (cmpxchg(&sdev->queue_stopped, 1, 0))
+	if (cmpxchg(&sdev->queue_stopped, 1, 0)) {
+		pr_err("%s calling blk_mq_unquiesce_queue sdev=%pS\n", __func__, sdev);
 		blk_mq_unquiesce_queue(sdev->request_queue);
+	}
 }
 
 static void scsi_stop_queue(struct scsi_device *sdev)
@@ -3138,7 +3155,7 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 					struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 					pr_err("%s5 sdev=%pS call mpath_clear_current_path mpath_device=%pS\n",
 						__func__, sdev, mpath_device);
-					mpath_clear_current_path(mpath_device);
+				//	mpath_clear_current_path(mpath_device);
 				}
 		}
 		fallthrough;
@@ -3184,6 +3201,7 @@ static int scsi_internal_device_unblock(struct scsi_device *sdev,
 	int ret;
 
 	mutex_lock(&sdev->state_mutex);
+	pr_err("%s sdev=%pS calling scsi_internal_device_unblock_nowait\n", __func__, sdev);
 	ret = scsi_internal_device_unblock_nowait(sdev, new_state);
 	mutex_unlock(&sdev->state_mutex);
 
@@ -3223,12 +3241,14 @@ EXPORT_SYMBOL_GPL(scsi_block_targets);
 static void
 device_unblock(struct scsi_device *sdev, void *data)
 {
+	pr_err("%s sdev=%pS calling scsi_internal_device_unblock\n", __func__, sdev);
 	scsi_internal_device_unblock(sdev, *(enum scsi_device_state *)data);
 }
 
 static int
 target_unblock(struct device *dev, void *data)
 {
+	dev_err(dev, "%s\n", __func__);
 	if (scsi_is_target_device(dev))
 		starget_for_each_device(to_scsi_target(dev), data,
 					device_unblock);
@@ -3238,6 +3258,7 @@ target_unblock(struct device *dev, void *data)
 void
 scsi_target_unblock(struct device *dev, enum scsi_device_state new_state)
 {
+	dev_err(dev, "%s\n", __func__);
 	if (scsi_is_target_device(dev))
 		starget_for_each_device(to_scsi_target(dev), &new_state,
 					device_unblock);

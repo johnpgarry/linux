@@ -1896,6 +1896,8 @@ static void session_recovery_timedout(struct work_struct *work)
 	spin_unlock_irqrestore(&session->lock, flags);
 
 	ISCSI_DBG_TRANS_SESSION(session, "Unblocking SCSI target\n");
+	pr_err("%s2 session->state=%d ISCSI_SESSION_FREE=%d calling scsi_target_unblock with SDEV_TRANSPORT_OFFLINE\n",
+		__func__, session->state, ISCSI_SESSION_FREE);
 	scsi_target_unblock(&session->dev, SDEV_TRANSPORT_OFFLINE);
 	ISCSI_DBG_TRANS_SESSION(session, "Completed unblocking SCSI target\n");
 

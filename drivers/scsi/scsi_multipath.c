@@ -252,8 +252,8 @@ void scsi_mpath_failover_req(struct request *req)
 	pr_err("%s req=%pS bio=%pS scsi_device_online=%d sdev->was_reset=%d sdev->locked=%d mpath_device=%pS shost=%pS\n",
 		__func__, req, req->bio, scsi_device_online(sdev), sdev->was_reset, sdev->locked, mpath_device, shost);
 
-	if (!scsi_device_online(sdev) || sdev->was_reset || sdev->locked)
-		return;
+//	if (!scsi_device_online(sdev) || sdev->was_reset || sdev->locked)
+//		return;
 
 	mpath_clear_current_path(mpath_device);
 
