@@ -1904,15 +1904,22 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 {
 	enum scsi_disposition rtn;
 	struct request *req = scsi_cmd_to_rq(scmd);
-
+	struct scsi_device *sdev = scmd->device;
 
 	/*
 	 * if the device is offline, then we clearly just pass the result back
 	 * up to the top level.
 	 */
 	if (!scsi_device_online(scmd->device)) {
-		pr_err("%s scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
-			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
+		pr_err("%s scmd=%pS req=%pS bio=%pS scmd=%pS host_byte()=%d get_status_byte()=%d sdev_state=%d\n", __func__,
+			scmd, req, scmd, req->bio, host_byte(scmd->result), get_status_byte(scmd), sdev->sdev_state);
+
+		if (is_mpath_request(req)) {
+
+			pr_err("%s0 scmd=%pS req=%pS scmd=%pS bio=%pS returning scsi_mpath_failover_disposition\n", __func__,
+				scmd, req, scmd, req->bio);
+			return scsi_mpath_failover_disposition(scmd);
+		}
 
 		SCSI_LOG_ERROR_RECOVERY(5, scmd_printk(KERN_INFO, scmd,
 			"%s: device offline - report as SUCCESS\n", __func__));
@@ -1981,8 +1988,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 * based on its timers and recovery capablilities if
 		 * there are enough retries.
 		 */
-		pr_err("%s4 DID_TRANSPORT_DISRUPTED scmd=%pS req=%pS bio=%pS\n", __func__,
-			scmd, req, req->bio);
+		pr_err("%s4 DID_TRANSPORT_DISRUPTED scmd=%pS req=%pS bio=%pS scsi_device_online=%d\n", __func__,
+			scmd, req, req->bio, scsi_device_online(scmd->device));
 		goto maybe_retry;
 	case DID_TRANSPORT_FAILFAST:
 		/*
@@ -2101,7 +2108,7 @@ maybe_retry:
 	 * For SCSI Multipath check if there are path errors to
 	 * trigger failover to available path
 	 */
-	if (scsi_is_sdev_multipath(scmd->device)) {
+	if (is_mpath_request(req)) {
 		enum scsi_disposition smpd_dis;
 		pr_err("%s9.1 calling scsi_mpath_failover_disposition scmd=%pS req=%pS bio=%pS\n", __func__, scmd, req, req->bio);
 		smpd_dis = scsi_mpath_failover_disposition(scmd);
