@@ -532,8 +532,10 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
-	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
+	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m)) {
+		/* choose_pgpath -> choose_path_in_pg -> pg->ps.type->select_path */
 		pgpath = choose_pgpath(m, nr_bytes);
+	}
 
 	if (!pgpath) {
 		if (must_push_back_rq(m))
@@ -612,8 +614,8 @@ static void __multipath_queue_bio(struct multipath *m, struct bio *bio)
 	/* Queue for the daemon to resubmit */
 	bio_list_add(&m->queued_bios, bio);
 	if (!test_bit(MPATHF_QUEUE_IO, &m->flags)) {
-		pr_err("%s m=%pS bio=%pS MPATHF_QUEUE_IO not set, calling queue_work process_queued_bios\n",
-			__func__, m, bio);
+		pr_err("%s m=%pS current pgpath=%pS bio=%pS bi_size=%d MPATHF_QUEUE_IO not set, calling queue_work process_queued_bios\n",
+			__func__, m, READ_ONCE(m->current_pgpath), bio, bio->bi_iter.bi_size);
 		queue_work(kmultipathd, &m->process_queued_bios);
 	}
 }
@@ -633,8 +635,11 @@ static struct pgpath *__map_bio(struct multipath *m, struct bio *bio)
 
 	/* Do we need to select a new pgpath? */
 	pgpath = READ_ONCE(m->current_pgpath);
-	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m))
+	if (!pgpath || !mpath_double_check_test_bit(MPATHF_QUEUE_IO, m)) {
 		pgpath = choose_pgpath(m, bio->bi_iter.bi_size);
+		pr_err_once("%s0 dm-mpath.c !pgpath m=%pS called choose_pgpath bio=%pS pgpath=%pS\n",
+					__func__, m, bio, pgpath);
+	}
 
 	if (!pgpath) {
 		bio->printed++;
@@ -740,11 +745,13 @@ static void process_queued_bios(struct work_struct *work)
 	blk_start_plug(&plug);
 	while ((bio = bio_list_pop(&bios))) {
 		struct dm_mpath_io *mpio = get_mpio_from_bio(bio);
-		pr_err("%s0 m=%pS bio=%pS\n", __func__, m, bio);
+		pr_err("%s0 m=%pS bio=%pS bi_size=%d\n", __func__, m, bio, bio->bi_iter.bi_size);
 
 		dm_bio_restore(get_bio_details_from_mpio(mpio), bio);
+		pr_err("%s0.1 m=%pS bio=%pS bi_size=%d called dm_bio_restore\n", __func__, m, bio, bio->bi_iter.bi_size);
 		r = __multipath_map_bio(m, bio, mpio);
-		pr_err("%s0.1 called __multipath_map_bio m=%pS bio=%pS r=%d DM_MAPIO_REMAPPED=%d\n", __func__, m, bio, r, DM_MAPIO_REMAPPED);
+		pr_err("%s0.2 called __multipath_map_bio m=%pS bio=%pS bi_size=%d r=%d DM_MAPIO_REMAPPED=%d mpio->pgpath=%pS\n",
+			__func__, m, bio, bio->bi_iter.bi_size, r, DM_MAPIO_REMAPPED, mpio->pgpath);
 		switch (r) {
 		case DM_MAPIO_KILL:
 			pr_err("%s1 DM_MAPIO_KILL bio=%pS\n", __func__, bio);
@@ -1783,13 +1790,14 @@ static int multipath_end_io_bio(struct dm_target *ti, struct bio *clone,
 	int r = DM_ENDIO_DONE;
 
 	if (*error && blk_path_error(*error))
-		pr_err("%s1 *error=%d blk_path_error=%d clone=%pS pgpath=%pS BLK_STS_IOERR=%d\n",
-			__func__, *error, blk_path_error(*error), clone, pgpath, BLK_STS_IOERR);
+		pr_err("%s1 *error=%d BLK_STS_IOERR=%d blk_path_error=%d clone=%pS bi_size=%d mpio->pgpath=%pS m=%pS\n",
+			__func__, *error, BLK_STS_IOERR, blk_path_error(*error), clone, clone->bi_iter.bi_size, pgpath, m);
 	if (!*error || !blk_path_error(*error))
 		goto done;
 
 	if (pgpath) {
-		pr_err("%s2 calling fail_path clone=%pS pgpath=%pS *error=%d\n", __func__, clone, pgpath, *error);
+		pr_err("%s2 calling fail_path clone=%pS bi_size=%d pgpath=%pS *error=%d\n",
+			__func__, clone, clone->bi_iter.bi_size, pgpath, *error);
 		fail_path(pgpath);
 	}
 
