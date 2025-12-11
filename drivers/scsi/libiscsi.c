@@ -637,8 +637,8 @@ static void __fail_scsi_task(struct iscsi_task *task, int err)
 			req = scsi_cmd_to_rq(sc);
 		if (req)
 			bio = req->bio;
-		pr_err("%s setting ISCSI_TASK_ABRT_SESS_RECOV task->sc=%pS req=%pS bio=%pS\n",
-		__func__, task->sc, req, bio);
+		pr_err("%s setting ISCSI_TASK_ABRT_SESS_RECOV task->sc=%pS req=%pS bytes=%d bio=%pS bi_size=%d\n",
+		__func__, task->sc, req, blk_rq_bytes(req), bio, bio->bi_iter.bi_size);
 		state = ISCSI_TASK_ABRT_SESS_RECOV;
 	}
 	else
@@ -3409,6 +3409,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	struct iscsi_session *session = conn->session;
 	int old_stop_stage;
 
+	pr_err("%s\n", __func__);
 	mutex_lock(&session->eh_mutex);
 	spin_lock_bh(&session->frwd_lock);
 	if (conn->stop_stage == STOP_CONN_TERM) {
@@ -3435,6 +3436,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	iscsi_suspend_tx(conn);
 
 	spin_lock_bh(&session->frwd_lock);
+	pr_err("%s2\n", __func__);
 	conn->c_stage = ISCSI_CONN_STOPPED;
 	spin_unlock_bh(&session->frwd_lock);
 
@@ -3458,7 +3460,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	 * flush queues.
 	 */
 	spin_lock_bh(&session->frwd_lock);
-	pr_err("%s calling fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
+	pr_err("%s3 calling fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
 		__func__);
 	fail_scsi_tasks(conn, -1, DID_TRANSPORT_DISRUPTED);
 	fail_mgmt_tasks(session, conn);

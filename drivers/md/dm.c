@@ -1089,6 +1089,10 @@ static void clone_endio(struct bio *bio)
 	struct dm_io *io = tio->io;
 	struct mapped_device *md = io->md;
 
+	if (error)
+		pr_err("%s bio=%pS bi_size=%d error=%d\n", __func__,
+			bio, bio->bi_iter.bi_size, error);
+
 	if (unlikely(error == BLK_STS_TARGET)) {
 		if (bio_op(bio) == REQ_OP_DISCARD &&
 		    !bdev_max_discard_sectors(bio->bi_bdev))

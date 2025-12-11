@@ -668,6 +668,9 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	 */
 	percpu_ref_get(&q->q_usage_counter);
 
+	if (error)
+		pr_err("%s2 cmd=%pS req=%pS bytes=%d bio=%pS error=%d calling __blk_mq_end_request\n",
+				__func__, cmd, req, blk_rq_bytes(req), req->bio, error);
 	__blk_mq_end_request(req, error);
 
 	scsi_run_queue_async(sdev);
@@ -913,8 +916,11 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 	} else
 		action = ACTION_FAIL;
 
-	if (action != ACTION_FAIL && scsi_cmd_runtime_exceeced(cmd))
+	if (action != ACTION_FAIL && scsi_cmd_runtime_exceeced(cmd)) {
+		pr_err("%s setting ACTION_FAIL cmd=%pS req=%pS bio=%pS\n",
+			__func__, cmd, req, req->bio);
 		action = ACTION_FAIL;
+	}
 
 	switch (action) {
 	case ACTION_FAIL:
@@ -1316,7 +1322,8 @@ scsi_device_state_check(struct scsi_device *sdev, struct request *req)
 		return BLK_STS_OK;
 	case SDEV_OFFLINE:
 	case SDEV_TRANSPORT_OFFLINE:
-		pr_err_once("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE\n", __func__);
+		pr_err("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE req=%pS bytes=%d bio=%pS\n",
+			__func__, req, blk_rq_bytes(req), req->bio);
 		/*
 		 * If the device is offline we refuse to process any
 		 * commands.  The device must be brought online
@@ -1540,6 +1547,10 @@ static void scsi_complete(struct request *rq)
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
 	enum scsi_disposition disposition;
 
+	if (cmd->result)
+		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS bi_size=%d\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio, rq->bio->bi_iter.bi_size);
+
 	if (blk_mq_is_reserved_rq(rq)) {
 		/* Only pass-through requests are supported in this code path. */
 		WARN_ON_ONCE(!blk_rq_is_passthrough(scsi_cmd_to_rq(cmd)));
@@ -1729,6 +1740,11 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 static void scsi_done_internal(struct scsi_cmnd *cmd, bool complete_directly)
 {
 	struct request *req = scsi_cmd_to_rq(cmd);
+	struct bio *bio = req->bio;
+
+	if (cmd->result)
+		pr_err("%s cmd=%pS req=%pS complete_directly=%d bio=%pS bi_size=%d cmd->result=0x%x\n",
+			__func__, cmd, req, complete_directly, bio, bio->bi_iter.bi_size, cmd->result);
 
 	switch (cmd->submitter) {
 	case SUBMITTED_BY_BLOCK_LAYER:
@@ -1847,8 +1863,11 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 		 */
 		if (unlikely(sdev->sdev_state != SDEV_RUNNING)) {
 			ret = scsi_device_state_check(sdev, req);
-			if (ret != BLK_STS_OK)
+			if (ret != BLK_STS_OK) {
+				pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bytes=%d bio=%pS bi_size=%d req->rq_flags & RQF_DONTPREP=%d\n",
+					__func__, ret, req, blk_rq_bytes(req), req->bio, req->bio->bi_iter.bi_size, !!(req->rq_flags & RQF_DONTPREP));
 				goto out_put_budget;
+			}
 		}
 
 		ret = BLK_STS_RESOURCE;
@@ -2907,16 +2926,22 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
-	if (scsi_device_set_state(sdev, SDEV_BLOCK))
+	pr_err("%s sdev=%pS\n", __func__, sdev);
+	if (scsi_device_set_state(sdev, SDEV_BLOCK)) {
+
+		pr_err("%s2 calling scsi_device_set_state SDEV_CREATED_BLOCK sdev=%pS\n", __func__, sdev);
 		return scsi_device_set_state(sdev, SDEV_CREATED_BLOCK);
+	}
 
 	return 0;
 }
 
 void scsi_start_queue(struct scsi_device *sdev)
 {
-	if (cmpxchg(&sdev->queue_stopped, 1, 0))
+	if (cmpxchg(&sdev->queue_stopped, 1, 0)) {
+		pr_err("%s calling blk_mq_unquiesce_queue sdev=%pS\n", __func__, sdev);
 		blk_mq_unquiesce_queue(sdev->request_queue);
+	}
 }
 
 static void scsi_stop_queue(struct scsi_device *sdev)
@@ -2947,7 +2972,11 @@ static void scsi_stop_queue(struct scsi_device *sdev)
  */
 int scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
-	int ret = __scsi_internal_device_block_nowait(sdev);
+	int ret;
+
+	pr_err("%s calling __scsi_internal_device_block_nowait sdev=%pS\n",
+		__func__, sdev);
+	ret = __scsi_internal_device_block_nowait(sdev);
 
 	/*
 	 * The device has transitioned to SDEV_BLOCK.  Stop the
@@ -2981,6 +3010,8 @@ static void scsi_device_block(struct scsi_device *sdev, void *data)
 	enum scsi_device_state state;
 
 	mutex_lock(&sdev->state_mutex);
+	pr_err("%s calling __scsi_internal_device_block_nowait sdev=%pS\n",
+		__func__, sdev);
 	err = __scsi_internal_device_block_nowait(sdev);
 	state = sdev->sdev_state;
 	if (err == 0)
@@ -3029,8 +3060,16 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 	 * Try to transition the scsi device to SDEV_RUNNING or one of the
 	 * offlined states and goose the device queue if successful.
 	 */
+	pr_err("%s3 new_state=%d SDEV_TRANSPORT_OFFLINE=%d sdev->sdev_state=%d\n",
+		__func__, new_state, SDEV_TRANSPORT_OFFLINE, sdev->sdev_state);
 	switch (sdev->sdev_state) {
 	case SDEV_BLOCK:
+		if (new_state == SDEV_TRANSPORT_OFFLINE) {
+			pr_err("%s4 new_state=%d SDEV_TRANSPORT_OFFLINE=%d sdev->sdev_state=%d\n",
+				__func__, new_state, SDEV_TRANSPORT_OFFLINE, sdev->sdev_state);
+
+		}
+		fallthrough;
 	case SDEV_TRANSPORT_OFFLINE:
 		sdev->sdev_state = new_state;
 		break;
@@ -3073,6 +3112,7 @@ static int scsi_internal_device_unblock(struct scsi_device *sdev,
 	int ret;
 
 	mutex_lock(&sdev->state_mutex);
+	pr_err("%s sdev=%pS calling scsi_internal_device_unblock_nowait\n", __func__, sdev);
 	ret = scsi_internal_device_unblock_nowait(sdev, new_state);
 	mutex_unlock(&sdev->state_mutex);
 
@@ -3112,12 +3152,14 @@ EXPORT_SYMBOL_GPL(scsi_block_targets);
 static void
 device_unblock(struct scsi_device *sdev, void *data)
 {
+	pr_err("%s sdev=%pS calling scsi_internal_device_unblock\n", __func__, sdev);
 	scsi_internal_device_unblock(sdev, *(enum scsi_device_state *)data);
 }
 
 static int
 target_unblock(struct device *dev, void *data)
 {
+	dev_err(dev, "%s\n", __func__);
 	if (scsi_is_target_device(dev))
 		starget_for_each_device(to_scsi_target(dev), data,
 					device_unblock);
@@ -3127,6 +3169,7 @@ target_unblock(struct device *dev, void *data)
 void
 scsi_target_unblock(struct device *dev, enum scsi_device_state new_state)
 {
+	dev_err(dev, "%s\n", __func__);
 	if (scsi_is_target_device(dev))
 		starget_for_each_device(to_scsi_target(dev), &new_state,
 					device_unblock);

@@ -359,6 +359,8 @@ enum blk_eh_timer_return scsi_timeout(struct request *req)
 	 * If scsi_done() has already set SCMD_STATE_COMPLETE, do not modify
 	 * *scmd.
 	 */
+	pr_err("%s req=%pS scmd=%pS SCMD_STATE_COMPLETE set=%d\n",
+		__func__, req, scmd, test_bit(SCMD_STATE_COMPLETE, &scmd->state));
 	if (test_and_set_bit(SCMD_STATE_COMPLETE, &scmd->state))
 		return BLK_EH_DONE;
 	atomic_inc(&scmd->device->iodone_cnt);
@@ -1904,15 +1906,15 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 {
 	enum scsi_disposition rtn;
 	struct request *req = scsi_cmd_to_rq(scmd);
-
+	struct scsi_device *sdev = scmd->device;
 
 	/*
 	 * if the device is offline, then we clearly just pass the result back
 	 * up to the top level.
 	 */
 	if (!scsi_device_online(scmd->device)) {
-		pr_err("%s scmd=%pS req=%pS scmd=%pS host_byte()=%d get_status_byte()=%d scsi_device_online=%d\n", __func__,
-			scmd, req, scmd, host_byte(scmd->result), get_status_byte(scmd), scsi_device_online(scmd->device));
+		pr_err("%s scmd=%pS req=%pS bio=%pS scmd=%pS host_byte()=%d get_status_byte()=%d sdev_state=%d\n", __func__,
+			scmd, req, scmd, req->bio, host_byte(scmd->result), get_status_byte(scmd), sdev->sdev_state);
 
 		SCSI_LOG_ERROR_RECOVERY(5, scmd_printk(KERN_INFO, scmd,
 			"%s: device offline - report as SUCCESS\n", __func__));
@@ -1981,8 +1983,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 * based on its timers and recovery capablilities if
 		 * there are enough retries.
 		 */
-		pr_err("%s4 DID_TRANSPORT_DISRUPTED scmd=%pS req=%pS bio=%pS\n", __func__,
-			scmd, req, req->bio);
+		pr_err("%s4 DID_TRANSPORT_DISRUPTED scmd=%pS req=%pS bio=%pS scsi_device_online=%d\n", __func__,
+			scmd, req, req->bio, scsi_device_online(scmd->device));
 		goto maybe_retry;
 	case DID_TRANSPORT_FAILFAST:
 		/*
@@ -2096,17 +2098,23 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 maybe_retry:
 	pr_err("%s9 maybe_retry: scmd=%pS req=%pS bio=%pS host_byte()=%d status_byte()=%d FAILFAST_DRIVER=%d retry_allowed=%d\n", "decide_dis",
 			scmd, req, req->bio, host_byte(scmd->result), get_status_byte(scmd), !!(req->cmd_flags & REQ_FAILFAST_DRIVER), scsi_cmd_retry_allowed(scmd));
+	pr_err("%s9.1 maybe_retry:req=%pS bytes=%d bio=%pS bi_size=%d\n", "decide_dis",
+			req, blk_rq_bytes(req), req->bio, req->bio->bi_iter.bi_size);
 
 	/* we requeue for retry because the error was retryable, and
 	 * the request was not marked fast fail.  Note that above,
 	 * even if the request is marked fast fail, we still requeue
 	 * for queue congestion conditions (QUEUE_FULL or BUSY) */
 	if (scsi_cmd_retry_allowed(scmd) && !scsi_noretry_cmd(scmd)) {
+		pr_err("%s9.2 returning NEEDS_RETRY scmd=%pS req=%pS bio=%pS\n",
+			__func__, scmd, req, req->bio);
 		return NEEDS_RETRY;
 	} else {
 		/*
 		 * no more retries - report this one back to upper level.
 		 */
+		pr_err("%s9.3 returning SUCCESS scmd=%pS req=%pS bio=%pS\n",
+			__func__, scmd, req, req->bio);
 		return SUCCESS;
 	}
 }
