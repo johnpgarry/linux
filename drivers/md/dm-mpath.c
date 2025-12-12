@@ -295,17 +295,17 @@ static struct dm_bio_details *get_bio_details_from_mpio(struct dm_mpath_io *mpio
 	return bio_details;
 }
 
-static void multipath_init_per_bio_data(struct bio *bio, struct dm_mpath_io **mpio_p)
+static void multipath_init_per_bio_data(struct bio *clone, struct dm_mpath_io **mpio_p)
 {
-	struct dm_mpath_io *mpio = get_mpio_from_bio(bio);
+	struct dm_mpath_io *mpio = get_mpio_from_bio(clone);
 	struct dm_bio_details *bio_details = get_bio_details_from_mpio(mpio);
 
-	mpio->nr_bytes = bio->bi_iter.bi_size;
+	mpio->nr_bytes = clone->bi_iter.bi_size;
 	mpio->pgpath = NULL;
 	mpio->start_time_ns = 0;
 	*mpio_p = mpio;
 
-	dm_bio_record(bio_details, bio);
+	dm_bio_record(bio_details, clone);
 }
 
 /*
@@ -693,13 +693,13 @@ static int __multipath_map_bio(struct multipath *m, struct bio *bio,
 	return DM_MAPIO_REMAPPED;
 }
 
-static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
+static int multipath_map_bio(struct dm_target *ti, struct bio *clone)
 {
 	struct multipath *m = ti->private;
 	struct dm_mpath_io *mpio = NULL;
 
-	multipath_init_per_bio_data(bio, &mpio);
-	return __multipath_map_bio(m, bio, mpio);
+	multipath_init_per_bio_data(clone, &mpio);
+	return __multipath_map_bio(m, clone, mpio);
 }
 
 static void process_queued_io_list(struct multipath *m)
