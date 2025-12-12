@@ -1158,9 +1158,20 @@ EXPORT_SYMBOL(__blk_mq_end_request);
 
 void blk_mq_end_request(struct request *rq, blk_status_t error)
 {
+	struct bio *bio = rq->bio;
+	if (error && 0)
+		pr_err("%s rq=%pS blk_rq_bytes(rq)=%d bio=%pS bi_size=%d calling blk_update_request bio->bi_iter.bi_size=%d\n", __func__,
+			rq, blk_rq_bytes(rq), rq->bio, rq->bio ? rq->bio->bi_iter.bi_size : -1, bio->bi_iter.bi_size);
 	if (blk_update_request(rq, error, blk_rq_bytes(rq)))
 		BUG();
+	//bio->bi_iter.bi_size is not zero and rq->bio = NULL;
+	if (error && 0)
+		pr_err("%s2 rq=%pS blk_rq_bytes(rq)=%d bio=%pS bi_size=%d calling __blk_mq_end_request  bio->bi_iter.bi_size=%d\n", __func__,
+			rq, blk_rq_bytes(rq), rq->bio, rq->bio ? rq->bio->bi_iter.bi_size : -1, bio->bi_iter.bi_size);
 	__blk_mq_end_request(rq, error);
+	if (error && 0)
+		pr_err("%s3 rq=%pS blk_rq_bytes(rq)=%d bio=%pS bi_size=%d called __blk_mq_end_request  bio->bi_iter.bi_size=%d\n", __func__,
+			rq, blk_rq_bytes(rq), rq->bio, rq->bio ? rq->bio->bi_iter.bi_size : -1, bio->bi_iter.bi_size);
 }
 EXPORT_SYMBOL(blk_mq_end_request);
 

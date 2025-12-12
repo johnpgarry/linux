@@ -1321,7 +1321,7 @@ scsi_device_state_check(struct scsi_device *sdev, struct request *req)
 		return BLK_STS_OK;
 	case SDEV_OFFLINE:
 	case SDEV_TRANSPORT_OFFLINE:
-		pr_err("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE req=%pS bytes=%d bio=%pS\n",
+		pr_err_once("%s2 SDEV_OFFLINE or SDEV_TRANSPORT_OFFLINE req=%pS bytes=%d bio=%pS\n",
 			__func__, req, blk_rq_bytes(req), req->bio);
 		/*
 		 * If the device is offline we refuse to process any
@@ -1845,7 +1845,7 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (unlikely(sdev->sdev_state != SDEV_RUNNING)) {
 		ret = scsi_device_state_check(sdev, req);
 		if (ret != BLK_STS_OK) {
-			pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bytes=%d bio=%pS bi_size=%d req->rq_flags & RQF_DONTPREP=%d\n",
+			pr_err_once("%s1 scsi_device_state_check failed ret=%d req=%pS bytes=%d bio=%pS bi_size=%d req->rq_flags & RQF_DONTPREP=%d\n",
 				__func__, ret, req, blk_rq_bytes(req), req->bio, req->bio->bi_iter.bi_size, !!(req->rq_flags & RQF_DONTPREP));
 			goto out_put_budget;
 		}

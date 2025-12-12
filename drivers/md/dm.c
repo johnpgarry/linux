@@ -90,11 +90,6 @@ struct clone_info {
 	bool submit_as_polled:1;
 };
 
-static inline struct dm_target_io *clone_to_tio(struct bio *clone)
-{
-	return container_of(clone, struct dm_target_io, clone);
-}
-
 void *dm_per_bio_data(struct bio *bio, size_t data_size)
 {
 	if (!dm_tio_flagged(clone_to_tio(bio), DM_TIO_INSIDE_DM_IO))
