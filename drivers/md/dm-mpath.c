@@ -612,7 +612,6 @@ static void multipath_release_clone(struct request *clone,
 static void __multipath_queue_bio(struct multipath *m, struct bio *bio)
 {
 	/* Queue for the daemon to resubmit */
-	pr_err("%s0 bio=%pS\n", __func__, bio);
 	bio_list_add(&m->queued_bios, bio);
 	if (!test_bit(MPATHF_QUEUE_IO, &m->flags)) {
 		pr_err("%s m=%pS current pgpath=%pS bio=%pS bi_size=%d MPATHF_QUEUE_IO not set, calling queue_work process_queued_bios\n",
@@ -1790,7 +1789,6 @@ static int multipath_end_io_bio(struct dm_target *ti, struct bio *clone,
 	unsigned long flags;
 	int r = DM_ENDIO_DONE;
 
-	pr_err("%s clone=%pS\n", __func__, clone);
 	if (*error && blk_path_error(*error))
 		pr_err("%s1 *error=%d BLK_STS_IOERR=%d blk_path_error=%d clone=%pS bi_size=%d mpio->pgpath=%pS m=%pS\n",
 			__func__, *error, BLK_STS_IOERR, blk_path_error(*error), clone, clone->bi_iter.bi_size, pgpath, m);
@@ -1817,8 +1815,7 @@ static int multipath_end_io_bio(struct dm_target *ti, struct bio *clone,
 		}
 		spin_unlock_irqrestore(&m->lock, flags);
 	}
-	pr_err("%s3 calling multipath_queue_bio -> __multipath_queue_bio clone=%pS bi_size=%d pgpath=%pS *error=%d\n",
-			__func__, clone, clone->bi_iter.bi_size, pgpath, *error);
+
 	multipath_queue_bio(m, clone);
 	r = DM_ENDIO_INCOMPLETE;
 done:
