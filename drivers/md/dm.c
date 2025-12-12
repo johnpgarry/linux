@@ -583,6 +583,7 @@ static struct dm_io *alloc_io(struct mapped_device *md, struct bio *bio, gfp_t g
 	tio->io = NULL;
 
 	io = container_of(tio, struct dm_io, tio);
+	pr_err("%s clone=%pS bio=%pS io=%pS tio=%pS called bio_alloc_clone\n", __func__, clone, bio, io, tio);
 	io->magic = DM_IO_MAGIC;
 	io->status = BLK_STS_OK;
 	io->requeue_flush_with_data = false;
@@ -622,9 +623,12 @@ static struct bio *alloc_tio(struct clone_info *ci, struct dm_target *ti,
 		tio = &ci->io->tio;
 		/* alloc_io() already initialized embedded clone */
 		clone = &tio->clone;
+		pr_err("%s1 clone=%pS ci->bio=%pS\n", __func__, clone, ci->bio);
 	} else {
 		clone = bio_alloc_clone(NULL, ci->bio, gfp_mask,
 					&md->mempools->bs);
+
+		pr_err("%s2 clone=%pS ci->bio=%pS\n", __func__, clone, ci->bio);
 		if (!clone)
 			return NULL;
 
@@ -946,6 +950,8 @@ static void __dm_io_complete(struct dm_io *io, bool first_stage)
 	bool requeued;
 	bool requeue_flush_with_data;
 
+	pr_err("%s bio = io->orig_bio=%pS\n", __func__, bio);
+
 	requeued = dm_handle_requeue(io, first_stage);
 	if (requeued && first_stage)
 		return;
@@ -985,6 +991,7 @@ static void __dm_io_complete(struct dm_io *io, bool first_stage)
 		/* done with normal IO or empty flush */
 		if (io_error)
 			bio->bi_status = io_error;
+		pr_err("%s2 calling bio_endio bio=%pS\n", __func__, bio);
 		bio_endio(bio);
 	}
 }
@@ -1032,6 +1039,7 @@ static inline void dm_io_complete(struct dm_io *io)
 	 * Also flush data dm_io won't be marked as DM_IO_WAS_SPLIT, so they
 	 * also aren't handled via the first stage requeue.
 	 */
+	pr_err("%s calling __dm_io_complete io->orig_bio=%pS\n", __func__, io->orig_bio);
 	__dm_io_complete(io, dm_io_flagged(io, DM_IO_WAS_SPLIT));
 }
 
@@ -1041,8 +1049,11 @@ static inline void dm_io_complete(struct dm_io *io)
  */
 static inline void __dm_io_dec_pending(struct dm_io *io)
 {
-	if (atomic_dec_and_test(&io->io_count))
+	if (atomic_dec_and_test(&io->io_count)) {
+		pr_err("%s calling dm_io_complete io->orig_bio=%pS\n",
+			__func__, io->orig_bio);
 		dm_io_complete(io);
+	}
 }
 
 static void dm_io_set_error(struct dm_io *io, blk_status_t error)
@@ -1063,6 +1074,8 @@ static void dm_io_dec_pending(struct dm_io *io, blk_status_t error)
 	if (unlikely(error))
 		dm_io_set_error(io, error);
 
+	pr_err("%s calling dm_io_complete io->orig_bio=%pS\n",
+			__func__, io->orig_bio);
 	__dm_io_dec_pending(io);
 }
 
@@ -1089,6 +1102,7 @@ static void clone_endio(struct bio *bio)
 	struct dm_io *io = tio->io;
 	struct mapped_device *md = io->md;
 
+	pr_err("%s bio=%pS endio=%pS\n", __func__, bio, endio);
 	if (error)
 		pr_err("%s bio=%pS bi_size=%d error=%d\n", __func__,
 			bio, bio->bi_iter.bi_size, error);
@@ -1140,6 +1154,7 @@ static void clone_endio(struct bio *bio)
 		up(&md->swap_bios_semaphore);
 
 	free_tio(bio);
+	pr_err("%s1 calling bio=%pS endio=%pS io->orig_bio=%pS\n", __func__, bio, endio, io->orig_bio);
 	dm_io_dec_pending(io, error);
 }
 
@@ -1364,6 +1379,7 @@ void dm_submit_bio_remap(struct bio *clone, struct bio *tgt_clone)
 	struct dm_io *io = tio->io;
 
 	/* establish bio that will get submitted */
+	pr_err("%s tgt_clone=%pS clone=%pS calling submit_bio_noacct\n", __func__, tgt_clone, clone);
 	if (!tgt_clone)
 		tgt_clone = clone;
 
@@ -2039,6 +2055,8 @@ send_preflush_with_data:
 	bio_trim(bio, io->sectors, ci.sector_count);
 	trace_block_split(bio, bio->bi_iter.bi_sector);
 	bio_inc_remaining(bio);
+
+	pr_err("%s bio=%pS calling submit_bio_noacct\n", __func__, bio);
 	submit_bio_noacct(bio);
 out:
 	/*
@@ -2055,6 +2073,7 @@ out:
 		 */
 		if (error)
 			atomic_dec(&io->io_count);
+		pr_err("%s2 bio=%pS calling dm_io_dec_pending\n", __func__, bio);
 		dm_io_dec_pending(io, error);
 	} else
 		dm_queue_poll_io(bio, io);
@@ -2066,6 +2085,7 @@ static void dm_submit_bio(struct bio *bio)
 	int srcu_idx;
 	struct dm_table *map;
 
+	pr_err("%s bio=%pS bi_end_io=%pS\n", __func__, bio, bio->bi_end_io);
 	map = dm_get_live_table(md, &srcu_idx);
 	if (unlikely(!map)) {
 		DMERR_LIMIT("%s: mapping table unavailable, erroring io",
@@ -2834,6 +2854,7 @@ static void dm_wq_work(struct work_struct *work)
 		if (!bio)
 			break;
 
+		pr_err("%s calling bio=%pS\n", __func__, bio);
 		submit_bio_noacct(bio);
 		cond_resched();
 	}
