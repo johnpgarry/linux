@@ -12,6 +12,7 @@
 #include "dm-bio-record.h"
 #include "dm-path-selector.h"
 #include "dm-uevent.h"
+#include "dm-core.h"
 
 #include <linux/blkdev.h>
 #include <linux/ctype.h>
@@ -739,7 +740,10 @@ static void process_queued_bios(struct work_struct *work)
 	blk_start_plug(&plug);
 	while ((bio = bio_list_pop(&bios))) {
 		struct dm_mpath_io *mpio = get_mpio_from_bio(bio);
-		pr_err("%s0 m=%pS bio=%pS bi_size=%d\n", __func__, m, bio, bio->bi_iter.bi_size);
+		struct dm_target_io *tio = clone_to_tio(bio);
+		struct dm_io *io = tio->io;
+		pr_err("%s0 m=%pS bio=%pS bi_size=%d orig_bio=%pS\n",
+			__func__, m, bio, bio->bi_iter.bi_size, io->orig_bio);
 
 		dm_bio_restore(get_bio_details_from_mpio(mpio), bio);
 		pr_err("%s0.1 m=%pS bio=%pS bi_size=%d called dm_bio_restore\n", __func__, m, bio, bio->bi_iter.bi_size);
@@ -1792,13 +1796,13 @@ static int multipath_end_io_bio(struct dm_target *ti, struct bio *clone,
 	int r = DM_ENDIO_DONE;
 
 	if (*error && blk_path_error(*error))
-		pr_err("%s1 *error=%d BLK_STS_IOERR=%d blk_path_error=%d clone=%pS bi_size=%d mpio->pgpath=%pS m=%pS\n",
+		pr_err_once("%s1 *error=%d BLK_STS_IOERR=%d blk_path_error=%d clone=%pS bi_size=%d mpio->pgpath=%pS m=%pS\n",
 			__func__, *error, BLK_STS_IOERR, blk_path_error(*error), clone, clone->bi_iter.bi_size, pgpath, m);
 	if (!*error || !blk_path_error(*error))
 		goto done;
 
 	if (pgpath) {
-		pr_err("%s2 calling fail_path clone=%pS bi_size=%d pgpath=%pS *error=%d\n",
+		pr_err_once("%s2 calling fail_path clone=%pS bi_size=%d pgpath=%pS *error=%d\n",
 			__func__, clone, clone->bi_iter.bi_size, pgpath, *error);
 		fail_path(pgpath);
 	}
