@@ -26,6 +26,7 @@
 #include <linux/uio.h>
 #include <linux/hdreg.h>
 #include <linux/delay.h>
+#include <linux/atomic.h>
 #include <linux/wait.h>
 #include <linux/pr.h>
 #include <linux/refcount.h>
@@ -578,6 +579,29 @@ static struct dm_io *alloc_io(struct mapped_device *md, struct bio *bio, gfp_t g
 	tio->io = NULL;
 
 	io = container_of(tio, struct dm_io, tio);
+
+	//pr_err("%s clone=%pS bio=%pS io=%pS tio=%pS called bio_alloc_clone\n", __func__, clone, bio, io, tio);
+	if (clone->bi_flags != (bio->bi_flags | 1 << BIO_CLONED)) {
+		pr_err_once("%s1 clone->bi_flags=0x%x bio->bi_flags=0x%x\n",
+			__func__, clone->bi_flags, bio->bi_flags);
+	//	BUG(); bi_flags is in herited
+	}
+	if (memcmp(&clone->bi_iter, &bio->bi_iter, sizeof(struct bvec_iter))) {
+		pr_err("%s2 clone->bi_iter differ\n",
+			__func__);
+		BUG();
+	}
+	if (atomic_read(&clone->__bi_remaining) != atomic_read(&bio->__bi_remaining)) {
+		pr_err("%s3 clone->__bi_remaining=%d bio->__bi_remaining=%d\n",
+			__func__, atomic_read(&clone->__bi_remaining), atomic_read(&bio->__bi_remaining));
+		BUG();
+	}
+	if (clone->bi_end_io != bio->bi_end_io) {
+		pr_err_once("%s4 clone->bi_end_io=%pS bio->bi_end_io=%pS\n",
+			__func__, clone->bi_end_io, bio->bi_end_io);
+		// clone->bi_end_io=0x0 bio->bi_end_io=mpage_read_end_io+0x0/0x120
+		//BUG();
+	}
 	io->magic = DM_IO_MAGIC;
 	io->status = BLK_STS_OK;
 	io->requeue_flush_with_data = false;
