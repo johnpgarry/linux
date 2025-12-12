@@ -1584,7 +1584,7 @@ static void scsi_complete(struct request *rq)
 
 	__maybe_unused bool is_flush = rq->rq_flags & RQF_FLUSH_SEQ;
 	if (is_mpath_request(rq) && cmd->result)
-		pr_err("%s cmd=%pS rq=%pS\n", __func__, cmd, rq);
+		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS\n", __func__, cmd, rq, blk_rq_bytes(rq), rq->bio);
 
 
 //	if (rq->cmd_flags & REQ_SCSI_MPATH)
@@ -1600,23 +1600,23 @@ static void scsi_complete(struct request *rq)
 
 	disposition = scsi_decide_disposition(cmd);
 	if (disposition != SUCCESS && is_mpath_request(rq)) {
-		pr_err("%s0 disposition=0x%x rq=%pS bio=%pS\n",
-			__func__, disposition, rq, rq->bio);
+	//	pr_err("%s0 disposition=0x%x rq=%pS bio=%pS\n",
+	//		__func__, disposition, rq, rq->bio);
 	}
 	if (disposition != SUCCESS && disposition != FAILOVER && scsi_cmd_runtime_exceeced(cmd)) {
-		pr_err("%s0.1 disposition=0x%x rq=%pS bio=%pS scsi_cmd_runtime_exceeced setting SUCCESS\n",
-				__func__, disposition, rq, rq->bio);
+	//	pr_err("%s0.1 disposition=0x%x rq=%pS bio=%pS scsi_cmd_runtime_exceeced setting SUCCESS\n",
+	//			__func__, disposition, rq, rq->bio);
 		disposition = SUCCESS;
 	}
-	if (disposition != SUCCESS && is_mpath_request(rq))
-		pr_err("%s0.2 disposition=0x%x rq=%pS bio=%pS\n",
-			__func__, disposition, rq, rq->bio);
+	//if (disposition != SUCCESS && is_mpath_request(rq))
+	//	pr_err("%s0.2 disposition=0x%x rq=%pS bio=%pS\n",
+	//		__func__, disposition, rq, rq->bio);
 
 	scsi_log_completion(cmd, disposition);
 
-	if (disposition != SUCCESS && is_mpath_request(rq))
-		pr_err("%s1 disposition=0x%x rq=%pS bio=%pS\n",
-			__func__, disposition, rq, rq->bio);
+//	if (disposition != SUCCESS && is_mpath_request(rq))
+//		pr_err("%s1 disposition=0x%x rq=%pS bio=%pS\n",
+//			__func__, disposition, rq, rq->bio);
 
 	switch (disposition) {
 	case SUCCESS:
@@ -1796,8 +1796,8 @@ static void scsi_done_internal(struct scsi_cmnd *cmd, bool complete_directly)
 	struct bio *bio = req->bio;
 
 	if (is_mpath_request(req) && cmd->result)
-		pr_err("%s cmd=%pS req=%pS complete_directly=%d bio=%pS cmd->result=0x%x\n",
-			__func__, cmd, req, complete_directly, bio, cmd->result);
+		pr_err("%s cmd=%pS req=%pS complete_directly=%d bio=%pS cmd->result=0x%x DID_TRANSPORT_DISRUPTED=0x%x\n",
+			__func__, cmd, req, complete_directly, bio, cmd->result, DID_TRANSPORT_DISRUPTED);
 
 	switch (cmd->submitter) {
 	case SUBMITTED_BY_BLOCK_LAYER:
@@ -1807,21 +1807,21 @@ static void scsi_done_internal(struct scsi_cmnd *cmd, bool complete_directly)
 	case SUBMITTED_BY_SCSI_RESET_IOCTL:
 		return;
 	}
-	if (is_mpath_request(req) && cmd->result)
-			pr_err("%s2 cmd=%pS req=%pS bio=%pS\n", __func__, cmd, req, bio);
+//	if (is_mpath_request(req) && cmd->result)
+//			pr_err("%s2 cmd=%pS req=%pS bio=%pS\n", __func__, cmd, req, bio);
 	if (unlikely(blk_should_fake_timeout(scsi_cmd_to_rq(cmd)->q)))
 		return;
-	if (is_mpath_request(req) && cmd->result)
-		pr_err("%s3 cmd=%pS req=%pS SCMD_STATE_COMPLETE set=%d bio\n",
-			__func__, cmd, req, test_bit(SCMD_STATE_COMPLETE, &cmd->state));
+//	if (is_mpath_request(req) && cmd->result)
+//		pr_err("%s3 cmd=%pS req=%pS SCMD_STATE_COMPLETE set=%d bio\n",
+//			__func__, cmd, req, test_bit(SCMD_STATE_COMPLETE, &cmd->state));
 	if (unlikely(test_and_set_bit(SCMD_STATE_COMPLETE, &cmd->state)))
 		return;
-	if (is_mpath_request(req) && cmd->result)
-		pr_err("%s4 cmd=%pS req=%pS calling trace_scsi_dispatch_cmd_done\n", __func__, cmd, req);
+//	if (is_mpath_request(req) && cmd->result)
+//		pr_err("%s4 cmd=%pS req=%pS calling trace_scsi_dispatch_cmd_done\n", __func__, cmd, req);
 	trace_scsi_dispatch_cmd_done(cmd);
 
-	if (is_mpath_request(req) && cmd->result)
-		pr_err("%s5 cmd=%pS req=%pS req->q=%pS bio=%pS called trace_scsi_dispatch_cmd_done\n", __func__, cmd, req, req->q, bio);
+//	if (is_mpath_request(req) && cmd->result)
+//		pr_err("%s5 cmd=%pS req=%pS req->q=%pS bio=%pS called trace_scsi_dispatch_cmd_done\n", __func__, cmd, req, req->q, bio);
 //	if (is_mpath_request(req) && cmd->result)
 //		pr_err("%s5.1 cmd=%pS req=%pS req->q->mq_ops=%pS bio=%pS\n", __func__, cmd, req, req->q->mq_ops, bio);
 //	if (is_mpath_request(req) && cmd->result)
