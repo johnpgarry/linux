@@ -1012,6 +1012,10 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head);
 void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
 
+int nvme_mpath_report_zones(struct mpath_device *mpath_device, sector_t sector,
+		unsigned int nr_zones, struct blk_report_zones_args *args);
+
+
 static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;

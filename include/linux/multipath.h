@@ -89,6 +89,8 @@ struct mpath_head_template {
 	int (*get_unique_id)(struct mpath_device *, u8 id[16], enum blk_unique_id type);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg);
+	int (*report_zones)(struct mpath_device *, sector_t sector,
+		unsigned int nr_zones, struct blk_report_zones_args *args);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct attribute_group **device_groups;
 };

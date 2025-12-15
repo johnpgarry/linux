@@ -3972,6 +3972,9 @@ const struct mpath_head_template mpdt = {
 	.get_unique_id = nvme_mpath_get_unique_id,
 	.ioctl = nvme_mpath_ioctl,
 	.device_groups = nvme_ns_attr_groups,
+	#ifdef CONFIG_BLK_DEV_ZONED
+	.report_zones = nvme_mpath_report_zones,
+	#endif
 };
 
 static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,

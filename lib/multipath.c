@@ -414,6 +414,28 @@ out_unlock:
 	return err;
 }
 
+#ifdef CONFIG_BLK_DEV_ZONED
+static int mpath_report_zones(struct gendisk *disk, sector_t sector,
+		unsigned int nr_zones, struct blk_report_zones_args *args)
+{
+	struct mpath_head *mpath_head = disk->private_data;
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	if (!mpath_head->mpdt->report_zones)
+		return -EOPNOTSUPP;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device)
+		ret = mpath_head->mpdt->report_zones(mpath_device, sector, nr_zones, args);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	return ret;
+}
+#else
+#define mpath_report_zones	NULL
+#endif /* CONFIG_BLK_DEV_ZONED */
+
 const struct block_device_operations mpath_ops = {
 	.owner          = THIS_MODULE,
 	.submit_bio	= multipath_submit_bio,
@@ -421,6 +443,7 @@ const struct block_device_operations mpath_ops = {
 	.release	= mpath_release,
 	.ioctl			= mpath_ioctl,
 	.get_unique_id	= mpath_get_unique_id,
+	.report_zones	= mpath_report_zones,
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 
