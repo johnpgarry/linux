@@ -2064,14 +2064,10 @@ out_put_budget:
 		 * again.
 		 */
 		if (!scsi_device_online(sdev) && is_mpath_request(req)) {
-			pr_err("%s10.7 calling scsi_done req=%pS cmd=%pS bio=%pS\n", __func__, req, cmd, req->bio);
-			clear_bit(SCMD_STATE_COMPLETE, &cmd->state);
-			scsi_done(cmd);
+			pr_err("%s10.7 calling scsi_mpath_failover_req ret=%d req=%pS bio=%pS\n",
+				__func__, ret, req, req->bio);
+			scsi_mpath_failover_req(req);
 			return 0;
-		//	pr_err("%s10.7 calling scsi_mpath_failover_req ret=%d req=%pS bio=%pS\n",
-		//		__func__, ret, req, req->bio);
-		//	scsi_mpath_failover_req(req);
-		//	return 0;
 		}
 		break;
 	}
