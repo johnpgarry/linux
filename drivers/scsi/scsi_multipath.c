@@ -314,20 +314,20 @@ void scsi_mpath_failover_req(struct request *req)
 	blk_steal_bios(&mpath_head->requeue_list, req);
 	#else
 	bio_list_add(&mpath_head->requeue_list, master_bio);
-	req->bio = NULL;
-	req->biotail = NULL;
-	req->__data_len = 0;
 	#endif
 
 	spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
-	/* this is a cloned bio */
-	bio_put(clone);
 
+	/* End old request with clone detached and then release that io */
+	req->bio = NULL;
+	req->biotail = NULL;
+	req->__data_len = 0;
+	blk_mq_end_request(req, 0);
+	bio_put(clone);
 
 	scmd->result = 0;
 //	pr_err("%s5 req=%pS bio=%pS calling blk_mq_end_request\n",
 //		__func__, req, req->bio);
-	blk_mq_end_request(req, 0);
 //	pr_err("%s5.1 req=%pS bio=%pS called blk_mq_end_request, calling kblockd_schedule_work\n",
 //		__func__, req, req->bio);
 
