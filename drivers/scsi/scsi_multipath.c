@@ -254,19 +254,26 @@ void scsi_mpath_failover_req(struct request *req)
 {
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = scmd->device;
-	struct Scsi_Host *shost = scmd->device->host;
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	struct gendisk *disk = mpath_head->disk;
 	//struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	unsigned long flags;
-	struct bio *bio = req->bio;
+	struct bio *clone = req->bio;
+	struct bio *bio_loop; 
 
-	pr_err("%s req=%pS bio=%pS scsi_device_online=%d sdev->was_reset=%d sdev->locked=%d mpath_device=%pS shost=%pS\n",
-		__func__, req, req->bio, scsi_device_online(sdev), sdev->was_reset, sdev->locked, mpath_device, shost);
-	pr_err("%s1 req=%pS blk_rq_bytes=%d bio=%pS bi_iter.bi_size=%d bio->bi_next=%pS calling mpath_clear_current_path\n",
-		__func__, req, blk_rq_bytes(req), bio, bio->bi_iter.bi_size, bio->bi_next);
+	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
+	struct bio *master_bio;
+
+	scsi_mpath_clone_bio = container_of(clone, struct scsi_mpath_clone_bio, clone);
+	master_bio = scsi_mpath_clone_bio->master_bio;
+
+
+	pr_err("%s req=%pS clone=%pS master_bio=%pS online=%d was_reset=%d locked=%d mpath_device=%pS\n",
+		__func__, req, clone, master_bio, scsi_device_online(sdev), sdev->was_reset, sdev->locked, mpath_device);
+	pr_err("%s1 req=%pS blk_rq_bytes=%d clone=%pS bi_iter.bi_size=%d clone->bi_next=%pS\n",
+		__func__, req, blk_rq_bytes(req), clone, clone->bi_iter.bi_size, clone->bi_next);
 
 //	if (!scsi_device_online(sdev) || sdev->was_reset || sdev->locked)
 //		return;
@@ -278,18 +285,18 @@ void scsi_mpath_failover_req(struct request *req)
 	 * ready to process command. kick off a requeue of scsi command and try
 	 * other available path
 	 */
-	pr_err("%s2 req=%pS bio=%pS scsi_is_mpath_error=%d mpath_device=%pS calling mpath_clear_current_path\n",
-		__func__, req, req->bio, scsi_is_mpath_error(scmd), mpath_device);
+//	pr_err("%s2 req=%pS clone=%pS scsi_is_mpath_error=%d mpath_device=%pS calling mpath_clear_current_path\n",
+//		__func__, req, clone, scsi_is_mpath_error(scmd), mpath_device);
 	if (scsi_is_mpath_error(scmd)) {
 		/*
 		 * Set flag as pending and requeue bio for retry on
 		 * another path
 		 */
-		pr_err("%s3 req=%pS bio=%pS scsi_is_mpath_error=%d mpath_device=%pS mpath_head=%pS\n",
-		__func__, req, req->bio, scsi_is_mpath_error(scmd), mpath_device, mpath_head);
+//		pr_err("%s3 req=%pS clone=%pS scsi_is_mpath_error=%d mpath_device=%pS mpath_head=%pS\n",
+//		__func__, req, clone, scsi_is_mpath_error(scmd), mpath_device, mpath_head);
 	//	set_bit(SCSI_MPATH_DEVICE_IO_PENDING, &scsi_mpath_dev->flags);
-		pr_err("%s3.1 req=%pS bytes=%d bio=%pS bi_size=%d scsi_is_mpath_error=%d mpath_device=%pS shost->work_q=%pS\n",
-		__func__, req, blk_rq_bytes(req), req->bio, req->bio->bi_iter.bi_size, scsi_is_mpath_error(scmd), mpath_device, shost->work_q);
+//		pr_err("%s3.1 req=%pS bytes=%d clone=%pS bi_size=%d scsi_is_mpath_error=%d mpath_device=%pS shost->work_q=%pS\n",
+//		__func__, req, blk_rq_bytes(req), clone, clone->bi_iter.bi_size, scsi_is_mpath_error(scmd), mpath_device, shost->work_q);
 	//	queue_work(shost->work_q, &mpath_head->requeue_work);
 	}
 
@@ -298,25 +305,31 @@ void scsi_mpath_failover_req(struct request *req)
 	 * operation, if yes, then clear polled reqeust and reqeue bio
 	 */
 	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
-	for (bio = req->bio; bio; bio = bio->bi_next) {
-		pr_err("%s4 looping bio=%pS bi_size=%d bio->bi_bdev=%pS req->q->disk->part0=%pS disk->part0=%pS\n",
-			__func__, bio, bio->bi_iter.bi_size, bio->bi_bdev, req->q->disk->part0, disk->part0);
-		bio_set_dev(bio, disk->part0);
-		if (bio->bi_opf & REQ_POLLED) {
-			bio->bi_opf &= ~REQ_POLLED;
-			bio->bi_cookie = BLK_QC_T_NONE;
-		}
+	for (bio_loop = master_bio; bio_loop; bio_loop = bio_loop->bi_next) {
+	//	pr_err("%s4 looping bio_loop=%pS bi_size=%d bio_loop->bi_bdev=%pS part0=%pS disk->part0=%pS\n",
+	//		__func__, bio_loop, bio_loop->bi_iter.bi_size, bio_loop->bi_bdev, part0, disk->part0);
+		BUG_ON(bio_loop->bi_bdev != disk->part0);
 	}
+	#ifdef dssda_old
 	blk_steal_bios(&mpath_head->requeue_list, req);
+	#else
+	bio_list_add(&mpath_head->requeue_list, master_bio);
+	req->bio = NULL;
+	req->biotail = NULL;
+	req->__data_len = 0;
+	#endif
+
 	spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
+	/* this is a cloned bio */
+	bio_put(clone);
 
 
 	scmd->result = 0;
-	pr_err("%s5 req=%pS bio=%pS calling blk_mq_end_request\n",
-		__func__, req, req->bio);
+//	pr_err("%s5 req=%pS bio=%pS calling blk_mq_end_request\n",
+//		__func__, req, req->bio);
 	blk_mq_end_request(req, 0);
-	pr_err("%s5.1 req=%pS bio=%pS called blk_mq_end_request, calling kblockd_schedule_work\n",
-		__func__, req, req->bio);
+//	pr_err("%s5.1 req=%pS bio=%pS called blk_mq_end_request, calling kblockd_schedule_work\n",
+//		__func__, req, req->bio);
 
 	kblockd_schedule_work(&mpath_head->requeue_work);
 }

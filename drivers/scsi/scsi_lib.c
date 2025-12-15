@@ -1953,8 +1953,8 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 			ret = scsi_device_state_check(sdev, req);
 			if (ret != BLK_STS_OK) {
 
-			pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bytes=%d bio=%pS req->rq_flags & RQF_DONTPREP=%d\n",
-				__func__, ret, req, blk_rq_bytes(req), req->bio, !!(req->rq_flags & RQF_DONTPREP));
+				//pr_err("%s1 scsi_device_state_check failed ret=%d req=%pS bytes=%d bio=%pS req->rq_flags & RQF_DONTPREP=%d\n",
+				//	__func__, ret, req, blk_rq_bytes(req), req->bio, !!(req->rq_flags & RQF_DONTPREP));
 				goto out_put_budget;
 			}
 		}
@@ -2036,7 +2036,7 @@ out_dec_target_busy:
 	if (scsi_target(sdev)->can_queue > 0)
 		atomic_dec(&scsi_target(sdev)->target_busy);
 out_put_budget:
-	pr_err("%s10.0 out_put_budget: ret=%d req=%pS bio=%pS\n", __func__, ret, req, req->bio);
+//	pr_err("%s10.0 out_put_budget: ret=%d req=%pS bio=%pS\n", __func__, ret, req, req->bio);
 	scsi_mq_put_budget(q, cmd->budget_token);
 	cmd->budget_token = -1;
 	switch (ret) {
@@ -2052,8 +2052,8 @@ out_put_budget:
 			scsi_mq_uninit_cmd(cmd);
 		break;
 	default:
-		pr_err("%s10.6 default: ret=%d req=%pS bio=%pS scsi_device_online=%d\n",
-			__func__, ret, req, req->bio, scsi_device_online(sdev));
+	//	pr_err("%s10.6 default: ret=%d req=%pS bio=%pS scsi_device_online=%d\n",
+		//	__func__, ret, req, req->bio, scsi_device_online(sdev));
 		if (unlikely(!scsi_device_online(sdev)))
 			cmd->result = DID_NO_CONNECT << 16;
 		else

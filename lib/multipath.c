@@ -61,7 +61,7 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device)
 	bool changed = false;
 	int node;
 
-	pr_err("%s mpath_device=%pS\n", __func__, mpath_device);
+//	pr_err("%s mpath_device=%pS\n", __func__, mpath_device);
 	if (!mpath_head)
 		return changed;
 
@@ -303,17 +303,17 @@ static void multipath_submit_bio(struct bio *bio)
 	 * need to use bio_split pool from the original queue to
 	 * allocate the bvecs from.
 	 */
-	if (special)
-		pr_err("%s bio=%pS bi_size=%d mpath_head=%pS bio->bi_bdev=%pS\n",
-			__func__, bio, bio->bi_iter.bi_size, mpath_head, bio->bi_bdev);
+//	if (special)
+//		pr_err("%s bio=%pS bi_size=%d mpath_head=%pS bio->bi_bdev=%pS\n",
+//			__func__, bio, bio->bi_iter.bi_size, mpath_head, bio->bi_bdev);
 	if (special && bio->bi_iter.bi_size != SZ_16K)
 		pr_err("%s0 bio=%pS bi_size=%d mpath_head=%pS bio->bi_bdev=%pS\n",
 			__func__, bio, bio->bi_iter.bi_size, mpath_head, bio->bi_bdev);
 
 	bio = bio_split_to_limits(bio);
-	if (special)
-		pr_err("%s1 bio=%pS mpath_head=%pS called bio_split_to_limits\n",
-			__func__, bio, mpath_head);
+	//if (special)
+	//	pr_err("%s1 bio=%pS mpath_head=%pS called bio_split_to_limits\n",
+	//		__func__, bio, mpath_head);
 	if (!bio)
 		return;
 
@@ -325,20 +325,20 @@ static void multipath_submit_bio(struct bio *bio)
 	}
 	if (likely(mpath_device)) {
 		bio->bi_opf |= REQ_MPATH;
-		if (special)
-			pr_err("%s3.0 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS clone_bio=%pS\n",
-				__func__, bio, bio->bi_bdev, mpath_device, mpath_head->mpdt->clone_bio);
+	//	if (special)
+	//		pr_err("%s3.0 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS clone_bio=%pS\n",
+	//			__func__, bio, bio->bi_bdev, mpath_device, mpath_head->mpdt->clone_bio);
 		if (mpath_head->mpdt->clone_bio)
 			bio = mpath_head->mpdt->clone_bio(bio);
 		bio_set_dev(bio, mpath_device->disk->part0);
 		atomic_inc(&mpath_device->nr_total);
-		if (special)
-			pr_err("%s3.1 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS\n",
-				__func__, bio, bio->bi_bdev, mpath_device);
+	//	if (special)
+	//		pr_err("%s3.1 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS\n",
+	//			__func__, bio, bio->bi_bdev, mpath_device);
 		submit_bio_noacct(bio);
-		if (special)
-			pr_err("%s4 bio=%pS called submit_bio_noacct\n",
-				__func__, bio);
+	//	if (special)
+	//		pr_err("%s4 bio=%pS called submit_bio_noacct\n",
+	//			__func__, bio);
 	//	BUG();
 	} else if (mpath_available_path(mpath_head)) {
 		pr_err("No Usable Path - Requeing I/O calling bio_list_add requeue_list bio=%pS\n", bio);
@@ -565,8 +565,7 @@ void mpath_requeue_work(struct work_struct *work)
 		next = bio->bi_next;
 		bio->bi_next = NULL;
 		bio->printed = 1;
-		pr_err("%s2 mpath_head=%pS bio=%pS calling submit_bio_noacct bio->bi_bdev=%pS\n",
-			__func__, mpath_head, bio, bio->bi_bdev);
+		pr_err("%s2 bio=%pS bi_size=%d\n", __func__, bio, bio->bi_iter.bi_size);
 		submit_bio_noacct(bio);
 	}
 }
