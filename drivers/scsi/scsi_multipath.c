@@ -10,6 +10,8 @@
 #include <linux/moduleparam.h>
 #include <linux/topology.h>
 #include <linux/kmemleak.h>
+#include <linux/hdreg.h>
+#include <linux/sysfs.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_dh.h>
 #include <scsi/scsi_proto.h>
@@ -20,7 +22,6 @@
 #include "scsi_alua.h"
 #include "scsi_priv.h"
 
-#include <linux/sysfs.h>
 
 static DEFINE_IDA(scsi_mpath_index_ida);
 

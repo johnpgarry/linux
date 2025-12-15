@@ -7,6 +7,7 @@
 #include <linux/moduleparam.h>
 #include <linux/topology.h>
 #include <linux/multipath.h>
+#include <linux/hdreg.h>
 
 static int mpath_head_add_cdev(struct mpath_head *mpath_head);
 static void mpath_free_disk(struct kref *ref);
@@ -436,6 +437,17 @@ static int mpath_report_zones(struct gendisk *disk, sector_t sector,
 #define mpath_report_zones	NULL
 #endif /* CONFIG_BLK_DEV_ZONED */
 
+static int mpath_getgeo(struct gendisk *disk, struct hd_geometry *geo)
+{
+	/* some standard values */
+	/* TODO: find a way to hook this into sd_getgeo() */
+	geo->heads = 1 << 6;
+	geo->sectors = 1 << 5;
+	geo->cylinders = get_capacity(disk) >> 11;
+
+	return 0;
+}
+
 const struct block_device_operations mpath_ops = {
 	.owner          = THIS_MODULE,
 	.submit_bio	= multipath_submit_bio,
@@ -444,6 +456,7 @@ const struct block_device_operations mpath_ops = {
 	.ioctl			= mpath_ioctl,
 	.get_unique_id	= mpath_get_unique_id,
 	.report_zones	= mpath_report_zones,
+	.getgeo		= mpath_getgeo,
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 
