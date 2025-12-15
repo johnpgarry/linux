@@ -434,6 +434,7 @@ static void scsi_mpath_clone_end_io(struct bio *clone)
 		__func__, clone, scsi_mpath_clone_bio, master_bio, clone->bi_status);
 
 	master_bio->bi_status = clone->bi_status;
+	bio_put(clone);
 	bio_endio(master_bio);
 }
 
