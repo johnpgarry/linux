@@ -805,8 +805,11 @@ static int nvme_lookup_ana_group_desc(struct nvme_ctrl *ctrl,
 
 void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 {
+
 	pr_err("%s ns=%pS anagrpid=0x%x nvme_ctrl_use_ana=%d\n",
 		__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl));
+	struct mpath_head *mpath_head = mpath_priv_to_head(ns_to_head(ns));
+
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
 		struct nvme_ana_group_desc desc = {
 			.grpid = anagrpid,
@@ -840,8 +843,8 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 	}
 
 #ifdef CONFIG_BLK_DEV_ZONED
-	if (blk_queue_is_zoned(ns->queue) && ns_to_head(ns)->disk)
-		ns_to_head(ns)->disk->nr_zones = ns->disk->nr_zones;
+	if (blk_queue_is_zoned(ns->queue) && mpath_head->disk)
+		mpath_head->disk->nr_zones = ns->disk->nr_zones;
 #endif
 }
 
