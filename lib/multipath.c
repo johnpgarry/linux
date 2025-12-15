@@ -295,7 +295,7 @@ static void multipath_submit_bio(struct bio *bio)
 
 	if (bio->printed)
 		special = true;
-	special = true;
+	//special = true;
 
 	/*
 	 * The scsi device might be going away and the bio might be

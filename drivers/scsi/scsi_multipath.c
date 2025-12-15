@@ -430,8 +430,8 @@ static void scsi_mpath_clone_end_io(struct bio *clone)
 	scsi_mpath_clone_bio = container_of(clone, struct scsi_mpath_clone_bio, clone);
 	master_bio = scsi_mpath_clone_bio->master_bio;
 
-	pr_err("%s clone=%pS scsi_mpath_clone_bio=%pS master_bio=%pS clone->bi_status=%d\n",
-		__func__, clone, scsi_mpath_clone_bio, master_bio, clone->bi_status);
+//	pr_err("%s clone=%pS scsi_mpath_clone_bio=%pS master_bio=%pS clone->bi_status=%d\n",
+//		__func__, clone, scsi_mpath_clone_bio, master_bio, clone->bi_status);
 
 	master_bio->bi_status = clone->bi_status;
 	bio_put(clone);
@@ -446,18 +446,18 @@ static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 	struct bio *clone;
 	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
 
-	pr_err_once("%s bio=%pS bdev=%pS\n",
-		__func__, bio, bdev);
+	//pr_err_once("%s bio=%pS bdev=%pS\n",
+	//	__func__, bio, bdev);
 	bd_disk = bdev->bd_disk;
-	pr_err_once("%s1 bio=%pS bdev=%pS bd_disk=%pS\n",
-		__func__, bio, bdev, bd_disk);
+	//pr_err_once("%s1 bio=%pS bdev=%pS bd_disk=%pS\n",
+	//	__func__, bio, bdev, bd_disk);
 	mpath_head = bd_disk->private_data;
-	pr_err_once("%s2 bio=%pS bdev=%pS bd_disk=%pS mpath_head=%pS\n",
-		__func__, bio, bdev, bd_disk, mpath_head);
+	//pr_err_once("%s2 bio=%pS bdev=%pS bd_disk=%pS mpath_head=%pS\n",
+	//	__func__, bio, bdev, bd_disk, mpath_head);
 
 	clone = bio_alloc_clone(bio->bi_bdev, bio, GFP_NOWAIT, &scsi_mpath_bio_pool);
 
-	pr_err("%s9 bio=%pS clone=%pS\n", __func__, bio, clone);
+//	pr_err("%s9 bio=%pS clone=%pS\n", __func__, bio, clone);
 
 	if (!clone)
 		return NULL;
@@ -465,8 +465,8 @@ static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 	clone->bi_end_io = scsi_mpath_clone_end_io;
 
 	scsi_mpath_clone_bio = container_of(clone, struct scsi_mpath_clone_bio, clone);
-	pr_err("%s9.1 bio=%pS bi_end_io=%pS clone=%pS bi_end_io=%pS scsi_mpath_clone_bio=%pS\n",
-		__func__, bio, bio->bi_end_io, clone, clone->bi_end_io, scsi_mpath_clone_bio);
+//	pr_err("%s9.1 bio=%pS bi_end_io=%pS clone=%pS bi_end_io=%pS scsi_mpath_clone_bio=%pS\n",
+//		__func__, bio, bio->bi_end_io, clone, clone->bi_end_io, scsi_mpath_clone_bio);
 	scsi_mpath_clone_bio->master_bio = bio;
 
 	return clone;
