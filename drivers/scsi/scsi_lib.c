@@ -1604,9 +1604,12 @@ static void scsi_complete(struct request *rq)
 
 
 
-	if (cmd->result)
-		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS bi_size=%d\n",
+	if (cmd->result) {
+		pr_err("%s0.0 cmd=%pS rq=%pS bytes=%d bio=%pS\n",
+			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio);
+		pr_err("%s0.1 cmd=%pS rq=%pS bytes=%d bio=%pS bi_size=%d\n",
 			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio, rq->bio->bi_iter.bi_size);
+	}
 	INIT_LIST_HEAD(&cmd->eh_entry);
 
 	atomic_inc(&cmd->device->iodone_cnt);

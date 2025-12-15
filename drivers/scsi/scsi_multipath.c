@@ -422,7 +422,20 @@ static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16]
 
 static struct bio_set scsi_mpath_bio_pool;
 
+static void scsi_mpath_clone_end_io(struct bio *clone)
+{
+	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
+	struct bio *master_bio;
 
+	scsi_mpath_clone_bio = container_of(clone, struct scsi_mpath_clone_bio, clone);
+	master_bio = scsi_mpath_clone_bio->master_bio;
+
+	pr_err("%s clone=%pS scsi_mpath_clone_bio=%pS master_bio=%pS clone->bi_status=%d\n",
+		__func__, clone, scsi_mpath_clone_bio, master_bio, clone->bi_status);
+
+	master_bio->bi_status = clone->bi_status;
+	bio_endio(master_bio);
+}
 
 static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 {
@@ -447,6 +460,8 @@ static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 
 	if (!clone)
 		return NULL;
+
+	clone->bi_end_io = scsi_mpath_clone_end_io;
 
 	scsi_mpath_clone_bio = container_of(clone, struct scsi_mpath_clone_bio, clone);
 	pr_err("%s9.1 bio=%pS bi_end_io=%pS clone=%pS bi_end_io=%pS scsi_mpath_clone_bio=%pS\n",
