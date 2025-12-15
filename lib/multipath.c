@@ -188,7 +188,7 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_head *mpath_head
 {
 	struct mpath_device *best_opt = NULL, *mpath_device;
 	__maybe_unused struct mpath_device *best_nonopt = NULL;
-	unsigned int min_depth_opt = UINT_MAX;//, min_depth_nonopt = UINT_MAX;
+	unsigned int min_depth_opt = UINT_MAX, min_depth_nonopt = UINT_MAX;
 	unsigned int depth;
 
 	//pr_err("%s mpath_head=%pS min_depth_opt=%d\n", __func__, mpath_head, min_depth_opt);
@@ -209,12 +209,12 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_head *mpath_head
 				best_opt = mpath_device;
 			}
 			break;
-//		case NVME_ANA_NONOPTIMIZED:
-//			if (depth < min_depth_nonopt) {
-//				min_depth_nonopt = depth;
-//				best_nonopt = ns;
-//			}
-//			break;
+		case MPATH_STATE_ACTIVE:
+			if (depth < min_depth_nonopt) {
+				min_depth_nonopt = depth;
+				best_nonopt = mpath_device;
+			}
+			break;
 		default:
 			pr_err("%s1 mpath_device=%pS ->state=%d\n",
 				__func__, mpath_device, mpath_device->state);
@@ -228,7 +228,7 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_head *mpath_head
 	}
 
 //	pr_err_ratelimited("%s3 min_depth_opt=%d best_opt=%pS\n", __func__, min_depth_opt, best_opt);
-	return best_opt;
+	return best_opt ? best_opt : best_nonopt;
 }
 
 static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
