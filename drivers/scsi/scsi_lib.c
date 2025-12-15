@@ -1575,9 +1575,9 @@ static void scsi_complete(struct request *rq)
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
 	enum scsi_disposition disposition;
-	if (rq->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS\n",
-			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio);
+//	if (rq->cmd_flags & REQ_SCSI_MPATH)
+//		pr_err("%s cmd=%pS rq=%pS bytes=%d bio=%pS\n",
+//			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio);
 	if (blk_mq_is_reserved_rq(rq)) {
 		/* Only pass-through requests are supported in this code path. */
 		WARN_ON_ONCE(!blk_rq_is_passthrough(scsi_cmd_to_rq(cmd)));
@@ -1954,8 +1954,8 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	is_flush = req->rq_flags & RQF_FLUSH_SEQ;
 
-	if (req->cmd_flags & REQ_SCSI_MPATH)
-		pr_err("%s2 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
+//	if (req->cmd_flags & REQ_SCSI_MPATH)
+//		pr_err("%s2 req=%pS req->bio=%pS cmd=%pS REQ_SCSI_MPATH is_flush=%d rq_flags=0x%x\n", __func__, req, req->bio, cmd, is_flush, req->rq_flags);
 	if (blk_mq_is_reserved_rq(req)) {
 		reason = shost->hostt->queue_reserved_command(shost, cmd);
 		if (reason) {
