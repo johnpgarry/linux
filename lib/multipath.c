@@ -295,6 +295,7 @@ static void multipath_submit_bio(struct bio *bio)
 
 	if (bio->printed)
 		special = true;
+	special = true;
 
 	/*
 	 * The scsi device might be going away and the bio might be
@@ -323,11 +324,16 @@ static void multipath_submit_bio(struct bio *bio)
 			__func__, bio, mpath_head, mpath_available_path(mpath_head));
 	}
 	if (likely(mpath_device)) {
-		bio_set_dev(bio, mpath_device->disk->part0);
 		bio->bi_opf |= REQ_MPATH;
+		if (special)
+			pr_err("%s3.0 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS clone_bio=%pS\n",
+				__func__, bio, bio->bi_bdev, mpath_device, mpath_head->mpdt->clone_bio);
+		if (mpath_head->mpdt->clone_bio)
+			bio = mpath_head->mpdt->clone_bio(bio);
+		bio_set_dev(bio, mpath_device->disk->part0);
 		atomic_inc(&mpath_device->nr_total);
 		if (special)
-			pr_err("%s3 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS\n",
+			pr_err("%s3.1 bio=%pS bio->bi_bdev=%pS called bio_set_dev calling submit_bio_noacct mpath_device=%pS\n",
 				__func__, bio, bio->bi_bdev, mpath_device);
 		submit_bio_noacct(bio);
 		if (special)

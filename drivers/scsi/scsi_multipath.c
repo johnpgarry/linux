@@ -92,6 +92,17 @@ static struct scsi_mpath_head *scsi_mpath_find_disk(struct scsi_device *sdev);
 static LIST_HEAD(scsi_mpath_heads_list);
 static DEFINE_MUTEX(scsi_mpath_heads_lock);
 
+struct scsi_mpath_clone_bio {
+//	union {
+//		struct kiocb		*iocb;
+//		struct task_struct	*waiter;
+//	};
+//	size_t			size;
+//	atomic_t		ref;
+//	unsigned int		flags;
+	struct bio *master_bio;
+	struct bio		clone ____cacheline_aligned_in_smp;
+};
 
 /* Check for path error */
 static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
@@ -409,6 +420,42 @@ static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16]
 	return scsi_mpath_unique_id(scsi_mpath_dev->sdev, id, type);
 }
 
+static struct bio_set scsi_mpath_bio_pool;
+
+
+
+static struct bio *scsi_mpath_clone_bio(struct bio *bio)
+{
+	struct block_device *bdev = bio->bi_bdev;
+	struct gendisk *bd_disk;
+	struct mpath_head *mpath_head;
+	struct bio *clone;
+	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
+
+	pr_err_once("%s bio=%pS bdev=%pS\n",
+		__func__, bio, bdev);
+	bd_disk = bdev->bd_disk;
+	pr_err_once("%s1 bio=%pS bdev=%pS bd_disk=%pS\n",
+		__func__, bio, bdev, bd_disk);
+	mpath_head = bd_disk->private_data;
+	pr_err_once("%s2 bio=%pS bdev=%pS bd_disk=%pS mpath_head=%pS\n",
+		__func__, bio, bdev, bd_disk, mpath_head);
+
+	clone = bio_alloc_clone(bio->bi_bdev, bio, GFP_NOWAIT, &scsi_mpath_bio_pool);
+
+	pr_err("%s9 bio=%pS clone=%pS\n", __func__, bio, clone);
+
+	if (!clone)
+		return NULL;
+
+	scsi_mpath_clone_bio = container_of(clone, struct scsi_mpath_clone_bio, clone);
+	pr_err("%s9.1 bio=%pS bi_end_io=%pS clone=%pS bi_end_io=%pS scsi_mpath_clone_bio=%pS\n",
+		__func__, bio, bio->bi_end_io, clone, clone->bi_end_io, scsi_mpath_clone_bio);
+	scsi_mpath_clone_bio->master_bio = bio;
+
+	return clone;
+}
+
 struct mpath_head_template smpdt = {
 //	.class = &scsi_mpath_disk_class,
 	.cdev_class = &scsi_mpath_generic_class,
@@ -417,6 +464,7 @@ struct mpath_head_template smpdt = {
 	.get_unique_id = scsi_mpath_get_unique_id,
 	.ioctl = scsi_mpath_ioctl,
 	.device_groups = mpath_device_groups,
+	.clone_bio = scsi_mpath_clone_bio,
 };
 
 /*
@@ -1016,7 +1064,15 @@ static int __init init_scsi_mp(void)
 	if (err < 0)
 		goto unregister_blkdev;
 
+	err = bioset_init(&scsi_mpath_bio_pool, 100,
+				offsetof(struct scsi_mpath_clone_bio, clone),
+				BIOSET_NEED_BVECS|BIOSET_PERCPU_CACHE);
+	if (err < 0)
+		goto class_register;
+
 	return 0;
+class_register:
+	class_unregister(&scsi_mpath_disk_class);
 unregister_blkdev:
 	unregister_blkdev(0, "scsi-mpath-disk");
 destroy_disk_class:
