@@ -374,9 +374,124 @@ struct mpath_pr_ops {
 static int nvme_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
 			u32 flags)
 {
-	return 0;
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	struct nvmet_pr_register_data data = { 0 };
+	struct nvme_command c = { 0 };
+	u32 cdw10;
+	int ret;
+
+	if (flags & ~PR_FL_IGNORE_KEY)
+		return -EOPNOTSUPP;
+
+	data.crkey = cpu_to_le64(old_key);
+	data.nrkey = cpu_to_le64(new_key);
+
+	cdw10 = old_key ? NVME_PR_REGISTER_ACT_REPLACE :
+		NVME_PR_REGISTER_ACT_REG;
+	cdw10 |= (flags & PR_FL_IGNORE_KEY) ? NVME_PR_IGNORE_KEY : 0;
+	cdw10 |= NVME_PR_CPTPL_PERSIST;
+
+	/* __nvme_send_pr_command */
+	c.common.opcode = nvme_cmd_resv_register;
+	c.common.cdw10 = cpu_to_le32(cdw10);
+	c.common.cdw11 = cpu_to_le32(0);
+
+	/* nvme_send_ns_head_pr_command */
+	c.common.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
+	ret = nvme_submit_sync_cmd(ns->queue, &c, &data, sizeof(struct nvmet_pr_register_data));
+
+	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
 }
+
+#ifdef sdsddd
+static int nvme_mpath_pr_reserve(struct mpath_device *mpath_device, u64 key, enum pr_type type,
+		u32 flags)
+{
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_reserve(bdev, key, type, flags);
+}
+
+static int nvme_mpath_pr_release(struct mpath_device *mpath_device, u64 key, enum pr_type type)
+{
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_release(bdev, key, type);
+}
+
+static int nvme_mpath_pr_preempt(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
+		enum pr_type type, bool abort)
+{
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_preempt(bdev, old_key, new_key, type, abort);
+}
+
+static int nvme_mpath_pr_clear(struct mpath_device *mpath_device, u64 key)
+{
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_clear(bdev, key);
+}
+
+static int nvme_mpath_pr_read_keys(struct mpath_device *mpath_device, struct pr_keys *keys_info)
+{
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_read_keys(bdev, keys_info);
+}
+
+static int nvme_mpath_pr_read_reservation(struct mpath_device *mpath_device,
+				  struct pr_held_reservation *rsv)
+{
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_read_reservation(bdev, rsv);
+}
+#endif
 
 const struct mpath_pr_ops nvme_mpath_pr_ops = {
 	.pr_register	= nvme_mpath_pr_register,
+//	.pr_reserve	= nvme_mpath_pr_reserve,
+//	.pr_release	= nvme_mpath_pr_release,
+//	.pr_preempt	= nvme_mpath_pr_preempt,
+//	.pr_clear	= nvme_mpath_pr_clear,
+//	.pr_read_keys	= nvme_mpath_pr_read_keys,
+//	.pr_read_reservation = nvme_mpath_pr_read_reservation,
 };
