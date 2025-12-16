@@ -465,6 +465,7 @@ const struct block_device_operations mpath_ops = {
 	.get_unique_id	= mpath_get_unique_id,
 	.report_zones	= mpath_report_zones,
 	.getgeo		= mpath_getgeo,
+	.compat_ioctl	= blkdev_compat_ptr_ioctl,
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 
