@@ -410,7 +410,9 @@ static int mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 	}
 
 	/* ->ioctl must always unlock */
-	return mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, srcu_idx);
+	err = mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, srcu_idx);
+	lockdep_assert_not_held(&mpath_head->srcu);
+	return err;
 
 out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
@@ -418,6 +420,7 @@ out_unlock:
 }
 
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx)
+__releases(&mpath_head->srcu)
 {
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 }
