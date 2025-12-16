@@ -525,6 +525,64 @@ static int scsi_mpath_pr_release(struct mpath_device *mpath_device, u64 key, enu
 	return mpath_device->disk->fops->pr_ops->pr_release(bdev, key, type);
 }
 
+static int scsi_mpath_pr_preempt(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
+		enum pr_type type, bool abort)
+{
+	struct scsi_mpath_device *scsi_multipath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_multipath_dev->sdev;
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s scsi_multipath_dev=%pS sdev=%pS\n", __func__, scsi_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_preempt(bdev, old_key, new_key, type, abort);
+}
+
+static int scsi_mpath_pr_clear(struct mpath_device *mpath_device, u64 key)
+{
+	struct scsi_mpath_device *scsi_multipath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_multipath_dev->sdev;
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s scsi_multipath_dev=%pS sdev=%pS\n", __func__, scsi_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_clear(bdev, key);
+}
+
+static int scsi_mpath_pr_read_keys(struct mpath_device *mpath_device, struct pr_keys *keys_info)
+{
+	struct scsi_mpath_device *scsi_multipath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_multipath_dev->sdev;
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s scsi_multipath_dev=%pS sdev=%pS\n", __func__, scsi_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_read_keys(bdev, keys_info);
+}
+
+static int scsi_mpath_pr_read_reservation(struct mpath_device *mpath_device,
+				  struct pr_held_reservation *rsv)
+{
+	struct scsi_mpath_device *scsi_multipath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_multipath_dev->sdev;
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s scsi_multipath_dev=%pS sdev=%pS\n", __func__, scsi_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_read_reservation(bdev, rsv);
+}
+
 static const struct mpath_pr_ops mapth_pr_ops = {
 	#ifdef dsdsd
 	.pr_register	= sd_pr_register,
@@ -538,6 +596,10 @@ static const struct mpath_pr_ops mapth_pr_ops = {
 	.pr_register	= scsi_mpath_pr_register,
 	.pr_reserve	= scsi_mpath_pr_reserve,
 	.pr_release	= scsi_mpath_pr_release,
+	.pr_preempt	= scsi_mpath_pr_preempt,
+	.pr_clear	= scsi_mpath_pr_clear,
+	.pr_read_keys	= scsi_mpath_pr_read_keys,
+	.pr_read_reservation = scsi_mpath_pr_read_reservation,
 };
 
 struct mpath_head_template smpdt = {
