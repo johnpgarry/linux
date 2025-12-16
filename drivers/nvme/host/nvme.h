@@ -608,9 +608,6 @@ static inline struct nvme_ns_head *ns_to_head(struct nvme_ns *ns)
 	struct mpath_device *mpath_device = &ns->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 
-//	pr_err("%s ns=%pS mpath_device=%pS mpath_head=%pS\n",
-//		__func__, ns, mpath_device, mpath_head);
-
 	return (struct nvme_ns_head *)(mpath_head + 1);
 }
 
