@@ -394,7 +394,6 @@ static int mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 	struct mpath_head *mpath_head = disk->private_data;
 	struct mpath_device *mpath_device;
 	int srcu_idx, err;
-	bool unlocked = false;
 
 	pr_err("%s cmd=0x%x arg=%ld mpath_head=%pS\n", __func__, cmd, arg, mpath_head);
 	
@@ -410,13 +409,19 @@ static int mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 		goto out_unlock;
 	}
 
-	err = mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, &unlocked);
+	/* ->ioctl must always unlock */
+	return mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, srcu_idx);
 
 out_unlock:
-	if (!unlocked)
-		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return err;
 }
+
+void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx)
+{
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+}
+EXPORT_SYMBOL_GPL(mpath_head_read_unlock);
 
 #ifdef CONFIG_BLK_DEV_ZONED
 static int mpath_report_zones(struct gendisk *disk, sector_t sector,
@@ -508,7 +513,6 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 	struct mpath_device *mpath_device;
 	fmode_t mode = file->f_mode;
 	int srcu_idx, err;
-	bool unlocked = false;
 
 	pr_err("%s cdev=%pS cmd=0x%x arg=%ld mpath_head=%pS mode=%d\n",
 		__func__, cdev, cmd, arg, mpath_head, mode);
@@ -535,10 +539,10 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 	 * access to the device is prohibited.
 	 */
 	err = 0;//mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, &unlocked);
+	return err;// ioctl must unlock
 
 out_unlock:
-	if (unlocked == false)
-		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return err;
 }
 

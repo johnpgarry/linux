@@ -87,12 +87,15 @@ struct mpath_head_template {
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
-		    unsigned int cmd, unsigned long arg, bool *unlocked);
+		    unsigned int cmd, unsigned long arg, int srcu_idx);
 	int (*report_zones)(struct mpath_device *, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct attribute_group **device_groups;
 };
+
+
+void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 
 struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt,
 						int privsize);

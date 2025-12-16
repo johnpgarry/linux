@@ -396,9 +396,10 @@ static inline bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 }
 
 static int scsi_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
-		    unsigned int cmd, unsigned long arg, bool *unlocked)
+		    unsigned int cmd, unsigned long arg, int srcu_idx)
 {
 	int err;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 
@@ -411,12 +412,14 @@ static int scsi_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	err = scsi_ioctl_block_when_processing_errors(sdev, cmd,
 			(mode & BLK_OPEN_NDELAY));
 	if (err)
-		return err;
+		goto out;
 
 	pr_err("%s3 cmd=0x%x arg=%ld sdev=%pS calling scsi_ioctl\n", __func__, cmd, arg, sdev);
 	err = scsi_ioctl(sdev, mode & BLK_OPEN_WRITE, cmd, (void __user *)arg);
 	pr_err("%s3.1 cmd=0x%x arg=%ld sdev=%pS called scsi_ioctl err=%d\n", __func__, cmd, arg, sdev, err);
 
+out:
+	mpath_head_read_unlock(mpath_head, srcu_idx);
 	return err;
 }
 
