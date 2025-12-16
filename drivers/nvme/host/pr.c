@@ -422,21 +422,26 @@ static int nvme_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key
 			&data, sizeof(data));
 }
 
-#ifdef sdsddd
 static int nvme_mpath_pr_reserve(struct mpath_device *mpath_device, u64 key, enum pr_type type,
 		u32 flags)
 {
-	struct nvme_ns *ns = nvme_to_ns(mpath_device);
-	struct block_device *bdev = mpath_device->disk->part0;
+	struct nvmet_pr_acquire_data data = { 0 };
+	u32 cdw10;
 
-	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
-
-	if (!mpath_device->disk->fops->pr_ops)
+	if (flags & ~PR_FL_IGNORE_KEY)
 		return -EOPNOTSUPP;
 
-	return mpath_device->disk->fops->pr_ops->pr_reserve(bdev, key, type, flags);
+	data.crkey = cpu_to_le64(key);
+
+	cdw10 = NVME_PR_ACQUIRE_ACT_ACQUIRE;
+	cdw10 |= nvme_pr_type_from_blk(type) << 8;
+	cdw10 |= (flags & PR_FL_IGNORE_KEY) ? NVME_PR_IGNORE_KEY : 0;
+
+	return nvme_mpath_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_acquire,
+			&data, sizeof(data));
 }
 
+#ifdef sdsddd
 static int nvme_mpath_pr_release(struct mpath_device *mpath_device, u64 key, enum pr_type type)
 {
 	struct nvme_ns *ns = nvme_to_ns(mpath_device);
@@ -507,7 +512,7 @@ static int nvme_mpath_pr_read_reservation(struct mpath_device *mpath_device,
 
 const struct mpath_pr_ops nvme_mpath_pr_ops = {
 	.pr_register	= nvme_mpath_pr_register,
-//	.pr_reserve	= nvme_mpath_pr_reserve,
+	.pr_reserve	= nvme_mpath_pr_reserve,
 //	.pr_release	= nvme_mpath_pr_release,
 //	.pr_preempt	= nvme_mpath_pr_preempt,
 //	.pr_clear	= nvme_mpath_pr_clear,
