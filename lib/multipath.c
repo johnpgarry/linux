@@ -466,16 +466,67 @@ static int mpath_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 	return 0;
 }
 
+#ifdef dsdsd_copied_from_multipathc
+const struct block_device_operations nvme_ns_head_ops = {
+	.owner		= THIS_MODULE,
+	.submit_bio	= nvme_ns_head_submit_bio,
+	.open		= nvme_ns_head_open,
+	.release	= nvme_ns_head_release,
+	.ioctl		= nvme_ns_head_ioctl,
+	.compat_ioctl	= blkdev_compat_ptr_ioctl,
+	.getgeo		= nvme_getgeo,
+	.get_unique_id	= nvme_ns_head_get_unique_id,
+	.report_zones	= nvme_ns_head_report_zones,
+	.pr_ops		= &nvme_pr_ops,
+};
+
+
+const struct pr_ops nvme_pr_ops = {
+	.pr_register	= nvme_pr_register,
+	.pr_reserve	= nvme_pr_reserve,
+	.pr_release	= nvme_pr_release,
+	.pr_preempt	= nvme_pr_preempt,
+	.pr_clear	= nvme_pr_clear,
+	.pr_read_keys	= nvme_pr_read_keys,
+	.pr_read_reservation = nvme_pr_read_reservation,
+};
+
+#endif
+
+static int mpath_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
+		unsigned int flags)
+{
+	struct mpath_head *mpath_head = bdev->bd_disk->private_data;
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = 0;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	pr_err("%s mpath_head=%pS mpath_device=%pS mpath_head->mpdt->pr_ops=%pS\n",
+		__func__, mpath_head, mpath_device, mpath_head->mpdt->pr_ops);
+	if (mpath_device && mpath_head->mpdt->pr_ops)
+		ret = mpath_head->mpdt->pr_ops->pr_register(mpath_device, old_key, new_key, flags);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return 0;
+}
+
+static const struct pr_ops mpath_pr_ops = {
+	.pr_register	= mpath_pr_register,
+
+};
+
 const struct block_device_operations mpath_ops = {
 	.owner          = THIS_MODULE,
 	.submit_bio	= multipath_submit_bio,
 	.open		= mpath_open,
 	.release	= mpath_release,
 	.ioctl			= mpath_ioctl,
+	.compat_ioctl	= blkdev_compat_ptr_ioctl,
 	.get_unique_id	= mpath_get_unique_id,
 	.report_zones	= mpath_report_zones,
 	.getgeo		= mpath_getgeo,
-	.compat_ioctl	= blkdev_compat_ptr_ioctl,
+	.pr_ops		= &mpath_pr_ops,
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 

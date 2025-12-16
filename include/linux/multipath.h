@@ -7,6 +7,7 @@
 #include <linux/blk-mq.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
+#include <linux/pr.h>
 
 
 struct mpath_device;
@@ -81,6 +82,33 @@ struct mpath_device {
 
 #define REQ_MPATH		REQ_DRV
 
+struct mpath_pr_ops {
+	int (*pr_register)(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
+			u32 flags);
+	int (*pr_reserve)(struct mpath_device *mpath_device, u64 key,
+			enum pr_type type, u32 flags);
+	int (*pr_release)(struct mpath_device *mpath_device, u64 key,
+			enum pr_type type);
+	int (*pr_preempt)(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
+			enum pr_type type, bool abort);
+	int (*pr_clear)(struct mpath_device *mpath_device, u64 key);
+	/*
+	 * pr_read_keys - Read the registered keys and return them in the
+	 * pr_keys->keys array. The keys array will have been allocated at the
+	 * end of the pr_keys struct, and pr_keys->num_keys must be set to the
+	 * number of keys the array can hold. If there are more than can fit
+	 * in the array, success will still be returned and pr_keys->num_keys
+	 * will reflect the total number of keys the device contains, so the
+	 * caller can retry with a larger array.
+	 */
+	int (*pr_read_keys)(struct mpath_device *mpath_device,
+			struct pr_keys *keys_info);
+	int (*pr_read_reservation)(struct mpath_device *mpath_device,
+			struct pr_held_reservation *rsv);
+};
+
+
+
 struct mpath_head_template {
 	//const struct class *class;
 	const struct class *cdev_class;
@@ -91,6 +119,7 @@ struct mpath_head_template {
 	int (*report_zones)(struct mpath_device *, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args);
 	struct bio *(*clone_bio)(struct bio *);
+	const struct mpath_pr_ops *pr_ops;
 	const struct attribute_group **device_groups;
 };
 

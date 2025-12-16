@@ -3977,6 +3977,7 @@ const struct mpath_head_template mpdt = {
 	#ifdef CONFIG_BLK_DEV_ZONED
 	.report_zones = nvme_mpath_report_zones,
 	#endif
+	.pr_ops = &nvme_mpath_pr_ops,
 };
 
 static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
