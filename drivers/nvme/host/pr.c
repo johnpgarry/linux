@@ -256,6 +256,30 @@ retry:
 	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
 }
 
+static int nvme_mpath_pr_resv_report(struct mpath_device *mpath_device, void *data,
+		u32 data_len, bool *eds)
+{
+	u32 cdw10, cdw11;
+	int ret;
+
+	cdw10 = nvme_bytes_to_numd(data_len);
+	cdw11 = NVME_EXTENDED_DATA_STRUCT;
+	*eds = true;
+
+retry:
+	ret = __nvme_mpath_send_pr_command(mpath_device, cdw10, cdw11, nvme_cmd_resv_report,
+			data, data_len);
+	if (ret == NVME_SC_HOST_ID_INCONSIST &&
+	    cdw11 == NVME_EXTENDED_DATA_STRUCT) {
+		cdw11 = 0;
+		*eds = false;
+		goto retry;
+	}
+
+	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
+}
+
+
 static int nvme_pr_read_keys(struct block_device *bdev,
 		struct pr_keys *keys_info)
 {
@@ -487,20 +511,52 @@ static int nvme_mpath_pr_clear(struct mpath_device *mpath_device, u64 key)
 			&data, sizeof(data));
 }
 
-#ifdef sdsddd
 static int nvme_mpath_pr_read_keys(struct mpath_device *mpath_device, struct pr_keys *keys_info)
-{
-	struct nvme_ns *ns = nvme_to_ns(mpath_device);
-	struct block_device *bdev = mpath_device->disk->part0;
+{	
+	size_t rse_len;
+	u32 num_keys = keys_info->num_keys;
+	struct nvme_reservation_status_ext *rse;
+	int ret, i;
+	bool eds;
 
-	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+	/*
+	 * Assume we are using 128-bit host IDs and allocate a buffer large
+	 * enough to get enough keys to fill the return keys buffer.
+	 */
+	rse_len = struct_size(rse, regctl_eds, num_keys);
+	if (rse_len > U32_MAX)
+		return -EINVAL;
 
-	if (!mpath_device->disk->fops->pr_ops)
-		return -EOPNOTSUPP;
+	rse = kzalloc(rse_len, GFP_KERNEL);
+	if (!rse)
+		return -ENOMEM;
 
-	return mpath_device->disk->fops->pr_ops->pr_read_keys(bdev, keys_info);
+	ret = nvme_mpath_pr_resv_report(mpath_device, rse, rse_len, &eds);
+	if (ret)
+		goto free_rse;
+
+	keys_info->generation = le32_to_cpu(rse->gen);
+	keys_info->num_keys = get_unaligned_le16(&rse->regctl);
+
+	num_keys = min(num_keys, keys_info->num_keys);
+	for (i = 0; i < num_keys; i++) {
+		if (eds) {
+			keys_info->keys[i] =
+					le64_to_cpu(rse->regctl_eds[i].rkey);
+		} else {
+			struct nvme_reservation_status *rs;
+
+			rs = (struct nvme_reservation_status *)rse;
+			keys_info->keys[i] = le64_to_cpu(rs->regctl_ds[i].rkey);
+		}
+	}
+
+free_rse:
+	kfree(rse);
+	return ret;
 }
 
+#ifdef sdsddd
 static int nvme_mpath_pr_read_reservation(struct mpath_device *mpath_device,
 				  struct pr_held_reservation *rsv)
 {
@@ -522,6 +578,6 @@ const struct mpath_pr_ops nvme_mpath_pr_ops = {
 	.pr_release	= nvme_mpath_pr_release,
 	.pr_preempt	= nvme_mpath_pr_preempt,
 	.pr_clear	= nvme_mpath_pr_clear,
-//	.pr_read_keys	= nvme_mpath_pr_read_keys,
+	.pr_read_keys	= nvme_mpath_pr_read_keys,
 //	.pr_read_reservation = nvme_mpath_pr_read_reservation,
 };
