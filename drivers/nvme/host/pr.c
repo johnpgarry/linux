@@ -49,7 +49,7 @@ static enum pr_type block_pr_type_from_nvme(enum nvme_pr_type type)
 	return 0;
 }
 
-static int nvme_mpath_send_device_pr_command(struct mpath_device *mpath_device,
+static int nvme_send_device_pr_command(struct mpath_device *mpath_device,
 		struct nvme_command *c, void *data, unsigned int data_len)
 {
 	struct nvme_ns *ns = nvme_to_ns(mpath_device);
@@ -78,7 +78,7 @@ static int nvme_status_to_pr_err(int status)
 	}
 }
 
-static int __nvme_mpath_send_pr_command(struct mpath_device *mpath_device, u32 cdw10,
+static int __nvme_send_pr_command(struct mpath_device *mpath_device, u32 cdw10,
 		u32 cdw11, u8 op, void *data, unsigned int data_len)
 {
 	struct nvme_command c = { 0 };
@@ -87,15 +87,15 @@ static int __nvme_mpath_send_pr_command(struct mpath_device *mpath_device, u32 c
 	c.common.cdw10 = cpu_to_le32(cdw10);
 	c.common.cdw11 = cpu_to_le32(cdw11);
 
-	return nvme_mpath_send_device_pr_command(mpath_device, &c, data, data_len);
+	return nvme_send_device_pr_command(mpath_device, &c, data, data_len);
 }
 
-static int nvme_mpath_send_pr_command(struct mpath_device *mpath_device, u32 cdw10, u32 cdw11,
+static int nvme_send_pr_command(struct mpath_device *mpath_device, u32 cdw10, u32 cdw11,
 		u8 op, void *data, unsigned int data_len)
 {
 	int ret;
 
-	ret = __nvme_mpath_send_pr_command(mpath_device, cdw10, cdw11, op, data, data_len);
+	ret = __nvme_send_pr_command(mpath_device, cdw10, cdw11, op, data, data_len);
 	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
 }
 
@@ -116,7 +116,7 @@ static int nvme_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key
 	cdw10 |= (flags & PR_FL_IGNORE_KEY) ? NVME_PR_IGNORE_KEY : 0;
 	cdw10 |= NVME_PR_CPTPL_PERSIST;
 
-	return nvme_mpath_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_register,
+	return nvme_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_register,
 			&data, sizeof(data));
 }
 
@@ -135,7 +135,7 @@ static int nvme_mpath_pr_reserve(struct mpath_device *mpath_device, u64 key, enu
 	cdw10 |= nvme_pr_type_from_blk(type) << 8;
 	cdw10 |= (flags & PR_FL_IGNORE_KEY) ? NVME_PR_IGNORE_KEY : 0;
 
-	return nvme_mpath_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_acquire,
+	return nvme_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_acquire,
 			&data, sizeof(data));
 }
 
@@ -153,7 +153,7 @@ static int nvme_mpath_pr_preempt(struct mpath_device *mpath_device, u64 old, u64
 			NVME_PR_ACQUIRE_ACT_PREEMPT;
 	cdw10 |= nvme_pr_type_from_blk(type) << 8;
 
-	return nvme_mpath_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_acquire,
+	return nvme_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_acquire,
 			&data, sizeof(data));
 }
 
@@ -167,7 +167,7 @@ static int nvme_mpath_pr_clear(struct mpath_device *mpath_device, u64 key)
 	cdw10 = NVME_PR_RELEASE_ACT_CLEAR;
 	cdw10 |= key ? 0 : NVME_PR_IGNORE_KEY;
 
-	return nvme_mpath_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_release,
+	return nvme_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_release,
 			&data, sizeof(data));
 }
 
@@ -182,7 +182,7 @@ static int nvme_mpath_pr_release(struct mpath_device *mpath_device, u64 key, enu
 	cdw10 |= nvme_pr_type_from_blk(type) << 8;
 	cdw10 |= key ? 0 : NVME_PR_IGNORE_KEY;
 
-	return nvme_mpath_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_release,
+	return nvme_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_release,
 			&data, sizeof(data));
 }
 
@@ -197,7 +197,7 @@ static int nvme_mpath_pr_resv_report(struct mpath_device *mpath_device, void *da
 	*eds = true;
 
 retry:
-	ret = __nvme_mpath_send_pr_command(mpath_device, cdw10, cdw11, nvme_cmd_resv_report,
+	ret = __nvme_send_pr_command(mpath_device, cdw10, cdw11, nvme_cmd_resv_report,
 			data, data_len);
 	if (ret == NVME_SC_HOST_ID_INCONSIST &&
 	    cdw11 == NVME_EXTENDED_DATA_STRUCT) {
