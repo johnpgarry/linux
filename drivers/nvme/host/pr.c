@@ -117,6 +117,36 @@ static int nvme_send_pr_command(struct block_device *bdev, u32 cdw10, u32 cdw11,
 	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
 }
 
+static int nvme_mpath_send_device_pr_command(struct mpath_device *mpath_device,
+		struct nvme_command *c, void *data, unsigned int data_len)
+{
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+
+	c->common.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
+	return nvme_submit_sync_cmd(ns->queue, c, data, data_len);
+}
+
+static int __nvme_mpath_send_pr_command(struct mpath_device *mpath_device, u32 cdw10,
+		u32 cdw11, u8 op, void *data, unsigned int data_len)
+{
+	struct nvme_command c = { 0 };
+
+	c.common.opcode = op;
+	c.common.cdw10 = cpu_to_le32(cdw10);
+	c.common.cdw11 = cpu_to_le32(cdw11);
+
+	return nvme_mpath_send_device_pr_command(mpath_device, &c, data, data_len);
+}
+
+static int nvme_mpath_send_pr_command(struct mpath_device *mpath_device, u32 cdw10, u32 cdw11,
+		u8 op, void *data, unsigned int data_len)
+{
+	int ret;
+
+	ret = __nvme_mpath_send_pr_command(mpath_device, cdw10, cdw11, op, data, data_len);
+	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
+}
+
 static int nvme_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
 		unsigned int flags)
 {
@@ -374,11 +404,8 @@ struct mpath_pr_ops {
 static int nvme_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
 			u32 flags)
 {
-	struct nvme_ns *ns = nvme_to_ns(mpath_device);
 	struct nvmet_pr_register_data data = { 0 };
-	struct nvme_command c = { 0 };
 	u32 cdw10;
-	int ret;
 
 	if (flags & ~PR_FL_IGNORE_KEY)
 		return -EOPNOTSUPP;
@@ -391,16 +418,8 @@ static int nvme_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key
 	cdw10 |= (flags & PR_FL_IGNORE_KEY) ? NVME_PR_IGNORE_KEY : 0;
 	cdw10 |= NVME_PR_CPTPL_PERSIST;
 
-	/* __nvme_send_pr_command */
-	c.common.opcode = nvme_cmd_resv_register;
-	c.common.cdw10 = cpu_to_le32(cdw10);
-	c.common.cdw11 = cpu_to_le32(0);
-
-	/* nvme_send_ns_head_pr_command */
-	c.common.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
-	ret = nvme_submit_sync_cmd(ns->queue, &c, &data, sizeof(struct nvmet_pr_register_data));
-
-	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
+	return nvme_mpath_send_pr_command(mpath_device, cdw10, 0, nvme_cmd_resv_register,
+			&data, sizeof(data));
 }
 
 #ifdef sdsddd
