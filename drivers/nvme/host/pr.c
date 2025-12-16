@@ -556,21 +556,67 @@ free_rse:
 	return ret;
 }
 
-#ifdef sdsddd
 static int nvme_mpath_pr_read_reservation(struct mpath_device *mpath_device,
-				  struct pr_held_reservation *rsv)
+				  struct pr_held_reservation *resv)
 {
-	struct nvme_ns *ns = nvme_to_ns(mpath_device);
-	struct block_device *bdev = mpath_device->disk->part0;
+	struct nvme_reservation_status_ext tmp_rse, *rse;
+	int ret, i, num_regs;
+	u32 rse_len;
+	bool eds;
 
-	pr_err("%s nvme_multipath_dev=%pS sdev=%pS\n", __func__, nvme_multipath_dev, sdev);
+get_num_regs:
+	/*
+	 * Get the number of registrations so we know how big to allocate
+	 * the response buffer.
+	 */
+	ret = nvme_mpath_pr_resv_report(mpath_device, &tmp_rse, sizeof(tmp_rse), &eds);
+	if (ret)
+		return ret;
 
-	if (!mpath_device->disk->fops->pr_ops)
-		return -EOPNOTSUPP;
+	num_regs = get_unaligned_le16(&tmp_rse.regctl);
+	if (!num_regs) {
+		resv->generation = le32_to_cpu(tmp_rse.gen);
+		return 0;
+	}
 
-	return mpath_device->disk->fops->pr_ops->pr_read_reservation(bdev, rsv);
+	rse_len = struct_size(rse, regctl_eds, num_regs);
+	rse = kzalloc(rse_len, GFP_KERNEL);
+	if (!rse)
+		return -ENOMEM;
+
+	ret = nvme_mpath_pr_resv_report(mpath_device, rse, rse_len, &eds);
+	if (ret)
+		goto free_rse;
+
+	if (num_regs != get_unaligned_le16(&rse->regctl)) {
+		kfree(rse);
+		goto get_num_regs;
+	}
+
+	resv->generation = le32_to_cpu(rse->gen);
+	resv->type = block_pr_type_from_nvme(rse->rtype);
+
+	for (i = 0; i < num_regs; i++) {
+		if (eds) {
+			if (rse->regctl_eds[i].rcsts) {
+				resv->key = le64_to_cpu(rse->regctl_eds[i].rkey);
+				break;
+			}
+		} else {
+			struct nvme_reservation_status *rs;
+
+			rs = (struct nvme_reservation_status *)rse;
+			if (rs->regctl_ds[i].rcsts) {
+				resv->key = le64_to_cpu(rs->regctl_ds[i].rkey);
+				break;
+			}
+		}
+	}
+
+free_rse:
+	kfree(rse);
+	return ret;
 }
-#endif
 
 const struct mpath_pr_ops nvme_mpath_pr_ops = {
 	.pr_register	= nvme_mpath_pr_register,
@@ -579,5 +625,5 @@ const struct mpath_pr_ops nvme_mpath_pr_ops = {
 	.pr_preempt	= nvme_mpath_pr_preempt,
 	.pr_clear	= nvme_mpath_pr_clear,
 	.pr_read_keys	= nvme_mpath_pr_read_keys,
-//	.pr_read_reservation = nvme_mpath_pr_read_reservation,
+	.pr_read_reservation = nvme_mpath_pr_read_reservation,
 };
