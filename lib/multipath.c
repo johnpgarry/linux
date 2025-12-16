@@ -374,13 +374,14 @@ static int mpath_get_unique_id(struct gendisk *disk, u8 id[16],
     enum blk_unique_id type)
 {
 	struct mpath_head *mpath_head = disk->private_data;
-	int srcu_idx, ret = -EWOULDBLOCK;
+	int srcu_idx, ret = 0;
 	struct mpath_device *mpath_device;
 
+	pr_err("%s\n", __func__);
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
-	if (mpath_device)
-		ret = mpath_head->mpdt->get_unique_id(mpath_device, id, type);
+	if (mpath_device && mpath_device->disk->fops->get_unique_id)
+		ret = mpath_device->disk->fops->get_unique_id(mpath_device->disk, id, type);
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;

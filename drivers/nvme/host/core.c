@@ -3952,12 +3952,6 @@ static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
 	return true;
 }
 
-static int nvme_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16],
-	enum blk_unique_id type)
-{
-	return 0;
-}
-
 static int nvme_mpath_ioctl(struct mpath_device *, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg)
 {
@@ -3969,7 +3963,6 @@ const struct mpath_head_template mpdt = {
 //	.cdev_class = &scsi_mpath_generic_class,
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
-	.get_unique_id = nvme_mpath_get_unique_id,
 	.ioctl = nvme_mpath_ioctl,
 	.device_groups = nvme_ns_attr_groups,
 	#ifdef CONFIG_BLK_DEV_ZONED

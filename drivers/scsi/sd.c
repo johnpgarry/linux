@@ -1937,13 +1937,6 @@ static int sd_get_unique_id(struct gendisk *disk, u8 id[16],
 		if (len == 16)
 			break;
 	}
-
-	if (scsi_is_sdev_multipath(sdev)) {
-
-		pr_err("%s calling scsi_mpath_unique_id\n", __func__);
-		ret = scsi_mpath_unique_id(sdev, id, type);
-	}
-
 out_unlock:
 	rcu_read_unlock();
 	return ret;

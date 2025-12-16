@@ -426,14 +426,6 @@ static __maybe_unused void scsi_mpath_head_release(struct device *dev)
 	dev_err(dev, "%s dev=%pS mpath_head=%pS\n", __func__, dev, mpath_head);
 }
 
-static int scsi_mpath_get_unique_id(struct mpath_device *mpath_device, u8 id[16],
-	enum blk_unique_id type)
-{
-	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
-
-	return scsi_mpath_unique_id(scsi_mpath_dev->sdev, id, type);
-}
-
 static struct bio_set scsi_mpath_bio_pool;
 
 static void scsi_mpath_clone_end_io(struct bio *clone)
@@ -491,7 +483,6 @@ struct mpath_head_template smpdt = {
 	.cdev_class = &scsi_mpath_generic_class,
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
-	.get_unique_id = scsi_mpath_get_unique_id,
 	.ioctl = scsi_mpath_ioctl,
 	.device_groups = mpath_device_groups,
 	.clone_bio = scsi_mpath_clone_bio,
@@ -916,24 +907,6 @@ int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 	return SUCCESS;
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_failover_disposition);
-
-int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16],
-		enum blk_unique_id type)
-{
-	#if 0
-	struct scsi_mpath_dh_data *dh_data = sdev->pg_data;
-
-	pr_err("%s sdev=%pS\n", __func__, sdev);
-	if (type != BLK_UID_NAA)
-		return -EINVAL;
-
-	if (strncmp(dh_data->device_id_str, id, 16) == 0)
-		return dh_data->device_id_len;
-	#endif
-
-	return -EINVAL;
-}
-EXPORT_SYMBOL_GPL(scsi_mpath_unique_id);
 
 int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
