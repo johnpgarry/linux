@@ -371,5 +371,12 @@ struct mpath_pr_ops {
 };
 #endif
 
+static int nvme_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
+			u32 flags)
+{
+	return 0;
+}
+
 const struct mpath_pr_ops nvme_mpath_pr_ops = {
+	.pr_register	= nvme_mpath_pr_register,
 };

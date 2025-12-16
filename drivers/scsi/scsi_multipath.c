@@ -481,6 +481,34 @@ static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 	return clone;
 }
 
+static int scsi_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key, u64 new_key,
+			u32 flags)
+{
+	struct scsi_mpath_device *scsi_multipath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_multipath_dev->sdev;
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s scsi_multipath_dev=%pS sdev=%pS\n", __func__, scsi_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_register(bdev, old_key, new_key, flags);
+}
+
+static const struct mpath_pr_ops mapth_pr_ops = {
+	#ifdef dsdsd
+	.pr_register	= sd_pr_register,
+	.pr_reserve	= sd_pr_reserve,
+	.pr_release	= sd_pr_release,
+	.pr_preempt	= sd_pr_preempt,
+	.pr_clear	= sd_pr_clear,
+	.pr_read_keys	= sd_pr_read_keys,
+	.pr_read_reservation = sd_pr_read_reservation,
+	#endif
+	.pr_register	= scsi_mpath_pr_register,
+};
+
 struct mpath_head_template smpdt = {
 //	.class = &scsi_mpath_disk_class,
 	.cdev_class = &scsi_mpath_generic_class,
@@ -489,6 +517,7 @@ struct mpath_head_template smpdt = {
 	.ioctl = scsi_mpath_ioctl,
 	.device_groups = mpath_device_groups,
 	.clone_bio = scsi_mpath_clone_bio,
+	.pr_ops = &mapth_pr_ops,
 };
 
 /*
