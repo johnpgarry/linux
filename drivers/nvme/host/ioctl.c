@@ -698,23 +698,24 @@ int nvme_ns_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 	return 0;
 }
 #ifdef CONFIG_NVME_MULTIPATH
-#ifdef dsdd
-static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
+static int nvme_mpath_device_ctrl_ioctl(struct mpath_device *mpath_device, unsigned int cmd,
 		void __user *argp, struct nvme_ns_head *head, int srcu_idx,
 		bool open_for_write)
-	__releases(&head->srcu)
 {
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
 	struct nvme_ctrl *ctrl = ns->ctrl;
 	int ret;
 
 	nvme_get_ctrl(ns->ctrl);
-	srcu_read_unlock(&head->srcu, srcu_idx);
+	mpath_head_read_unlock(mpath_head, srcu_idx);
 	pr_err("%s cmd=0x%x calling nvme_ctrl_ioctl\n", __func__, cmd);
 	ret = nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
 
 	nvme_put_ctrl(ctrl);
 	return ret;
 }
+#ifdef dsdd
 #error
 int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg)
@@ -773,7 +774,7 @@ long nvme_ns_head_chr_ioctl(struct file *file, unsigned int cmd,
 
 	if (is_ctrl_ioctl(cmd)) {
 		pr_err("%s2 cmd=0x%x arg=%ld ns=%pS calling nvme_ns_head_ctrl_ioctl\n", __func__, cmd, arg, ns);
-		return nvme_ns_head_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
+		return nvme_mpath_device_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
 				open_for_write);
 	}
 
@@ -823,16 +824,9 @@ int nvme_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	 * deadlock when deleting namespaces using the passthrough interface.
 	 */
 	if (is_ctrl_ioctl(cmd)) {
-		struct nvme_ctrl *ctrl = ns->ctrl;
-		pr_err("%s2 is_ctrl_ioctl=%d calling nvme_ns_head_ctrl_ioctl\n", __func__, is_ctrl_ioctl(cmd));
-
-		nvme_get_ctrl(ctrl);
-		mpath_head_read_unlock(mpath_head, srcu_idx);
-		pr_err("%s cmd=0x%x calling nvme_ctrl_ioctl\n", __func__, cmd);
-		ret = nvme_ctrl_ioctl(ctrl, cmd, argp, open_for_write);
-
-		nvme_put_ctrl(ctrl);
-		return ret;
+		pr_err("%s2 is_ctrl_ioctl=%d calling nvme_mpath_device_ctrl_ioctl\n", __func__, is_ctrl_ioctl(cmd));
+		return nvme_mpath_device_ctrl_ioctl(mpath_device, cmd, argp, head, srcu_idx,
+					       open_for_write);
 	}
 
 	pr_err("%s3 is_ctrl_ioctl=%d calling nvme_ns_ioctl\n", __func__, is_ctrl_ioctl(cmd));
