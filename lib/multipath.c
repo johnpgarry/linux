@@ -440,11 +440,18 @@ static int mpath_report_zones(struct gendisk *disk, sector_t sector,
 
 static int mpath_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 {
-	/* some standard values */
-	/* TODO: find a way to hook this into sd_getgeo() */
-	geo->heads = 1 << 6;
-	geo->sectors = 1 << 5;
-	geo->cylinders = get_capacity(disk) >> 11;
+	struct mpath_head *mpath_head = disk->private_data;
+	int srcu_idx, ret = 0;
+	struct mpath_device *mpath_device;
+
+	pr_err("%s\n", __func__);
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device && mpath_device->disk->fops->getgeo) { //-ENOTTY for no method
+		pr_err("%s2 getgeo=%pS\n", __func__, mpath_device->disk->fops->getgeo);
+		ret = mpath_device->disk->fops->getgeo(mpath_device->disk, geo);
+	}
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return 0;
 }

@@ -1643,6 +1643,8 @@ static int sd_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 	sector_t capacity = logical_to_sectors(sdp, sdkp->capacity);
 	int diskinfo[4];
 
+	pr_err("%s disk=%pS sdp=%pS\n", __func__, disk, sdp);
+
 	/* default to most commonly used values */
 	diskinfo[0] = 0x40;	/* 1 << 6 */
 	diskinfo[1] = 0x20;	/* 1 << 5 */
