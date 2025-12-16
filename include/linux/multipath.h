@@ -87,7 +87,7 @@ struct mpath_head_template {
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
-		    unsigned int cmd, unsigned long arg);
+		    unsigned int cmd, unsigned long arg, bool *unlocked);
 	int (*report_zones)(struct mpath_device *, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args);
 	struct bio *(*clone_bio)(struct bio *);

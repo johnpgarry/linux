@@ -394,6 +394,7 @@ static int mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 	struct mpath_head *mpath_head = disk->private_data;
 	struct mpath_device *mpath_device;
 	int srcu_idx, err;
+	bool unlocked = false;
 
 	pr_err("%s cmd=0x%x arg=%ld mpath_head=%pS\n", __func__, cmd, arg, mpath_head);
 	
@@ -409,10 +410,11 @@ static int mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 		goto out_unlock;
 	}
 
-	err = mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg);
+	err = mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, &unlocked);
 
 out_unlock:
-	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	if (!unlocked)
+		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return err;
 }
 
@@ -506,9 +508,10 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 	struct mpath_device *mpath_device;
 	fmode_t mode = file->f_mode;
 	int srcu_idx, err;
+	bool unlocked = false;
 
-	pr_err("%s cdev=%pS cmd=0x%x arg=%ld mpath_head=%pS\n",
-		__func__, cdev, cmd, arg, mpath_head);
+	pr_err("%s cdev=%pS cmd=0x%x arg=%ld mpath_head=%pS mode=%d\n",
+		__func__, cdev, cmd, arg, mpath_head, mode);
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
@@ -531,10 +534,11 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 	 * may try and take the device offline, in which case all further
 	 * access to the device is prohibited.
 	 */
-	err = mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg);
+	err = 0;//mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, &unlocked);
 
 out_unlock:
-	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	if (unlocked == false)
+		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return err;
 }
 

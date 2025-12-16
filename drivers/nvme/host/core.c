@@ -3952,11 +3952,20 @@ static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
 	return true;
 }
 
-static int nvme_mpath_ioctl(struct mpath_device *, blk_mode_t mode,
-		    unsigned int cmd, unsigned long arg)
-{
-	return 0;
-}
+#ifdef dsdsd_copied_from_multipathc
+const struct block_device_operations nvme_ns_head_ops = {
+	.owner		= THIS_MODULE,
+	.submit_bio	= nvme_ns_head_submit_bio,
+	.open		= nvme_ns_head_open,
+	.release	= nvme_ns_head_release,
+	.ioctl		= nvme_ns_head_ioctl,
+	.compat_ioctl	= blkdev_compat_ptr_ioctl,
+	.getgeo		= nvme_getgeo,
+	.get_unique_id	= nvme_ns_head_get_unique_id,
+	.report_zones	= nvme_ns_head_report_zones,
+	.pr_ops		= &nvme_pr_ops,
+};
+#endif
 
 const struct mpath_head_template mpdt = {
 //	.class = &scsi_mpath_head_class,

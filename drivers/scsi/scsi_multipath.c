@@ -396,7 +396,7 @@ static inline bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 }
 
 static int scsi_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
-		    unsigned int cmd, unsigned long arg)
+		    unsigned int cmd, unsigned long arg, bool *unlocked)
 {
 	int err;
 	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);

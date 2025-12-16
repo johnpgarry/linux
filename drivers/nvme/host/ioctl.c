@@ -715,7 +715,7 @@ static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
 	nvme_put_ctrl(ctrl);
 	return ret;
 }
-
+#error
 int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg)
 {
@@ -740,7 +740,8 @@ int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
 	 * deadlock when deleting namespaces using the passthrough interface.
 	 */
 	if (is_ctrl_ioctl(cmd)) {
-		pr_err("%s2 is_ctrl_ioctl=%d calling nvme_ns_head_ctrl_ioctl\n", __func__, is_ctrl_ioctl(cmd));
+		pr_err("%s2 is_ctrl_ioctl=%d calling nvme_ns_head_ctrl_ioctl cmd=0x%x\n",
+		__func__, is_ctrl_ioctl(cmd), cmd);
 		return nvme_ns_head_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
 					       open_for_write);
 	}
@@ -798,6 +799,49 @@ int nvme_ns_head_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 	return ret;
 }
 #endif
+
+int nvme_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
+		    unsigned int cmd, unsigned long arg, bool *unlocked)
+{
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	struct block_device *bdev = mpath_head->disk->part0;
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
+	bool open_for_write = mode & BLK_OPEN_WRITE;
+	void __user *argp = (void __user *)arg;
+	int srcu_idx, ret = -EWOULDBLOCK;
+	unsigned int flags = 0;
+
+	pr_err("%s is_ctrl_ioctl=%d mpath_head=%pS bdev=%pS head=%pS\n",
+		__func__, is_ctrl_ioctl(cmd), mpath_head, bdev, head);
+	if (bdev_is_partition(bdev))
+		flags |= NVME_IOCTL_PARTITION;
+
+	/*
+	 * Handle ioctls that apply to the controller instead of the namespace
+	 * separately and drop the ns SRCU reference early.  This avoids a
+	 * deadlock when deleting namespaces using the passthrough interface.
+	 */
+	if (is_ctrl_ioctl(cmd)) {
+		struct nvme_ctrl *ctrl = ns->ctrl;
+		pr_err("%s2 is_ctrl_ioctl=%d calling nvme_ns_head_ctrl_ioctl\n", __func__, is_ctrl_ioctl(cmd));
+
+		nvme_get_ctrl(ctrl);
+		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+		*unlocked = true;
+		pr_err("%s cmd=0x%x calling nvme_ctrl_ioctl\n", __func__, cmd);
+		ret = nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
+
+		nvme_put_ctrl(ctrl);
+		return ret;
+	}
+
+	pr_err("%s3 is_ctrl_ioctl=%d calling nvme_ns_ioctl\n", __func__, is_ctrl_ioctl(cmd));
+	ret = nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
+
+	return ret;
+}
+
 #endif /* CONFIG_NVME_MULTIPATH */
 
 int nvme_dev_uring_cmd(struct io_uring_cmd *ioucmd, unsigned int issue_flags)
