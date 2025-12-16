@@ -496,6 +496,21 @@ static int scsi_mpath_pr_register(struct mpath_device *mpath_device, u64 old_key
 	return mpath_device->disk->fops->pr_ops->pr_register(bdev, old_key, new_key, flags);
 }
 
+static int scsi_mpath_pr_reserve(struct mpath_device *mpath_device, u64 key, enum pr_type type,
+		u32 flags)
+{
+	struct scsi_mpath_device *scsi_multipath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_multipath_dev->sdev;
+	struct block_device *bdev = mpath_device->disk->part0;
+
+	pr_err("%s scsi_multipath_dev=%pS sdev=%pS\n", __func__, scsi_multipath_dev, sdev);
+
+	if (!mpath_device->disk->fops->pr_ops)
+		return -EOPNOTSUPP;
+
+	return mpath_device->disk->fops->pr_ops->pr_reserve(bdev, key, type, flags);
+}
+
 static const struct mpath_pr_ops mapth_pr_ops = {
 	#ifdef dsdsd
 	.pr_register	= sd_pr_register,
@@ -507,6 +522,7 @@ static const struct mpath_pr_ops mapth_pr_ops = {
 	.pr_read_reservation = sd_pr_read_reservation,
 	#endif
 	.pr_register	= scsi_mpath_pr_register,
+	.pr_reserve	= scsi_mpath_pr_reserve,
 };
 
 struct mpath_head_template smpdt = {
