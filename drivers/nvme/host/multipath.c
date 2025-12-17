@@ -65,34 +65,6 @@ module_param_cb(multipath_always_on, &multipath_always_on_ops,
 MODULE_PARM_DESC(multipath_always_on,
 	"create multipath node always except for private namespace with non-unique nsid; note that this also implicitly enables native multipath support");
 static int iopolicy = NVME_IOPOLICY_NUMA;
-#ifdef dsdsd
-static const char *nvme_iopolicy_names[] = {
-	[NVME_IOPOLICY_NUMA]	= "numa",
-	[NVME_IOPOLICY_RR]	= "round-robin",
-	[NVME_IOPOLICY_QD]      = "queue-depth",
-};
-
-
-static int nvme_set_iopolicy(const char *val, const struct kernel_param *kp)
-{
-	if (!val)
-		return -EINVAL;
-	if (!strncmp(val, "numa", 4))
-		iopolicy = NVME_IOPOLICY_NUMA;
-	else if (!strncmp(val, "round-robin", 11))
-		iopolicy = NVME_IOPOLICY_RR;
-	else if (!strncmp(val, "queue-depth", 11))
-		iopolicy = NVME_IOPOLICY_QD;
-	else
-		return -EINVAL;
-
-	return 0;
-}
-static int nvme_get_iopolicy(char *buf, const struct kernel_param *kp)
-{
-	return sprintf(buf, "%s\n", nvme_iopolicy_names[iopolicy]);
-}
-#endif
 
 module_param_call(iopolicy, mpath_set_iopolicy, mpath_get_iopolicy,
 	&iopolicy, 0644);
