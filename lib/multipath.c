@@ -1239,7 +1239,7 @@ static void mpath_free_disk(struct kref *ref)
 
 
 // nvme_mpath_remove_disk
-static void mpath_remove_disk(struct mpath_head *mpath_head)
+void mpath_remove_disk(struct mpath_head *mpath_head)
 {
 	bool remove = false;
 	struct gendisk *disk = mpath_head->disk;
@@ -1250,7 +1250,7 @@ static void mpath_remove_disk(struct mpath_head *mpath_head)
 	if (!disk)
 		return;
 
-	//mutex_lock(&mpath_subsys->lock);
+	mutex_lock(&mpath_subsys->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -1276,11 +1276,11 @@ static void mpath_remove_disk(struct mpath_head *mpath_head)
 		mod_delayed_work(mpath_wq, &mpath_head->remove_work,
 				mpath_head->delayed_removal_secs * HZ);
 	} else {
-	//	list_del_init(&head->entry);
+		list_del_init(&mpath_head->entry);
 		remove = true;
 	}
 out:
-//	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 	if (remove) {
 		pr_err("%s9 calling nvme_remove_head mpath_head=%pS\n",
 			__func__, mpath_head);

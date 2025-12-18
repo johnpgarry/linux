@@ -383,6 +383,8 @@ int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
 	return ret;
 }
 
+
+#ifdef dsdsdd
 static void nvme_remove_head(struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = mpath_priv_to_head(head);
@@ -418,6 +420,7 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 			__func__, head);
 	nvme_put_ns_head(head);
 }
+#endif
 
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
@@ -834,6 +837,7 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 #endif
 }
 
+#ifdef dsdsd
 void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	bool remove = false;
@@ -883,6 +887,7 @@ out:
 		nvme_remove_head(head);
 	}
 }
+#endif
 
 void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {

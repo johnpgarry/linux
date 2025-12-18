@@ -4454,8 +4454,8 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
 		__func__, ns, list_empty(&mpath_head->dev_list));
 	if (list_empty(&mpath_head->dev_list)) {
-	//	if (!nvme_mpath_queue_if_no_path(ns_to_head(ns)))
-	//		list_del_init(&ns_to_head(ns)->entry);
+		if (!mpath_head_queue_if_no_path(mpath_head))
+			list_del_init(&mpath_head->entry);
 		last_path = true;
 	}
 	pr_err("%s3 ns=%pS last_path=%d\n", __func__, ns, last_path);
@@ -4480,9 +4480,9 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	synchronize_srcu(&ns->ctrl->srcu);
 
 	if (last_path) {
-		pr_err("%s6 ns=%pS calling nvme_mpath_remove_disk ns_to_head(ns)=%pS\n",
+		pr_err("%s6 ns=%pS calling mpath_remove_disk ns_to_head(ns)=%pS\n",
 			__func__, ns, ns_to_head(ns));
-		nvme_mpath_remove_disk(ns_to_head(ns));
+		mpath_remove_disk(mpath_head);
 	}
 	pr_err("%s7 ns=%pS calling nvme_put_ns\n",
 			__func__, ns);

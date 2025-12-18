@@ -192,6 +192,7 @@ ssize_t mpath_iopolicy_show(struct mpath_subsys *mpath_subsys, char *buf);
 ssize_t mpath_iopolicy_store(struct mpath_subsys *mpath_subsys, const char *buf, size_t count);
 
 void mpath_device_set_live(struct mpath_device *mpath_device);
+void mpath_remove_disk(struct mpath_head *mpath_head);
 
 //extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
