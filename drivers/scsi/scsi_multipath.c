@@ -588,7 +588,7 @@ static void scsi_mpath_cdev_rel(struct device *dev)
 {
 //	dev_err(dev, "%s\n", __func__);
 //	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
-	pr_err("%s dev=%pS\n", __func__, dev);
+	dev_err(dev, "%s dev=%pS ida_free(nvme_ns_chr_minor_ida) for nvme, we don't really need this for SCSI so\n", __func__, dev);
 }
 
 static int scsi_mpath_add_cdev(struct mpath_head *mpath_head)
