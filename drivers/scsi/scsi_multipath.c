@@ -711,6 +711,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 	pr_err("%s4.1 called scsi_mpath_find_disk sdev=%pS mpath_head=%pS\n", __func__, sdev, scsi_mpath_head);
 	if (scsi_mpath_head) {
 		struct mpath_subsys *mpath_subsys;
+
 		mpath_head = mpath_priv_to_head(scsi_mpath_head);
 
 		mpath_subsys = mpath_head->mpath_subsys;
@@ -743,7 +744,9 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		goto out_free_ida;
 	}
 
+	INIT_LIST_HEAD(&mpath_head->mpath_subsys->heads);
 	mutex_init(&mpath_head->mpath_subsys->lock);
+	list_add_tail(&mpath_head->entry, &mpath_head->mpath_subsys->heads);
 
 	device_initialize(&scsi_mpath_head->dev);
 	set_dev_node(&scsi_mpath_head->dev, dev_to_node(shost_dev));
