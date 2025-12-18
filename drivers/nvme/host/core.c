@@ -1260,6 +1260,8 @@ EXPORT_SYMBOL_NS_GPL(nvme_command_effects, "NVME_TARGET_PASSTHRU");
 
 u32 nvme_passthru_start(struct nvme_ctrl *ctrl, struct nvme_ns *ns, u8 opcode)
 {
+	struct nvme_subsystem *subsys = ctrl->subsys;
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 	u32 effects = nvme_command_effects(ctrl, ns, opcode);
 
 	/*
@@ -1268,7 +1270,7 @@ u32 nvme_passthru_start(struct nvme_ctrl *ctrl, struct nvme_ns *ns, u8 opcode)
 	 */
 	if (effects & NVME_CMD_EFFECTS_CSE_MASK) {
 		mutex_lock(&ctrl->scan_lock);
-		mutex_lock(&ctrl->subsys->lock);
+		mutex_lock(&mpath_subsys->lock);
 		nvme_mpath_start_freeze(ctrl->subsys);
 		nvme_mpath_wait_freeze(ctrl->subsys);
 		nvme_start_freeze(ctrl);
@@ -1281,10 +1283,13 @@ EXPORT_SYMBOL_NS_GPL(nvme_passthru_start, "NVME_TARGET_PASSTHRU");
 void nvme_passthru_end(struct nvme_ctrl *ctrl, struct nvme_ns *ns, u32 effects,
 		       struct nvme_command *cmd, int status)
 {
+	struct nvme_subsystem *subsys = ctrl->subsys;
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
+
 	if (effects & NVME_CMD_EFFECTS_CSE_MASK) {
 		nvme_unfreeze(ctrl);
 		nvme_mpath_unfreeze(ctrl->subsys);
-		mutex_unlock(&ctrl->subsys->lock);
+		mutex_unlock(&mpath_subsys->lock);
 		mutex_unlock(&ctrl->scan_lock);
 	}
 	if (effects & NVME_CMD_EFFECTS_CCC) {
@@ -3259,7 +3264,7 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 //	pr_err("%s subsys=%pS ctrl=%pS id=%pS id->cmic=%d\n", __func__, subsys, ctrl, id, id->cmic);
 
 	subsys->instance = -1;
-	mutex_init(&subsys->lock);
+	//mutex_init(&subsys->lock);
 	kref_init(&subsys->ref);
 	INIT_LIST_HEAD(&subsys->ctrls);
 	INIT_LIST_HEAD(&subsys->nsheads);
@@ -3837,9 +3842,11 @@ static const struct file_operations nvme_dev_fops = {
 static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 		unsigned nsid)
 {
+	struct nvme_subsystem *subsys = ctrl->subsys;
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 	struct nvme_ns_head *h;
 
-	lockdep_assert_held(&ctrl->subsys->lock);
+	lockdep_assert_held(&mpath_subsys->lock);
 
 	list_for_each_entry(h, &ctrl->subsys->nsheads, entry) {
 		/*
@@ -3859,12 +3866,13 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 		struct nvme_ns_ids *ids)
 {
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 	bool has_uuid = !uuid_is_null(&ids->uuid);
 	bool has_nguid = memchr_inv(ids->nguid, 0, sizeof(ids->nguid));
 	bool has_eui64 = memchr_inv(ids->eui64, 0, sizeof(ids->eui64));
 	struct nvme_ns_head *h;
 
-	lockdep_assert_held(&subsys->lock);
+	lockdep_assert_held(&mpath_subsys->lock);
 
 //	if (has_uuid)
 //		pr_err("%s has_uuid=1 %pU ids=%pS subsys=%pS\n", __func__, &ids->uuid, ids, subsys);
@@ -4090,11 +4098,12 @@ static int nvme_global_check_duplicate_ids(struct nvme_subsystem *this,
 	 */
 	mutex_lock(&nvme_subsystems_lock);
 	list_for_each_entry(s, &nvme_subsystems, entry) {
+		struct mpath_subsys *mpath_subsys = &s->mpath_subsys;
 		if (s == this)
 			continue;
-		mutex_lock(&s->lock);
+		mutex_lock(&mpath_subsys->lock);
 		ret = nvme_subsys_check_duplicate_ids(s, ids);
-		mutex_unlock(&s->lock);
+		mutex_unlock(&mpath_subsys->lock);
 		if (ret)
 			break;
 	}
@@ -4109,6 +4118,8 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	struct nvme_ns_head *head = NULL;
 	struct mpath_device *mpath_device;
 	struct mpath_head *mpath_head;
+	struct nvme_subsystem *subsys = ctrl->subsys;
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 	int ret;
 
 	mpath_device = &ns->mpath_device;
@@ -4151,7 +4162,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		ctrl->quirks |= NVME_QUIRK_BOGUS_NID;
 	}
 
-	mutex_lock(&ctrl->subsys->lock);
+	mutex_lock(&mpath_subsys->lock);
 	//pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x\n", __func__, ns, info->nsid);
 	head = nvme_find_ns_head(ctrl, info->nsid);
 
@@ -4208,7 +4219,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	pr_err("%s22 mpath_head=%pS ns=%pS head=%pS\n",
 		__func__, mpath_head, ns, head);
 	//BUG();
-	mutex_unlock(&ctrl->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 
 #ifdef CONFIG_NVME_MULTIPATH
 	cancel_delayed_work(&mpath_head->remove_work);
@@ -4221,7 +4232,7 @@ out_put_ns_head:
 	nvme_put_ns_head(head);
 out_unlock:
 	pr_err("%s12\n", __func__);
-	mutex_unlock(&ctrl->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 	return ret;
 }
 
@@ -4271,6 +4282,8 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	int node = ctrl->numa_node;
 	bool last_path = false;
 	struct mpath_device *mpath_device;
+	struct nvme_subsystem *subsys = ctrl->subsys;
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 
 	ns = kzalloc_node(sizeof(*ns), GFP_KERNEL, node);
 	if (!ns)
@@ -4375,7 +4388,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	mutex_unlock(&ctrl->namespaces_lock);
 	synchronize_srcu(&ctrl->srcu);
  out_unlink_ns:
-	mutex_lock(&ctrl->subsys->lock);
+	mutex_lock(&mpath_subsys->lock);
 	list_del_rcu(&ns->mpath_device.siblings);
 	#ifdef dsddd
 	if (list_empty(&ns_to_head(ns)->list)) {
@@ -4392,7 +4405,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 			last_path = true;
 	}
 	#endif
-	mutex_unlock(&ctrl->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 	if (last_path)
 		nvme_put_ns_head(ns_to_head(ns));
 	nvme_put_ns_head(ns_to_head(ns));
@@ -4407,6 +4420,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	bool last_path = false;
 	struct mpath_device *mpath_device = &ns->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
 		return;
@@ -4427,7 +4441,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (mpath_clear_current_path(mpath_device))
 		synchronize_srcu(&mpath_head->srcu);
 
-	mutex_lock(&ns->ctrl->subsys->lock);
+	mutex_lock(&mpath_subsys->lock);
 	list_del_rcu(&ns->mpath_device.siblings);
 	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
 		__func__, ns, list_empty(&mpath_head->dev_list));
@@ -4437,7 +4451,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		last_path = true;
 	}
 	pr_err("%s3 ns=%pS last_path=%d\n", __func__, ns, last_path);
-	mutex_unlock(&ns->ctrl->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 
 	/* guarantee not available in head->list */
 	synchronize_srcu(&mpath_head->srcu);

@@ -738,7 +738,7 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 	INIT_LIST_HEAD(&mpath_head->dev_list);
 	INIT_WORK(&mpath_head->partition_scan_work, multipath_partition_scan_work);
 	pr_err("%s6\n", __func__);
-	mutex_init(&mpath_head->lock);
+	//mutex_init(&mpath_head->lock);
 	kref_init(&mpath_head->ref);
 
 	//mpath_head->dev.class = mpdt->class; //&scsi_mpath_head_class;
@@ -924,6 +924,7 @@ EXPORT_SYMBOL_GPL(mpath_alloc_head_disk);
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 	int ret;
 
 	pr_err("%s disk=%pS MPATH_HEAD_DISK_LIVE=%d\n",
@@ -953,7 +954,8 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 
 	mpath_add_sysfs_link(mpath_head);
 
-	mutex_lock(&mpath_head->lock);
+	// original used nvme_ns_head lock for this only!
+	mutex_lock(&mpath_subsys->lock);
 	if (mpath_head->mpdt->is_optimized(mpath_device)) { //checkme is proper CB
 		int node, srcu_idx;
 
@@ -962,7 +964,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 			__mpath_find_path(mpath_head, node);
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	}
-	mutex_unlock(&mpath_head->lock);
+	mutex_unlock(&mpath_subsys->lock);
 
 	synchronize_srcu(&mpath_head->srcu);
 	kblockd_schedule_work(&mpath_head->requeue_work);
@@ -1243,12 +1245,12 @@ static void mpath_remove_disk(struct mpath_head *mpath_head)
 	struct gendisk *disk = mpath_head->disk;
 	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 
-	pr_err("%s mpath_head=%pS disk=%pS\n",
-		__func__, mpath_head, disk);
+	pr_err("%s mpath_head=%pS disk=%pS mpath_subsys=%pS\n",
+		__func__, mpath_head, disk, mpath_subsys);
 	if (!disk)
 		return;
 
-	mutex_lock(&mpath_subsys->lock);
+	//mutex_lock(&mpath_subsys->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -1261,8 +1263,8 @@ static void mpath_remove_disk(struct mpath_head *mpath_head)
 	 
 	pr_err("%s1 mpath_head=%pS list_empty(dev_list)=%d\n",
 		__func__, mpath_head, list_empty(&mpath_head->dev_list));
-	//if (!list_empty(&mpath_head->dev_list))
-	//	goto out;
+	if (!list_empty(&mpath_head->dev_list))
+		goto out;
 
 	if (mpath_head->delayed_removal_secs) {
 		/*
@@ -1291,13 +1293,15 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 {
 	bool last_path = false;
 	struct mpath_head *mpath_head;
+	struct mpath_subsys *mpath_subsys;
 	
 	pr_err("%s mpath_device=%pS\n", __func__, mpath_device);
 
 	mpath_head = mpath_device->mpath_head;
+	mpath_subsys = mpath_head->mpath_subsys;
 
-	pr_err("%s1 mpath_device=%pS calling mpath_remove_sysfs_link\n",
-		__func__, mpath_device);
+	pr_err("%s1 mpath_device=%pS mpath_subsys=%pS calling mpath_remove_sysfs_link\n",
+		__func__, mpath_device, mpath_subsys);
 	mpath_remove_sysfs_link(mpath_device);
 
 	synchronize_srcu(&mpath_head->srcu);
@@ -1317,7 +1321,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 	flush_work(&mpath_head->requeue_work);
 	//put_disk(sdev->scsi_mpath_dev);
 
-	mutex_lock(&mpath_head->lock);
+	mutex_lock(&mpath_subsys->lock);
 	
 	list_del_rcu(&mpath_device->siblings);
 	pr_err("%s3 list_empty=%d\n", __func__, list_empty(&mpath_head->dev_list));
@@ -1327,7 +1331,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 		}
 		last_path = true;
 	}
-	mutex_unlock(&mpath_head->lock);
+	mutex_unlock(&mpath_subsys->lock);
 
 	pr_err("%s4 last_path=%d\n",
 		__func__, last_path);

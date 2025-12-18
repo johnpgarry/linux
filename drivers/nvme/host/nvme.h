@@ -438,7 +438,9 @@ struct nvme_subsystem {
 	 */
 	struct kref		ref;
 	struct list_head	entry;
+	#ifdef dsdsdd
 	struct mutex		lock;
+	#endif
 	struct list_head	ctrls;
 	struct list_head	nsheads;
 	char			subnqn[NVMF_NQN_SIZE];

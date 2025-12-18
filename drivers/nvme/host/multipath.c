@@ -78,10 +78,11 @@ void nvme_mpath_default_iopolicy(struct nvme_subsystem *subsys)
 
 void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 {
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 	struct nvme_ns_head *h;
 
 	pr_err("%s subsys=%pS\n", __func__, subsys);
-	lockdep_assert_held(&subsys->lock);
+	lockdep_assert_held(&mpath_subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
 		struct mpath_head *mpath_head = mpath_priv_to_head(h);
 		struct gendisk *disk = mpath_head->disk;
@@ -92,10 +93,11 @@ void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 
 void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 {
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 	struct nvme_ns_head *h;
 
 	pr_err("%s subsys=%pS\n", __func__, subsys);
-	lockdep_assert_held(&subsys->lock);
+	lockdep_assert_held(&mpath_subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
 		struct mpath_head *mpath_head = mpath_priv_to_head(h);
 		struct gendisk *disk = mpath_head->disk;
@@ -106,10 +108,11 @@ void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 
 void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 {
+	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
 	struct nvme_ns_head *h;
 
 	pr_err("%s subsys=%pS\n", __func__, subsys);
-	lockdep_assert_held(&subsys->lock);
+	lockdep_assert_held(&mpath_subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
 		struct mpath_head *mpath_head = mpath_priv_to_head(h);
 		struct gendisk *disk = mpath_head->disk;
@@ -733,23 +736,25 @@ DEVICE_ATTR_RO(numa_nodes);
 static ssize_t delayed_removal_secs_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	struct gendisk *disk = dev_to_disk(dev);
-	struct mpath_head *mpath_head = disk->private_data;
-	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	__maybe_unused struct gendisk *disk = dev_to_disk(dev);
+	__maybe_unused struct mpath_head *mpath_head = disk->private_data;
+	__maybe_unused struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 	int ret;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&mpath_subsys->lock);
 	ret = sysfs_emit(buf, "%u\n", mpath_head->delayed_removal_secs);
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 	return ret;
 }
 
 static ssize_t delayed_removal_secs_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct gendisk *disk = dev_to_disk(dev);
-	struct mpath_head *mpath_head = disk->private_data;
-	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	__maybe_unused struct gendisk *disk = dev_to_disk(dev);
+	__maybe_unused struct mpath_head *mpath_head = disk->private_data;
+	__maybe_unused struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 	unsigned int sec;
 	int ret;
 
@@ -757,13 +762,13 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&mpath_subsys->lock);
 	mpath_head->delayed_removal_secs = sec;
 //	if (sec)
 //		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
 //	else
 //		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 	/*
 	 * Ensure that update to NVME_NSHEAD_QUEUE_IF_NO_PATH is seen
 	 * by its reader.
@@ -836,6 +841,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	bool remove = false;
 	struct mpath_head *mpath_head = mpath_priv_to_head(head);
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 	struct gendisk *disk = mpath_head->disk;
 
 	pr_err("%s head=%pS disk=%pS\n",
@@ -843,7 +849,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	if (!disk)
 		return;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&mpath_subsys->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -873,7 +879,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 		remove = true;
 	}
 out:
-//	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&mpath_subsys->lock);
 	if (remove) {
 		pr_err("%s9 calling nvme_remove_head head=%pS\n",
 			__func__, head);

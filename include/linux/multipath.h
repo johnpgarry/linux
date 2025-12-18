@@ -35,7 +35,7 @@ enum mpath_iopolicy {
 
 struct mpath_subsys {
 	enum mpath_iopolicy	iopolicy;
-	struct mutex		lock;
+	struct mutex            lock;
 };
 
 struct mpath_head {
@@ -54,7 +54,6 @@ struct mpath_head {
 	unsigned long           flags;		/* flag for multipath devices*/
 
 	struct work_struct	partition_scan_work;
-	struct mutex            lock;
 
 	struct device *parent;
 

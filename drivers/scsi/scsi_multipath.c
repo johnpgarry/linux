@@ -710,11 +710,14 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 	scsi_mpath_head = scsi_mpath_find_disk(sdev);
 	pr_err("%s4.1 called scsi_mpath_find_disk sdev=%pS mpath_head=%pS\n", __func__, sdev, scsi_mpath_head);
 	if (scsi_mpath_head) {
+		struct mpath_subsys *mpath_subsys;
 		mpath_head = mpath_priv_to_head(scsi_mpath_head);
-		mutex_lock(&mpath_head->lock);
-		list_add_tail(&mpath_device->siblings, &mpath_head->dev_list);
-		mutex_unlock(&mpath_head->lock);
+
+		mpath_subsys = mpath_head->mpath_subsys;
+		mutex_lock(&mpath_subsys->lock);
+		list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
 		mpath_device->mpath_head = mpath_head;
+		mutex_unlock(&mpath_subsys->lock);
 		return 0;
 	}
 
@@ -1136,7 +1139,7 @@ void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
 	scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
 	pr_err("%s clearing SCSI_MPATH_DISK_LIVE (if set) sdev=%pS\n", __func__, sdev);
-	if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
+	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
 		synchronize_srcu(&mpath_head->srcu);
 		kblockd_schedule_work(&mpath_head->requeue_work);
 	//	del_gendisk(sdev->scsi_mpath_dev);
