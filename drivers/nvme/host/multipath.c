@@ -682,17 +682,29 @@ static void nvme_requeue_work(struct work_struct *work)
 
 static void nvme_remove_head(struct nvme_ns_head *head)
 {
+	pr_err("%s head=%pS NVME_NSHEAD_DISK_LIVE set=%d\n",
+		__func__, head, test_bit(NVME_NSHEAD_DISK_LIVE, &head->flags));
 	if (test_and_clear_bit(NVME_NSHEAD_DISK_LIVE, &head->flags)) {
 		/*
 		 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
 		 * to allow multipath to fail all I/O.
 		 */
+		pr_err("%s2 head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, head);
 		kblockd_schedule_work(&head->requeue_work);
 
+		pr_err("%s3 head=%pS calling nvme_cdev_del\n",
+			__func__, head);
 		nvme_cdev_del(&head->cdev, &head->cdev_device);
+		pr_err("%s4 head=%pS calling synchronize_srcu\n",
+			__func__, head);
 		synchronize_srcu(&head->srcu);
+		pr_err("%s5 head=%pS calling del_gendisk\n",
+			__func__, head);
 		del_gendisk(head->disk);
 	}
+	pr_err("%s6 head=%pS calling nvme_put_ns_head\n",
+			__func__, head);
 	nvme_put_ns_head(head);
 }
 
@@ -736,6 +748,10 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	 * either case, for private namespaces, we ensure that the NSID is
 	 * unique.
 	 */
+	pr_err("%s1 ctrl=%pS head=%pS checking multipath_always_on=%d CMIC_MULTI set=%d multipath=%d\n",
+		__func__, ctrl, head, multipath_always_on,
+		!!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL),
+		multipath);
 	if (!multipath_always_on) {
 		if (!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL) ||
 				!multipath)
@@ -769,6 +785,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	set_bit(GD_SUPPRESS_PART_SCAN, &head->disk->state);
 	sprintf(head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
+	pr_err("%s4 head=%pS calling nvme_tryget_ns_head\n", __func__, head);
 	nvme_tryget_ns_head(head);
 	return 0;
 }
@@ -993,11 +1010,12 @@ void nvme_mpath_update(struct nvme_ctrl *ctrl)
 {
 	u32 nr_change_groups = 0;
 
-	pr_err("%s ctrl=%pS\n", __func__, ctrl);
+	pr_err("%s ctrl=%pS ana_log_buf=%pS\n", __func__, ctrl, ctrl->ana_log_buf);
 	if (!ctrl->ana_log_buf)
 		return;
 
 	mutex_lock(&ctrl->ana_lock);
+	pr_err("%s2 ctrl=%pS calling nvme_parse_ana_log\n", __func__, ctrl);
 	nvme_parse_ana_log(ctrl, &nr_change_groups, nvme_update_ana_state);
 	mutex_unlock(&ctrl->ana_lock);
 }
@@ -1299,6 +1317,9 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	bool remove = false;
 
+	pr_err("%s head=%pS head->disk=%pS\n",
+		__func__, head, head->disk);
+
 	if (!head->disk)
 		return;
 
@@ -1312,6 +1333,8 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	 * head->list here. If it is no longer empty then we skip enqueuing the
 	 * delayed head removal work.
 	 */
+	pr_err("%s1 head=%pS list_empty(&head->list)=%d\n",
+		__func__, head, list_empty(&head->list));
 	if (!list_empty(&head->list))
 		goto out;
 
@@ -1330,23 +1353,37 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	}
 out:
 	mutex_unlock(&head->subsys->lock);
-	if (remove)
+	if (remove) {
+		pr_err("%s9 calling nvme_remove_head head=%pS\n",
+			__func__, head);
 		nvme_remove_head(head);
+	}
 }
 
 void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
+	pr_err("%s head=%pS head->disk=%pS\n",
+		__func__, head, head->disk);
 	if (!head->disk)
 		return;
+	pr_err("%s1 head=%pS calling kblockd_schedule_work requeue_work\n",
+		__func__, head);
 	/* make sure all pending bios are cleaned up */
 	kblockd_schedule_work(&head->requeue_work);
+	pr_err("%s2 head=%pS calling flush_work requeue_work\n",
+		__func__, head);
 	flush_work(&head->requeue_work);
+	pr_err("%s3 head=%pS calling flush_work partition_scan_work\n",
+		__func__, head);
 	flush_work(&head->partition_scan_work);
+	pr_err("%s4 head=%pS head->disk=%pS calling put_disk\n",
+		__func__, head, head->disk);
 	put_disk(head->disk);
 }
 
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl)
 {
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	mutex_init(&ctrl->ana_lock);
 	timer_setup(&ctrl->anatt_timer, nvme_anatt_timeout, 0);
 	INIT_WORK(&ctrl->ana_work, nvme_ana_work);

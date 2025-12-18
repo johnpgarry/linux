@@ -707,7 +707,7 @@ int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
 	unsigned int flags = 0;
-
+	pr_err("%s is_ctrl_ioctl=%d\n", __func__, is_ctrl_ioctl(cmd));
 	if (bdev_is_partition(bdev))
 		flags |= NVME_IOCTL_PARTITION;
 
@@ -721,10 +721,14 @@ int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
 	 * separately and drop the ns SRCU reference early.  This avoids a
 	 * deadlock when deleting namespaces using the passthrough interface.
 	 */
-	if (is_ctrl_ioctl(cmd))
+	if (is_ctrl_ioctl(cmd)) {
+		pr_err("%s2 is_ctrl_ioctl=%d calling nvme_ns_head_ctrl_ioctl cmd=0x%x\n",
+		__func__, is_ctrl_ioctl(cmd), cmd);
 		return nvme_ns_head_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
 					       open_for_write);
+	}
 
+	pr_err("%s3 is_ctrl_ioctl=%d calling nvme_ns_ioctl cmd=0x%x\n", __func__, is_ctrl_ioctl(cmd), cmd);
 	ret = nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
 out_unlock:
 	srcu_read_unlock(&head->srcu, srcu_idx);

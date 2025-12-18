@@ -3256,6 +3256,8 @@ static void nvme_reset_work(struct work_struct *work)
 		goto out;
 	}
 
+	pr_err("%s\n", __func__);
+
 	nvme_start_ctrl(&dev->ctrl);
 	return;
 
