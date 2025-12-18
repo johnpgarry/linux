@@ -811,8 +811,10 @@ static void mpath_free_head(struct kref *ref)
 // nvme_put_ns_head
 static void mpath_put_head(struct mpath_head *mpath_head)
 {
-	pr_err("%s mpath_head=%pS calling kref_put -> nvme_free_ns_head\n",
-		__func__, mpath_head);
+	struct kref *kref = &mpath_head->ref;
+
+	pr_err("%s mpath_head=%pS calling kref_put -> mpath_free_head kref refcount=%d\n",
+		__func__, mpath_head, refcount_read(&kref->refcount));
 	kref_put(&mpath_head->ref, mpath_free_head);
 }
 
@@ -845,7 +847,7 @@ static void mpath_remove_head(struct mpath_head *mpath_head)
 		del_gendisk(disk);
 	}
 
-	pr_err("%s6 mpath_head=%pS calling nvme_put_ns_head\n",
+	pr_err("%s6 mpath_head=%pS calling mpath_put_head\n",
 			__func__, mpath_head);
 	mpath_put_head(mpath_head);
 }
@@ -871,9 +873,15 @@ static void mpath_remove_head_work(struct work_struct *work)
 	module_put(THIS_MODULE);
 }
 
+static bool mpath_tryget_head(struct mpath_head *mpath_head)
+{
+	return kref_get_unless_zero(&mpath_head->ref);
+}
+
 int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 {
 	struct queue_limits lim;
+	struct kref *ref = &mpath_head->ref;
 	int ret;
 
 	INIT_DELAYED_WORK(&mpath_head->remove_work, mpath_remove_head_work);
@@ -917,6 +925,11 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	bio_list_init(&mpath_head->requeue_list);
 	pr_err("%s12.3 ret=%d after bio_list_init mpath_head=%pS sdev->scsi_mpath_dev=%pS\n",
 		__func__, ret, NULL, NULL);
+
+	mpath_tryget_head(mpath_head);
+
+	pr_err("%s12.4 called mpath_tryget_head ref=%pS refcount=%d\n",
+		__func__, ref, refcount_read(&ref->refcount));
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_head_disk);
@@ -1145,6 +1158,7 @@ int mpath_add_head(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_add_head);
 
+//nvme_mpath_put_disk
 void mpath_put_disk(struct mpath_head *mpath_head)
 {
 	pr_err("%s mpath_head=%pS calling kref_put -> mpath_free_disk\n",

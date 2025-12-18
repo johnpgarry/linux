@@ -700,8 +700,10 @@ bool nvme_tryget_ns_head(struct nvme_ns_head *head)
 
 void nvme_put_ns_head(struct nvme_ns_head *head)
 {
-	pr_err("%s head=%pS calling kref_put -> nvme_free_ns_head\n",
-		__func__, head);
+	struct kref *ref = &head->ref;
+
+	pr_err("%s head=%pS calling kref_put -> nvme_free_ns_head ref=%pS refcount=%d\n",
+		__func__, head, ref, refcount_read(&ref->refcount));
 	kref_put(&head->ref, nvme_free_ns_head);
 }
 
@@ -4429,11 +4431,13 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	struct mpath_device *mpath_device = &ns->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
+	struct kref *kref = &mpath_head->ref;
 
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
 		return;
 
-	pr_err("%s ns=%pS\n", __func__, ns);
+	pr_err("%s ns=%pS head kref=%pS refcount=%d\n",
+		__func__, ns, kref, refcount_read(&kref->refcount));
 
 	clear_bit(NVME_NS_READY, &ns->flags);
 	set_capacity(ns->disk, 0);
