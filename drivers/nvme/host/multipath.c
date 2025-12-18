@@ -387,9 +387,9 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 
-	pr_err("%s head=%pS MPATH_DISK_LIVE set=%d\n",
-		__func__, head, test_bit(MPATH_DISK_LIVE, &mpath_head->flags));
-	if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
+	pr_err("%s head=%pS MPATH_HEAD_DISK_LIVE set=%d\n",
+		__func__, head, test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags));
+	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
 		struct mpath_head *mpath_head = mpath_priv_to_head(head);
 		struct gendisk *disk = mpath_head->disk;
 		/*
@@ -419,33 +419,12 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 	nvme_put_ns_head(head);
 }
 
-static void nvme_remove_head_work(struct work_struct *work)
-{
-	struct nvme_ns_head *head = container_of(to_delayed_work(work),
-			struct nvme_ns_head, remove_work);
-	bool remove = false;
-	struct mpath_head *mpath_head = mpath_priv_to_head(head);
-
-	mutex_lock(&head->subsys->lock);
-	if (list_empty(&mpath_head->dev_list)) {
-		list_del_init(&mpath_head->dev_list);
-		remove = true;
-	}
-	mutex_unlock(&head->subsys->lock);
-	if (remove)
-		nvme_remove_head(head);
-
-	module_put(THIS_MODULE);
-}
-
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 	struct gendisk *gendisk = mpath_head->disk;
 	int ret;
 
-	INIT_DELAYED_WORK(&head->remove_work, nvme_remove_head_work);
-	head->delayed_removal_secs = 0;
 
 	/*
 	 * If "multipath_always_on" is enabled, a multipath node is added
@@ -565,7 +544,7 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		 * is not live but still create the sysfs link to this path from
 		 * head node if head node of the path has already come alive.
 		 */
-		if (test_bit(MPATH_DISK_LIVE, &mpath_head->flags))
+		if (test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags))
 			mpath_add_sysfs_link((&ns->mpath_device)->mpath_head);
 	}
 }
@@ -755,11 +734,12 @@ static ssize_t delayed_removal_secs_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct gendisk *disk = dev_to_disk(dev);
-	struct nvme_ns_head *head = disk->private_data;
+	struct mpath_head *mpath_head = disk->private_data;
+	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
 	int ret;
 
 	mutex_lock(&head->subsys->lock);
-	ret = sysfs_emit(buf, "%u\n", head->delayed_removal_secs);
+	ret = sysfs_emit(buf, "%u\n", mpath_head->delayed_removal_secs);
 	mutex_unlock(&head->subsys->lock);
 	return ret;
 }
@@ -768,8 +748,8 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct gendisk *disk = dev_to_disk(dev);
-	struct nvme_ns_head *head = disk->private_data;
-	struct mpath_head *mpath_head = mpath_priv_to_head(head);
+	struct mpath_head *mpath_head = disk->private_data;
+	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
 	unsigned int sec;
 	int ret;
 
@@ -778,17 +758,17 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 		return ret;
 
 	mutex_lock(&head->subsys->lock);
-	head->delayed_removal_secs = sec;
-	if (sec)
-		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags1);
-	else
-		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags1);
+	mpath_head->delayed_removal_secs = sec;
+//	if (sec)
+//		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
+//	else
+//		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
 	mutex_unlock(&head->subsys->lock);
 	/*
 	 * Ensure that update to NVME_NSHEAD_QUEUE_IF_NO_PATH is seen
 	 * by its reader.
 	 */
-	synchronize_srcu(&mpath_head->srcu);
+	//synchronize_srcu(&head->srcu);
 
 	return count;
 }
@@ -879,21 +859,21 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	if (!list_empty(&mpath_head->dev_list))
 		goto out;
 
-	if (head->delayed_removal_secs) {
+	if (mpath_head->delayed_removal_secs) {
 		/*
 		 * Ensure that no one could remove this module while the head
 		 * remove work is pending.
 		 */
 		if (!try_module_get(THIS_MODULE))
 			goto out;
-		mod_delayed_work(nvme_wq, &head->remove_work,
-				head->delayed_removal_secs * HZ);
+		mod_delayed_work(nvme_wq, &mpath_head->remove_work,
+				mpath_head->delayed_removal_secs * HZ);
 	} else {
 		list_del_init(&head->entry);
 		remove = true;
 	}
 out:
-	mutex_unlock(&head->subsys->lock);
+//	mutex_unlock(&head->subsys->lock);
 	if (remove) {
 		pr_err("%s9 calling nvme_remove_head head=%pS\n",
 			__func__, head);

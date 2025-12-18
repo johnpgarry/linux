@@ -28,12 +28,14 @@ enum mpath_iopolicy {
 /*
  * Mark bio as coming from scsi multipath node
  */
-#define MPATH_DISK_LIVE            0
+#define MPATH_HEAD_DISK_LIVE            0
+#define MPATH_HEAD_QUEUE_IF_NO_PATH		1
 
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
 
 struct mpath_subsys {
 	enum mpath_iopolicy	iopolicy;
+	struct mutex		lock;
 };
 
 struct mpath_head {
@@ -55,6 +57,9 @@ struct mpath_head {
 	struct mutex            lock;
 
 	struct device *parent;
+
+	struct delayed_work	remove_work;
+	unsigned int		delayed_removal_secs;
 
 	struct mpath_device __rcu *current_path[MAX_NUMNODES]; /* scsi_device of current path */
 	const struct mpath_head_template *mpdt;
@@ -138,6 +143,12 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt,
 int mpath_alloc_head_disk(struct mpath_head *mpath_head);
 int __must_check mpath_add_head(struct mpath_head *);
 
+static inline bool mpath_head_queue_if_no_path(struct mpath_head *mpath_head)
+{
+	if (test_bit(MPATH_HEAD_QUEUE_IF_NO_PATH, &mpath_head->flags))
+		return true;
+	return false;
+}
 
 static inline struct mpath_head *mpath_priv_to_head(void *d)
 {

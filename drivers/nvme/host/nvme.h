@@ -520,8 +520,10 @@ struct nvme_ns_head {
 	struct mutex		lock;
 #endif
 	unsigned long		flags1;
+#ifdef dsdsdd
 	struct delayed_work	remove_work;
 	unsigned int		delayed_removal_secs;
+#endif
 #define NVME_NSHEAD_DISK_LIVE		0
 #define NVME_NSHEAD_QUEUE_IF_NO_PATH	1
 #ifdef dsdsd

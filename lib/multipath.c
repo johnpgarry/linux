@@ -14,6 +14,7 @@ static void mpath_free_disk(struct kref *ref);
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
+static struct workqueue_struct *mpath_wq;
 /*
  * SCSI multipath will only allow 'NUMA' or 'round-robin' policy for IO.
  * In Future, if more apropriate IO-policy is introduced will be added
@@ -266,8 +267,8 @@ static bool mpath_available_path(struct mpath_head *mpath_head)
 {
 	struct mpath_device *mpath_device;
 
-	//pr_err("%s mpath_head=%pS MPATH_DISK_LIVE=%d\n", __func__, mpath_head, test_bit(MPATH_DISK_LIVE, &mpath_head->flags));
-	if (!test_bit(MPATH_DISK_LIVE, &mpath_head->flags))
+	//pr_err("%s mpath_head=%pS MPATH_HEAD_DISK_LIVE=%d\n", __func__, mpath_head, test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags));
+	if (!test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags))
 		return false;
 
 	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
@@ -781,11 +782,102 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_head);
 
+//nvme_free_ns_head
+static void mpath_free_head(struct kref *ref)
+{
+	struct mpath_head *mpath_head =
+		container_of(ref, struct mpath_head, ref);
+
+	pr_err("%s mpath_head=%pS calling mpath_put_disk\n",
+		__func__, mpath_head);
+	mpath_put_disk(mpath_head);
+	pr_err("%s1 mpath_head=%pS calling ida_free\n",
+		__func__, mpath_head);
+	//ida_free(&head->subsys->ns_ida, head->instance);
+	#ifdef sdsd
+	pr_err("%s2 head=%pS calling cleanup_srcu_struct\n",
+		__func__, head);
+	cleanup_srcu_struct(&head->srcu);
+	#endif 
+	//nvme_put_subsystem(head->subsys);
+	//kfree(head->plids);
+	#ifdef sdsd
+	pr_err("%s4 head=%pS calling kfree(head)\n",
+		__func__, head);
+	kfree(head);
+	#endif 
+}
+
+// nvme_put_ns_head
+static void mpath_put_head(struct mpath_head *mpath_head)
+{
+	pr_err("%s mpath_head=%pS calling kref_put -> nvme_free_ns_head\n",
+		__func__, mpath_head);
+	kref_put(&mpath_head->ref, mpath_free_head);
+}
+
+// nvme_remove_head
+static void mpath_remove_head(struct mpath_head *mpath_head)
+{
+	pr_err("%s mpath_head=%pS MPATH_HEAD_DISK_LIVE set=%d\n",
+		__func__, mpath_head, test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags));
+	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
+		struct gendisk *disk = mpath_head->disk;
+		/*
+		 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
+		 * to allow multipath to fail all I/O.
+		 */
+		pr_err("%s2 mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, mpath_head);
+		kblockd_schedule_work(&mpath_head->requeue_work);
+
+
+		pr_err("%s3 mpath_head=%pS not calling nvme_cdev_del\n",
+			__func__, mpath_head);
+		//nvme_cdev_del(&head->cdev, &head->cdev_device);
+
+		pr_err("%s4 mpath_head=%pS calling synchronize_srcu\n",
+			__func__, mpath_head);
+		synchronize_srcu(&mpath_head->srcu);
+
+		pr_err("%s5 mpath_head=%pS calling del_gendisk\n",
+			__func__, mpath_head);
+		del_gendisk(disk);
+	}
+
+	pr_err("%s6 mpath_head=%pS calling nvme_put_ns_head\n",
+			__func__, mpath_head);
+	mpath_put_head(mpath_head);
+}
+
+static void mpath_remove_head_work(struct work_struct *work)
+{
+	struct mpath_head *mpath_head = container_of(to_delayed_work(work),
+			struct mpath_head, remove_work);
+	bool remove = false;
+
+	pr_err("%s mpath_head=%pS remove=%d\n", __func__, mpath_head, remove);
+
+//	mutex_lock(&head->subsys->lock);
+//	if (list_empty(&mpath_head->dev_list)) {
+//		list_del_init(&mpath_head->dev_list);
+//		remove = true;
+//	}
+//	mutex_unlock(&head->subsys->lock);
+	if (remove) {
+		mpath_remove_head(mpath_head);
+	}
+
+	module_put(THIS_MODULE);
+}
 
 int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 {
 	struct queue_limits lim;
 	int ret;
+
+	INIT_DELAYED_WORK(&mpath_head->remove_work, mpath_remove_head_work);
+	mpath_head->delayed_removal_secs = 0;
 
 	blk_set_stacking_limits(&lim);
 	pr_err("%s8 mpath_head->parent=%pS\n", __func__, mpath_head->parent);
@@ -834,10 +926,10 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	int ret;
 
-	pr_err("%s disk=%pS MPATH_DISK_LIVE=%d\n",
-		__func__, mpath_head, test_bit(MPATH_DISK_LIVE, &mpath_head->flags));
+	pr_err("%s disk=%pS MPATH_HEAD_DISK_LIVE=%d\n",
+		__func__, mpath_head, test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags));
 
-	if (!test_and_set_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
+	if (!test_and_set_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
 //		struct device *dd1 = &mpath_head->dev;
 //		struct kobject *dd1_kobj = &dd1->kobj;
 //		struct kref *dd1_kobj_kref = &dd1_kobj->kref;
@@ -848,7 +940,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 		ret = device_add_disk(parent, mpath_head->disk, mpath_head->mpdt->device_groups);
 		pr_err("%s1 called device_add_disk ret=%d ref count=%d\n", __func__, ret, 0/*kref_read(dd1_kobj_kref)*/);
 		if (ret) {
-			clear_bit(MPATH_DISK_LIVE, &mpath_head->flags);
+			clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags);
 			return;
 		}
 		pr_err("%s2 calling scsi_mpath_head_add_cdev partition_scan_work\n", __func__);
@@ -918,6 +1010,7 @@ ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf)
 	return sysfs_emit(buf, "%*pbl\n", nodemask_pr_args(&numa_nodes));
 }
 EXPORT_SYMBOL_GPL(mpath_numa_nodes_show);
+
 
 void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 {
@@ -1052,6 +1145,8 @@ EXPORT_SYMBOL_GPL(mpath_add_head);
 
 void mpath_put_disk(struct mpath_head *mpath_head)
 {
+	pr_err("%s mpath_head=%pS calling kref_put -> mpath_free_disk\n",
+		__func__, mpath_head);
 	kref_put(&mpath_head->ref, mpath_free_disk);
 }
 EXPORT_SYMBOL_GPL(mpath_put_disk);
@@ -1071,7 +1166,7 @@ void mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 	#if 0
 	list_for_each_entry_rcu(sdev, &scsi_mpath_head->dev_list, mpath_dev_entry) {
 		if (capacity != get_capacity(sdev->scsi_mpath_dev->gd))
-			clear_bit(SCSI_MPATH_DISK_LIVE, &scsi_mpath_dev->flags);
+			clear_bit(MPATH_HEAD_DISK_LIVE, &scsi_mpath_dev->flags);
 	}
 	#endif
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
@@ -1140,6 +1235,58 @@ static void mpath_free_disk(struct kref *ref)
 	kfree(mpath_head);
 }
 
+
+// nvme_mpath_remove_disk
+static void mpath_remove_disk(struct mpath_head *mpath_head)
+{
+	bool remove = false;
+	struct gendisk *disk = mpath_head->disk;
+	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
+
+	pr_err("%s mpath_head=%pS disk=%pS\n",
+		__func__, mpath_head, disk);
+	if (!disk)
+		return;
+
+	mutex_lock(&mpath_subsys->lock);
+	/*
+	 * We are called when all paths have been removed, and at that point
+	 * head->list is expected to be empty. However, nvme_remove_ns() and
+	 * nvme_init_ns_head() can run concurrently and so if head->delayed_
+	 * removal_secs is configured, it is possible that by the time we reach
+	 * this point, head->list may no longer be empty. Therefore, we recheck
+	 * head->list here. If it is no longer empty then we skip enqueuing the
+	 * delayed head removal work.
+	 */
+	 
+	pr_err("%s1 mpath_head=%pS list_empty(dev_list)=%d\n",
+		__func__, mpath_head, list_empty(&mpath_head->dev_list));
+	//if (!list_empty(&mpath_head->dev_list))
+	//	goto out;
+
+	if (mpath_head->delayed_removal_secs) {
+		/*
+		 * Ensure that no one could remove this module while the head
+		 * remove work is pending.
+		 */
+		if (!try_module_get(THIS_MODULE))
+			goto out;
+		mod_delayed_work(mpath_wq, &mpath_head->remove_work,
+				mpath_head->delayed_removal_secs * HZ);
+	} else {
+	//	list_del_init(&head->entry);
+		remove = true;
+	}
+out:
+//	mutex_unlock(&head->subsys->lock);
+	if (remove) {
+		pr_err("%s9 calling nvme_remove_head mpath_head=%pS\n",
+			__func__, mpath_head);
+		mpath_remove_head(mpath_head);
+	}
+}
+
+// nvme_ns_remove
 void mpath_remove_device(struct mpath_device *mpath_device)
 {
 	bool last_path = false;
@@ -1175,8 +1322,9 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 	list_del_rcu(&mpath_device->siblings);
 	pr_err("%s3 list_empty=%d\n", __func__, list_empty(&mpath_head->dev_list));
 	if (list_empty(&mpath_head->dev_list)) {
-//		if (!nvme_mpath_queue_if_no_path(ns->head))
-//			list_del_init(&ns->head->entry);
+		if (!mpath_head_queue_if_no_path(mpath_head)) {
+		//	list_del_init(&ns->head->entry);
+		}
 		last_path = true;
 	}
 	mutex_unlock(&mpath_head->lock);
@@ -1185,24 +1333,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 		__func__, last_path);
 
 	if (last_path) {
-		pr_err("%s5 MPATH_DISK_LIVE set=%d\n",
-			__func__, test_bit(MPATH_DISK_LIVE, &mpath_head->flags));
-		if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
-			/*
-			 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
-			 * to allow multipath to fail all I/O.
-			 */
-			kblockd_schedule_work(&mpath_head->requeue_work);
-			pr_err("%s5.0 calling mpath_cdev_del\n", __func__);
-			mpath_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
-			pr_err("%s5.1 calling synchronize_srcu\n", __func__);
-			synchronize_srcu(&mpath_head->srcu);
-			pr_err("%s5.2 not calling device_del\n", __func__);
-		//	device_del(&scsi_mpath_head->dev);???
-			pr_err("%s5.3 calling del_gendisk mpath_head->disk=%pS\n", __func__, mpath_head->disk);
-			del_gendisk(mpath_head->disk);
-		}
-		pr_err("%s6 calling put_disk on mpath_head->disk=%pS\n", __func__, mpath_head->disk);
+		mpath_remove_disk(mpath_head);
 		
 	}
 	pr_err("%s9 mpath_device=%pS calling mpath_put_disk\n", __func__, mpath_device);
@@ -1323,12 +1454,16 @@ static int __init mpath_init(void)
 {
 	pr_err("%s\n", __func__);
 
+	mpath_wq = alloc_workqueue("mpath-wq", WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_SYSFS, 0);
+	if (!mpath_wq)
+		return -ENOMEM;
 	return 0;
 }
 
 static void __exit mpath_exit(void)
 {
 	pr_err("%s\n", __func__);
+	destroy_workqueue(mpath_wq);
 }
 
 module_init(mpath_init);

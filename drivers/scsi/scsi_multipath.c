@@ -740,6 +740,8 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		goto out_free_ida;
 	}
 
+	mutex_init(&mpath_head->mpath_subsys->lock);
+
 	device_initialize(&scsi_mpath_head->dev);
 	set_dev_node(&scsi_mpath_head->dev, dev_to_node(shost_dev));
 	ret = dev_set_name(&scsi_mpath_head->dev, name);

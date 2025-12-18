@@ -4211,7 +4211,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	mutex_unlock(&ctrl->subsys->lock);
 
 #ifdef CONFIG_NVME_MULTIPATH
-	cancel_delayed_work(&head->remove_work);
+	cancel_delayed_work(&mpath_head->remove_work);
 #endif
 	pr_err("%s10\n", __func__);
 	return 0;
