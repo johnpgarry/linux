@@ -1181,6 +1181,8 @@ EXPORT_SYMBOL_GPL(mpath_get_disk);
 
 int mpath_head_add_cdev(struct mpath_head *mpath_head)
 {
+	pr_err("%s mpath_head->mpdt->add_cdev=%pS head=%pS\n",
+		__func__, mpath_head->mpdt->add_cdev, mpath_head);
 	return mpath_head->mpdt->add_cdev(mpath_head);
 }
 

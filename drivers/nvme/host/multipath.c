@@ -355,9 +355,13 @@ static const struct file_operations nvme_ns_head_chr_fops = {
 	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 };
 
-static __maybe_unused int nvme_add_ns_head_cdev(struct nvme_ns_head *head)
+int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
 {
+	//struct mpath_head *mpath_head = mpath_priv_to_head(head);
+	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
 	int ret;
+
+	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 
 	head->cdev_device.parent = &head->subsys->dev;
 	ret = dev_set_name(&head->cdev_device, "ng%dn%d",

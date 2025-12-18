@@ -754,9 +754,11 @@ out_unlock:
 	return ret;
 }
 
+#endif
 long nvme_ns_head_chr_ioctl(struct file *file, unsigned int cmd,
 		unsigned long arg)
 {
+	#ifdef dsddd_stub
 	bool open_for_write = file->f_mode & FMODE_WRITE;
 	struct cdev *cdev = file_inode(file)->i_cdev;
 	struct nvme_ns_head *head =
@@ -783,11 +785,15 @@ long nvme_ns_head_chr_ioctl(struct file *file, unsigned int cmd,
 out_unlock:
 	srcu_read_unlock(&head->srcu, srcu_idx);
 	return ret;
+	#else
+	return 0;
+	#endif
 }
 
 int nvme_ns_head_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 		unsigned int issue_flags)
 {
+	#ifdef dsddd_stub
 	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
 	struct nvme_ns_head *head = container_of(cdev, struct nvme_ns_head, cdev);
 	int srcu_idx = srcu_read_lock(&head->srcu);
@@ -798,8 +804,10 @@ int nvme_ns_head_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 		ret = nvme_ns_uring_cmd(ns, ioucmd, issue_flags);
 	srcu_read_unlock(&head->srcu, srcu_idx);
 	return ret;
+	#else
+	return 0;
+	#endif
 }
-#endif
 
 int nvme_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg, int srcu_idx)

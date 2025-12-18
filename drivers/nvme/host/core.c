@@ -3989,6 +3989,7 @@ const struct block_device_operations nvme_ns_head_ops = {
 const struct mpath_head_template mpdt = {
 //	.class = &scsi_mpath_head_class,
 //	.cdev_class = &scsi_mpath_generic_class,
+	.add_cdev = nvme_mpath_add_cdev,
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
 	.ioctl = nvme_mpath_ioctl,
