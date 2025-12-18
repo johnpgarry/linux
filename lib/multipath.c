@@ -365,7 +365,7 @@ static int mpath_open(struct gendisk *disk, blk_mode_t mode)
 static void mpath_release(struct gendisk *disk)
 {
 	struct mpath_head *mpath_head = disk->private_data;
-
+	pr_err("%s mpath_head=%pS disk=%pS calling kref_put\n", __func__, mpath_head, disk);
 	kref_put(&mpath_head->ref, mpath_free_disk);
 }
 
@@ -598,7 +598,6 @@ out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return err;
 }
-
 
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
 {
@@ -1152,12 +1151,13 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 			 * to allow multipath to fail all I/O.
 			 */
 			kblockd_schedule_work(&mpath_head->requeue_work);
-
+			pr_err("%s5.0 calling mpath_cdev_del\n", __func__);
 			mpath_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
+			pr_err("%s5.1 calling synchronize_srcu\n", __func__);
 			synchronize_srcu(&mpath_head->srcu);
-			pr_err("%s5.1 not calling device_del\n", __func__);
+			pr_err("%s5.2 not calling device_del\n", __func__);
 		//	device_del(&scsi_mpath_head->dev);???
-			pr_err("%s5.2 calling del_gendisk mpath_head->disk=%pS\n", __func__, mpath_head->disk);
+			pr_err("%s5.3 calling del_gendisk mpath_head->disk=%pS\n", __func__, mpath_head->disk);
 			del_gendisk(mpath_head->disk);
 		}
 		pr_err("%s6 calling put_disk on mpath_head->disk=%pS\n", __func__, mpath_head->disk);

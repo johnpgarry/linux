@@ -673,14 +673,22 @@ static void nvme_free_ns_head(struct kref *ref)
 	struct nvme_ns_head *head =
 		container_of(ref, struct nvme_ns_head, ref);
 
+	pr_err("%s head=%pS calling nvme_mpath_put_disk\n",
+		__func__, head);
 	nvme_mpath_put_disk(head);
+	pr_err("%s1 head=%pS calling ida_free\n",
+		__func__, head);
 	ida_free(&head->subsys->ns_ida, head->instance);
 	#ifdef sdsd
+	pr_err("%s2 head=%pS calling cleanup_srcu_struct\n",
+		__func__, head);
 	cleanup_srcu_struct(&head->srcu);
 	#endif 
 	nvme_put_subsystem(head->subsys);
 	kfree(head->plids);
 	#ifdef sdsd
+	pr_err("%s4 head=%pS calling kfree(head)\n",
+		__func__, head);
 	kfree(head);
 	#endif 
 }
@@ -692,6 +700,8 @@ bool nvme_tryget_ns_head(struct nvme_ns_head *head)
 
 void nvme_put_ns_head(struct nvme_ns_head *head)
 {
+	pr_err("%s head=%pS calling kref_put -> nvme_free_ns_head\n",
+		__func__, head);
 	kref_put(&head->ref, nvme_free_ns_head);
 }
 
@@ -699,9 +709,13 @@ static void nvme_free_ns(struct kref *kref)
 {
 	struct nvme_ns *ns = container_of(kref, struct nvme_ns, kref);
 
+	pr_err("%s ns=%pS calling put_disk(ns->disk)\n", __func__, ns);
 	put_disk(ns->disk);
+	pr_err("%s1 ns=%pS calling nvme_put_ns_head\n", __func__, ns);
 	nvme_put_ns_head(ns_to_head(ns));
+	pr_err("%s2 ns=%pS calling nvme_put_ctrl\n", __func__, ns);
 	nvme_put_ctrl(ns->ctrl);
+	pr_err("%s3 ns=%pS calling kfree\n", __func__, ns);
 	kfree(ns);
 }
 
@@ -712,6 +726,8 @@ bool nvme_get_ns(struct nvme_ns *ns)
 
 void nvme_put_ns(struct nvme_ns *ns)
 {
+	pr_err("%s  ns=%pS calling kref_put -> nvme_free_ns\n",
+			__func__, ns);
 	kref_put(&ns->kref, nvme_free_ns);
 }
 EXPORT_SYMBOL_NS_GPL(nvme_put_ns, "NVME_TARGET_PASSTHRU");
@@ -3877,12 +3893,15 @@ static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 
 static void nvme_cdev_rel(struct device *dev)
 {
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
 	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
 }
 
 void nvme_cdev_del(struct cdev *cdev, struct device *cdev_device)
 {
+	dev_err(cdev_device, "%s cdev_device=%pS calling cdev_device_del\n", __func__, cdev_device);
 	cdev_device_del(cdev, cdev_device);
+	dev_err(cdev_device, "%s cdev_device=%pS calling\n", __func__, cdev_device);
 	put_device(cdev_device);
 }
 
@@ -4389,6 +4408,8 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
 		return;
 
+	pr_err("%s ns=%pS\n", __func__, ns);
+
 	clear_bit(NVME_NS_READY, &ns->flags);
 	set_capacity(ns->disk, 0);
 	nvme_fault_inject_fini(&ns->fault_inject);
@@ -4405,11 +4426,14 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 
 	mutex_lock(&ns->ctrl->subsys->lock);
 	list_del_rcu(&ns->mpath_device.siblings);
+	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
+		__func__, ns, list_empty(&mpath_head->dev_list));
 	if (list_empty(&mpath_head->dev_list)) {
 		if (!nvme_mpath_queue_if_no_path(ns_to_head(ns)))
 			list_del_init(&ns_to_head(ns)->entry);
 		last_path = true;
 	}
+	pr_err("%s3 ns=%pS last_path=%d\n", __func__, ns, last_path);
 	mutex_unlock(&ns->ctrl->subsys->lock);
 
 	/* guarantee not available in head->list */
@@ -4418,6 +4442,8 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (!nvme_ns_head_multipath(ns_to_head(ns)))
 		nvme_cdev_del(&ns->cdev, &ns->cdev_device);
 
+	pr_err("%s4 ns=%pS calling nvme_mpath_remove_sysfs_link\n",
+		__func__, ns);
 	mpath_remove_sysfs_link(&ns->mpath_device);
 
 	del_gendisk(ns->disk);

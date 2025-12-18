@@ -373,6 +373,8 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 
+	pr_err("%s head=%pS MPATH_DISK_LIVE set=%d\n",
+		__func__, head, test_bit(MPATH_DISK_LIVE, &mpath_head->flags));
 	if (test_and_clear_bit(MPATH_DISK_LIVE, &mpath_head->flags)) {
 		struct mpath_head *mpath_head = mpath_priv_to_head(head);
 		struct gendisk *disk = mpath_head->disk;
@@ -380,12 +382,26 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 		 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
 		 * to allow multipath to fail all I/O.
 		 */
+		pr_err("%s2 head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, head);
 		kblockd_schedule_work(&mpath_head->requeue_work);
 
+
+		pr_err("%s3 head=%pS calling nvme_cdev_del\n",
+			__func__, head);
 		nvme_cdev_del(&head->cdev, &head->cdev_device);
+
+		pr_err("%s4 head=%pS calling synchronize_srcu\n",
+			__func__, head);
 		synchronize_srcu(&mpath_head->srcu);
+
+		pr_err("%s5 head=%pS calling del_gendisk\n",
+			__func__, head);
 		del_gendisk(disk);
 	}
+
+	pr_err("%s6 head=%pS calling nvme_put_ns_head\n",
+			__func__, head);
 	nvme_put_ns_head(head);
 }
 
@@ -828,6 +844,8 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 	struct gendisk *disk = mpath_head->disk;
 
+	pr_err("%s head=%pS disk=%pS\n",
+		__func__, head, disk);
 	if (!disk)
 		return;
 
@@ -841,6 +859,9 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	 * head->list here. If it is no longer empty then we skip enqueuing the
 	 * delayed head removal work.
 	 */
+	 
+	pr_err("%s1 head=%pS list_empty(dev_list)=%d\n",
+		__func__, head, list_empty(&mpath_head->dev_list));
 	if (!list_empty(&mpath_head->dev_list))
 		goto out;
 
@@ -859,20 +880,32 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	}
 out:
 	mutex_unlock(&head->subsys->lock);
-	if (remove)
+	if (remove) {
+		pr_err("%s9 calling nvme_remove_head head=%pS\n",
+			__func__, head);
 		nvme_remove_head(head);
+	}
 }
 
 void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = mpath_priv_to_head(head);
 	struct gendisk *disk = mpath_head->disk;
+	pr_err("%s head=%pS disk=%pS\n", __func__, head, disk);
 	if (!disk)
 		return;
+
+	pr_err("%s1 head=%pS calling kblockd_schedule_work requeue_work\n",
+		__func__, head);
 	/* make sure all pending bios are cleaned up */
 	kblockd_schedule_work(&mpath_head->requeue_work);
 	flush_work(&mpath_head->requeue_work);
+	pr_err("%s3 head=%pS calling flush_work partition_scan_work\n",
+		__func__, head);
 	flush_work(&mpath_head->partition_scan_work);
+
+	pr_err("%s4 head=%pS disk=%pS not calling put_disk\n",
+		__func__, head, disk);
 //	put_disk(head->disk); fixme
 }
 
