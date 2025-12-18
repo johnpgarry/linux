@@ -327,6 +327,7 @@ const struct block_device_operations nvme_ns_head_ops = {
 };
 #endif
 
+#ifdef dsdsdd
 static inline struct nvme_ns_head *cdev_ns_to_head(struct cdev *cdev)
 {
 	return container_of(cdev, struct nvme_ns_head, cdev);
@@ -345,6 +346,7 @@ static int nvme_ns_head_chr_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+// replaced by mpath_generic_chr_fops
 static const struct file_operations nvme_ns_head_chr_fops = {
 	.owner		= THIS_MODULE,
 	.open		= nvme_ns_head_chr_open,
@@ -354,6 +356,7 @@ static const struct file_operations nvme_ns_head_chr_fops = {
 	.uring_cmd	= nvme_ns_head_chr_uring_cmd,
 	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 };
+#endif
 
 int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
 {
@@ -361,15 +364,16 @@ int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
 	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
 	int ret;
 
-	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
+	pr_err("%s mpath_head=%pS head=%pS ng%dn%d\n",
+		__func__, mpath_head, head, head->subsys->instance, head->instance);
 
-	head->cdev_device.parent = &head->subsys->dev;
-	ret = dev_set_name(&head->cdev_device, "ng%dn%d",
+	mpath_head->cdev_device.parent = &head->subsys->dev;
+	ret = dev_set_name(&mpath_head->cdev_device, "ng%dn%d",
 			   head->subsys->instance, head->instance);
 	if (ret)
 		return ret;
-	ret = nvme_cdev_add(&head->cdev, &head->cdev_device,
-			    &nvme_ns_head_chr_fops, THIS_MODULE);
+	ret = nvme_cdev_add(&mpath_head->cdev, &mpath_head->cdev_device,
+			    &mpath_generic_chr_fops, THIS_MODULE);
 	return ret;
 }
 
@@ -391,9 +395,9 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 		kblockd_schedule_work(&mpath_head->requeue_work);
 
 
-		pr_err("%s3 head=%pS calling nvme_cdev_del\n",
+		pr_err("%s3 head=%pS not calling nvme_cdev_del\n",
 			__func__, head);
-		nvme_cdev_del(&head->cdev, &head->cdev_device);
+		//nvme_cdev_del(&head->cdev, &head->cdev_device);
 
 		pr_err("%s4 head=%pS calling synchronize_srcu\n",
 			__func__, head);

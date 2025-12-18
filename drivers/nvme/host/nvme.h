@@ -500,8 +500,10 @@ struct nvme_ns_head {
 
 	struct ratelimit_state	rs_nuse;
 
+	#ifdef dsdsd
 	struct cdev		cdev;
 	struct device		cdev_device;
+	#endif
 
 #ifdef dsddd
 	struct gendisk		*disk;

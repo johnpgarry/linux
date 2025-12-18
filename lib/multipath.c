@@ -627,6 +627,8 @@ const struct file_operations mpath_generic_chr_fops = {
 	.release	= mpath_generic_chr_release,
 	.unlocked_ioctl	= mpath_generic_chr_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
+//	.uring_cmd	= nvme_ns_head_chr_uring_cmd,
+//	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 };
 EXPORT_SYMBOL_GPL(mpath_generic_chr_fops);
 
