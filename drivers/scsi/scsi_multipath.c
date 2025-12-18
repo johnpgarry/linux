@@ -22,6 +22,7 @@
 #include "scsi_alua.h"
 #include "scsi_priv.h"
 
+static dev_t mpath_head_chr_devt;
 
 static DEFINE_IDA(scsi_mpath_index_ida);
 
@@ -583,6 +584,44 @@ static int scsi_mpath_pr_read_reservation(struct mpath_device *mpath_device,
 	return mpath_device->disk->fops->pr_ops->pr_read_reservation(bdev, rsv);
 }
 
+static void scsi_mpath_cdev_rel(struct device *dev)
+{
+//	dev_err(dev, "%s\n", __func__);
+//	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
+	pr_err("%s dev=%pS\n", __func__, dev);
+}
+
+static int scsi_mpath_add_cdev(struct mpath_head *mpath_head)
+{
+	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
+	unsigned int minor = scsi_mpath_head->index;
+	int ret;
+
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
+
+	// following can be moved to disk alloc code
+	mpath_head->cdev_device.parent = mpath_head->parent;
+	ret = dev_set_name(&mpath_head->cdev_device, "smpg%d", minor);
+	pr_err("%s called dev_set_name ret=%d\n", __func__, ret);
+	if (ret)
+		return ret;
+
+	mpath_head->cdev_device.devt = MKDEV(MAJOR(mpath_head_chr_devt), minor);
+	mpath_head->cdev_device.class = &scsi_mpath_generic_class;
+	mpath_head->cdev_device.release = scsi_mpath_cdev_rel;
+	// following can be moved to disk alloc code
+	device_initialize(&mpath_head->cdev_device);
+	cdev_init(&mpath_head->cdev, &mpath_generic_chr_fops);
+	mpath_head->cdev.owner = THIS_MODULE;
+	ret = cdev_device_add(&mpath_head->cdev, &mpath_head->cdev_device);
+	pr_err("%s1 called cdev_device_add ret=%d\n", __func__, ret);
+	if (ret)
+		put_device(&mpath_head->cdev_device);
+	return ret;
+
+	return 0;
+}
+
 static const struct mpath_pr_ops mapth_pr_ops = {
 	#ifdef dsdsd
 	.pr_register	= sd_pr_register,
@@ -604,13 +643,14 @@ static const struct mpath_pr_ops mapth_pr_ops = {
 
 struct mpath_head_template smpdt = {
 //	.class = &scsi_mpath_disk_class,
-	.cdev_class = &scsi_mpath_generic_class,
+//	.cdev_class = &scsi_mpath_generic_class,
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
 	.ioctl = scsi_mpath_ioctl,
 	.device_groups = mpath_device_groups,
 	.clone_bio = scsi_mpath_clone_bio,
 	.pr_ops = &mapth_pr_ops,
+	.add_cdev = scsi_mpath_add_cdev,
 };
 
 /*
@@ -693,7 +733,6 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		goto out_free_ida;
 	}
 	
-
 	scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	mpath_head->mpath_subsys = kzalloc(sizeof(struct mpath_subsys), GFP_KERNEL);
 	if (!mpath_head->mpath_subsys) {
@@ -1196,10 +1235,15 @@ static int __init init_scsi_mp(void)
 				offsetof(struct scsi_mpath_clone_bio, clone),
 				BIOSET_NEED_BVECS|BIOSET_PERCPU_CACHE);
 	if (err < 0)
-		goto class_register;
-
+		goto class_unregister;
+	err = alloc_chrdev_region(&mpath_head_chr_devt, 0, 1U << MINORBITS,
+				     "mpath-generic");
+	if (err < 0)
+		goto bioset_uninit;
 	return 0;
-class_register:
+bioset_uninit:
+	bioset_exit(&scsi_mpath_bio_pool);
+class_unregister:
 	class_unregister(&scsi_mpath_disk_class);
 unregister_blkdev:
 	unregister_blkdev(0, "scsi-mpath-disk");
@@ -1219,6 +1263,7 @@ static void __exit exit_scsi_mp(void)
 	class_unregister(&scsi_mpath_disk_class);
 	unregister_blkdev(0, "scsi-mpath-disk");
 	bioset_exit(&scsi_mpath_bio_pool);
+	unregister_chrdev_region(mpath_head_chr_devt, 1U << MINORBITS);
 }
 
 module_init(init_scsi_mp);

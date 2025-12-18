@@ -111,7 +111,8 @@ struct mpath_pr_ops {
 
 struct mpath_head_template {
 	//const struct class *class;
-	const struct class *cdev_class;
+	//const struct class *cdev_class;
+	int (*add_cdev)(struct mpath_head *);
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
@@ -122,7 +123,6 @@ struct mpath_head_template {
 	const struct mpath_pr_ops *pr_ops;
 	const struct attribute_group **device_groups;
 };
-
 
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 
@@ -179,6 +179,8 @@ void mpath_device_set_live(struct mpath_device *mpath_device);
 extern const struct block_device_operations mpath_ops;
 extern const struct attribute_group *mpath_device_groups[];
 extern const struct attribute_group mpath_attr_group;
+
+extern const struct file_operations mpath_generic_chr_fops;
 
 bool is_mpath_head(struct gendisk *disk);
 

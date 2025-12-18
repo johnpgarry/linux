@@ -11,7 +11,6 @@
 
 static int mpath_head_add_cdev(struct mpath_head *mpath_head);
 static void mpath_free_disk(struct kref *ref);
-static dev_t mpath_head_chr_devt;
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
 
@@ -563,7 +562,6 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 {
 	struct cdev *cdev = file_inode(file)->i_cdev;
 	struct mpath_head *mpath_head = container_of(cdev, struct mpath_head, cdev);
-	struct scsi_device *sdev;
 	struct mpath_device *mpath_device;
 	fmode_t mode = file->f_mode;
 	int srcu_idx, err;
@@ -579,7 +577,7 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 		goto out_unlock;
 	//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	//sdev = scsi_mpath_dev->sdev;
-	pr_err("%s2 cmd=0x%x arg=%ld sdev=%pS\n", __func__, cmd, arg, sdev);
+	pr_err("%s2 cmd=0x%x arg=%ld\n", __func__, cmd, arg);
 
 //	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO)) {
 //		err = -ENOIOCTLCMD;
@@ -592,7 +590,8 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 	 * may try and take the device offline, in which case all further
 	 * access to the device is prohibited.
 	 */
-	err = 0;//mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, &unlocked);
+	err = mpath_head->mpdt->ioctl(mpath_device, mode, cmd, arg, srcu_idx);
+	lockdep_assert_not_held(&mpath_head->srcu);
 	return err;// ioctl must unlock
 
 out_unlock:
@@ -600,12 +599,6 @@ out_unlock:
 	return err;
 }
 
-static void mpath_cdev_rel(struct device *dev)
-{
-//	dev_err(dev, "%s\n", __func__);
-//	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
-	pr_err("%s dev=%pS\n", __func__, dev);
-}
 
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
 {
@@ -629,13 +622,14 @@ void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
 }
 EXPORT_SYMBOL_GPL(mpath_cdev_del);
 
-static const struct file_operations mpath_generic_chr_fops = {
+const struct file_operations mpath_generic_chr_fops = {
 	.owner		= THIS_MODULE,
 	.open		= mpath_generic_chr_open,
 	.release	= mpath_generic_chr_release,
 	.unlocked_ioctl	= mpath_generic_chr_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
 };
+EXPORT_SYMBOL_GPL(mpath_generic_chr_fops);
 
 static void multipath_partition_scan_work(struct work_struct *work)
 {
@@ -817,7 +811,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 			return;
 		}
 		pr_err("%s2 calling scsi_mpath_head_add_cdev partition_scan_work\n", __func__);
-		//mpath_head_add_cdev(mpath_head);
+		mpath_head_add_cdev(mpath_head);
 		pr_err("%s3 calling kblockd_schedule_work partition_scan_work\n", __func__);
 		kblockd_schedule_work(&mpath_head->partition_scan_work);
 	}
@@ -1185,30 +1179,9 @@ int mpath_get_disk(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_get_disk);
 
-__maybe_unused int mpath_head_add_cdev(struct mpath_head *mpath_head)
+int mpath_head_add_cdev(struct mpath_head *mpath_head)
 {
-	int ret, minor = 0 /*mpath_head->index*/;
-
-	// following can be moved to disk alloc code
-	mpath_head->cdev_device.parent = mpath_head->parent;
-	ret = dev_set_name(&mpath_head->cdev_device, "smpg%d",
-						minor);
-	pr_err("%s called dev_set_name ret=%d\n", __func__, ret);
-	if (ret)
-		return ret;
-
-	mpath_head->cdev_device.devt = MKDEV(MAJOR(mpath_head_chr_devt), minor);
-	mpath_head->cdev_device.class = mpath_head->mpdt->cdev_class;
-	mpath_head->cdev_device.release = mpath_cdev_rel;
-	// following can be moved to disk alloc code
-	device_initialize(&mpath_head->cdev_device);
-	cdev_init(&mpath_head->cdev, &mpath_generic_chr_fops);
-	mpath_head->cdev.owner = THIS_MODULE;
-	ret = cdev_device_add(&mpath_head->cdev, &mpath_head->cdev_device);
-	pr_err("%s1 called cdev_device_add ret=%d\n", __func__, ret);
-	if (ret)
-		put_device(&mpath_head->cdev_device);
-	return ret;
+	return mpath_head->mpdt->add_cdev(mpath_head);
 }
 
 
@@ -1304,18 +1277,14 @@ EXPORT_SYMBOL_GPL(mpath_iopolicy_store);
 
 static int __init mpath_init(void)
 {
-	int err;
 	pr_err("%s\n", __func__);
-	err = alloc_chrdev_region(&mpath_head_chr_devt, 0, 1U << MINORBITS,
-				     "mpath-generic");
 
-	return err;
+	return 0;
 }
 
 static void __exit mpath_exit(void)
 {
 	pr_err("%s\n", __func__);
-	unregister_chrdev_region(mpath_head_chr_devt, 1U << MINORBITS);
 }
 
 module_init(mpath_init);
