@@ -221,6 +221,8 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 		struct gendisk *disk = mpath_head->disk;
 		if (!disk)
 			continue;
+		pr_err("%s3 ctrl=%pS mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, ctrl, mpath_head);
 		kblockd_schedule_work(&mpath_head->requeue_work);
 		if (nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE)
 			disk_uevent(disk, KOBJ_CHANGE);
@@ -250,6 +252,8 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 		struct mpath_head *mpath_head = mpath_priv_to_head(head);
 
 		mpath_clear_current_path(&ns->mpath_device);
+		pr_err("%s3 ctrl=%pS mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, ctrl, mpath_head);
 		kblockd_schedule_work(&mpath_head->requeue_work);
 	}
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
@@ -277,6 +281,8 @@ void nvme_mpath_revalidate_paths(struct nvme_ns *ns)
 
 	for_each_node(node)
 		rcu_assign_pointer(mpath_head->current_path[node], NULL);
+	pr_err("%s ns=%pS head=%pS mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
+		__func__, ns, head, mpath_head);
 	kblockd_schedule_work(&mpath_head->requeue_work);
 }
 
@@ -390,8 +396,8 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 		 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
 		 * to allow multipath to fail all I/O.
 		 */
-		pr_err("%s2 head=%pS calling kblockd_schedule_work requeue_work\n",
-			__func__, head);
+		pr_err("%s2 mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, mpath_head);
 		kblockd_schedule_work(&mpath_head->requeue_work);
 
 
@@ -902,9 +908,8 @@ void nvme_mpath_put_disk(struct nvme_ns_head *head)
 	pr_err("%s head=%pS disk=%pS\n", __func__, head, disk);
 	if (!disk)
 		return;
-
-	pr_err("%s1 head=%pS calling kblockd_schedule_work requeue_work\n",
-		__func__, head);
+	pr_err("%s1 mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
+		__func__, mpath_head);
 	/* make sure all pending bios are cleaned up */
 	kblockd_schedule_work(&mpath_head->requeue_work);
 	flush_work(&mpath_head->requeue_work);

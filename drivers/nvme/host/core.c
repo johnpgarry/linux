@@ -4448,7 +4448,8 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	pr_err("%s4 ns=%pS calling nvme_mpath_remove_sysfs_link\n",
 		__func__, ns);
 	mpath_remove_sysfs_link(&ns->mpath_device);
-
+	pr_err("%s5 ns=%pS calling del_gendisk ns->disk=%pS\n",
+			__func__, ns, ns->disk);
 	del_gendisk(ns->disk);
 
 	mutex_lock(&ns->ctrl->namespaces_lock);
@@ -4456,8 +4457,13 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	mutex_unlock(&ns->ctrl->namespaces_lock);
 	synchronize_srcu(&ns->ctrl->srcu);
 
-	if (last_path)
+	if (last_path) {
+		pr_err("%s6 ns=%pS calling nvme_mpath_remove_disk ns_to_head(ns)=%pS\n",
+			__func__, ns, ns_to_head(ns));
 		nvme_mpath_remove_disk(ns_to_head(ns));
+	}
+	pr_err("%s7 ns=%pS calling nvme_put_ns\n",
+			__func__, ns);
 	nvme_put_ns(ns);
 }
 
@@ -4758,11 +4764,14 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 	struct nvme_ns *ns, *next;
 	LIST_HEAD(ns_list);
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
+
 	/*
 	 * make sure to requeue I/O to all namespaces as these
 	 * might result from the scan itself and must complete
 	 * for the scan_work to make progress
 	 */
+	pr_err("%s1 ctrl=%pS calling nvme_mpath_clear_ctrl_paths\n", __func__, ctrl);
 	nvme_mpath_clear_ctrl_paths(ctrl);
 
 	/*
@@ -4791,8 +4800,11 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 	mutex_unlock(&ctrl->namespaces_lock);
 	synchronize_srcu(&ctrl->srcu);
 
-	list_for_each_entry_safe(ns, next, &ns_list, list)
+	list_for_each_entry_safe(ns, next, &ns_list, list) {
+
+		pr_err("%s4 ctrl=%pS calling nvme_ns_remove ns=%pS\n", __func__, ctrl, ns);
 		nvme_ns_remove(ns);
+	}
 }
 EXPORT_SYMBOL_GPL(nvme_remove_namespaces);
 
