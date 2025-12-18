@@ -8,6 +8,7 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/pr.h>
+#include <linux/io_uring/cmd.h>
 
 
 struct mpath_device;
@@ -119,6 +120,8 @@ struct mpath_head_template {
 		    unsigned int cmd, unsigned long arg, int srcu_idx);
 	int (*report_zones)(struct mpath_device *, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args);
+	int (*chr_uring_cmd)(struct mpath_device *, struct io_uring_cmd *ioucmd,
+		unsigned int issue_flags);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct mpath_pr_ops *pr_ops;
 	const struct attribute_group **device_groups;

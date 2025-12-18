@@ -790,23 +790,13 @@ out_unlock:
 	#endif
 }
 
-int nvme_ns_head_chr_uring_cmd(struct io_uring_cmd *ioucmd,
+int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
+		struct io_uring_cmd *ioucmd,
 		unsigned int issue_flags)
 {
-	#ifdef dsddd_stub
-	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
-	struct nvme_ns_head *head = container_of(cdev, struct nvme_ns_head, cdev);
-	int srcu_idx = srcu_read_lock(&head->srcu);
-	struct nvme_ns *ns = NULL;//fixme nvme_find_path(head);
-	int ret = -EINVAL;
+	struct nvme_ns *ns = nvme_to_ns(mpath_device);
 
-	if (ns)
-		ret = nvme_ns_uring_cmd(ns, ioucmd, issue_flags);
-	srcu_read_unlock(&head->srcu, srcu_idx);
-	return ret;
-	#else
-	return 0;
-	#endif
+	return nvme_ns_uring_cmd(ns, ioucmd, issue_flags);
 }
 
 int nvme_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,

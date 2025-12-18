@@ -3998,6 +3998,7 @@ const struct mpath_head_template mpdt = {
 	.report_zones = nvme_mpath_report_zones,
 	#endif
 	.pr_ops = &nvme_mpath_pr_ops,
+	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 };
 
 static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,

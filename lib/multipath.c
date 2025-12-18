@@ -599,6 +599,47 @@ out_unlock:
 	return err;
 }
 
+static int mpath_generic_chr_uring_cmd(struct io_uring_cmd *ioucmd,
+		unsigned int issue_flags)
+{
+	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
+	struct mpath_head *mpath_head = container_of(cdev, struct mpath_head, cdev);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EINVAL;
+
+	if (!mpath_head->mpdt->chr_uring_cmd)
+		return -EOPNOTSUPP;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+
+	pr_err("%s cdev=%pS issue_flags=%d mpath_device=%pS\n",
+		__func__, cdev, issue_flags, mpath_device);
+	if (!mpath_device)
+		goto out_unlock;
+
+	pr_err("%s2 cdev=%pS issue_flags=%d mpath_device=%pS calling chr_uring_cmd=%pS\n",
+		__func__, cdev, issue_flags, mpath_device, mpath_head->mpdt->chr_uring_cmd);
+	ret = mpath_head->mpdt->chr_uring_cmd(mpath_device, ioucmd, issue_flags);
+out_unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	return ret;
+}
+
+static int mpath_generic_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
+				 struct io_comp_batch *iob,
+				 unsigned int poll_flags)
+{
+	#ifdef dsdd
+	struct nvme_uring_cmd_pdu *pdu = nvme_uring_cmd_pdu(ioucmd);
+	struct request *req = pdu->req;
+
+	if (req && blk_rq_is_poll(req))
+		return blk_rq_poll(req, iob, poll_flags);
+	#endif
+	return 0;
+}
+
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)
 {
 	struct device *dd1 = cdev_device->parent;
@@ -627,8 +668,8 @@ const struct file_operations mpath_generic_chr_fops = {
 	.release	= mpath_generic_chr_release,
 	.unlocked_ioctl	= mpath_generic_chr_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
-//	.uring_cmd	= nvme_ns_head_chr_uring_cmd,
-//	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
+	.uring_cmd	= mpath_generic_chr_uring_cmd,
+	.uring_cmd_iopoll = mpath_generic_chr_uring_cmd_iopoll,
 };
 EXPORT_SYMBOL_GPL(mpath_generic_chr_fops);
 

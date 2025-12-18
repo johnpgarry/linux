@@ -973,6 +973,9 @@ int nvme_getgeo(struct gendisk *disk, struct hd_geometry *geo);
 int nvme_dev_uring_cmd(struct io_uring_cmd *ioucmd, unsigned int issue_flags);
 int nvme_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg, int srcu_idx);
+int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
+		struct io_uring_cmd *ioucmd,
+		unsigned int issue_flags);
 
 extern const struct attribute_group *nvme_ns_attr_groups[];
 extern const struct attribute_group nvme_ns_mpath_attr_group;
