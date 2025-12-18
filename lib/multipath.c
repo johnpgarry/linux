@@ -551,7 +551,7 @@ static int mpath_generic_chr_release(struct inode *inode, struct file *file)
 	struct cdev *cdev = file_inode(file)->i_cdev;
 	struct mpath_head *mpath_head = container_of(cdev, struct mpath_head, cdev);
 
-	pr_err("%s cdev=%pS mpath_head=%pS\n", __func__, cdev, mpath_head);
+	//pr_err("%s cdev=%pS mpath_head=%pS\n", __func__, cdev, mpath_head);
 
 	kref_put(&mpath_head->ref, mpath_free);
 	return 0;
@@ -630,14 +630,13 @@ static int mpath_generic_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags)
 {
-	#ifdef dsdd
-	struct nvme_uring_cmd_pdu *pdu = nvme_uring_cmd_pdu(ioucmd);
-	struct request *req = pdu->req;
+	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
+	struct mpath_head *mpath_head = container_of(cdev, struct mpath_head, cdev);
 
-	if (req && blk_rq_is_poll(req))
-		return blk_rq_poll(req, iob, poll_flags);
-	#endif
-	return 0;
+	if (!mpath_head->mpdt->chr_uring_cmd_iopoll)
+		return -EOPNOTSUPP;
+
+	return mpath_head->mpdt->chr_uring_cmd_iopoll(ioucmd, iob, poll_flags);
 }
 
 void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device)

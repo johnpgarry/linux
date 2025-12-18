@@ -122,6 +122,9 @@ struct mpath_head_template {
 		unsigned int nr_zones, struct blk_report_zones_args *args);
 	int (*chr_uring_cmd)(struct mpath_device *, struct io_uring_cmd *ioucmd,
 		unsigned int issue_flags);
+	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
+				 struct io_comp_batch *iob,
+				 unsigned int poll_flags);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct mpath_pr_ops *pr_ops;
 	const struct attribute_group **device_groups;
