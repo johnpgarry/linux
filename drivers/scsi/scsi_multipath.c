@@ -1218,6 +1218,7 @@ static void __exit exit_scsi_mp(void)
 	pr_err("%s\n", __func__);
 	class_unregister(&scsi_mpath_disk_class);
 	unregister_blkdev(0, "scsi-mpath-disk");
+	bioset_exit(&scsi_mpath_bio_pool);
 }
 
 module_init(init_scsi_mp);
