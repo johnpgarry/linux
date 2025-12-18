@@ -217,11 +217,14 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 	struct nvme_ns *ns;
 	int srcu_idx;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
 		if (!ns->head->disk)
 			continue;
+		pr_err("%s3 ctrl=%pS ns->head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, ctrl, ns->head);
 		kblockd_schedule_work(&ns->head->requeue_work);
 		if (nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE)
 			disk_uevent(ns->head->disk, KOBJ_CHANGE);
@@ -262,10 +265,13 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 	struct nvme_ns *ns;
 	int srcu_idx;
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
 		nvme_mpath_clear_current_path(ns);
+		pr_err("%s3 ctrl=%pS ns->head=%pS calling kblockd_schedule_work requeue_work\n",
+			__func__, ctrl, ns->head);
 		kblockd_schedule_work(&ns->head->requeue_work);
 	}
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
@@ -288,6 +294,7 @@ void nvme_mpath_revalidate_paths(struct nvme_ns *ns)
 
 	for_each_node(node)
 		rcu_assign_pointer(head->current_path[node], NULL);
+	pr_err("%s ns=%pS head=%pS calling kblockd_schedule_work requeue_work\n", __func__, ns, head);
 	kblockd_schedule_work(&head->requeue_work);
 }
 
@@ -668,6 +675,7 @@ static void nvme_requeue_work(struct work_struct *work)
 		container_of(work, struct nvme_ns_head, requeue_work);
 	struct bio *bio, *next;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	spin_lock_irq(&head->requeue_lock);
 	next = bio_list_get(&head->requeue_list);
 	spin_unlock_irq(&head->requeue_lock);
@@ -1272,13 +1280,22 @@ void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 	struct device *target;
 	struct kobject *kobj;
 
+	pr_err("%s ns=%pS NVME_NS_SYSFS_ATTR_LINK set=%d\n",
+		__func__, ns, test_bit(NVME_NS_SYSFS_ATTR_LINK, &ns->flags));
 	if (!test_bit(NVME_NS_SYSFS_ATTR_LINK, &ns->flags))
 		return;
 
 	target = disk_to_dev(ns->disk);
 	kobj = &disk_to_dev(ns->head->disk)->kobj;
+
+	pr_err("%s2 calling sysfs_remove_link_from_group kobj=%pS dev_name(target)=%s\n",
+		__func__, kobj, dev_name(target));
+
 	sysfs_remove_link_from_group(kobj, nvme_ns_mpath_attr_group.name,
 			dev_name(target));
+
+	pr_err("%s3 calling sysfs_delete_link kobj=%pS dev_name(target)=%s\n",
+		__func__, kobj, dev_name(target));
 	clear_bit(NVME_NS_SYSFS_ATTR_LINK, &ns->flags);
 }
 

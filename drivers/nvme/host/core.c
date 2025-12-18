@@ -4604,11 +4604,14 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 	struct nvme_ns *ns, *next;
 	LIST_HEAD(ns_list);
 
+	pr_err("%s ctrl=%pS\n", __func__, ctrl);
+
 	/*
 	 * make sure to requeue I/O to all namespaces as these
 	 * might result from the scan itself and must complete
 	 * for the scan_work to make progress
 	 */
+	pr_err("%s1 ctrl=%pS calling nvme_mpath_clear_ctrl_paths\n", __func__, ctrl);
 	nvme_mpath_clear_ctrl_paths(ctrl);
 
 	/*
@@ -4637,8 +4640,11 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 	mutex_unlock(&ctrl->namespaces_lock);
 	synchronize_srcu(&ctrl->srcu);
 
-	list_for_each_entry_safe(ns, next, &ns_list, list)
+	list_for_each_entry_safe(ns, next, &ns_list, list) {
+
+		pr_err("%s4 ctrl=%pS calling nvme_ns_remove ns=%pS\n", __func__, ctrl, ns);
 		nvme_ns_remove(ns);
+	}
 }
 EXPORT_SYMBOL_GPL(nvme_remove_namespaces);
 
