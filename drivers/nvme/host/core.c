@@ -3256,18 +3256,21 @@ static bool nvme_validate_cntlid(struct nvme_subsystem *subsys,
 static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 {
 	struct nvme_subsystem *subsys, *found;
+	struct mpath_subsys *mpath_subsys;
 	int ret;
 
 	subsys = kzalloc(sizeof(*subsys), GFP_KERNEL);
 	if (!subsys)
 		return -ENOMEM;
+	mpath_subsys = &subsys->mpath_subsys;
+
 //	pr_err("%s subsys=%pS ctrl=%pS id=%pS id->cmic=%d\n", __func__, subsys, ctrl, id, id->cmic);
 
 	subsys->instance = -1;
 	//mutex_init(&subsys->lock);
 	kref_init(&subsys->ref);
 	INIT_LIST_HEAD(&subsys->ctrls);
-	INIT_LIST_HEAD(&subsys->nsheads);
+	INIT_LIST_HEAD(&mpath_subsys->heads);
 	nvme_init_subnqn(subsys, ctrl, id);
 	memcpy(subsys->serial, id->sn, sizeof(subsys->serial));
 	memcpy(subsys->model, id->mn, sizeof(subsys->model));
@@ -3844,11 +3847,13 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 {
 	struct nvme_subsystem *subsys = ctrl->subsys;
 	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
-	struct nvme_ns_head *h;
+	struct mpath_head *mpath_head;
 
 	lockdep_assert_held(&mpath_subsys->lock);
 
-	list_for_each_entry(h, &ctrl->subsys->nsheads, entry) {
+	list_for_each_entry(mpath_head, &mpath_subsys->heads, entry) {
+		struct nvme_ns_head *h = mpath_to_priv_head(mpath_head);
+
 		/*
 		 * Private namespaces can share NSIDs under some conditions.
 		 * In that case we can't use the same ns_head for namespaces
@@ -3870,7 +3875,8 @@ static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 	bool has_uuid = !uuid_is_null(&ids->uuid);
 	bool has_nguid = memchr_inv(ids->nguid, 0, sizeof(ids->nguid));
 	bool has_eui64 = memchr_inv(ids->eui64, 0, sizeof(ids->eui64));
-	struct nvme_ns_head *h;
+	struct mpath_head *mpath_head;
+	
 
 	lockdep_assert_held(&mpath_subsys->lock);
 
@@ -3879,7 +3885,9 @@ static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 //	else
 //		pr_err("%s has_uuid=0 ids=%pS subsys=%pS\n", __func__, ids, subsys);
 
-	list_for_each_entry(h, &subsys->nsheads, entry) {
+	list_for_each_entry(mpath_head, &mpath_subsys->heads, entry) {
+		struct nvme_ns_head *h = mpath_to_priv_head(mpath_head);
+
 		if (has_uuid && uuid_equal(&ids->uuid, &h->ids.uuid)) {
 //			pr_err("%s2 h=%pS uuid_equal\n", __func__, h);
 			return -EINVAL;
@@ -4067,7 +4075,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	ret = mpath_add_head(mpath_head);
 	pr_err("%s2 ret=%d from mpath_add_disk\n", __func__, ret);
 
-	list_add_tail(&head->entry, &ctrl->subsys->nsheads);
+	list_add_tail(&mpath_head->entry, &mpath_head->mpath_subsys->heads);
 
 	kref_get(&ctrl->subsys->ref);
 
@@ -4115,7 +4123,7 @@ static int nvme_global_check_duplicate_ids(struct nvme_subsystem *this,
 static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 {
 	struct nvme_ctrl *ctrl = ns->ctrl;
-	struct nvme_ns_head *head = NULL;
+	struct nvme_ns_head *head;
 	struct mpath_device *mpath_device;
 	struct mpath_head *mpath_head;
 	struct nvme_subsystem *subsys = ctrl->subsys;
@@ -4392,7 +4400,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	list_del_rcu(&ns->mpath_device.siblings);
 	#ifdef dsddd
 	if (list_empty(&ns_to_head(ns)->list)) {
-		list_del_init(&ns_to_head(ns)->entry);
+		//list_del_init(&ns_to_head(ns)->entry);
 		/*
 		 * If multipath is not configured, we still create a namespace
 		 * head (nshead), but head->disk is not initialized in that
@@ -4446,8 +4454,8 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
 		__func__, ns, list_empty(&mpath_head->dev_list));
 	if (list_empty(&mpath_head->dev_list)) {
-		if (!nvme_mpath_queue_if_no_path(ns_to_head(ns)))
-			list_del_init(&ns_to_head(ns)->entry);
+	//	if (!nvme_mpath_queue_if_no_path(ns_to_head(ns)))
+	//		list_del_init(&ns_to_head(ns)->entry);
 		last_path = true;
 	}
 	pr_err("%s3 ns=%pS last_path=%d\n", __func__, ns, last_path);

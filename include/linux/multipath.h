@@ -36,12 +36,14 @@ enum mpath_iopolicy {
 struct mpath_subsys {
 	enum mpath_iopolicy	iopolicy;
 	struct mutex            lock;
+	struct list_head		heads;
 };
 
 struct mpath_head {
 	struct mpath_subsys *mpath_subsys;
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
+	struct list_head	entry; /* Entry into list of subsystems */
 	struct gendisk		*disk;
 	struct kref		ref;
 	struct	bio_list	requeue_list; /* list for requeing bio */

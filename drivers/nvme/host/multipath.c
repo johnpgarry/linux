@@ -79,12 +79,11 @@ void nvme_mpath_default_iopolicy(struct nvme_subsystem *subsys)
 void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 {
 	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
-	struct nvme_ns_head *h;
+	struct mpath_head *mpath_head;
 
 	pr_err("%s subsys=%pS\n", __func__, subsys);
 	lockdep_assert_held(&mpath_subsys->lock);
-	list_for_each_entry(h, &subsys->nsheads, entry) {
-		struct mpath_head *mpath_head = mpath_priv_to_head(h);
+	list_for_each_entry(mpath_head, &mpath_subsys->heads, entry) {
 		struct gendisk *disk = mpath_head->disk;
 		if (disk)
 			blk_mq_unfreeze_queue_nomemrestore(disk->queue);
@@ -94,12 +93,11 @@ void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 {
 	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
-	struct nvme_ns_head *h;
+	struct mpath_head *mpath_head;
 
 	pr_err("%s subsys=%pS\n", __func__, subsys);
 	lockdep_assert_held(&mpath_subsys->lock);
-	list_for_each_entry(h, &subsys->nsheads, entry) {
-		struct mpath_head *mpath_head = mpath_priv_to_head(h);
+	list_for_each_entry(mpath_head, &mpath_subsys->heads, entry) {
 		struct gendisk *disk = mpath_head->disk;
 		if (disk)
 			blk_mq_freeze_queue_wait(disk->queue);
@@ -109,12 +107,11 @@ void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 {
 	struct mpath_subsys *mpath_subsys = &subsys->mpath_subsys;
-	struct nvme_ns_head *h;
+	struct mpath_head *mpath_head;
 
 	pr_err("%s subsys=%pS\n", __func__, subsys);
 	lockdep_assert_held(&mpath_subsys->lock);
-	list_for_each_entry(h, &subsys->nsheads, entry) {
-		struct mpath_head *mpath_head = mpath_priv_to_head(h);
+	list_for_each_entry(mpath_head, &mpath_subsys->heads, entry) {
 		struct gendisk *disk = mpath_head->disk;
 		if (disk)
 			blk_freeze_queue_start(disk->queue);
@@ -875,7 +872,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 		mod_delayed_work(nvme_wq, &mpath_head->remove_work,
 				mpath_head->delayed_removal_secs * HZ);
 	} else {
-		list_del_init(&head->entry);
+		list_del_init(&mpath_head->entry);
 		remove = true;
 	}
 out:

@@ -442,7 +442,6 @@ struct nvme_subsystem {
 	struct mutex		lock;
 	#endif
 	struct list_head	ctrls;
-	struct list_head	nsheads;
 	char			subnqn[NVMF_NQN_SIZE];
 	char			serial[20];
 	char			model[40];
@@ -486,7 +485,7 @@ struct nvme_ns_head {
 	u16			pi_size;
 	u8			pi_type;
 	u8			guard_type;
-	struct list_head	entry;
+	//struct list_head	entry;
 	struct kref		ref;
 	bool			shared;
 	bool			rotational;
