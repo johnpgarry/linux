@@ -199,6 +199,11 @@ int mpath_get_iopolicy(char *buf, const struct kernel_param *kp);
 ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf);
 ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy, const char *buf, size_t count);
 
+static inline enum mpath_iopolicy_e mpath_read_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
+{
+	return READ_ONCE(mpath_iopolicy->iopolicy);
+}
+
 void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_head *mpath_head);
 

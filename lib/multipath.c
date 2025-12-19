@@ -1437,7 +1437,7 @@ EXPORT_SYMBOL_GPL(mpath_device_groups);
 ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf)
 {
 	return sysfs_emit(buf, "%s\n",
-			  mpath_iopolicy_names[READ_ONCE(mpath_iopolicy->iopolicy)]);
+			  mpath_iopolicy_names[mpath_read_iopolicy(mpath_iopolicy)]);
 }
 EXPORT_SYMBOL_GPL(mpath_iopolicy_show);
 

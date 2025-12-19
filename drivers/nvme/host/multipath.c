@@ -65,7 +65,7 @@ module_param_cb(multipath_always_on, &multipath_always_on_ops,
 		&multipath_always_on, 0444);
 MODULE_PARM_DESC(multipath_always_on,
 	"create multipath node always except for private namespace with non-unique nsid; note that this also implicitly enables native multipath support");
-static int iopolicy = NVME_IOPOLICY_NUMA;
+static int iopolicy = MPATH_IOPOLICY_NUMA;
 
 module_param_call(iopolicy, mpath_set_iopolicy, mpath_get_iopolicy,
 	&iopolicy, 0644);
@@ -173,7 +173,7 @@ void nvme_mpath_start_request(struct request *rq)
 	struct gendisk *disk = mpath_head->disk;
 	struct nvme_subsystem *subsys = head->subsys;
 
-	if ((READ_ONCE(subsys->iopolicy.iopolicy) == NVME_IOPOLICY_QD) &&
+	if ((mpath_read_iopolicy(&subsys->iopolicy) == MPATH_IOPOLICY_QD) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
 		atomic_inc(&ns->ctrl->nr_active);
 		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
@@ -714,7 +714,7 @@ static ssize_t queue_depth_show(struct device *dev,
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
 
-	if (READ_ONCE(subsys->iopolicy.iopolicy) != MPATH_IOPOLICY_QD)
+	if (mpath_read_iopolicy(&subsys->iopolicy) != MPATH_IOPOLICY_QD)
 		return 0;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&ns->ctrl->nr_active));
@@ -727,9 +727,8 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
 	struct mpath_device *mpath_device = &ns->mpath_device;
-	enum mpath_iopolicy_e iopolicy = READ_ONCE(subsys->iopolicy.iopolicy);
 
-	return mpath_numa_nodes_show(mpath_device, iopolicy, buf);
+	return mpath_numa_nodes_show(mpath_device, mpath_read_iopolicy(&subsys->iopolicy), buf);
 }
 DEVICE_ATTR_RO(numa_nodes);
 

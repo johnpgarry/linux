@@ -422,11 +422,13 @@ static inline enum nvme_ctrl_state nvme_ctrl_state(struct nvme_ctrl *ctrl)
 	return READ_ONCE(ctrl->state);
 }
 
+#ifdef dsdsd
 enum nvme_iopowwlicy {
 	NVME_IOPOLICY_NUMA,
 	NVME_IOPOLICY_RR,
 	NVME_IOPOLICY_QD,
 };
+#endif
 
 struct nvme_subsystem {
 	int			instance;

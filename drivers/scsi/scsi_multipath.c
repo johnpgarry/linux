@@ -212,7 +212,7 @@ void scsi_mpath_start_request(struct request *req)
 	struct gendisk *disk = mpath_head->disk;
 	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
-	if ((READ_ONCE(scsi_mpath_head->iopolicy.iopolicy) == MPATH_IOPOLICY_QD) &&
+	if ((mpath_read_iopolicy(&scsi_mpath_head->iopolicy) == MPATH_IOPOLICY_QD) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
 		atomic_inc(&mpath_device->nr_active);
 		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;

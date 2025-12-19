@@ -3988,18 +3988,9 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
 	struct nvme_subsystem *subsys = head->subsys;
 
-	return READ_ONCE(subsys->iopolicy.iopolicy);
+	return mpath_read_iopolicy(&subsys->iopolicy);
 }
 
-#ifdef dsdsd
-static void nvme_mpath_set_iopolicy(struct mpath_head *mpath_head, enum mpath_iopolicy iopolicy)
-{
-	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
-	struct nvme_subsystem *subsys = head->subsys;
-
-	WRITE_ONCE(subsys->iopolicy, iopolicy);
-}
-#endif
 
 #ifdef dsdsd_copied_from_multipathc
 const struct block_device_operations nvme_ns_head_ops = {
@@ -4025,7 +4016,6 @@ const struct mpath_head_template mpdt = {
 	.ioctl = nvme_mpath_ioctl,
 	.device_groups = nvme_ns_attr_groups,
 	.get_iopolicy = nvme_mpath_get_iopolicy,
-	//.set_iopolicy = nvme_mpath_set_iopolicy,
 	#ifdef CONFIG_BLK_DEV_ZONED
 	.report_zones = nvme_mpath_report_zones,
 	#endif
