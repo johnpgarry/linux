@@ -1042,9 +1042,8 @@ static __maybe_unused ssize_t scsi_mpath_iopolicy_show(struct device *dev,
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
-	struct mpath_iopolicy *iopolicy = &scsi_mpath_head->iopolicy;
 
-	return mpath_iopolicy_show(READ_ONCE(iopolicy->iopolicy), buf);
+	return mpath_iopolicy_show(&scsi_mpath_head->iopolicy, buf);
 }
 
 struct device_attribute scsi_mpath_iopolicy = \

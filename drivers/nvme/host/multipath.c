@@ -678,7 +678,7 @@ static ssize_t nvme_subsys_iopolicy_show(struct device *dev,
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
 
-	return mpath_iopolicy_show(READ_ONCE(subsys->iopolicy.iopolicy), buf);
+	return mpath_iopolicy_show(&subsys->iopolicy, buf);
 }
 
 static ssize_t nvme_subsys_iopolicy_store(struct device *dev,

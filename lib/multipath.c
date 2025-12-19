@@ -1434,10 +1434,10 @@ const struct attribute_group *mpath_device_groups[] = {
 };
 EXPORT_SYMBOL_GPL(mpath_device_groups);
 
-ssize_t mpath_iopolicy_show(enum mpath_iopolicy_e iopolicy, char *buf)
+ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf)
 {
 	return sysfs_emit(buf, "%s\n",
-			  mpath_iopolicy_names[iopolicy]);
+			  mpath_iopolicy_names[READ_ONCE(mpath_iopolicy->iopolicy)]);
 }
 EXPORT_SYMBOL_GPL(mpath_iopolicy_show);
 
