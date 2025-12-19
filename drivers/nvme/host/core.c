@@ -695,6 +695,10 @@ static void nvme_free_ns_head(struct kref *ref)
 
 bool nvme_tryget_ns_head(struct nvme_ns_head *head)
 {
+	struct kref *ref = &head->ref;
+
+	pr_err("%s head=%pS calling kref_get_unless_zero ref=%pS refcount=%d\n",
+		__func__, head, ref, refcount_read(&ref->refcount));
 	return kref_get_unless_zero(&head->ref);
 }
 
@@ -4317,7 +4321,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	ns->ctrl = ctrl;
 	kref_init(&ns->kref);
 
-	pr_err("%s ns=%pS info=%pS calling nvme_init_ns_head ns_to_head(ns)=%pS\n", __func__, ns, info, ns_to_head(ns));
+	pr_err("%s ns=%pS info=%pS calling nvme_init_ns_head\n", __func__, ns, info);
 	if (nvme_init_ns_head(ns, info))
 		goto out_cleanup_disk;
 	pr_err("%s0.1 ns=%pS info=%pS called nvme_init_ns_head ns_to_head(ns)=%pS\n", __func__, ns, info, ns_to_head(ns));
