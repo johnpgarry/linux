@@ -3991,7 +3991,6 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 	return mpath_read_iopolicy(&subsys->iopolicy);
 }
 
-
 #ifdef dsdsd_copied_from_multipathc
 const struct block_device_operations nvme_ns_head_ops = {
 	.owner		= THIS_MODULE,

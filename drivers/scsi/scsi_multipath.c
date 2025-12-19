@@ -212,7 +212,7 @@ void scsi_mpath_start_request(struct request *req)
 	struct gendisk *disk = mpath_head->disk;
 	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
-	if ((mpath_read_iopolicy(&scsi_mpath_head->iopolicy) == MPATH_IOPOLICY_QD) &&
+	if (mpath_qd_iopolicy(&scsi_mpath_head->iopolicy) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
 		atomic_inc(&mpath_device->nr_active);
 		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
@@ -978,7 +978,7 @@ static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attr
 	dev_err(dev, "%s2 iopolicy=%d SCSI_MPATH_IOPOLICY_NUMA=%d\n", __func__,
 		scsi_mpath_head->iopolicy.iopolicy, MPATH_IOPOLICY_NUMA);
 
-	return mpath_numa_nodes_show(mpath_device, READ_ONCE(mpath_iopolicy->iopolicy), buf);
+	return mpath_numa_nodes_show(mpath_device, mpath_iopolicy, buf);
 }
 
 struct device_attribute scsi_mpath_numa_nodes = \
@@ -1001,7 +1001,7 @@ static ssize_t scsi_mpath_nr_active_show(struct device *dev,
 	mpath_head = mpath_device->mpath_head;
 	scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
-	if (READ_ONCE(scsi_mpath_head->iopolicy.iopolicy) != MPATH_IOPOLICY_QD)
+	if (!mpath_qd_iopolicy(&scsi_mpath_head->iopolicy))
 		return 0;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&mpath_device->nr_active));

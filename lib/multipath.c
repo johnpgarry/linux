@@ -1005,7 +1005,7 @@ bool mpath_device_is_live(struct mpath_device *mpath_device)
 EXPORT_SYMBOL_GPL(mpath_device_is_live);
 
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
-					enum mpath_iopolicy_e iopolicy, char *buf)
+					struct mpath_iopolicy *mpath_iopolicy, char *buf)
 {
 	int node, srcu_idx;
 	nodemask_t numa_nodes;
@@ -1015,7 +1015,7 @@ ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
 	pr_err("%s mpath_device=%pS mpath_head=%pS\n", __func__,
 		mpath_device, mpath_head);
 
-	if (iopolicy != MPATH_IOPOLICY_NUMA)
+	if (mpath_read_iopolicy(mpath_iopolicy) != MPATH_IOPOLICY_NUMA)
 		return 0;
 
 	nodes_clear(numa_nodes);

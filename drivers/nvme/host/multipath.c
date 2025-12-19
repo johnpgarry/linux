@@ -173,7 +173,7 @@ void nvme_mpath_start_request(struct request *rq)
 	struct gendisk *disk = mpath_head->disk;
 	struct nvme_subsystem *subsys = head->subsys;
 
-	if ((mpath_read_iopolicy(&subsys->iopolicy) == MPATH_IOPOLICY_QD) &&
+	if (mpath_qd_iopolicy(&subsys->iopolicy) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
 		atomic_inc(&ns->ctrl->nr_active);
 		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
@@ -714,7 +714,7 @@ static ssize_t queue_depth_show(struct device *dev,
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
 
-	if (mpath_read_iopolicy(&subsys->iopolicy) != MPATH_IOPOLICY_QD)
+	if (!mpath_qd_iopolicy(&subsys->iopolicy))
 		return 0;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&ns->ctrl->nr_active));
@@ -728,7 +728,7 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
 	struct mpath_device *mpath_device = &ns->mpath_device;
 
-	return mpath_numa_nodes_show(mpath_device, mpath_read_iopolicy(&subsys->iopolicy), buf);
+	return mpath_numa_nodes_show(mpath_device, &subsys->iopolicy, buf);
 }
 DEVICE_ATTR_RO(numa_nodes);
 

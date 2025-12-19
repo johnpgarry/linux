@@ -181,7 +181,7 @@ struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 void mpath_requeue_work(struct work_struct *work);
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
-					enum mpath_iopolicy_e iopolicy, char *buf);
+					struct mpath_iopolicy *iopolicy, char *buf);
 void mpath_put_disk(struct mpath_head *mpath_head);
 int mpath_get_disk(struct mpath_head *mpath_head);
 //int mpath_head_add_cdev(struct mpath_head *mpath_head);
@@ -202,6 +202,11 @@ ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy, const char *
 static inline enum mpath_iopolicy_e mpath_read_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
 {
 	return READ_ONCE(mpath_iopolicy->iopolicy);
+}
+
+static inline bool mpath_qd_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
+{
+	return mpath_read_iopolicy(mpath_iopolicy) == MPATH_IOPOLICY_QD;
 }
 
 void mpath_device_set_live(struct mpath_device *mpath_device);
