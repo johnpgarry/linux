@@ -878,6 +878,11 @@ static bool mpath_tryget_head(struct mpath_head *mpath_head)
 	return kref_get_unless_zero(&mpath_head->ref);
 }
 
+static void mpath_init_subsys(struct mpath_subsys *mpath_subsys)
+{
+	mutex_init(&mpath_subsys->lock);
+}
+
 int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 {
 	struct queue_limits lim;
@@ -895,7 +900,8 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	lim.dma_alignment = 3;
 
 	mpath_head->disk = blk_alloc_disk(&lim, dev_to_node(mpath_head->parent));
-	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS\n", __func__, NULL, NULL, mpath_head->disk);
+	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS subsys=%pS\n",
+		__func__, NULL, NULL, mpath_head->disk, mpath_head->mpath_subsys);
 	if (IS_ERR(mpath_head->disk))
 		return -ENOMEM;
 
@@ -927,6 +933,8 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 		__func__, ret, NULL, NULL);
 
 	mpath_tryget_head(mpath_head);
+
+	mpath_init_subsys(mpath_head->mpath_subsys);
 
 	pr_err("%s12.4 called mpath_tryget_head ref=%pS refcount=%d\n",
 		__func__, ref, refcount_read(&ref->refcount));
