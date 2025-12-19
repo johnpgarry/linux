@@ -422,7 +422,7 @@ static inline enum nvme_ctrl_state nvme_ctrl_state(struct nvme_ctrl *ctrl)
 	return READ_ONCE(ctrl->state);
 }
 
-enum nvme_iopolicy {
+enum nvme_iopowwlicy {
 	NVME_IOPOLICY_NUMA,
 	NVME_IOPOLICY_RR,
 	NVME_IOPOLICY_QD,
@@ -431,17 +431,15 @@ enum nvme_iopolicy {
 struct nvme_subsystem {
 	int			instance;
 	struct device		dev;
-	struct mpath_subsys mpath_subsys;
 	/*
 	 * Because we unregister the device on the last put we need
 	 * a separate refcount.
 	 */
 	struct kref		ref;
 	struct list_head	entry;
-	#ifdef dsdsdd
 	struct mutex		lock;
-	#endif
 	struct list_head	ctrls;
+	struct list_head	nsheads;
 	char			subnqn[NVMF_NQN_SIZE];
 	char			serial[20];
 	char			model[40];
@@ -452,7 +450,7 @@ struct nvme_subsystem {
 	u16			awupf; /* 0's based value. */
 	struct ida		ns_ida;
 #ifdef CONFIG_NVME_MULTIPATH
-	enum nvme_iopolicy	iopolicy;
+	struct mpath_iopolicy mpath_iopolicy;
 #endif
 };
 
@@ -485,7 +483,7 @@ struct nvme_ns_head {
 	u16			pi_size;
 	u8			pi_type;
 	u8			guard_type;
-	//struct list_head	entry;
+	struct list_head	entry;
 	struct kref		ref;
 	bool			shared;
 	bool			rotational;

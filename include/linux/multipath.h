@@ -19,7 +19,7 @@ enum mpath_access_state {
 	MPATH_STATE_INVALID	= 0xFF
 };
 
-enum mpath_iopolicy {
+enum mpath_iopolicies {
 	MPATH_IOPOLICY_NUMA,
 	MPATH_IOPOLICY_RR,
 	MPATH_IOPOLICY_QD,
@@ -33,14 +33,19 @@ enum mpath_iopolicy {
 
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
 
+#ifdef dsdsdsd
 struct mpath_subsys {
 	enum mpath_iopolicy	iopolicy;
 	struct mutex            lock;
 	struct list_head		heads;
 };
+#else
+struct mpath_iopolicy {
+	enum mpath_iopolicies	iopolicy;
+};
+#endif
 
 struct mpath_head {
-	struct mpath_subsys *mpath_subsys;
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	struct list_head	entry; /* Entry into list of subsystems */
@@ -169,11 +174,14 @@ static inline bool is_mpath_request(struct request *req)
 #define cdev_mpath_priv_to_head(cdev) container_of(cdev, struct mpath_head, cdev)
 
 bool mpath_clear_current_path(struct mpath_device *);
-struct mpath_device *mpath_find_path(struct mpath_head *mpath_head);
-struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head, int node);
+struct mpath_device *mpath_find_path(struct mpath_head *mpath_head,
+				struct mpath_iopolicy *mpath_iopolicy);
+struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
+				struct mpath_iopolicy *mpath_iopolicy, int node);
 void mpath_requeue_work(struct work_struct *work);
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
-ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf);
+ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
+					struct mpath_iopolicy *mpath_iopolicy, char *buf);
 void mpath_put_disk(struct mpath_head *mpath_head);
 int mpath_get_disk(struct mpath_head *mpath_head);
 //int mpath_head_add_cdev(struct mpath_head *mpath_head);
@@ -188,8 +196,8 @@ void mpath_remove_device(struct mpath_device *mpath_device);
 int mpath_set_iopolicy(const char *val, const struct kernel_param *kp);
 int mpath_get_iopolicy(char *buf, const struct kernel_param *kp);
 
-ssize_t mpath_iopolicy_show(struct mpath_subsys *mpath_subsys, char *buf);
-ssize_t mpath_iopolicy_store(struct mpath_subsys *mpath_subsys, const char *buf, size_t count);
+ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf);
+ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy, const char *buf, size_t count);
 
 void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_head *mpath_head);

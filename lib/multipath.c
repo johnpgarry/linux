@@ -81,7 +81,8 @@ EXPORT_SYMBOL_GPL(mpath_clear_current_path);
  * Search path based on iopolicy and numa node affinity
  * and return the scsi_device for that path
  */
-struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head, int node)
+struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
+				struct mpath_iopolicy *mpath_iopolicy, int node)
 {
 	int found_distance = INT_MAX, fallback_distance = INT_MAX, distance;
 	//struct scsi_device *sdev_found = NULL, *sdev_fallback = NULL, *sdev;
@@ -97,7 +98,7 @@ struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head, int node)
 		}
 
 		if (mpath_device->numa_node != NUMA_NO_NODE &&
-		    (READ_ONCE(mpath_head->mpath_subsys->iopolicy) == MPATH_IOPOLICY_NUMA))
+		    (READ_ONCE(mpath_iopolicy->iopolicy) == MPATH_IOPOLICY_NUMA))
 			distance = node_distance(node, mpath_device->numa_node);
 		else
 			distance = LOCAL_DISTANCE;
@@ -141,7 +142,8 @@ static struct mpath_device *mpath_next_dev(struct mpath_head *mpath_head,
 	return list_first_or_null_rcu(&mpath_head->dev_list, struct mpath_device, siblings);
 }
 
-static struct mpath_device *mpath_round_robin_path(struct mpath_head *mpath_head)
+static struct mpath_device *mpath_round_robin_path(struct mpath_head *mpath_head,
+				struct mpath_iopolicy *mpath_iopolicy)
 {
 	struct mpath_device *mpath_device, *found = NULL;
 	int node = numa_node_id();
@@ -149,7 +151,7 @@ static struct mpath_device *mpath_round_robin_path(struct mpath_head *mpath_head
 					       &mpath_head->srcu);
 
 	if (unlikely(!old))
-		return __mpath_find_path(mpath_head, node);
+		return __mpath_find_path(mpath_head, mpath_iopolicy, node);
 
 	if (list_is_singular(&mpath_head->dev_list)) {
 		if(mpath_head->mpdt->is_disabled(mpath_device))
@@ -232,7 +234,8 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_head *mpath_head
 	return best_opt ? best_opt : best_nonopt;
 }
 
-static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
+static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head,
+					struct mpath_iopolicy *mpath_iopolicy)
 {
 	int node = numa_node_id();
 	struct mpath_device *mpath_device;
@@ -240,25 +243,27 @@ static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
 	pr_err_once("%s mpath_head=%pS\n", __func__, mpath_head);
 	mpath_device = srcu_dereference(mpath_head->current_path[node], &mpath_head->srcu);
 	if (unlikely(!mpath_device))
-		return __mpath_find_path(mpath_head, node);
+		return __mpath_find_path(mpath_head, mpath_iopolicy, node);
 	//scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
 	pr_err_once("%s1 mpath_head=%pS mpath_device=%pS\n", __func__, mpath_head, mpath_device);
 	if (unlikely(!mpath_head->mpdt->is_optimized(mpath_device)))
-		return __mpath_find_path(mpath_head, node);
+		return __mpath_find_path(mpath_head, mpath_iopolicy, node);
 	return mpath_device;
 }
 
-struct mpath_device *mpath_find_path(struct mpath_head *mpath_head)
+struct mpath_device *mpath_find_path(struct mpath_head *mpath_head,
+					struct mpath_iopolicy *mpath_iopolicy)
 {
 	//struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
-	pr_err_once("%s mpath_head=%pS iopolicy=%d\n", __func__, mpath_head, READ_ONCE(mpath_head->mpath_subsys->iopolicy));
-	switch (READ_ONCE(mpath_head->mpath_subsys->iopolicy)) {
+	pr_err_once("%s mpath_head=%pS iopolicy=%d\n", __func__,
+		mpath_head, READ_ONCE(mpath_iopolicy->iopolicy));
+	switch (READ_ONCE(mpath_iopolicy->iopolicy)) {
 	case MPATH_IOPOLICY_QD:
 		return mpath_queue_depth_path(mpath_head);
 	case MPATH_IOPOLICY_RR:
-		return mpath_round_robin_path(mpath_head);
+		return mpath_round_robin_path(mpath_head, mpath_iopolicy);
 	default:
-		return mpath_numa_path(mpath_head);
+		return mpath_numa_path(mpath_head, mpath_iopolicy);
 	}
 }
 EXPORT_SYMBOL_GPL(mpath_find_path);
@@ -319,7 +324,7 @@ static void multipath_submit_bio(struct bio *bio)
 		return;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 	if (!mpath_device) {
 		pr_err("%s2 bio=%pS mpath_device=NULL mpath_head=%pS mpath_available_path=%d\n",
 			__func__, bio, mpath_head, mpath_available_path(mpath_head));
@@ -379,7 +384,7 @@ static int mpath_get_unique_id(struct gendisk *disk, u8 id[16],
 
 	pr_err("%s\n", __func__);
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 	if (mpath_device && mpath_device->disk->fops->get_unique_id)
 		ret = mpath_device->disk->fops->get_unique_id(mpath_device->disk, id, type);
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
@@ -398,7 +403,7 @@ static int mpath_ioctl(struct block_device *bdev, blk_mode_t mode,
 	pr_err("%s cmd=0x%x arg=%ld mpath_head=%pS\n", __func__, cmd, arg, mpath_head);
 	
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 	pr_err("%s1 cmd=0x%x arg=%ld mpath_device=%pS called scsi_find_path srcu_idx=%d mpath_device=%pS\n",
 		__func__, cmd, arg, mpath_device, srcu_idx, mpath_device);
 	if (!mpath_device)
@@ -438,7 +443,7 @@ static int mpath_report_zones(struct gendisk *disk, sector_t sector,
 		return -EOPNOTSUPP;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 	if (mpath_device)
 		ret = mpath_head->mpdt->report_zones(mpath_device, sector, nr_zones, args);
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
@@ -456,7 +461,7 @@ static int mpath_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 
 	pr_err("%s\n", __func__);
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 	if (mpath_device && mpath_device->disk->fops->getgeo) { //-ENOTTY for no method
 		pr_err("%s2 getgeo=%pS\n", __func__, mpath_device->disk->fops->getgeo);
 		ret = mpath_device->disk->fops->getgeo(mpath_device->disk, geo);
@@ -501,7 +506,7 @@ static int mpath_pr_register(struct block_device *bdev, u64 old_key, u64 new_key
 	int srcu_idx, ret = 0;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 	pr_err("%s mpath_head=%pS mpath_device=%pS mpath_head->mpdt->pr_ops=%pS\n",
 		__func__, mpath_head, mpath_device, mpath_head->mpdt->pr_ops);
 	if (mpath_device && mpath_head->mpdt->pr_ops)
@@ -571,7 +576,7 @@ static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
 		__func__, cdev, cmd, arg, mpath_head, mode);
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 	pr_err("%s1 cmd=0x%x arg=%ld mpath_head=%pS called scsi_find_path srcu_idx=%d mpath_device=%pS\n",
 		__func__, cmd, arg, mpath_head, srcu_idx, mpath_device);
 	if (!mpath_device)
@@ -612,7 +617,7 @@ static int mpath_generic_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 		return -EOPNOTSUPP;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, NULL /* fixme */);
 
 	pr_err("%s cdev=%pS issue_flags=%d mpath_device=%pS\n",
 		__func__, cdev, issue_flags, mpath_device);
@@ -878,11 +883,6 @@ static bool mpath_tryget_head(struct mpath_head *mpath_head)
 	return kref_get_unless_zero(&mpath_head->ref);
 }
 
-static void mpath_init_subsys(struct mpath_subsys *mpath_subsys)
-{
-	mutex_init(&mpath_subsys->lock);
-}
-
 int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 {
 	struct queue_limits lim;
@@ -900,8 +900,8 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	lim.dma_alignment = 3;
 
 	mpath_head->disk = blk_alloc_disk(&lim, dev_to_node(mpath_head->parent));
-	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS subsys=%pS\n",
-		__func__, NULL, NULL, mpath_head->disk, mpath_head->mpath_subsys);
+	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS mpath_iopolicy=%pS\n",
+		__func__, NULL, NULL, mpath_head->disk, NULL);
 	if (IS_ERR(mpath_head->disk))
 		return -ENOMEM;
 
@@ -934,7 +934,7 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 
 	mpath_tryget_head(mpath_head);
 
-	mpath_init_subsys(mpath_head->mpath_subsys);
+	//mpath_init_subsys(mpath_head->mpath_subsys);
 
 	pr_err("%s12.4 called mpath_tryget_head ref=%pS refcount=%d\n",
 		__func__, ref, refcount_read(&ref->refcount));
@@ -945,7 +945,7 @@ EXPORT_SYMBOL_GPL(mpath_alloc_head_disk);
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
+//	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 	int ret;
 
 	pr_err("%s disk=%pS MPATH_HEAD_DISK_LIVE=%d\n",
@@ -976,16 +976,16 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 	mpath_add_sysfs_link(mpath_head);
 
 	// original used nvme_ns_head lock for this only!
-	mutex_lock(&mpath_subsys->lock);
+	//mutex_lock(&mpath_subsys->lock);
 	if (mpath_head->mpdt->is_optimized(mpath_device)) { //checkme is proper CB
 		int node, srcu_idx;
 
 		srcu_idx = srcu_read_lock(&mpath_head->srcu);
 		for_each_online_node(node)
-			__mpath_find_path(mpath_head, node);
+			__mpath_find_path(mpath_head, NULL, node);
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	}
-	mutex_unlock(&mpath_subsys->lock);
+	//mutex_unlock(&mpath_subsys->lock);
 
 	synchronize_srcu(&mpath_head->srcu);
 	kblockd_schedule_work(&mpath_head->requeue_work);
@@ -1004,7 +1004,8 @@ bool mpath_device_is_live(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_device_is_live);
 
-ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf)
+ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
+					struct mpath_iopolicy *mpath_iopolicy, char *buf)
 {
 	int node, srcu_idx;
 	nodemask_t numa_nodes;
@@ -1014,7 +1015,7 @@ ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device, char *buf)
 	pr_err("%s mpath_device=%pS mpath_head=%pS\n", __func__,
 		mpath_device, mpath_head);
 
-	if (mpath_head->mpath_subsys->iopolicy != MPATH_IOPOLICY_NUMA)
+	if (mpath_iopolicy->iopolicy != MPATH_IOPOLICY_NUMA)
 		return 0;
 
 	nodes_clear(numa_nodes);
@@ -1265,14 +1266,14 @@ void mpath_remove_disk(struct mpath_head *mpath_head)
 {
 	bool remove = false;
 	struct gendisk *disk = mpath_head->disk;
-	struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
+	//struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 
 	pr_err("%s mpath_head=%pS disk=%pS mpath_subsys=%pS\n",
-		__func__, mpath_head, disk, mpath_subsys);
+		__func__, mpath_head, disk, NULL);
 	if (!disk)
 		return;
 
-	mutex_lock(&mpath_subsys->lock);
+	//mutex_lock(&mpath_subsys->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -1302,7 +1303,7 @@ void mpath_remove_disk(struct mpath_head *mpath_head)
 		remove = true;
 	}
 out:
-	mutex_unlock(&mpath_subsys->lock);
+	//mutex_unlock(&mpath_subsys->lock);
 	if (remove) {
 		pr_err("%s9 calling nvme_remove_head mpath_head=%pS\n",
 			__func__, mpath_head);
@@ -1315,15 +1316,15 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 {
 	bool last_path = false;
 	struct mpath_head *mpath_head;
-	struct mpath_subsys *mpath_subsys;
+	//struct mpath_subsys *mpath_subsys;
 	
 	pr_err("%s mpath_device=%pS\n", __func__, mpath_device);
 
 	mpath_head = mpath_device->mpath_head;
-	mpath_subsys = mpath_head->mpath_subsys;
+	//mpath_subsys = mpath_head->mpath_subsys;
 
 	pr_err("%s1 mpath_device=%pS mpath_subsys=%pS calling mpath_remove_sysfs_link\n",
-		__func__, mpath_device, mpath_subsys);
+		__func__, mpath_device, NULL);
 	mpath_remove_sysfs_link(mpath_device);
 
 	synchronize_srcu(&mpath_head->srcu);
@@ -1343,7 +1344,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 	flush_work(&mpath_head->requeue_work);
 	//put_disk(sdev->scsi_mpath_dev);
 
-	mutex_lock(&mpath_subsys->lock);
+	//mutex_lock(&mpath_subsys->lock);
 	
 	list_del_rcu(&mpath_device->siblings);
 	pr_err("%s3 list_empty=%d\n", __func__, list_empty(&mpath_head->dev_list));
@@ -1353,7 +1354,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 		}
 		last_path = true;
 	}
-	mutex_unlock(&mpath_subsys->lock);
+	//mutex_unlock(&mpath_subsys->lock);
 
 	pr_err("%s4 last_path=%d\n",
 		__func__, last_path);
@@ -1433,22 +1434,22 @@ const struct attribute_group *mpath_device_groups[] = {
 };
 EXPORT_SYMBOL_GPL(mpath_device_groups);
 
-ssize_t mpath_iopolicy_show(struct mpath_subsys *mpath_subsys, char *buf)
+ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf)
 {
 	return sysfs_emit(buf, "%s\n",
-			  mpath_iopolicy_names[READ_ONCE(mpath_subsys->iopolicy)]);
+			  mpath_iopolicy_names[READ_ONCE(mpath_iopolicy->iopolicy)]);
 }
 EXPORT_SYMBOL_GPL(mpath_iopolicy_show);
 
-static void mpath_iopolicy_update(struct mpath_subsys *mpath_subsys,
+static void mpath_iopolicy_update(struct mpath_iopolicy *mpath_iopolicy,
 		int iopolicy)
 {
-	int old_iopolicy = READ_ONCE(mpath_subsys->iopolicy);
+	int old_iopolicy = READ_ONCE(mpath_iopolicy->iopolicy);
 
 	if (old_iopolicy == iopolicy)
 		return;
 
-	WRITE_ONCE(mpath_subsys->iopolicy, iopolicy);
+	WRITE_ONCE(mpath_iopolicy->iopolicy, iopolicy);
 
 	/* iopolicy changes clear the mpath by design */
 	//mutex_lock(&nvme_subsystems_lock);
@@ -1461,13 +1462,13 @@ static void mpath_iopolicy_update(struct mpath_subsys *mpath_subsys,
 			mpath_iopolicy_names[iopolicy]);
 }
 
-ssize_t mpath_iopolicy_store(struct mpath_subsys *mpath_subsys, const char *buf, size_t count)
+ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy, const char *buf, size_t count)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
 		if (sysfs_streq(buf, mpath_iopolicy_names[i])) {
-			mpath_iopolicy_update(mpath_subsys, i);
+			mpath_iopolicy_update(mpath_iopolicy, i);
 			return count;
 		}
 	}
