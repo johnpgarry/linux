@@ -212,7 +212,7 @@ void scsi_mpath_start_request(struct request *req)
 	struct gendisk *disk = mpath_head->disk;
 	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
-	if ((READ_ONCE(scsi_mpath_head->mpath_iopolicy.iopolicy) == MPATH_IOPOLICY_QD) &&
+	if ((READ_ONCE(scsi_mpath_head->iopolicy.iopolicy) == MPATH_IOPOLICY_QD) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
 		atomic_inc(&mpath_device->nr_active);
 		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
@@ -974,11 +974,11 @@ static ssize_t scsi_mpath_numa_nodes_show(struct device *dev, struct device_attr
 	mpath_head = mpath_device->mpath_head;
 
 	scsi_mpath_head = mpath_to_priv_head(mpath_head);
-	mpath_iopolicy = &scsi_mpath_head->mpath_iopolicy;
+	mpath_iopolicy = &scsi_mpath_head->iopolicy;
 	dev_err(dev, "%s2 iopolicy=%d SCSI_MPATH_IOPOLICY_NUMA=%d\n", __func__,
-		scsi_mpath_head->mpath_iopolicy.iopolicy, MPATH_IOPOLICY_NUMA);
+		scsi_mpath_head->iopolicy.iopolicy, MPATH_IOPOLICY_NUMA);
 
-	return mpath_numa_nodes_show(mpath_device, mpath_iopolicy, buf);
+	return mpath_numa_nodes_show(mpath_device, READ_ONCE(mpath_iopolicy->iopolicy), buf);
 }
 
 struct device_attribute scsi_mpath_numa_nodes = \
@@ -1001,7 +1001,7 @@ static ssize_t scsi_mpath_nr_active_show(struct device *dev,
 	mpath_head = mpath_device->mpath_head;
 	scsi_mpath_head = mpath_to_priv_head(mpath_head);
 
-	if (scsi_mpath_head->mpath_iopolicy.iopolicy != MPATH_IOPOLICY_QD)
+	if (READ_ONCE(scsi_mpath_head->iopolicy.iopolicy) != MPATH_IOPOLICY_QD)
 		return 0;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&mpath_device->nr_active));
@@ -1034,7 +1034,7 @@ static ssize_t scsi_mpath_iopolicy_store(struct device *dev,
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
 
-	return mpath_iopolicy_store(&scsi_mpath_head->mpath_iopolicy, buf, count);
+	return mpath_iopolicy_store(&scsi_mpath_head->iopolicy, buf, count);
 }
 
 static __maybe_unused ssize_t scsi_mpath_iopolicy_show(struct device *dev,
@@ -1042,8 +1042,9 @@ static __maybe_unused ssize_t scsi_mpath_iopolicy_show(struct device *dev,
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_iopolicy *iopolicy = &scsi_mpath_head->iopolicy;
 
-	return mpath_iopolicy_show(&scsi_mpath_head->mpath_iopolicy, buf);
+	return mpath_iopolicy_show(READ_ONCE(iopolicy->iopolicy), buf);
 }
 
 struct device_attribute scsi_mpath_iopolicy = \

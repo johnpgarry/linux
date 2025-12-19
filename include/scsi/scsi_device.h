@@ -116,7 +116,7 @@ struct scsi_mpath_head {
 	struct kref		ref;
 	char wwid[SCSI_MPATH_DEVICE_ID_LEN];
 
-	struct mpath_iopolicy mpath_iopolicy;
+	struct mpath_iopolicy iopolicy;
 };
 
 

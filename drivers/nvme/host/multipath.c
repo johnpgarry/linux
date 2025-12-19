@@ -6,6 +6,7 @@
 #include <linux/backing-dev.h>
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
+#include <linux/multipath.h>
 #include <trace/events/block.h>
 #include "nvme.h"
 
@@ -73,7 +74,7 @@ MODULE_PARM_DESC(iopolicy,
 
 void nvme_mpath_default_iopolicy(struct nvme_subsystem *subsys)
 {
-	subsys->mpath_iopolicy.iopolicy = iopolicy;
+	subsys->iopolicy.iopolicy = iopolicy;
 }
 
 void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
@@ -172,7 +173,7 @@ void nvme_mpath_start_request(struct request *rq)
 	struct gendisk *disk = mpath_head->disk;
 	struct nvme_subsystem *subsys = head->subsys;
 
-	if ((READ_ONCE(subsys->mpath_iopolicy.iopolicy) == NVME_IOPOLICY_QD) &&
+	if ((READ_ONCE(subsys->iopolicy.iopolicy) == NVME_IOPOLICY_QD) &&
 	    !(mpath_request->flags & MPATH_REQ_CNT_ACTIVE)) {
 		atomic_inc(&ns->ctrl->nr_active);
 		mpath_request->flags |= MPATH_REQ_CNT_ACTIVE;
@@ -677,7 +678,7 @@ static ssize_t nvme_subsys_iopolicy_show(struct device *dev,
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
 
-	return mpath_iopolicy_show(&subsys->mpath_iopolicy, buf);
+	return mpath_iopolicy_show(READ_ONCE(subsys->iopolicy.iopolicy), buf);
 }
 
 static ssize_t nvme_subsys_iopolicy_store(struct device *dev,
@@ -686,7 +687,7 @@ static ssize_t nvme_subsys_iopolicy_store(struct device *dev,
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
 	
-	return mpath_iopolicy_store(&subsys->mpath_iopolicy, buf, count);
+	return mpath_iopolicy_store(&subsys->iopolicy, buf, count);
 }
 SUBSYS_ATTR_RW(iopolicy, S_IRUGO | S_IWUSR,
 		      nvme_subsys_iopolicy_show, nvme_subsys_iopolicy_store);
@@ -713,7 +714,7 @@ static ssize_t queue_depth_show(struct device *dev,
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
 
-	if (subsys->mpath_iopolicy.iopolicy != MPATH_IOPOLICY_QD)
+	if (READ_ONCE(subsys->iopolicy.iopolicy) != MPATH_IOPOLICY_QD)
 		return 0;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&ns->ctrl->nr_active));
@@ -726,9 +727,9 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
 	struct mpath_device *mpath_device = &ns->mpath_device;
-	struct mpath_iopolicy *mpath_iopolicy = &subsys->mpath_iopolicy;
+	enum mpath_iopolicy_e iopolicy = READ_ONCE(subsys->iopolicy.iopolicy);
 
-	return mpath_numa_nodes_show(mpath_device, mpath_iopolicy, buf);
+	return mpath_numa_nodes_show(mpath_device, iopolicy, buf);
 }
 DEVICE_ATTR_RO(numa_nodes);
 

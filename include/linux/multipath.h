@@ -19,7 +19,7 @@ enum mpath_access_state {
 	MPATH_STATE_INVALID	= 0xFF
 };
 
-enum mpath_iopolicies {
+enum mpath_iopolicy_e {
 	MPATH_IOPOLICY_NUMA,
 	MPATH_IOPOLICY_RR,
 	MPATH_IOPOLICY_QD,
@@ -41,7 +41,7 @@ struct mpath_subsys {
 };
 #else
 struct mpath_iopolicy {
-	enum mpath_iopolicies	iopolicy;
+	enum mpath_iopolicy_e	iopolicy;
 };
 #endif
 
@@ -136,6 +136,7 @@ struct mpath_head_template {
 	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags);
+	enum mpath_iopolicy_e (*get_iopolicy)(struct mpath_head *);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct mpath_pr_ops *pr_ops;
 	const struct attribute_group **device_groups;
@@ -174,14 +175,13 @@ static inline bool is_mpath_request(struct request *req)
 #define cdev_mpath_priv_to_head(cdev) container_of(cdev, struct mpath_head, cdev)
 
 bool mpath_clear_current_path(struct mpath_device *);
-struct mpath_device *mpath_find_path(struct mpath_head *mpath_head,
-				struct mpath_iopolicy *mpath_iopolicy);
+struct mpath_device *mpath_find_path(struct mpath_head *mpath_head);
 struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
-				struct mpath_iopolicy *mpath_iopolicy, int node);
+				enum mpath_iopolicy_e, int node);
 void mpath_requeue_work(struct work_struct *work);
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
-					struct mpath_iopolicy *mpath_iopolicy, char *buf);
+					enum mpath_iopolicy_e iopolicy, char *buf);
 void mpath_put_disk(struct mpath_head *mpath_head);
 int mpath_get_disk(struct mpath_head *mpath_head);
 //int mpath_head_add_cdev(struct mpath_head *mpath_head);
@@ -196,7 +196,7 @@ void mpath_remove_device(struct mpath_device *mpath_device);
 int mpath_set_iopolicy(const char *val, const struct kernel_param *kp);
 int mpath_get_iopolicy(char *buf, const struct kernel_param *kp);
 
-ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf);
+ssize_t mpath_iopolicy_show(enum mpath_iopolicy_e iopolicy, char *buf);
 ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy, const char *buf, size_t count);
 
 void mpath_device_set_live(struct mpath_device *mpath_device);

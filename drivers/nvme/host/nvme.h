@@ -450,7 +450,7 @@ struct nvme_subsystem {
 	u16			awupf; /* 0's based value. */
 	struct ida		ns_ida;
 #ifdef CONFIG_NVME_MULTIPATH
-	struct mpath_iopolicy mpath_iopolicy;
+	struct mpath_iopolicy iopolicy;
 #endif
 };
 

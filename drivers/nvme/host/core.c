@@ -23,6 +23,7 @@
 #include <linux/pm_qos.h>
 #include <linux/ratelimit.h>
 #include <linux/unaligned.h>
+#include <linux/multipath.h>
 
 #include "nvme.h"
 #include "fabrics.h"
@@ -3982,6 +3983,24 @@ static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
 	return true;
 }
 
+static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_head)
+{
+	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	struct nvme_subsystem *subsys = head->subsys;
+
+	return READ_ONCE(subsys->iopolicy.iopolicy);
+}
+
+#ifdef dsdsd
+static void nvme_mpath_set_iopolicy(struct mpath_head *mpath_head, enum mpath_iopolicy iopolicy)
+{
+	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	struct nvme_subsystem *subsys = head->subsys;
+
+	WRITE_ONCE(subsys->iopolicy, iopolicy);
+}
+#endif
+
 #ifdef dsdsd_copied_from_multipathc
 const struct block_device_operations nvme_ns_head_ops = {
 	.owner		= THIS_MODULE,
@@ -4005,6 +4024,8 @@ const struct mpath_head_template mpdt = {
 	.is_optimized = nvme_mpath_is_optimized,
 	.ioctl = nvme_mpath_ioctl,
 	.device_groups = nvme_ns_attr_groups,
+	.get_iopolicy = nvme_mpath_get_iopolicy,
+	//.set_iopolicy = nvme_mpath_set_iopolicy,
 	#ifdef CONFIG_BLK_DEV_ZONED
 	.report_zones = nvme_mpath_report_zones,
 	#endif
