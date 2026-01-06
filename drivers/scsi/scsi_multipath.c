@@ -623,6 +623,13 @@ static int scsi_mpath_add_cdev(struct mpath_head *mpath_head)
 	return 0;
 }
 
+static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_head)
+{
+	struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
+
+	return mpath_read_iopolicy(&scsi_mpath_head->iopolicy);
+}
+
 static const struct mpath_pr_ops mapth_pr_ops = {
 	#ifdef dsdsd
 	.pr_register	= sd_pr_register,
@@ -652,6 +659,7 @@ struct mpath_head_template smpdt = {
 	.clone_bio = scsi_mpath_clone_bio,
 	.pr_ops = &mapth_pr_ops,
 	.add_cdev = scsi_mpath_add_cdev,
+	.get_iopolicy = scsi_mpath_get_iopolicy,
 };
 
 /*
