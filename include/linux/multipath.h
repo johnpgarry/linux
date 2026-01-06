@@ -69,8 +69,6 @@ struct mpath_head {
 
 	struct mpath_device __rcu *current_path[MAX_NUMNODES]; /* scsi_device of current path */
 	const struct mpath_head_template *mpdt;
-	unsigned long hostdata[]  /* Used for storage of host specific stuff */
-			__attribute__ ((aligned (sizeof(unsigned long))));
 };
 
 #define MPATH_REQ_IO_STATS (1 << 0)
@@ -144,8 +142,8 @@ struct mpath_head_template {
 
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 
-struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt,
-						int privsize);
+int mpath_alloc_head(struct mpath_head *mpath_head,
+	const struct mpath_head_template *mpdt);
 
 int mpath_alloc_head_disk(struct mpath_head *mpath_head);
 int __must_check mpath_add_head(struct mpath_head *);
@@ -157,14 +155,14 @@ static inline bool mpath_head_queue_if_no_path(struct mpath_head *mpath_head)
 	return false;
 }
 
-static inline struct mpath_head *mpath_priv_to_head(void *d)
+static inline struct mpath_head *mpath_priv_to_head1(void *d)
 {
-	return d - sizeof(struct mpath_head);
+	return d + sizeof(struct mpath_head);
 }
 
-static inline void *mpath_to_priv_head(struct mpath_head *mpath_head)
+static inline void *mpath_to_priv_head1(struct mpath_head *mpath_head)
 {
-	return mpath_head + 1;
+	return mpath_head - 1;
 }
 
 static inline bool is_mpath_request(struct request *req)

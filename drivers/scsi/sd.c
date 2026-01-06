@@ -3747,7 +3747,7 @@ static int sd_revalidate_mpath_head(struct scsi_mpath_head *scsi_mpath_head, str
 	struct scsi_device *sdp = sdkp->device;
 	struct queue_limits *mpath_lim;
 	struct queue_limits lim2;
-	struct mpath_head *mpath_head = mpath_priv_to_head(scsi_mpath_head);
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 	int err;
 
 	//blk_mq_freeze_queue(sdp->mpath_disk->queue);
@@ -4182,7 +4182,7 @@ static int sd_probe(struct device *dev)
 		struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 		struct mpath_head *mpath_head = mpath_device->mpath_head;
-		struct scsi_mpath_head *scsi_mpath_head = mpath_to_priv_head(mpath_head);
+		struct scsi_mpath_head *scsi_mpath_head = container_of(mpath_head, struct scsi_mpath_head, mpath_head);
 		pr_err("%s calling sd_revalidate_mpath_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
 		sd_revalidate_mpath_head(scsi_mpath_head, sdkp);

@@ -2533,7 +2533,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		struct queue_limits lim;
 		unsigned int memflags;
 		struct nvme_ns_head *head = ns_to_head(ns);
-		struct mpath_head *mpath_head = mpath_priv_to_head(head);
+		struct mpath_head *mpath_head = &head->mpath_head;
 		struct gendisk *disk = mpath_head->disk;
 
 		lim = queue_limits_start_update(disk->queue);
@@ -3882,7 +3882,7 @@ static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 //		pr_err("%s has_uuid=0 ids=%pS subsys=%pS\n", __func__, ids, subsys);
 
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		struct nvme_ns_head *h = mpath_to_priv_head(mpath_head);
+		struct nvme_ns_head *h = container_of(mpath_head, struct nvme_ns_head, mpath_head);
 
 		if (has_uuid && uuid_equal(&ids->uuid, &h->ids.uuid)) {
 //			pr_err("%s2 h=%pS uuid_equal\n", __func__, h);
@@ -3985,7 +3985,7 @@ static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
 
 static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_head)
 {
-	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	struct nvme_ns_head *head = container_of(mpath_head, struct nvme_ns_head, mpath_head);
 	struct nvme_subsystem *subsys = head->subsys;
 
 	return mpath_read_iopolicy(&subsys->iopolicy);
@@ -4032,16 +4032,21 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	struct mpath_head *mpath_head;
 	char name[256];
 	struct nvme_subsystem *subsys = ctrl->subsys;
+
+	head = kzalloc(size, GFP_KERNEL);
+	pr_err("%s ctrl=%pS info=%pS head=%pS\n", __func__, ctrl, info, head);
+	if (!head)
+		goto out;
 	ret = ida_alloc_min(&ctrl->subsys->ns_ida, 1, GFP_KERNEL);
 	if (ret < 0)
 		return ERR_PTR(ret);
+	mpath_head = &head->mpath_head;
 
 	sprintf(name, "nvme%dn%d",
 			ctrl->subsys->instance, ret);
-	mpath_head = mpath_alloc_head(&mpdt, size);
-	if (!mpath_head)
+	ret = mpath_alloc_head(mpath_head, &mpdt);
+	if (ret)
 		goto out_free_ida;
-	head = mpath_to_priv_head(mpath_head);
 
 	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 
@@ -4091,7 +4096,7 @@ out_cleanup_srcu:
 	//kfree(head);
 out_free_ida:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
-//out:
+out:
 	if (ret > 0)
 		ret = blk_status_to_errno(nvme_error_status(ret));
 	return ERR_PTR(ret);
@@ -4172,7 +4177,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	}
 
 	mutex_lock(&ctrl->subsys->lock);
-	//pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x\n", __func__, ns, info->nsid);
+	pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x\n", __func__, ns, info->nsid);
 	head = nvme_find_ns_head(ctrl, info->nsid);
 
 
@@ -4192,11 +4197,11 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			goto out_unlock;
 		}
 
-		mpath_head = mpath_priv_to_head(head);
+		mpath_head = &head->mpath_head;
 		mpath_device->mpath_head = mpath_head;
 	} else {
 
-		mpath_head = mpath_priv_to_head(head);
+		mpath_head = &head->mpath_head;
 		mpath_device->mpath_head = mpath_head;
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&

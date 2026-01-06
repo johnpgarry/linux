@@ -117,6 +117,7 @@ struct scsi_mpath_head {
 	char wwid[SCSI_MPATH_DEVICE_ID_LEN];
 
 	struct mpath_iopolicy iopolicy;
+	struct mpath_head mpath_head;
 };
 
 

@@ -719,16 +719,14 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
-struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int privsize)
+int mpath_alloc_head(struct mpath_head *mpath_head, const struct mpath_head_template *mpdt)
 {
-	struct mpath_head *mpath_head;
-	int ret;
+//	int ret;
 
-	mpath_head = kzalloc(sizeof(*mpath_head) + privsize, GFP_KERNEL);
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_head=%pS mpath_device=%pS\n",
 		__func__, NULL, NULL, NULL, NULL, mpath_head, NULL);
-	if (!mpath_head)
-		return NULL;
+	//if (!mpath_head)
+	//	return NULL;
 	//scsi_mpath_head = mpath_to_priv_head(mpath_head);
 	//pr_err("%s mpath_head=%pS scsi_mpath_head=%pS\n",
 	//	__func__, NULL, mpath_head);
@@ -760,7 +758,7 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 //	device_initialize(&mpath_head->dev);
 //	set_dev_node(&mpath_head->dev, node_id);
 //	ret = dev_set_name(&mpath_head->dev, name);
-	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
+//	pr_err("%s8 ret=%d from dev_set_name\n", __func__, ret);
 
 
 
@@ -783,7 +781,7 @@ struct mpath_head *mpath_alloc_head(const struct mpath_head_template *mpdt, int 
 
 	pr_err("%s16 out\n", __func__);
 
-	return mpath_head;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_head);
 

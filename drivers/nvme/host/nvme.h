@@ -531,12 +531,12 @@ struct nvme_ns_head {
 	struct nvme_ns __rcu	*current_path[];
 #endif
 #endif
+	struct mpath_head mpath_head;
 };
 
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head = mpath_priv_to_head(head);
-	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && mpath_head->disk;
+	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->mpath_head.disk;
 }
 
 enum nvme_ns_features {
@@ -613,7 +613,7 @@ static inline struct nvme_ns_head *ns_to_head(struct nvme_ns *ns)
 	struct mpath_device *mpath_device = &ns->mpath_device;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 
-	return (struct nvme_ns_head *)(mpath_head + 1);
+	return container_of(mpath_head, struct nvme_ns_head, mpath_head);
 }
 
 /*
@@ -1032,7 +1032,7 @@ static inline void nvme_trace_bio_complete(struct request *req)
 	struct nvme_ns *ns = req->q->queuedata;
 
 	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio) {
-		struct mpath_head *mpath_head = mpath_priv_to_head(ns_to_head(ns));
+		struct mpath_head *mpath_head = &ns_to_head(ns)->mpath_head;
 		trace_block_bio_complete(mpath_head->disk->queue, req->bio);
 	}
 }

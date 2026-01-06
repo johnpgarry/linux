@@ -803,7 +803,7 @@ int nvme_mpath_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg, int srcu_idx)
 {
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	struct nvme_ns_head *head = mpath_to_priv_head(mpath_head);
+	struct nvme_ns_head *head = container_of(mpath_head, struct nvme_ns_head, mpath_head);
 	struct block_device *bdev = mpath_head->disk->part0;
 	struct nvme_ns *ns = nvme_to_ns(mpath_device);
 	bool open_for_write = mode & BLK_OPEN_WRITE;
