@@ -719,7 +719,7 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
-int mpath_init_head(struct mpath_head *mpath_head, const struct mpath_head_template *mpdt)
+void mpath_init_head(struct mpath_head *mpath_head, const struct mpath_head_template *mpdt)
 {
 //	int ret;
 
@@ -780,8 +780,6 @@ int mpath_init_head(struct mpath_head *mpath_head, const struct mpath_head_templ
 	//mutex_unlock(&scsi_mpath_heads_lock);
 
 	pr_err("%s16 out\n", __func__);
-
-	return 0;
 }
 EXPORT_SYMBOL_GPL(mpath_init_head);
 

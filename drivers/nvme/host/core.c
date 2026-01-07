@@ -4044,7 +4044,8 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 
 	sprintf(name, "nvme%dn%d",
 			ctrl->subsys->instance, ret);
-	ret = mpath_init_head(mpath_head, &mpdt);
+	mpath_init_head(mpath_head, &mpdt);
+	ret = 0;
 	if (ret)
 		goto out_free_ida;
 
