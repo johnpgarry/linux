@@ -4418,11 +4418,11 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	 * Ensure that !NVME_NS_READY is seen by other threads to prevent
 	 * this ns going back into current_path.
 	 */
-	synchronize_srcu(&mpath_head->srcu);
+	mpath_synchronize(mpath_head);
 
 	/* wait for concurrent submissions */
 	if (mpath_clear_current_path(mpath_device))
-		synchronize_srcu(&mpath_head->srcu);
+		mpath_synchronize(mpath_head);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
 	list_del_rcu(&ns->mpath_device.siblings);
@@ -4437,7 +4437,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	mutex_unlock(&ns->ctrl->subsys->lock);
 
 	/* guarantee not available in head->list */
-	synchronize_srcu(&mpath_head->srcu);
+	mpath_synchronize(mpath_head);
 
 	if (!nvme_ns_head_multipath(ns_to_head(ns)))
 		nvme_cdev_del(&ns->cdev, &ns->cdev_device);

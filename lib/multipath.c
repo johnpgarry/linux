@@ -77,6 +77,12 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_clear_current_path);
 
+void mpath_synchronize(struct mpath_head *mpath_head)
+{
+	synchronize_srcu(&mpath_head->srcu);
+}
+EXPORT_SYMBOL_GPL(mpath_clear_current_path);
+
 /*
  * Search path based on iopolicy and numa node affinity
  * and return the scsi_device for that path
@@ -841,7 +847,7 @@ static void mpath_remove_head(struct mpath_head *mpath_head)
 
 		pr_err("%s4 mpath_head=%pS calling synchronize_srcu\n",
 			__func__, mpath_head);
-		synchronize_srcu(&mpath_head->srcu);
+		mpath_synchronize(mpath_head);
 
 		pr_err("%s5 mpath_head=%pS calling del_gendisk\n",
 			__func__, mpath_head);
@@ -983,7 +989,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 	}
 	//mutex_unlock(&mpath_subsys->lock);
 
-	synchronize_srcu(&mpath_head->srcu);
+	mpath_synchronize(mpath_head);
 	kblockd_schedule_work(&mpath_head->requeue_work);
 }
 EXPORT_SYMBOL_GPL(mpath_device_set_live);
@@ -1323,11 +1329,11 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 		__func__, mpath_device, NULL);
 	mpath_remove_sysfs_link(mpath_device);
 
-	synchronize_srcu(&mpath_head->srcu);
+	mpath_synchronize(mpath_head);
 
 	/* wait for concurrent submissions */
 	if (mpath_clear_current_path(mpath_device))
-		synchronize_srcu(&mpath_head->srcu);
+		mpath_synchronize(mpath_head);
 
 	pr_err("%s2 mpath_device=%pS called scsi_mpath_remove_sysfs_link\n",
 		__func__, mpath_device);

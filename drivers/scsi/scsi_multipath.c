@@ -1158,7 +1158,7 @@ void scsi_mpath_shutdown_disk(struct scsi_device *sdev)
 
 	pr_err("%s clearing SCSI_MPATH_DISK_LIVE (if set) sdev=%pS\n", __func__, sdev);
 	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
-		synchronize_srcu(&mpath_head->srcu);
+		mpath_synchronize(mpath_head);
 		kblockd_schedule_work(&mpath_head->requeue_work);
 	//	del_gendisk(sdev->scsi_mpath_dev);
 	}

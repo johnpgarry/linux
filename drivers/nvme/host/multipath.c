@@ -407,7 +407,7 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 
 		pr_err("%s4 head=%pS calling synchronize_srcu\n",
 			__func__, head);
-		synchronize_srcu(&mpath_head->srcu);
+		mpath_synchronize(mpath_head);
 
 		pr_err("%s5 head=%pS calling del_gendisk\n",
 			__func__, head);
