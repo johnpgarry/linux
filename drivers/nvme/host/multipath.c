@@ -291,7 +291,6 @@ static inline bool nvme_path_is_optimized(struct nvme_ns *ns)
 		ns->ana_state == NVME_ANA_OPTIMIZED;
 }
 
-
 static __maybe_unused int nvme_ns_head_get_unique_id(struct gendisk *disk, u8 id[16],
 		enum blk_unique_id type)
 {
@@ -453,7 +452,9 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	//mpath_head->dev.parent = &subsys->dev;
 
 
-	sprintf(head->disk->disk_name, "nvme%dn%d",
+//	sprintf(head->disk->disk_name, "nvme%dn%d",
+//			ctrl->subsys->instance, head->instance);
+	sprintf(mpath_head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
 	pr_err("%s9 gendisk name=%s\n", __func__, gendisk->disk_name);
 	nvme_tryget_ns_head(head);

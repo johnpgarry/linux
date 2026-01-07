@@ -3995,7 +3995,6 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	size_t size = sizeof(*head);
 	int ret = -ENOMEM;
 	struct mpath_head *mpath_head;
-	char name[256];
 	struct nvme_subsystem *subsys = ctrl->subsys;
 
 	head = kzalloc(size, GFP_KERNEL);
@@ -4007,8 +4006,6 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 		return ERR_PTR(ret);
 	mpath_head = &head->mpath_head;
 
-	sprintf(name, "nvme%dn%d",
-			ctrl->subsys->instance, ret);
 	mpath_init_head(mpath_head, &mpdt);
 	ret = 0;
 	if (ret)
@@ -4042,8 +4039,8 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 
 	pr_err("%s ctrl=%pS head=%pS calling nvme_mpath_alloc_disk\n", __func__, ctrl, head);
 	ret = nvme_mpath_alloc_disk(ctrl, head);
-	pr_err("%s1 ctrl=%pS head=%pS called nvme_mpath_alloc_disk ret=%d name=%s\n",
-		__func__, ctrl, head, ret, name);
+	pr_err("%s1 ctrl=%pS head=%pS called nvme_mpath_alloc_disk ret=%d\n",
+		__func__, ctrl, head, ret);
 	if (ret)
 		goto out_cleanup_srcu;
 	pr_err("%s1.1 mpath_head->disk=%pS\n", __func__, mpath_head->disk);
