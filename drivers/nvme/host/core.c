@@ -4043,10 +4043,6 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 		__func__, ctrl, head, ret);
 	if (ret)
 		goto out_cleanup_srcu;
-	pr_err("%s1.1 mpath_head->disk=%pS\n", __func__, mpath_head->disk);
-	if (mpath_head->disk)
-		pr_err("%s1.2 mpath_head->disk->disk_name=%pS\n", __func__, mpath_head->disk->disk_name);
-	//sprintf(mpath_head->disk->disk_name, name);
 
 	ret = mpath_add_head(mpath_head);
 	pr_err("%s2 ret=%d from mpath_add_disk\n", __func__, ret);
