@@ -1040,7 +1040,7 @@ static inline void nvme_trace_bio_complete(struct request *req)
 }
 
 extern bool multipath;
-extern struct mpath_head_template mpdt;
+extern const struct mpath_head_template mpdt;
 extern struct device_attribute dev_attr_ana_grpid;
 extern struct device_attribute dev_attr_ana_state;
 extern struct device_attribute dev_attr_queue_depth;
