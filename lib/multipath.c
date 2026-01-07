@@ -81,7 +81,7 @@ void mpath_synchronize(struct mpath_head *mpath_head)
 {
 	synchronize_srcu(&mpath_head->srcu);
 }
-EXPORT_SYMBOL_GPL(mpath_clear_current_path);
+EXPORT_SYMBOL_GPL(mpath_synchronize);
 
 /*
  * Search path based on iopolicy and numa node affinity
