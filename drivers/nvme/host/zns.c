@@ -38,7 +38,7 @@ static int nvme_set_max_append(struct nvme_ctrl *ctrl)
 int nvme_query_zone_info(struct nvme_ns *ns, unsigned lbaf,
 		struct nvme_zone_info *zi)
 {
-	struct nvme_effects_log *log = ns_to_head(ns)->effects;
+	struct nvme_effects_log *log = ns->head->effects;
 	struct nvme_command c = { };
 	struct nvme_id_ns_zns *id;
 	int status;
@@ -49,12 +49,12 @@ int nvme_query_zone_info(struct nvme_ns *ns, unsigned lbaf,
 		if (test_and_clear_bit(NVME_NS_FORCE_RO, &ns->flags))
 			dev_warn(ns->ctrl->device,
 				 "Zone Append supported for zoned namespace:%d. Remove read-only mode\n",
-				 ns_to_head(ns)->ns_id);
+				 ns->head->ns_id);
 	} else {
 		set_bit(NVME_NS_FORCE_RO, &ns->flags);
 		dev_warn(ns->ctrl->device,
 			 "Zone Append not supported for zoned namespace:%d. Forcing to read-only mode\n",
-			 ns_to_head(ns)->ns_id);
+			 ns->head->ns_id);
 	}
 
 	/* Lazily query controller append limit for the first zoned namespace */
@@ -69,7 +69,7 @@ int nvme_query_zone_info(struct nvme_ns *ns, unsigned lbaf,
 		return -ENOMEM;
 
 	c.identify.opcode = nvme_admin_identify;
-	c.identify.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
+	c.identify.nsid = cpu_to_le32(ns->head->ns_id);
 	c.identify.cns = NVME_ID_CNS_CS_NS;
 	c.identify.csi = NVME_CSI_ZNS;
 
@@ -84,7 +84,7 @@ int nvme_query_zone_info(struct nvme_ns *ns, unsigned lbaf,
 	if (id->zoc) {
 		dev_warn(ns->ctrl->device,
 			"zone operations:%x not supported for namespace:%u\n",
-			le16_to_cpu(id->zoc), ns_to_head(ns)->ns_id);
+			le16_to_cpu(id->zoc), ns->head->ns_id);
 		status = -ENODEV;
 		goto free_data;
 	}
@@ -93,7 +93,7 @@ int nvme_query_zone_info(struct nvme_ns *ns, unsigned lbaf,
 	if (!is_power_of_2(zi->zone_size)) {
 		dev_warn(ns->ctrl->device,
 			"invalid zone size: %llu for namespace: %u\n",
-			zi->zone_size, ns_to_head(ns)->ns_id);
+			zi->zone_size, ns->head->ns_id);
 		status = -ENODEV;
 		goto free_data;
 	}
@@ -112,8 +112,8 @@ void nvme_update_zone_info(struct nvme_ns *ns, struct queue_limits *lim,
 	lim->max_open_zones = zi->max_open_zones;
 	lim->max_active_zones = zi->max_active_zones;
 	lim->max_hw_zone_append_sectors = ns->ctrl->max_zone_append;
-	lim->chunk_sectors = ns_to_head(ns)->zsze =
-		nvme_lba_to_sect(ns_to_head(ns), zi->zone_size);
+	lim->chunk_sectors = ns->head->zsze =
+		nvme_lba_to_sect(ns->head, zi->zone_size);
 }
 
 static void *nvme_zns_alloc_report_buffer(struct nvme_ns *ns,
@@ -127,7 +127,7 @@ static void *nvme_zns_alloc_report_buffer(struct nvme_ns *ns,
 				   sizeof(struct nvme_zone_descriptor);
 
 	nr_zones = min_t(unsigned int, nr_zones,
-			 get_capacity(ns->disk) >> ilog2(ns_to_head(ns)->zsze));
+			 get_capacity(ns->disk) >> ilog2(ns->head->zsze));
 
 	bufsize = sizeof(struct nvme_zone_report) +
 		nr_zones * sizeof(struct nvme_zone_descriptor);
@@ -151,7 +151,7 @@ static int nvme_zone_parse_entry(struct nvme_ns *ns,
 				 unsigned int idx,
 				 struct blk_report_zones_args *args)
 {
-	struct nvme_ns_head *head = ns_to_head(ns);
+	struct nvme_ns_head *head = ns->head;
 	struct blk_zone zone = { };
 
 	if ((entry->zt & 0xf) != NVME_ZONE_TYPE_SEQWRITE_REQ) {
@@ -181,7 +181,7 @@ int nvme_ns_report_zones(struct nvme_ns *ns, sector_t sector,
 	unsigned int nz, i;
 	size_t buflen;
 
-	if (ns_to_head(ns)->ids.csi != NVME_CSI_ZNS)
+	if (ns->head->ids.csi != NVME_CSI_ZNS)
 		return -EINVAL;
 
 	report = nvme_zns_alloc_report_buffer(ns, nr_zones, &buflen);
@@ -189,17 +189,17 @@ int nvme_ns_report_zones(struct nvme_ns *ns, sector_t sector,
 		return -ENOMEM;
 
 	c.zmr.opcode = nvme_cmd_zone_mgmt_recv;
-	c.zmr.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
+	c.zmr.nsid = cpu_to_le32(ns->head->ns_id);
 	c.zmr.numd = cpu_to_le32(nvme_bytes_to_numd(buflen));
 	c.zmr.zra = NVME_ZRA_ZONE_REPORT;
 	c.zmr.zrasf = NVME_ZRASF_ZONE_REPORT_ALL;
 	c.zmr.pr = NVME_REPORT_ZONE_PARTIAL;
 
-	sector &= ~(ns_to_head(ns)->zsze - 1);
+	sector &= ~(ns->head->zsze - 1);
 	while (zone_idx < nr_zones && sector < get_capacity(ns->disk)) {
 		memset(report, 0, buflen);
 
-		c.zmr.slba = cpu_to_le64(nvme_sect_to_lba(ns_to_head(ns), sector));
+		c.zmr.slba = cpu_to_le64(nvme_sect_to_lba(ns->head, sector));
 		ret = nvme_submit_sync_cmd(ns->queue, &c, report, buflen);
 		if (ret) {
 			if (ret > 0)
@@ -219,7 +219,7 @@ int nvme_ns_report_zones(struct nvme_ns *ns, sector_t sector,
 			zone_idx++;
 		}
 
-		sector += ns_to_head(ns)->zsze * nz;
+		sector += ns->head->zsze * nz;
 	}
 
 	if (zone_idx > 0)
@@ -237,8 +237,8 @@ blk_status_t nvme_setup_zone_mgmt_send(struct nvme_ns *ns, struct request *req,
 	memset(c, 0, sizeof(*c));
 
 	c->zms.opcode = nvme_cmd_zone_mgmt_send;
-	c->zms.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
-	c->zms.slba = cpu_to_le64(nvme_sect_to_lba(ns_to_head(ns), blk_rq_pos(req)));
+	c->zms.nsid = cpu_to_le32(ns->head->ns_id);
+	c->zms.slba = cpu_to_le64(nvme_sect_to_lba(ns->head, blk_rq_pos(req)));
 	c->zms.zsa = action;
 
 	if (req_op(req) == REQ_OP_ZONE_RESET_ALL)

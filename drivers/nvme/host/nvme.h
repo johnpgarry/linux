@@ -559,6 +559,7 @@ struct nvme_ns {
 	u32 ana_grpid;
 #endif
 	struct kref kref;
+	struct nvme_ns_head *head;
 
 	unsigned long flags;
 #define NVME_NS_REMOVING		0
@@ -610,6 +611,7 @@ struct nvme_ctrl_ops {
 	unsigned long (*get_virt_boundary)(struct nvme_ctrl *ctrl, bool is_admin);
 };
 
+#ifdef dsdsd
 static inline struct nvme_ns_head *ns_to_head(struct nvme_ns *ns)
 {
 	struct mpath_device *mpath_device = &ns->mpath_device;
@@ -617,6 +619,7 @@ static inline struct nvme_ns_head *ns_to_head(struct nvme_ns *ns)
 
 	return container_of(mpath_head, struct nvme_ns_head, mpath_head);
 }
+#endif
 
 /*
  * nvme command_id is constructed as such:
@@ -1034,7 +1037,7 @@ static inline void nvme_trace_bio_complete(struct request *req)
 	struct nvme_ns *ns = req->q->queuedata;
 
 	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio) {
-		struct mpath_head *mpath_head = &ns_to_head(ns)->mpath_head;
+		struct mpath_head *mpath_head = &ns->head->mpath_head;
 		trace_block_bio_complete(mpath_head->disk->queue, req->bio);
 	}
 }

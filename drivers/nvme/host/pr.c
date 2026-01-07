@@ -54,7 +54,7 @@ static int nvme_send_device_pr_command(struct mpath_device *mpath_device,
 {
 	struct nvme_ns *ns = nvme_to_ns(mpath_device);
 
-	c->common.nsid = cpu_to_le32(ns_to_head(ns)->ns_id);
+	c->common.nsid = cpu_to_le32(ns->head->ns_id);
 	return nvme_submit_sync_cmd(ns->queue, c, data, data_len);
 }
 

@@ -140,7 +140,7 @@ void nvme_failover_req(struct request *req)
 
 	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
 	for (bio = req->bio; bio; bio = bio->bi_next) {
-		struct mpath_head *mpath_head = &ns_to_head(ns)->mpath_head;
+		struct mpath_head *mpath_head = &ns->head->mpath_head;
 		struct gendisk *disk = mpath_head->disk;
 		bio_set_dev(bio, disk->part0);
 		if (bio->bi_opf & REQ_POLLED) {
@@ -168,7 +168,7 @@ void nvme_mpath_start_request(struct request *rq)
 {
 	struct nvme_ns *ns = rq->q->queuedata;
 	struct mpath_request *mpath_request = &nvme_req(rq)->mpath_request;
-	struct nvme_ns_head *head = ns_to_head(ns);
+	struct nvme_ns_head *head = ns->head;
 	struct mpath_head *mpath_head = &head->mpath_head;
 	struct gendisk *disk = mpath_head->disk;
 	struct nvme_subsystem *subsys = head->subsys;
@@ -216,7 +216,7 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
-		struct mpath_head *mpath_head = &ns_to_head(ns)->mpath_head;
+		struct mpath_head *mpath_head = &ns->head->mpath_head;
 		struct gendisk *disk = mpath_head->disk;
 		if (!disk)
 			continue;
@@ -247,7 +247,7 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
-		struct nvme_ns_head *head = ns_to_head(ns);
+		struct nvme_ns_head *head = ns->head;
 		struct mpath_head *mpath_head = &head->mpath_head;
 
 		mpath_clear_current_path(&ns->mpath_device);
@@ -260,7 +260,7 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 
 void nvme_mpath_revalidate_paths(struct nvme_ns *ns)
 {
-	struct nvme_ns_head *head = ns_to_head(ns);
+	struct nvme_ns_head *head = ns->head;
 	struct mpath_head *mpath_head = &head->mpath_head;
 	struct gendisk *disk = mpath_head->disk;
 	sector_t capacity = get_capacity(disk);
@@ -513,7 +513,7 @@ static inline bool nvme_state_is_live(enum nvme_ana_state state)
 static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		struct nvme_ns *ns)
 {
-	struct nvme_ns_head *head = ns_to_head(ns);
+	struct nvme_ns_head *head = ns->head;
 	struct mpath_head *mpath_head = &head->mpath_head;
 	ns->ana_grpid = le32_to_cpu(desc->grpid);
 	ns->ana_state = desc->state;
@@ -577,13 +577,13 @@ static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
 		unsigned nsid;
 again:
 		nsid = le32_to_cpu(desc->nsids[n]);
-		if (ns_to_head(ns)->ns_id < nsid)
+		if (ns->head->ns_id < nsid)
 			continue;
-		if (ns_to_head(ns)->ns_id == nsid)
+		if (ns->head->ns_id == nsid)
 			nvme_update_ns_ana_state(desc, ns);
 		if (++n == nr_nsids)
 			break;
-		if (ns_to_head(ns)->ns_id > nsid)
+		if (ns->head->ns_id > nsid)
 			goto again;
 	}
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
@@ -714,7 +714,7 @@ static ssize_t queue_depth_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
-	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
+	struct nvme_subsystem *subsys = ns->head->subsys;
 
 	if (!mpath_qd_iopolicy(&subsys->iopolicy))
 		return 0;
@@ -727,7 +727,7 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 		char *buf)
 {
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
-	struct nvme_subsystem *subsys = ns_to_head(ns)->subsys;
+	struct nvme_subsystem *subsys = ns->head->subsys;
 	struct mpath_device *mpath_device = &ns->mpath_device;
 
 	return mpath_numa_nodes_show(mpath_device, &subsys->iopolicy, buf);
@@ -798,7 +798,7 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 
 	pr_err("%s ns=%pS anagrpid=0x%x nvme_ctrl_use_ana=%d\n",
 		__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl));
-	struct mpath_head *mpath_head = &ns_to_head(ns)->mpath_head;
+	struct mpath_head *mpath_head = &ns->head->mpath_head;
 
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
 		struct nvme_ana_group_desc desc = {
