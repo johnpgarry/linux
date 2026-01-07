@@ -453,6 +453,8 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	//mpath_head->dev.parent = &subsys->dev;
 
 
+	sprintf(head->disk->disk_name, "nvme%dn%d",
+			ctrl->subsys->instance, head->instance);
 	pr_err("%s9 gendisk name=%s\n", __func__, gendisk->disk_name);
 	nvme_tryget_ns_head(head);
 	return 0;

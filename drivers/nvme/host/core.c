@@ -4042,10 +4042,14 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 
 	pr_err("%s ctrl=%pS head=%pS calling nvme_mpath_alloc_disk\n", __func__, ctrl, head);
 	ret = nvme_mpath_alloc_disk(ctrl, head);
-	pr_err("%s1 ctrl=%pS head=%pS called nvme_mpath_alloc_disk ret=%d\n", __func__, ctrl, head, ret);
+	pr_err("%s1 ctrl=%pS head=%pS called nvme_mpath_alloc_disk ret=%d name=%s\n",
+		__func__, ctrl, head, ret, name);
 	if (ret)
 		goto out_cleanup_srcu;
-	sprintf(mpath_head->disk->disk_name, name);
+	pr_err("%s1.1 mpath_head->disk=%pS\n", __func__, mpath_head->disk);
+	if (mpath_head->disk)
+		pr_err("%s1.2 mpath_head->disk->disk_name=%pS\n", __func__, mpath_head->disk->disk_name);
+	//sprintf(mpath_head->disk->disk_name, name);
 
 	ret = mpath_add_head(mpath_head);
 	pr_err("%s2 ret=%d from mpath_add_disk\n", __func__, ret);
