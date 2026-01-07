@@ -719,7 +719,7 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
-int mpath_alloc_head(struct mpath_head *mpath_head, const struct mpath_head_template *mpdt)
+int mpath_init_head(struct mpath_head *mpath_head, const struct mpath_head_template *mpdt)
 {
 //	int ret;
 
@@ -783,7 +783,7 @@ int mpath_alloc_head(struct mpath_head *mpath_head, const struct mpath_head_temp
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(mpath_alloc_head);
+EXPORT_SYMBOL_GPL(mpath_init_head);
 
 //nvme_free_ns_head
 static void mpath_free_head(struct kref *ref)

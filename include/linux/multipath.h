@@ -142,7 +142,7 @@ struct mpath_head_template {
 
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 
-int mpath_alloc_head(struct mpath_head *mpath_head,
+int mpath_init_head(struct mpath_head *mpath_head,
 	const struct mpath_head_template *mpdt);
 
 int mpath_alloc_head_disk(struct mpath_head *mpath_head);
