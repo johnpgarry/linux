@@ -3742,6 +3742,7 @@ static void sd_read_block_zero(struct scsi_disk *sdkp)
 	kfree(buffer);
 }
 
+#if defined(CONFIG_SCSI_MULTIPATH)
 static int sd_revalidate_mpath_head(struct scsi_mpath_head *scsi_mpath_head, struct scsi_disk *sdkp)
 {
 	struct scsi_device *sdp = sdkp->device;
@@ -3784,6 +3785,7 @@ static int sd_revalidate_mpath_head(struct scsi_mpath_head *scsi_mpath_head, str
 
 	return err;
 }
+#endif
 
 /**
  *	sd_revalidate_disk - called the first time a new disk is seen,
@@ -4064,6 +4066,7 @@ static int sd_probe(struct device *dev)
 
 	sdev_printk(KERN_INFO, sdp, "%s3.1 gd=%pS gd=%pS part0=%pS sdp->scsi_mpath_dev=%pS index=%d scsi_device_tpgs=%d\n",
 		__func__, gd, gd->disk_name, gd->part0, sdp->scsi_mpath_dev, index, scsi_device_tpgs(sdp));
+	#if defined(CONFIG_SCSI_MULTIPATH)
 	if (scsi_mpath_enabled() && scsi_device_tpgs(sdp)) {
 		struct scsi_mpath_device *scsi_mpath_dev;
 		struct mpath_device *mpath_device;
@@ -4091,8 +4094,8 @@ static int sd_probe(struct device *dev)
 		pr_err("%s3.3.2\n", __func__);
 	} else {
 		sdev_printk(KERN_INFO, sdp, "sd_probe5 gdname =%pS !scsi_is_sdev_multipath\n", gd->disk_name);
-		
 	}
+	#endif
 
 	sdkp->device = sdp;
 	sdkp->disk = gd;
@@ -4178,6 +4181,7 @@ static int sd_probe(struct device *dev)
 		  sdp->removable ? "removable " : "");
 	scsi_autopm_put_device(sdp);
 
+	#if defined(CONFIG_SCSI_MULTIPATH)
 	if (scsi_is_sdev_multipath(sdp) && 1/* sdp->is_shared */) {
 		struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
@@ -4191,6 +4195,7 @@ static int sd_probe(struct device *dev)
 		mpath_add_device(mpath_device);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
+	#endif
 
 	return 0;
 

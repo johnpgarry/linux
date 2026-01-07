@@ -104,6 +104,8 @@ struct scsi_vpd {
 	unsigned char	data[];
 };
 
+
+#if defined(CONFIG_SCSI_MULTIPATH)
 struct scsi_mpath_device;
 #define SCSI_MPATH_DEVICE_ID_LEN 40
 
@@ -151,6 +153,7 @@ struct scsi_mpath_device {
 	int	is_active;		/* Current Sdev is active from scsi_dh_alua */
 };
 #define to_scsi_mpath_device(d) container_of(d, struct scsi_mpath_device, mpath_device)
+#endif
 
 struct scsi_device {
 	struct Scsi_Host *host;
@@ -381,7 +384,7 @@ static inline bool scsi_is_sdev_multipath(struct scsi_device *sdev)
 	return scsi_mpath_enabled() && sdev->scsi_mpath_dev;
 }
 #else
-#define scsi_multipath	false;
+#define scsi_multipath	false
 static inline bool scsi_mpath_enabled(void)
 {
 	return false;

@@ -1140,6 +1140,7 @@ sdev_show_preferred_path(struct device *dev,
 static DEVICE_ATTR(preferred_path, S_IRUGO, sdev_show_preferred_path, NULL);
 #endif
 
+#ifdef CONFIG_SCSI_MULTIPATH
 static struct attribute *scsi_mpath_disk_attrs[] = {
 	&scsi_mpath_wwid.attr,
 	&scsi_mpath_iopolicy.attr,
@@ -1154,6 +1155,7 @@ const struct attribute_group *scsi_mpath_groups[] = {
 	&scsi_mpath_attrs_group,
 	NULL
 };
+#endif
 
 static ssize_t
 sdev_show_queue_ramp_up_period(struct device *dev,

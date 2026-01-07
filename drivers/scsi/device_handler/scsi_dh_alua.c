@@ -163,6 +163,7 @@ static struct scsi_alua_port_group *alua_find_get_pg(char *id_str, size_t id_siz
 	return NULL;
 }
 
+#if defined(CONFIG_SCSI_MULTIPATH)
 static void configure_scsi_mpath(struct scsi_device *sdev, struct scsi_alua_port_group *pg)
 {
 	pr_err("%s sdev=%pS pg=%pS scsi_is_sdev_multipath=%d sdev->mpath_dev=%pS\n",
@@ -192,6 +193,7 @@ static void configure_scsi_mpath(struct scsi_device *sdev, struct scsi_alua_port
 		pg->pref);
 //	sdev->host->mpath_alua_grpid = pg->group_id;
 }
+#endif
 
 /*
  * alua_alloc_pg - Allocate a new port_group structure
@@ -247,7 +249,9 @@ static struct scsi_alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 		kfree(pg);
 		sdev_printk(KERN_ERR, sdev, "%s0 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS calling configure_scsi_mpath\n",
 			__func__, sdev, group_id, tpgs, tmp_pg);
+		#if defined(CONFIG_SCSI_MULTIPATH)
 		configure_scsi_mpath(sdev, tmp_pg);
+		#endif
 		sdev_printk(KERN_ERR, sdev, "%s0.1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS called configure_scsi_mpath\n",
 			__func__, sdev, group_id, tpgs, tmp_pg);
 		return tmp_pg;
@@ -255,7 +259,9 @@ static struct scsi_alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 
 	sdev_printk(KERN_ERR, sdev, "%s1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS calling configure_scsi_mpath\n",
 			__func__, sdev, group_id, tpgs, tmp_pg);
+	#if defined(CONFIG_SCSI_MULTIPATH)
 	configure_scsi_mpath(sdev, pg);
+	#endif
 	sdev_printk(KERN_ERR, sdev, "%s1.1 sdev=%pS group_id=%d tpgs=%d tmp_pg=%pS called configure_scsi_mpath\n",
 			__func__, sdev, group_id, tpgs, tmp_pg);
 	

@@ -13,7 +13,9 @@
 #include <scsi/scsi_host.h>
 
 struct scsi_device;
-
+struct scsi_mpath_head;
+struct scsi_mpath_device;
+#ifdef CONFIG_SCSI_MULTIPATH
 enum scsi_mpath_access_state {
 	SCSI_MPATH_OPTIMAL	= SCSI_ACCESS_STATE_OPTIMAL,
 	SCSI_MPATH_ACTIVE	= SCSI_ACCESS_STATE_ACTIVE,
@@ -25,29 +27,81 @@ enum scsi_mpath_access_state {
 	SCSI_MPATH_INVALID	= 0xFF
 };
 
-struct scsi_mpath_head;
-struct scsi_mpath_device;
 
-extern void scsi_mpath_failover_req(struct request *);
+void scsi_mpath_failover_req(struct request *);
 //extern void scsi_mpath_start_request(struct request *);
 //extern void scsi_mpath_end_request(struct request *);
 
-extern int scsi_mpath_failover_disposition(struct scsi_cmnd *);
+int scsi_mpath_failover_disposition(struct scsi_cmnd *);
 int scsi_mpath_dev_alloc(struct scsi_device *, struct gendisk *disk);
 void scsi_mpath_remove_device(struct scsi_mpath_device *scsi_mpath_dev);
-extern void scsi_mpath_remove_disk(struct scsi_device *);
-extern void scsi_mpath_shutdown_disk(struct scsi_device *sdev);
-extern void scsi_mpath_dev_release(struct scsi_device *);
+void scsi_mpath_remove_disk(struct scsi_device *);
+void scsi_mpath_shutdown_disk(struct scsi_device *sdev);
+void scsi_mpath_dev_release(struct scsi_device *);
 void scsi_mpath_kick_requeue_lists(struct Scsi_Host *);
-extern void scsi_mpath_add_disk(struct scsi_device *);
+void scsi_mpath_add_disk(struct scsi_device *);
 void scsi_multipath_iopolicy_update(struct scsi_device *, int);
 int scsi_mpath_unique_lun_id(struct scsi_device *);
 void scsi_mpath_start_request(struct request *);
 void scsi_mpath_end_request(struct request *);
 
-extern void mpath_revalidate_path(struct gendisk *, sector_t);
-extern int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type);
+int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type);
 
 void scsi_mpath_wait_freeze(struct scsi_mpath_head *mpath_disk);
 void scsi_mpath_start_freeze(struct scsi_mpath_head *mpath_disk);
+#else //CONFIG_SCSI_MULTIPATH
+static inline void scsi_mpath_failover_req(struct request *)
+{
+}
+static inline int scsi_mpath_failover_disposition(struct scsi_cmnd *)
+{
+	return 0;
+}
+static inline int scsi_mpath_dev_alloc(struct scsi_device *, struct gendisk *disk)
+{
+	return -ENOMEM;
+}
+static inline void scsi_mpath_remove_device(struct scsi_mpath_device *scsi_mpath_dev)
+{
+}
+static inline void scsi_mpath_remove_disk(struct scsi_device *)
+{
+}
+static inline void scsi_mpath_shutdown_disk(struct scsi_device *)
+{
+}
+static inline void scsi_mpath_dev_release(struct scsi_device *)
+{
+}
+static inline void scsi_mpath_kick_requeue_lists(struct scsi_device *)
+{
+}
+static inline void scsi_mpath_add_disk(struct scsi_device *)
+{
+}
+static inline void scsi_multipath_iopolicy_update(struct scsi_device *)
+{
+}
+static inline int scsi_mpath_unique_lun_id(struct scsi_device *)
+{
+	return 0;
+}
+static inline void scsi_mpath_start_request(struct request *)
+{
+}
+static inline void scsi_mpath_end_request(struct request *)
+{
+}
+static inline int scsi_mpath_unique_id(struct scsi_device *sdev, u8 id[16], enum blk_unique_id type)
+{
+	return 0;
+}
+static inline void scsi_mpath_wait_freeze(struct scsi_mpath_head *mpath_disk)
+{
+}
+static inline void scsi_mpath_start_freeze(struct scsi_mpath_head *mpath_disk)
+{
+}
+
+#endif //CONFIG_SCSI_MULTIPATH
 #endif /* _SCSI_SCSI_MULTIPATH_H */

@@ -316,6 +316,7 @@ free_rse:
 	return ret;
 }
 
+#if defined(CONFIG_NVME_MULTIPATH)
 const struct mpath_pr_ops nvme_mpath_pr_ops = {
 	.pr_register	= nvme_mpath_pr_register,
 	.pr_reserve	= nvme_mpath_pr_reserve,
@@ -325,6 +326,7 @@ const struct mpath_pr_ops nvme_mpath_pr_ops = {
 	.pr_read_keys	= nvme_mpath_pr_read_keys,
 	.pr_read_reservation = nvme_mpath_pr_read_reservation,
 };
+#endif
 
 static int nvme_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
 		unsigned int flags)

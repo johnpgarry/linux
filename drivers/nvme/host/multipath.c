@@ -982,3 +982,38 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 	ctrl->ana_log_buf = NULL;
 	ctrl->ana_log_size = 0;
 }
+
+static bool nvme_mpath_is_disabled(struct mpath_device *mpath_device)
+{
+	return false;
+}
+
+static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
+{
+	return true;
+}
+
+static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_head)
+{
+	struct nvme_ns_head *head = container_of(mpath_head, struct nvme_ns_head, mpath_head);
+	struct nvme_subsystem *subsys = head->subsys;
+
+	return mpath_read_iopolicy(&subsys->iopolicy);
+}
+
+const struct mpath_head_template mpdt = {
+//	.class = &scsi_mpath_head_class,
+//	.cdev_class = &scsi_mpath_generic_class,
+	.add_cdev = nvme_mpath_add_cdev,
+	.is_disabled = nvme_mpath_is_disabled,
+	.is_optimized = nvme_mpath_is_optimized,
+	.ioctl = nvme_mpath_ioctl,
+	.device_groups = nvme_ns_attr_groups,
+	.get_iopolicy = nvme_mpath_get_iopolicy,
+	#ifdef CONFIG_BLK_DEV_ZONED
+	.report_zones = nvme_mpath_report_zones,
+	#endif
+	.pr_ops = &nvme_mpath_pr_ops,
+	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
+	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
+};

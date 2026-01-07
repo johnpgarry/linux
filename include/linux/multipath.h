@@ -10,19 +10,19 @@
 #include <linux/pr.h>
 #include <linux/io_uring/cmd.h>
 
+enum mpath_iopolicy_e {
+	MPATH_IOPOLICY_NUMA,
+	MPATH_IOPOLICY_RR,
+	MPATH_IOPOLICY_QD,
+};
 
+#if defined(CONFIG_LIBMULTIPATH)
 struct mpath_device;
 
 enum mpath_access_state {
 	MPATH_STATE_OPTIMIZED,
 	MPATH_STATE_ACTIVE,
 	MPATH_STATE_INVALID	= 0xFF
-};
-
-enum mpath_iopolicy_e {
-	MPATH_IOPOLICY_NUMA,
-	MPATH_IOPOLICY_RR,
-	MPATH_IOPOLICY_QD,
 };
 
 /*
@@ -208,5 +208,55 @@ extern const struct attribute_group mpath_attr_group;
 extern const struct file_operations mpath_generic_chr_fops;
 
 bool is_mpath_head(struct gendisk *disk);
+#else // CONFIG_LIBMULTIPATH
+
+struct mpath_head_template {
+};
+struct mpath_device {
+};
+struct mpath_head {
+};
+struct mpath_iopolicy {
+};
+
+static inline bool is_mpath_request(struct request *req)
+{
+	return false;
+}
+static inline void mpath_add_device(struct mpath_device *mpath_device)
+{
+}
+static inline void mpath_add_sysfs_link(struct mpath_head *mpath_head)
+{
+}
+static inline void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
+{
+}
+static inline void mpath_remove_disk(struct mpath_head *mpath_head)
+{
+}
+static inline bool mpath_clear_current_path(struct mpath_device *mpath_device)
+{
+	return false;
+}
+static inline bool mpath_head_queue_if_no_path(struct mpath_head *mpath_head)
+{
+	return false;
+}
+static inline int __must_check mpath_add_head(struct mpath_head *)
+{
+	return 0;
+}
+static inline void mpath_init_head(struct mpath_head *mpath_head,
+	const struct mpath_head_template *mpdt){
+}
+static inline enum mpath_iopolicy_e mpath_read_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
+{
+	return MPATH_IOPOLICY_NUMA;
+}
+
+#define mpath_device_groups NULL
+
+#endif //CONFIG_LIBMULTIPATH
 
 #endif // _LIBMULTIPATH_H
