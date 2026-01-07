@@ -2528,6 +2528,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 //	pr_err("%s1 ns=%pS info=%pS ret=%d nvme_ns_head_multipath=%d\n",
 	//	__func__, ns, info, ret, nvme_ns_head_multipath(ns->head));
+	#ifdef no_libmpath
 	if (!ret && nvme_ns_head_multipath(ns->head)) {
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
 		struct queue_limits lim;
@@ -2581,6 +2582,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 		blk_mq_unfreeze_queue(disk->queue, memflags);
 	}
+	#endif
 
 	return ret;
 }
@@ -3995,7 +3997,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	size_t size = sizeof(*head);
 	int ret = -ENOMEM;
 	struct mpath_head *mpath_head;
-	struct nvme_subsystem *subsys = ctrl->subsys;
+	__maybe_unused struct nvme_subsystem *subsys = ctrl->subsys;
 
 	head = kzalloc(size, GFP_KERNEL);
 	pr_err("%s ctrl=%pS info=%pS head=%pS\n", __func__, ctrl, info, head);
@@ -4014,7 +4016,9 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 
 	head->instance = ret;
+	#ifdef no_libmpath
 	mpath_head->parent = &subsys->dev;
+	#endif
 	#ifdef dsdd
 	INIT_LIST_HEAD(&head->list);
 	ret = init_srcu_struct(&head->srcu);
@@ -4161,14 +4165,22 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 
 		mpath_head = &head->mpath_head;
+		#ifdef no_libmpath
 		mpath_device->mpath_head = mpath_head;
+		#endif
 	} else {
 
 		mpath_head = &head->mpath_head;
+		#ifdef no_libmpath
 		mpath_device->mpath_head = mpath_head;
+		#endif
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
+			#ifdef no_libmpath
 		    !list_empty(&mpath_head->dev_list)) {
+			#else
+			1) {
+			#endif
 			dev_err(ctrl->device,
 				"Duplicate unshared namespace %d\n",
 				info->nsid);
@@ -4190,7 +4202,9 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	}
 
+	#ifdef no_libmpath
 	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
+	#endif
 	ns->head = head;
 	// ns->head = head;
 	pr_err("%s22 mpath_head=%pS ns=%pS head=%pS\n",
@@ -4277,7 +4291,9 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	disk->private_data = ns;
 
 	mpath_device = &ns->mpath_device;
+	#ifdef no_libmpath
 	mpath_device->disk = ns->disk = disk;
+	#endif
 	ns->queue = disk->queue;
 	ns->ctrl = ctrl;
 	kref_init(&ns->kref);
@@ -4364,7 +4380,9 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	synchronize_srcu(&ctrl->srcu);
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
+	#ifdef no_libmpath
 	list_del_rcu(&ns->mpath_device.siblings);
+	#endif
 	#ifdef dsddd
 	if (list_empty(&ns->head->list)) {
 		//list_del_init(&ns->head->entry);
@@ -4394,14 +4412,18 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 {
 	bool last_path = false;
 	struct mpath_device *mpath_device = &ns->mpath_device;
+	#ifdef no_libmpath
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	struct kref *kref = &mpath_head->ref;
+	#else
+	struct mpath_head *mpath_head = NULL;
+	#endif
+	__maybe_unused struct kref *kref = NULL;//&mpath_head->ref;
 
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
 		return;
 
 	pr_err("%s ns=%pS head kref=%pS refcount=%d\n",
-		__func__, ns, kref, refcount_read(&kref->refcount));
+		__func__, ns, kref, -1 /*refcount_read(&kref->refcount)*/);
 
 	clear_bit(NVME_NS_READY, &ns->flags);
 	set_capacity(ns->disk, 0);
@@ -4418,14 +4440,16 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		mpath_synchronize(mpath_head);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
+	#ifdef no_libmpath
 	list_del_rcu(&ns->mpath_device.siblings);
 	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
-		__func__, ns, list_empty(&mpath_head->dev_list));
+		__func__, ns, NULL/*list_empty(&mpath_head->dev_list)*/);
 	if (list_empty(&mpath_head->dev_list)) {
 		if (!mpath_head_queue_if_no_path(mpath_head))
 			list_del_init(&mpath_head->entry);
 		last_path = true;
 	}
+	#endif
 	pr_err("%s3 ns=%pS last_path=%d\n", __func__, ns, last_path);
 	mutex_unlock(&ns->ctrl->subsys->lock);
 

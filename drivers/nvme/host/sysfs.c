@@ -195,6 +195,7 @@ static DEVICE_ATTR_RO(metadata_bytes);
 
 static int ns_head_update_nuse(struct nvme_ns_head *head)
 {
+	#ifdef no_libmpath
 	struct nvme_id_ns *id;
 	struct nvme_ns *ns;
 	int srcu_idx, ret = -EWOULDBLOCK;
@@ -219,6 +220,9 @@ static int ns_head_update_nuse(struct nvme_ns_head *head)
 out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return ret;
+	#else
+	return 0;
+	#endif 
 }
 
 static int ns_update_nuse(struct nvme_ns *ns)
