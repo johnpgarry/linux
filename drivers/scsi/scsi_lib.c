@@ -3040,9 +3040,9 @@ static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
 	pr_err("%s sdev=%pS scsi_is_sdev_multipath=%d\n", __func__, sdev, scsi_is_sdev_multipath(sdev));
 	if (scsi_is_sdev_multipath(sdev)) {
-		struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
-		pr_err("%s1 sdev=%pS mpath_device=%pS calling scsi_mpath_clear_current_path?\n", __func__, sdev, mpath_device);
+		//struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+		//struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+		pr_err("%s1 sdev=%pS mpath_device=%pS calling scsi_mpath_clear_current_path?\n", __func__, sdev, NULL);
 		//scsi_mpath_clear_current_path(sdev);
 	//	mpath_clear_current_path(mpath_device);
 	}
@@ -3194,10 +3194,10 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 			pr_err("%s4 new_state=%d SDEV_TRANSPORT_OFFLINE=%d sdev->sdev_state=%d\n",
 				__func__, new_state, SDEV_TRANSPORT_OFFLINE, sdev->sdev_state);
 				if (scsi_is_sdev_multipath(sdev)) {
-					struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-					struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+				//	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+				//	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 					pr_err("%s5 sdev=%pS call mpath_clear_current_path mpath_device=%pS ?\n",
-						__func__, sdev, mpath_device);
+						__func__, sdev, NULL);
 				//	mpath_clear_current_path(mpath_device);
 				}
 		}
