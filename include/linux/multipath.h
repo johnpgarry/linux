@@ -155,16 +155,6 @@ static inline bool mpath_head_queue_if_no_path(struct mpath_head *mpath_head)
 	return false;
 }
 
-static inline struct mpath_head *mpath_priv_to_head1(void *d)
-{
-	return d + sizeof(struct mpath_head);
-}
-
-static inline void *mpath_to_priv_head1(struct mpath_head *mpath_head)
-{
-	return mpath_head - 1;
-}
-
 static inline bool is_mpath_request(struct request *req)
 {
 	return req->cmd_flags & REQ_MPATH;
