@@ -1277,8 +1277,8 @@ void mpath_add_device(struct mpath_device *mpath_device)
 	pr_err("%s mpath_device=%pS mpath_head=%pS\n", __func__, mpath_device, mpath_head);
 
 	if (mpath_device_is_live(mpath_device)) {
-		mpath_device->state = MPATH_STATE_OPTIMIZED;
-		pr_err("%s calling scsi_mpath_set_live\n", __func__);
+		WRITE_ONCE(mpath_device->state, MPATH_STATE_OPTIMIZED);
+		pr_err("%s2 calling scsi_mpath_set_live\n", __func__);
 		mpath_device_set_live(mpath_device);
 	}
 }
