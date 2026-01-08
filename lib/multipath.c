@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2018 Christoph Hellwig.
  * Copyright (c) 2025 Oracle and/or its affiliates.
  */
-#define MULTIPATHLIB_VISIBLE
+
 #include <linux/bio.h>
 #include <linux/moduleparam.h>
 #include <linux/topology.h>

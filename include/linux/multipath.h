@@ -46,11 +46,9 @@ struct mpath_iopolicy {
 #endif
 
 struct mpath_head {
-	#ifdef MULTIPATHLIB_VISIBLE
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	struct list_head	entry; /* Entry into list of subsystems */
-	#endif
 	struct gendisk		*disk;
 	struct kref		ref;
 	struct	bio_list	requeue_list; /* list for requeing bio */
