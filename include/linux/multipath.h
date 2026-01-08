@@ -198,6 +198,11 @@ static inline bool mpath_qd_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
 	return mpath_read_iopolicy(mpath_iopolicy) == MPATH_IOPOLICY_QD;
 }
 
+static inline struct mpath_head *mpath_disk_to_head(struct gendisk *disk)
+{
+	return disk->private_data;
+}
+
 void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
 void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device);
@@ -227,6 +232,10 @@ struct mpath_head {
 struct mpath_iopolicy {
 };
 
+static inline struct mpath_head *mpath_disk_to_head(struct gendisk *disk)
+{
+	return NULL;
+}
 static inline void mpath_synchronize(struct mpath_device *mpath_device)
 {
 }

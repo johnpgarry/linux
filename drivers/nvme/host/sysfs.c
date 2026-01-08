@@ -67,7 +67,7 @@ static inline struct nvme_ns_head *dev_to_ns_head(struct device *dev)
 //	dev_err(dev, "%s disk=%pS private_data=%pS nvme_disk_is_ns_head=%d\n",
 //		__func__, disk, disk->private_data, nvme_disk_is_ns_head(disk));
 	if (nvme_disk_is_ns_head(disk)) {
-		struct mpath_head *mpath_head = disk->private_data;
+		struct mpath_head *mpath_head = mpath_disk_to_head(disk);
 		return container_of(mpath_head, struct nvme_ns_head, mpath_head);
 	}
 	return nvme_get_ns_from_dev(dev)->head;
