@@ -4192,7 +4192,7 @@ static int sd_probe(struct device *dev)
 		sd_revalidate_mpath_head(scsi_mpath_head, sdkp);
 		pr_err("%s2 calling scsi_mpath_add_disk sdp=%pS sdkp=%pS\n",
 			__func__, sdp, sdkp);
-		mpath_add_device(mpath_device);
+		mpath_add_device_scsi(mpath_device);
 		//head = nvme_find_ns_head(ctrl, info->nsid);
 	}
 	#endif

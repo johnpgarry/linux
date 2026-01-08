@@ -1271,7 +1271,7 @@ void mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 }
 EXPORT_SYMBOL_GPL(mpath_revalidate_path);
 
-void mpath_add_device(struct mpath_device *mpath_device)
+void mpath_add_device_scsi(struct mpath_device *mpath_device)
 {
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	pr_err("%s mpath_device=%pS mpath_head=%pS\n", __func__, mpath_device, mpath_head);
@@ -1282,7 +1282,7 @@ void mpath_add_device(struct mpath_device *mpath_device)
 		mpath_device_set_live(mpath_device);
 	}
 }
-EXPORT_SYMBOL_GPL(mpath_add_device);
+EXPORT_SYMBOL_GPL(mpath_add_device_scsi);
 
 static void mpath_free_disk(struct kref *ref)
 {

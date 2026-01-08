@@ -178,7 +178,7 @@ void mpath_cdev_del(struct cdev *cdev, struct device *cdev_device);
 //void multipath_partition_scan_work(struct work_struct *work);
 void mpath_add_sysfs_link(struct mpath_head *mpath_head);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
-void mpath_add_device(struct mpath_device *mpath_device);
+void mpath_add_device_scsi(struct mpath_device *mpath_device);
 bool mpath_device_is_live(struct mpath_device *mpath_device);
 void mpath_remove_device(struct mpath_device *mpath_device);
 //void mpath_cdev_rel(struct device *dev);
@@ -243,7 +243,7 @@ static inline bool is_mpath_request(struct request *req)
 {
 	return false;
 }
-static inline void mpath_add_device(struct mpath_device *mpath_device)
+static inline void mpath_add_device_scsi(struct mpath_device *mpath_device)
 {
 }
 static inline void mpath_add_sysfs_link(struct mpath_head *mpath_head)
