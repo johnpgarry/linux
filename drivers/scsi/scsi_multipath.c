@@ -726,8 +726,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 
 	//	mpath_subsys = mpath_head->mpath_subsys;
 	//	mutex_lock(&mpath_subsys->lock);
-		list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
-		mpath_device->mpath_head = mpath_head;
+		mpath_init_device(mpath_head, mpath_device);
 	//	mutex_unlock(&mpath_subsys->lock);
 		return 0;
 	}

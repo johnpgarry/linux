@@ -4143,6 +4143,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	mutex_lock(&ctrl->subsys->lock);
 	pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x\n", __func__, ns, info->nsid);
 	head = nvme_find_ns_head(ctrl, info->nsid);
+	mpath_head = &head->mpath_head;
 
 
 	pr_err("%s1 ns=%pS called nvme_find_ns_head info->nsid=0x%x head=%pS\n", __func__, ns, info->nsid, head);
@@ -4160,17 +4161,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			ret = PTR_ERR(head);
 			goto out_unlock;
 		}
-
-		mpath_head = &head->mpath_head;
-		#ifdef no_libmpath
-		mpath_device->mpath_head = mpath_head;
-		#endif
 	} else {
-
-		mpath_head = &head->mpath_head;
-		#ifdef no_libmpath
-		mpath_device->mpath_head = mpath_head;
-		#endif
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
 			#ifdef no_libmpath
@@ -4199,11 +4190,8 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	}
 
-	#ifdef no_libmpath
-	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
-	#endif
+	mpath_init_device(mpath_head, mpath_device);
 	ns->head = head;
-	// ns->head = head;
 	pr_err("%s22 mpath_head=%pS ns=%pS head=%pS\n",
 		__func__, mpath_head, ns, head);
 	//BUG();

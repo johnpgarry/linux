@@ -725,6 +725,13 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
+void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device)
+{
+	mpath_device->mpath_head = mpath_head;
+	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
+}
+EXPORT_SYMBOL_GPL(mpath_init_device);
+
 void mpath_init_head(struct mpath_head *mpath_head)
 {
 //	int ret;
