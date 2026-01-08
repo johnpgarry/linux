@@ -203,6 +203,8 @@ void mpath_remove_disk(struct mpath_device *mpath_device);
 void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device);
 void mpath_uninit_device(struct mpath_device *mpath_device);
 
+int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device));
+
 //extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
 extern const struct attribute_group *mpath_device_groups[];
@@ -271,7 +273,10 @@ static inline bool mpath_head_device_added(struct mpath_head *mpath_head)
 static inline void mpath_uninit_device(struct mpath_device *mpath_device)
 {
 }
-
+static inline int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device))
+{
+	return 0;
+}
 #define mpath_device_groups NULL
 
 #endif //CONFIG_LIBMULTIPATH

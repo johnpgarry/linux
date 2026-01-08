@@ -197,36 +197,40 @@ static ssize_t metadata_bytes_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(metadata_bytes);
 
-static int ns_head_update_nuse(struct nvme_ns_head *head)
+static int ns_head_update_nuse_cb(struct mpath_device *mpath_device)
 {
-	#ifdef no_libmpath
+	struct nvme_ns *ns = container_of(mpath_device, struct nvme_ns, mpath_device);
+	struct nvme_ns_head *head = ns->head;
 	struct nvme_id_ns *id;
-	struct nvme_ns *ns;
-	int srcu_idx, ret = -EWOULDBLOCK;
-	struct mpath_head *mpath_head = &head->mpath_head;
-
-	/* Avoid issuing commands too often by rate limiting the update */
-	if (!__ratelimit(&head->rs_nuse))
-		return 0;
-
-	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	ns = NULL;// fixme nvme_find_path(head);
-	if (!ns)
-		goto out_unlock;
-
+	int ret;
+	pr_err("%s mpath_device=%pS ns=%pS\n", __func__, mpath_device, ns);
 	ret = nvme_identify_ns(ns->ctrl, head->ns_id, &id);
+	pr_err("%s1 mpath_device=%pS ns=%pS called nvme_identify_ns ret=%d\n",
+		__func__, mpath_device, ns, ret);
 	if (ret)
-		goto out_unlock;
+		return ret;
 
 	head->nuse = le64_to_cpu(id->nuse);
 	kfree(id);
-
-out_unlock:
-	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
-	return ret;
-	#else
 	return 0;
-	#endif 
+}
+
+static int ns_head_update_nuse(struct nvme_ns_head *head)
+{
+	struct mpath_head *mpath_head = &head->mpath_head;
+	int ret;
+
+	pr_err("%s head=%pS mpath_head=%pS\n", __func__, head, mpath_head);
+
+	/* Avoid issuing commands too often by rate limiting the update */
+//	if (!__ratelimit(&head->rs_nuse))
+//		return 0;
+
+	ret = mpath_call_for_device(mpath_head, ns_head_update_nuse_cb);
+	if (ret == -ENODEV)
+		return -EWOULDBLOCK;
+
+	return ret;
 }
 
 static int ns_update_nuse(struct nvme_ns *ns)
@@ -253,6 +257,8 @@ static ssize_t nuse_show(struct device *dev, struct device_attribute *attr,
 	struct nvme_ns_head *head = dev_to_ns_head(dev);
 	struct gendisk *disk = dev_to_disk(dev);
 	int ret;
+
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
 
 	if (nvme_disk_is_ns_head(disk))
 		ret = ns_head_update_nuse(head);

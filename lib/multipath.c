@@ -963,6 +963,25 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_head_disk);
 
+int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device))
+{
+	struct mpath_device *mpath_device;
+	int ret = -ENODEV, srcu_idx;
+
+	pr_err("%s mpath_head=%pS cb=%pS\n", __func__, mpath_head, cb);
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	pr_err("%s1 mpath_head=%pS cb=%pS srcu_idx=%d\n", __func__, mpath_head, cb, srcu_idx);
+	mpath_device = mpath_find_path(mpath_head);
+	pr_err("%s2 mpath_device=%pS cb=%pS srcu_idx=%d\n", __func__, mpath_device, cb, srcu_idx);
+	if (mpath_device)
+		ret = cb(mpath_device);
+	pr_err("%s3 mpath_device=%pS cb=%pS srcu_idx=%d ret=%d\n", __func__, mpath_device, cb, srcu_idx, ret);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mpath_call_for_device);
+
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
