@@ -13,6 +13,8 @@
 bool multipath = true;
 static bool multipath_always_on;
 
+static const struct mpath_head_template mpdt;
+
 static int multipath_param_set(const char *val, const struct kernel_param *kp)
 {
 	int ret;
@@ -427,6 +429,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	int ret;
 
 	mpath_head->parent = &subsys->dev;
+	mpath_head->mpdt = &mpdt;
 
 	/*
 	 * If "multipath_always_on" is enabled, a multipath node is added
@@ -1006,7 +1009,7 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 	return mpath_read_iopolicy(&subsys->iopolicy);
 }
 
-const struct mpath_head_template mpdt = {
+static const struct mpath_head_template mpdt = {
 //	.class = &scsi_mpath_head_class,
 //	.cdev_class = &scsi_mpath_generic_class,
 	.add_cdev = nvme_mpath_add_cdev,

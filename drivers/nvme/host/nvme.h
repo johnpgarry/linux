@@ -1046,7 +1046,6 @@ static inline void nvme_trace_bio_complete(struct request *req)
 }
 
 extern bool multipath;
-extern const struct mpath_head_template mpdt;
 extern struct device_attribute dev_attr_ana_grpid;
 extern struct device_attribute dev_attr_ana_state;
 extern struct device_attribute dev_attr_queue_depth;
@@ -1066,8 +1065,6 @@ static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
 }
 #else
 #define multipath false
-static const struct mpath_head_template mpdt = {
-};
 static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 {
 	return false;

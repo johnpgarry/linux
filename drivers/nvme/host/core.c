@@ -4008,7 +4008,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 		return ERR_PTR(ret);
 	mpath_head = &head->mpath_head;
 
-	mpath_init_head(mpath_head, &mpdt);
+	mpath_init_head(mpath_head);
 	ret = 0;
 	if (ret)
 		goto out_free_ida;

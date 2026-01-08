@@ -142,8 +142,7 @@ struct mpath_head_template {
 
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 
-void mpath_init_head(struct mpath_head *mpath_head,
-	const struct mpath_head_template *mpdt);
+void mpath_init_head(struct mpath_head *mpath_head);
 
 int mpath_alloc_head_disk(struct mpath_head *mpath_head);
 int __must_check mpath_add_head(struct mpath_head *);
@@ -252,8 +251,8 @@ static inline int __must_check mpath_add_head(struct mpath_head *)
 {
 	return 0;
 }
-static inline void mpath_init_head(struct mpath_head *mpath_head,
-	const struct mpath_head_template *mpdt){
+static inline void mpath_init_head(struct mpath_head *mpath_head)
+{
 }
 static inline enum mpath_iopolicy_e mpath_read_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
 {

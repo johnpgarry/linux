@@ -725,7 +725,7 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
-void mpath_init_head(struct mpath_head *mpath_head, const struct mpath_head_template *mpdt)
+void mpath_init_head(struct mpath_head *mpath_head)
 {
 //	int ret;
 
@@ -741,7 +741,7 @@ void mpath_init_head(struct mpath_head *mpath_head, const struct mpath_head_temp
 	//mpath_head->is_optimized = scsi_mpath_is_optimized;
 	//mpath_head->get_unique_id = scsi_mpath_get_unique_id;
 	//mpath_head->ioctl = scsi_mpath_ioctl;
-	mpath_head->mpdt = mpdt;
+	//mpath_head->mpdt = mpdt;
 
 	//INIT_LIST_HEAD(&scsi_mpath_head->entry);
 	INIT_LIST_HEAD(&mpath_head->dev_list);
