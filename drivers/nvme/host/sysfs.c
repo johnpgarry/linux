@@ -223,8 +223,8 @@ static int ns_head_update_nuse(struct nvme_ns_head *head)
 	pr_err("%s head=%pS mpath_head=%pS\n", __func__, head, mpath_head);
 
 	/* Avoid issuing commands too often by rate limiting the update */
-//	if (!__ratelimit(&head->rs_nuse))
-//		return 0;
+	if (!__ratelimit(&head->rs_nuse))
+		return 0;
 
 	ret = mpath_call_for_device(mpath_head, ns_head_update_nuse_cb);
 	if (ret == -ENODEV)
