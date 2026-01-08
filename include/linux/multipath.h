@@ -162,7 +162,7 @@ static inline bool is_mpath_request(struct request *req)
 
 #define cdev_mpath_priv_to_head(cdev) container_of(cdev, struct mpath_head, cdev)
 
-void mpath_synchronize(struct mpath_head *mpath_head);
+void mpath_synchronize(struct mpath_device *mpath_device);
 
 bool mpath_clear_current_path(struct mpath_device *);
 struct mpath_device *mpath_find_path(struct mpath_head *mpath_head);
@@ -221,7 +221,7 @@ struct mpath_head {
 struct mpath_iopolicy {
 };
 
-static inline void mpath_synchronize(struct mpath_head *mpath_head)
+static inline void mpath_synchronize(struct mpath_device *mpath_device)
 {
 }
 static inline bool is_mpath_request(struct request *req)
