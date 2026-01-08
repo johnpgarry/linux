@@ -805,6 +805,8 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 		__func__, ns, anagrpid, nvme_ctrl_use_ana(ns->ctrl));
 	struct mpath_head *mpath_head = &ns->head->mpath_head;
 
+	ns->mpath_device.disk = ns->disk;
+
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
 		struct nvme_ana_group_desc desc = {
 			.grpid = anagrpid,

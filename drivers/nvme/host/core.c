@@ -4297,9 +4297,8 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	disk->private_data = ns;
 
 	mpath_device = &ns->mpath_device;
-	#ifdef no_libmpath
-	mpath_device->disk = ns->disk = disk;
-	#endif
+	ns->disk = disk;
+
 	ns->queue = disk->queue;
 	ns->ctrl = ctrl;
 	kref_init(&ns->kref);
