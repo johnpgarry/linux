@@ -779,7 +779,6 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		return ret;
 
 	scsi_mpath_head->index = index;
-	mpath_device->mpath_head = mpath_head;
 
 	INIT_LIST_HEAD(&scsi_mpath_head->entry);
 	kref_init(&scsi_mpath_head->ref);
@@ -803,7 +802,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 
 	pr_err("%s13 ret=%d after bio_list_init sdev->scsi_mpath_dev=%pS scsi_mpath_head->wwid=%s\n",
 		__func__, ret, sdev->scsi_mpath_dev, scsi_mpath_head->wwid);
-	list_add_tail(&mpath_device->siblings, &mpath_head->dev_list);
+	mpath_init_device(mpath_head, mpath_device);
 
 	mutex_lock(&scsi_mpath_heads_lock);
 	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
