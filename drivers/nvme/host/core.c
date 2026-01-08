@@ -4207,9 +4207,9 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 				"Shared namespace support requires core_nvme.multipath=Y.\n");
 		}
 	}
-	pr_err("%s22.0 mpath_head=%pS mpath_device=%pS calling mpath_init_device\n",
+	pr_err("%s22.0 mpath_head=%pS mpath_device=%pS calling mpath_add_device\n",
 		__func__, mpath_head, mpath_device);
-	mpath_init_device(mpath_head, mpath_device);
+	mpath_add_device(mpath_head, mpath_device);
 	ns->head = head;
 	pr_err("%s22.1 mpath_head=%pS ns=%pS head=%pS\n",
 		__func__, mpath_head, ns, head);
@@ -4387,7 +4387,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	synchronize_srcu(&ctrl->srcu);
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
-	mpath_uninit_device(&ns->mpath_device);
+	mpath_delete_device(&ns->mpath_device);
 	#ifdef dsddd
 	if (list_empty(&ns->head->list)) {
 		//list_del_init(&ns->head->entry);
@@ -4440,7 +4440,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		mpath_synchronize(mpath_device);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
-	mpath_uninit_device(&ns->mpath_device);
+	mpath_delete_device(&ns->mpath_device);
 	#ifdef no_libmpath
 	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
 		__func__, ns, NULL/*list_empty(&mpath_head->dev_list)*/);

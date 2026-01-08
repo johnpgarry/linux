@@ -726,7 +726,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 
 	//	mpath_subsys = mpath_head->mpath_subsys;
 	//	mutex_lock(&mpath_subsys->lock);
-		mpath_init_device(mpath_head, mpath_device);
+		mpath_add_device(mpath_head, mpath_device);
 	//	mutex_unlock(&mpath_subsys->lock);
 		return 0;
 	}
@@ -802,7 +802,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 
 	pr_err("%s13 ret=%d after bio_list_init sdev->scsi_mpath_dev=%pS scsi_mpath_head->wwid=%s\n",
 		__func__, ret, sdev->scsi_mpath_dev, scsi_mpath_head->wwid);
-	mpath_init_device(mpath_head, mpath_device);
+	mpath_add_device(mpath_head, mpath_device);
 
 	mutex_lock(&scsi_mpath_heads_lock);
 	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);

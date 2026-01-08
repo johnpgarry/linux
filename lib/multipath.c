@@ -726,18 +726,18 @@ void mpath_requeue_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(mpath_requeue_work);
 
-void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device)
+void mpath_add_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device)
 {
 	mpath_device->mpath_head = mpath_head;
 	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
 }
-EXPORT_SYMBOL_GPL(mpath_init_device);
+EXPORT_SYMBOL_GPL(mpath_add_device);
 
-void mpath_uninit_device(struct mpath_device *mpath_device)
+void mpath_delete_device(struct mpath_device *mpath_device)
 {
 	list_del_rcu(&mpath_device->siblings);
 }
-EXPORT_SYMBOL_GPL(mpath_uninit_device);
+EXPORT_SYMBOL_GPL(mpath_delete_device);
 
 bool mpath_head_device_added(struct mpath_head *mpath_head)
 {

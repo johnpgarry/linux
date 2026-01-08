@@ -205,8 +205,8 @@ static inline struct mpath_head *mpath_disk_to_head(struct gendisk *disk)
 
 void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
-void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device);
-void mpath_uninit_device(struct mpath_device *mpath_device);
+void mpath_add_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device);
+void mpath_delete_device(struct mpath_device *mpath_device);
 
 int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device));
 void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpath_device *mpath_device));
@@ -274,14 +274,14 @@ static inline enum mpath_iopolicy_e mpath_read_iopolicy(struct mpath_iopolicy *m
 {
 	return MPATH_IOPOLICY_NUMA;
 }
-static inline void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device)
+static inline void mpath_add_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device)
 {
 }
 static inline bool mpath_head_device_added(struct mpath_head *mpath_head)
 {
 	return false; //?? this all needs to be checked
 }
-static inline void mpath_uninit_device(struct mpath_device *mpath_device)
+static inline void mpath_delete_device(struct mpath_device *mpath_device)
 {
 }
 static inline int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device))
