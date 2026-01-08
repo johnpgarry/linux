@@ -277,16 +277,11 @@ void nvme_mpath_revalidate_paths(struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
 	struct mpath_head *mpath_head = &head->mpath_head;
-	int node;
-	#ifdef dksddsd
-	int srcu_idx;
-	#endif
 
 	pr_err("%s ns=%pS head=%pS\n", __func__, ns, head);
 	mpath_iterate_devices(mpath_head, nvme_mpath_revalidate_paths_cb);
+	mpath_clear_paths(mpath_head);
 
-	for_each_node(node)
-		rcu_assign_pointer(mpath_head->current_path[node], NULL);
 	pr_err("%s ns=%pS head=%pS mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
 		__func__, ns, head, mpath_head);
 	kblockd_schedule_work(&mpath_head->requeue_work);

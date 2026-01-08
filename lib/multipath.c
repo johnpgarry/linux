@@ -921,7 +921,7 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	lim.max_zone_append_sectors = 0;
 	lim.dma_alignment = 3;
 
-	mpath_head->disk = blk_alloc_disk(&lim, dev_to_node(mpath_head->parent));
+	mpath_head->disk = blk_alloc_disk(&lim, 0 /* dev_to_node(mpath_head->parent) mpath_head->parent NOT SET YET*/);
 	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS mpath_iopolicy=%pS\n",
 		__func__, NULL, NULL, mpath_head->disk, NULL);
 	if (IS_ERR(mpath_head->disk))
@@ -996,6 +996,15 @@ void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpat
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 }
 EXPORT_SYMBOL_GPL(mpath_iterate_devices);
+
+void mpath_clear_paths(struct mpath_head *mpath_head)
+{
+	int node;
+
+	for_each_node(node)
+		rcu_assign_pointer(mpath_head->current_path[node], NULL);
+}
+EXPORT_SYMBOL_GPL(mpath_clear_paths);
 
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {
