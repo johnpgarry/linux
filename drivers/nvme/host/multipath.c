@@ -292,7 +292,7 @@ static inline bool nvme_path_is_optimized(struct nvme_ns *ns)
 	return nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE &&
 		ns->ana_state == NVME_ANA_OPTIMIZED;
 }
-
+#ifdef ddsdsd
 static __maybe_unused int nvme_ns_head_get_unique_id(struct gendisk *disk, u8 id[16],
 		enum blk_unique_id type)
 {
@@ -311,6 +311,7 @@ static __maybe_unused int nvme_ns_head_get_unique_id(struct gendisk *disk, u8 id
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return ret;
 }
+#endif
 
 int nvme_mpath_report_zones(struct mpath_device *mpath_device, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args)
