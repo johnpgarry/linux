@@ -745,6 +745,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 	mpath_head = &scsi_mpath_head->mpath_head;
 
 	mpath_init_head(mpath_head, &smpdt);
+	mpath_head->parent = &scsi_mpath_head->dev;
 	ret = 0;
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_head=%pS mpath_device=%pS\n",
 		__func__, sdev, sdev->scsi_mpath_dev, shost, shost_dev, mpath_head, mpath_device);
@@ -776,7 +777,6 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev, struct gendisk *disk)
 		__func__, mpath_head, scsi_mpath_head, ret);
 	if (ret)
 		return ret;
-	mpath_head->parent = &scsi_mpath_head->dev;
 
 	scsi_mpath_head->index = index;
 	mpath_device->mpath_head = mpath_head;

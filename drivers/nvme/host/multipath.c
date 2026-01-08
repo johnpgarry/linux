@@ -422,9 +422,11 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = &head->mpath_head;
+	struct nvme_subsystem *subsys = ctrl->subsys;
 	struct gendisk *gendisk = mpath_head->disk;
 	int ret;
 
+	mpath_head->parent = &subsys->dev;
 
 	/*
 	 * If "multipath_always_on" is enabled, a multipath node is added

@@ -4016,9 +4016,6 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 
 	head->instance = ret;
-	#ifdef no_libmpath
-	mpath_head->parent = &subsys->dev;
-	#endif
 	#ifdef dsdd
 	INIT_LIST_HEAD(&head->list);
 	ret = init_srcu_struct(&head->srcu);
