@@ -281,10 +281,10 @@ static inline int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)
 {
 	return 0;
 }
-void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpath_device *mpath_device));
+static inline void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpath_device *mpath_device))
 {
 }
-void mpath_clear_paths(struct mpath_head *mpath_head)
+static inline void mpath_clear_paths(struct mpath_head *mpath_head)
 {
 }
 #define mpath_device_groups NULL
