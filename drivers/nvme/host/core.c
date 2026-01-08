@@ -4416,6 +4416,8 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 static void nvme_ns_remove(struct nvme_ns *ns)
 {
 	bool last_path = false;
+	struct nvme_ns_head *head = ns->head;
+	struct mpath_head *mpath_head = &head->mpath_head;
 	struct mpath_device *mpath_device = &ns->mpath_device;
 	__maybe_unused struct kref *kref = NULL;//&mpath_head->ref;
 
@@ -4441,15 +4443,16 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 
 	mutex_lock(&ns->ctrl->subsys->lock);
 	mpath_delete_device(&ns->mpath_device);
-	#ifdef no_libmpath
-	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
-		__func__, ns, NULL/*list_empty(&mpath_head->dev_list)*/);
+
+	pr_err("%s2 ns=%pS checking mpath_head_device_added=%d\n",
+		__func__, ns, mpath_head_device_added(mpath_head));
 	if (!mpath_head_device_added(mpath_head)) {
-		if (!mpath_head_queue_if_no_path(mpath_head))
-			list_del_init(&mpath_head->entry);
+		if (!mpath_head_queue_if_no_path(mpath_head)) {
+			list_del_init(&ns->head->entry);
+		}
 		last_path = true;
 	}
-	#endif
+
 	pr_err("%s3 ns=%pS last_path=%d\n", __func__, ns, last_path);
 	mutex_unlock(&ns->ctrl->subsys->lock);
 
