@@ -48,6 +48,7 @@ struct mpath_iopolicy {
 struct mpath_head {
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
+	struct mutex            lock;
 	struct gendisk		*disk;
 	struct kref		ref;
 	struct	bio_list	requeue_list; /* list for requeing bio */

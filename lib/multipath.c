@@ -729,13 +729,19 @@ EXPORT_SYMBOL_GPL(mpath_requeue_work);
 void mpath_add_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device)
 {
 	mpath_device->mpath_head = mpath_head;
+	mutex_lock(&mpath_head->lock);
 	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
+	mutex_unlock(&mpath_head->lock);
 }
 EXPORT_SYMBOL_GPL(mpath_add_device);
 
 void mpath_delete_device(struct mpath_device *mpath_device)
 {
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+
+	mutex_lock(&mpath_head->lock);
 	list_del_rcu(&mpath_device->siblings);
+	mutex_unlock(&mpath_head->lock);
 }
 EXPORT_SYMBOL_GPL(mpath_delete_device);
 
@@ -767,7 +773,7 @@ void mpath_init_head(struct mpath_head *mpath_head)
 	INIT_LIST_HEAD(&mpath_head->dev_list);
 	INIT_WORK(&mpath_head->partition_scan_work, multipath_partition_scan_work);
 	pr_err("%s6\n", __func__);
-	//mutex_init(&mpath_head->lock);
+	mutex_init(&mpath_head->lock);
 	kref_init(&mpath_head->ref);
 
 	//mpath_head->dev.class = mpdt->class; //&scsi_mpath_head_class;
@@ -1364,7 +1370,7 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 		mod_delayed_work(mpath_wq, &mpath_head->remove_work,
 				mpath_head->delayed_removal_secs * HZ);
 	} else {
-		list_del_init(&mpath_head->entry);
+		//list_del_init(&mpath_head->entry); fixme
 		remove = true;
 	}
 out:
