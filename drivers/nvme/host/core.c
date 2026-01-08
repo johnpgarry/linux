@@ -4164,11 +4164,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	} else {
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
-			#ifdef no_libmpath
-		    !list_empty(&mpath_head->dev_list)) {
-			#else
-			1) {
-			#endif
+			mpath_head_device_added(mpath_head)) {
 			dev_err(ctrl->device,
 				"Duplicate unshared namespace %d\n",
 				info->nsid);
@@ -4424,7 +4420,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	list_del_rcu(&ns->mpath_device.siblings);
 	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
 		__func__, ns, NULL/*list_empty(&mpath_head->dev_list)*/);
-	if (list_empty(&mpath_head->dev_list)) {
+	if (!mpath_head_device_added(mpath_head)) {
 		if (!mpath_head_queue_if_no_path(mpath_head))
 			list_del_init(&mpath_head->entry);
 		last_path = true;

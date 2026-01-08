@@ -869,7 +869,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	 
 	pr_err("%s1 head=%pS list_empty(dev_list)=%d\n",
 		__func__, head, list_empty(&mpath_head->dev_list));
-	if (!list_empty(&mpath_head->dev_list))
+	if (!mpath_head_device_added(mpath_head))
 		goto out;
 
 	if (mpath_head->delayed_removal_secs) {
