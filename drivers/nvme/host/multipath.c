@@ -260,25 +260,30 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
 }
 
+static void nvme_mpath_revalidate_paths_cb(struct mpath_device *mpath_device)
+{
+	struct nvme_ns *ns = container_of(mpath_device, struct nvme_ns, mpath_device);
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
+	sector_t capacity = get_capacity(disk);
+
+	pr_err("%s ns=%pS mpath_device=%pS\n", __func__, ns, mpath_device);
+	if (capacity != get_capacity(ns->disk))
+			clear_bit(NVME_NS_READY, &ns->flags);
+}
+
+
 void nvme_mpath_revalidate_paths(struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
 	struct mpath_head *mpath_head = &head->mpath_head;
-	struct gendisk *disk = mpath_head->disk;
-	sector_t capacity = get_capacity(disk);
-	struct mpath_device *mpath_device;
 	int node;
+	#ifdef dksddsd
 	int srcu_idx;
+	#endif
 
 	pr_err("%s ns=%pS head=%pS\n", __func__, ns, head);
-	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
-				 srcu_read_lock_held(&mpath_head->srcu)) {
-		ns = nvme_to_ns(mpath_device);
-		if (capacity != get_capacity(ns->disk))
-			clear_bit(NVME_NS_READY, &ns->flags);
-	}
-	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	mpath_iterate_devices(mpath_head, nvme_mpath_revalidate_paths_cb);
 
 	for_each_node(node)
 		rcu_assign_pointer(mpath_head->current_path[node], NULL);

@@ -46,9 +46,11 @@ struct mpath_iopolicy {
 #endif
 
 struct mpath_head {
+	#ifdef MULTIPATHLIB_VISIBLE
 	struct srcu_struct 	srcu;
 	struct list_head	dev_list;	/* list of all mpath_sdevs */
 	struct list_head	entry; /* Entry into list of subsystems */
+	#endif
 	struct gendisk		*disk;
 	struct kref		ref;
 	struct	bio_list	requeue_list; /* list for requeing bio */
@@ -204,6 +206,7 @@ void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath
 void mpath_uninit_device(struct mpath_device *mpath_device);
 
 int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device));
+void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpath_device *mpath_device));
 
 //extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
@@ -276,6 +279,9 @@ static inline void mpath_uninit_device(struct mpath_device *mpath_device)
 static inline int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device))
 {
 	return 0;
+}
+void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpath_device *mpath_device));
+{
 }
 #define mpath_device_groups NULL
 

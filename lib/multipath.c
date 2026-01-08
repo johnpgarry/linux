@@ -3,6 +3,7 @@
  * Copyright (c) 2017-2018 Christoph Hellwig.
  * Copyright (c) 2025 Oracle and/or its affiliates.
  */
+#define MULTIPATHLIB_VISIBLE
 #include <linux/bio.h>
 #include <linux/moduleparam.h>
 #include <linux/topology.h>
@@ -981,6 +982,20 @@ int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_
 	return ret;
 }
 EXPORT_SYMBOL_GPL(mpath_call_for_device);
+
+void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpath_device *mpath_device))
+{
+	struct mpath_device *mpath_device;
+	int srcu_idx;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
+				 srcu_read_lock_held(&mpath_head->srcu)) {
+		cb(mpath_device);
+	}
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+}
+EXPORT_SYMBOL_GPL(mpath_iterate_devices);
 
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {
