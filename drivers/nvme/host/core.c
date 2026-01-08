@@ -4030,15 +4030,13 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	if (ret < 0)
 		return ERR_PTR(ret);
 	mpath_head = &head->mpath_head;
+	pr_err("%s0 ctrl=%pS info=%pS head=%pS ret=%d\n", __func__, ctrl, info, head, ret);
+	head->instance = ret;
 
 	mpath_init_head(mpath_head);
-	ret = 0;
-	if (ret)
-		goto out_free_ida;
 
-	pr_err("%s mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
+	pr_err("%s1 mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 
-	head->instance = ret;
 	#ifdef dsdd
 	INIT_LIST_HEAD(&head->list);
 	ret = init_srcu_struct(&head->srcu);
@@ -4061,15 +4059,15 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	} else
 		head->effects = ctrl->effects;
 
-	pr_err("%s ctrl=%pS head=%pS calling nvme_mpath_alloc_disk\n", __func__, ctrl, head);
+	pr_err("%s2 ctrl=%pS head=%pS calling nvme_mpath_alloc_disk\n", __func__, ctrl, head);
 	ret = nvme_mpath_alloc_disk(ctrl, head);
-	pr_err("%s1 ctrl=%pS head=%pS called nvme_mpath_alloc_disk ret=%d\n",
+	pr_err("%s3 ctrl=%pS head=%pS called nvme_mpath_alloc_disk ret=%d\n",
 		__func__, ctrl, head, ret);
 	if (ret)
 		goto out_cleanup_srcu;
 
 	ret = mpath_add_head(mpath_head);
-	pr_err("%s2 ret=%d from mpath_add_disk\n", __func__, ret);
+	pr_err("%s4 ret=%d from mpath_add_disk\n", __func__, ret);
 
 	list_add_tail(&head->entry, &ctrl->subsys->nsheads);
 
@@ -4081,7 +4079,7 @@ out_cleanup_srcu:
 //out_ida_remove:
 //out_free_head:
 	//kfree(head);
-out_free_ida:
+//out_free_ida:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
 out:
 	if (ret > 0)
