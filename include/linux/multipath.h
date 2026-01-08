@@ -200,7 +200,7 @@ static inline bool mpath_qd_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
 }
 
 void mpath_device_set_live(struct mpath_device *mpath_device);
-void mpath_remove_disk(struct mpath_head *mpath_head);
+void mpath_remove_disk(struct mpath_device *mpath_device);
 
 //extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
@@ -237,7 +237,7 @@ static inline void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 static inline void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 {
 }
-static inline void mpath_remove_disk(struct mpath_head *mpath_head)
+static inline void mpath_remove_disk(struct mpath_device *mpath_device)
 {
 }
 static inline bool mpath_clear_current_path(struct mpath_device *mpath_device)

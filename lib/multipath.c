@@ -1264,9 +1264,10 @@ static void mpath_free_disk(struct kref *ref)
 
 
 // nvme_mpath_remove_disk
-void mpath_remove_disk(struct mpath_head *mpath_head)
+void mpath_remove_disk(struct mpath_device *mpath_device)
 {
 	bool remove = false;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	struct gendisk *disk = mpath_head->disk;
 	//struct mpath_subsys *mpath_subsys = mpath_head->mpath_subsys;
 
@@ -1362,7 +1363,7 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 		__func__, last_path);
 
 	if (last_path) {
-		mpath_remove_disk(mpath_head);
+		mpath_remove_disk(mpath_device);
 		
 	}
 	pr_err("%s9 mpath_device=%pS calling mpath_put_disk\n", __func__, mpath_device);

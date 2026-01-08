@@ -4412,11 +4412,6 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 {
 	bool last_path = false;
 	struct mpath_device *mpath_device = &ns->mpath_device;
-	#ifdef no_libmpath
-	struct mpath_head *mpath_head = mpath_device->mpath_head;
-	#else
-	struct mpath_head *mpath_head = NULL;
-	#endif
 	__maybe_unused struct kref *kref = NULL;//&mpath_head->ref;
 
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
@@ -4474,7 +4469,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (last_path) {
 		pr_err("%s6 ns=%pS calling mpath_remove_disk ns->head=%pS\n",
 			__func__, ns, ns->head);
-		mpath_remove_disk(mpath_head);
+		mpath_remove_disk(mpath_device);
 	}
 	pr_err("%s7 ns=%pS calling nvme_put_ns\n",
 			__func__, ns);
