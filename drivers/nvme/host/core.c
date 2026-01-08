@@ -2381,10 +2381,12 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	unsigned lbaf;
 	int ret;
 
+	pr_err("%s ns=%pS info=%pS\n", __func__, ns, info);
 	ret = nvme_identify_ns(ns->ctrl, info->nsid, &id);
 	if (ret)
 		return ret;
 
+	pr_err("%s1 ns=%pS info=%pS\n", __func__, ns, info);
 	if (id->ncap == 0) {
 		/* namespace not allocated or attached */
 		info->is_removed = true;
@@ -2393,12 +2395,14 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	}
 	lbaf = nvme_lbaf_index(id->flbas);
 
+	pr_err("%s2 ns=%pS info=%pS\n", __func__, ns, info);
 	if (ns->ctrl->ctratt & NVME_CTRL_ATTR_ELBAS) {
 		ret = nvme_identify_ns_nvm(ns->ctrl, info->nsid, &nvm);
 		if (ret < 0)
 			goto out;
 	}
 
+	pr_err("%s3 ns=%pS info=%pS\n", __func__, ns, info);
 	if (IS_ENABLED(CONFIG_BLK_DEV_ZONED) &&
 	    ns->head->ids.csi == NVME_CSI_ZNS) {
 		ret = nvme_query_zone_info(ns, lbaf, &zi);
@@ -2406,14 +2410,18 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 			goto out;
 	}
 
+	pr_err("%s4 ns=%pS info=%pS\n", __func__, ns, info);
 	if (ns->ctrl->ctratt & NVME_CTRL_ATTR_FDPS) {
 		ret = nvme_query_fdp_info(ns, info);
 		if (ret < 0)
 			goto out;
 	}
-
+	pr_err("%s5.0.0 ns=%pS info=%pS\n", __func__, ns, info);
+	pr_err("%s5.0.1 ns->disk=%pS info=%pS\n", __func__, ns->disk, info);
+	pr_err("%s5.0.2 ns->disk->queue=%pS info=%pS\n", __func__, ns->disk->queue, info);
 	lim = queue_limits_start_update(ns->disk->queue);
 
+	pr_err("%s5.0.3 ns=%pS info=%pS\n", __func__, ns, info);
 	memflags = blk_mq_freeze_queue(ns->disk->queue);
 	ns->head->lba_shift = id->lbaf[lbaf].ds;
 	ns->head->nuse = le64_to_cpu(id->nuse);
@@ -2424,11 +2432,13 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	if (!nvme_update_disk_info(ns, id, &lim))
 		capacity = 0;
 
+	pr_err("%s5.1 ns=%pS head=%pS info=%pS\n", __func__, ns, ns->head, info);
 	nvme_config_discard(ns, &lim);
 	if (IS_ENABLED(CONFIG_BLK_DEV_ZONED) &&
 	    ns->head->ids.csi == NVME_CSI_ZNS)
 		nvme_update_zone_info(ns, &lim, &zi);
 
+	pr_err("%s5.2 ns=%pS info=%pS\n", __func__, ns, info);
 	if ((ns->ctrl->vwc & NVME_CTRL_VWC_PRESENT) && !info->no_vwc)
 		lim.features |= BLK_FEAT_WRITE_CACHE | BLK_FEAT_FUA;
 	else
@@ -2443,10 +2453,11 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	 * I/O to namespaces with metadata except when the namespace supports
 	 * PI, as it can strip/insert in that case.
 	 */
+	pr_err("%s5.3 ns=%pS info=%pS\n", __func__, ns, info);
 	if (!nvme_init_integrity(ns->head, &lim, info))
 		capacity = 0;
 
-	pr_err("%s ns=%pS ns->head=%pS\n", __func__, ns, ns->head);
+	pr_err("%s6 ns=%pS ns->head=%pS\n", __func__, ns, ns->head);
 	lim.max_write_streams = ns->head->nr_plids;
 	if (lim.max_write_streams)
 		lim.write_stream_granularity = min(info->runs, U32_MAX);
@@ -2464,6 +2475,7 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 		lim.max_hw_wzeroes_unmap_sectors = lim.max_write_zeroes_sectors;
 	}
 
+	pr_err("%s7 ns=%pS info=%pS\n", __func__, ns, info);
 	ret = queue_limits_commit_update(ns->disk->queue, &lim);
 	if (ret) {
 		blk_mq_unfreeze_queue(ns->disk->queue, memflags);
@@ -2475,6 +2487,8 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 	set_bit(NVME_NS_READY, &ns->flags);
 	blk_mq_unfreeze_queue(ns->disk->queue, memflags);
 
+
+	pr_err("%s8 ns=%pS info=%pS\n", __func__, ns, info);
 	if (blk_queue_is_zoned(ns->queue)) {
 		ret = blk_revalidate_disk_zones(ns->disk);
 		if (ret && !nvme_first_scan(ns->disk))
@@ -2483,6 +2497,7 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 
 	ret = 0;
 out:
+	pr_err("%s9 out: ns=%pS info=%pS\n", __func__, ns, info);
 	kfree(nvm);
 	kfree(id);
 	return ret;
@@ -2492,7 +2507,9 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 {
 	bool unsupported = false;
 	int ret;
-//	pr_err("%s ns=%pS info=%pS\n", __func__, ns, info);
+	pr_err("%s ns=%pS info=%pS\n", __func__, ns, info);
+	pr_err("%s0 ns->ctrl=%pS info=%pS\n", __func__, ns->ctrl, info);
+	pr_err("%s1 ns->ctrl->device=%pS info=%pS info->ids.csi=%d\n", __func__, ns->ctrl->device, info, info->ids.csi);
 	switch (info->ids.csi) {
 	case NVME_CSI_ZNS:
 		if (!IS_ENABLED(CONFIG_BLK_DEV_ZONED)) {
@@ -2502,7 +2519,10 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 			ret = nvme_update_ns_info_generic(ns, info);
 			break;
 		}
+		pr_err("%s1 ns=%pS info=%pS calling nvme_update_ns_info_block\n",
+			__func__, ns, info);
 		ret = nvme_update_ns_info_block(ns, info);
+		pr_err("%s1.1 ns=%pS info=%pS called nvme_update_ns_info_block\n", __func__, ns, info);
 		break;
 	case NVME_CSI_NVM:
 		ret = nvme_update_ns_info_block(ns, info);
@@ -2519,6 +2539,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 	 * If probing fails due an unsupported feature, hide the block device,
 	 * but still allow other access.
 	 */
+	pr_err("%s2 ret=%d\n", __func__, ret);
 	if (ret == -ENODEV) {
 		ns->disk->flags |= GENHD_FL_HIDDEN;
 		set_bit(NVME_NS_READY, &ns->flags);
@@ -2528,7 +2549,8 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 //	pr_err("%s1 ns=%pS info=%pS ret=%d nvme_ns_head_multipath=%d\n",
 	//	__func__, ns, info, ret, nvme_ns_head_multipath(ns->head));
-	#ifdef no_libmpath
+	#if IS_ENABLED(CONFIG_NVME_MULTIPATH)
+	pr_err("%s3 ret=%d\n", __func__, ret);
 	if (!ret && nvme_ns_head_multipath(ns->head)) {
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
 		struct queue_limits lim;
@@ -2583,6 +2605,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		blk_mq_unfreeze_queue(disk->queue, memflags);
 	}
 	#endif
+	pr_err("%s10 ret=%d\n", __func__, ret);
 
 	return ret;
 }
@@ -4141,12 +4164,11 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	}
 
 	mutex_lock(&ctrl->subsys->lock);
-	pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x\n", __func__, ns, info->nsid);
+	pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x mpath_device=%pS\n", __func__, ns, info->nsid, mpath_device);
 	head = nvme_find_ns_head(ctrl, info->nsid);
-	mpath_head = &head->mpath_head;
 
 
-	pr_err("%s1 ns=%pS called nvme_find_ns_head info->nsid=0x%x head=%pS\n", __func__, ns, info->nsid, head);
+	pr_err("%s1 ns=%pS called nvme_find_ns_head info->nsid=0x%x head=%pS mpath_head=%pS\n", __func__, ns, info->nsid, head, mpath_head);
 	if (!head) {
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, &info->ids);
 		if (ret) {
@@ -4161,7 +4183,9 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			ret = PTR_ERR(head);
 			goto out_unlock;
 		}
+		mpath_head = &head->mpath_head;
 	} else {
+		mpath_head = &head->mpath_head;
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
 			mpath_head_device_added(mpath_head)) {
@@ -4185,10 +4209,11 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 				"Shared namespace support requires core_nvme.multipath=Y.\n");
 		}
 	}
-
+	pr_err("%s22.0 mpath_head=%pS mpath_device=%pS calling mpath_init_device\n",
+		__func__, mpath_head, mpath_device);
 	mpath_init_device(mpath_head, mpath_device);
 	ns->head = head;
-	pr_err("%s22 mpath_head=%pS ns=%pS head=%pS\n",
+	pr_err("%s22.1 mpath_head=%pS ns=%pS head=%pS\n",
 		__func__, mpath_head, ns, head);
 	//BUG();
 	mutex_unlock(&ctrl->subsys->lock);
@@ -4299,7 +4324,10 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		pr_err("%s2.1 nvme_ns_head_multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 		sprintf(disk->disk_name, "nvme%dc%dn%d", ctrl->subsys->instance,
 			ctrl->instance, ns->head->instance);
+		pr_err("%s2.1.1 nvme_ns_head_multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 		disk->flags |= GENHD_FL_HIDDEN;
+
+		pr_err("%s2.1.2 nvme_ns_head_multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 	} else if (multipath) {
 		pr_err("%s2.2 multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->subsys->instance,
@@ -4309,9 +4337,10 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		sprintf(disk->disk_name, "nvme%dn%d", ctrl->instance,
 			ns->head->instance);
 	}
-
+	pr_err("%s2.4 ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 	if (nvme_update_ns_info(ns, info))
 		goto out_unlink_ns;
+	pr_err("%s2.5 ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
 
 	mutex_lock(&ctrl->namespaces_lock);
 	/*
@@ -4361,9 +4390,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	synchronize_srcu(&ctrl->srcu);
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
-	#ifdef no_libmpath
-	list_del_rcu(&ns->mpath_device.siblings);
-	#endif
+	mpath_uninit_device(&ns->mpath_device);
 	#ifdef dsddd
 	if (list_empty(&ns->head->list)) {
 		//list_del_init(&ns->head->entry);
@@ -4416,8 +4443,8 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		mpath_synchronize(mpath_device);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
+	mpath_uninit_device(&ns->mpath_device);
 	#ifdef no_libmpath
-	list_del_rcu(&ns->mpath_device.siblings);
 	pr_err("%s2 ns=%pS checking list_empty(dev_list)=%d\n",
 		__func__, ns, NULL/*list_empty(&mpath_head->dev_list)*/);
 	if (!mpath_head_device_added(mpath_head)) {

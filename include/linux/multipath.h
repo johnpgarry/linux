@@ -201,6 +201,7 @@ static inline bool mpath_qd_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
 void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
 void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device);
+void mpath_uninit_device(struct mpath_device *mpath_device);
 
 //extern struct device_attribute mpath_iopolicy;
 extern const struct block_device_operations mpath_ops;
@@ -266,6 +267,9 @@ static inline void mpath_init_device(struct mpath_head *mpath_head, struct mpath
 static inline bool mpath_head_device_added(struct mpath_head *mpath_head)
 {
 	return false; //?? this all needs to be checked
+}
+static inline void mpath_uninit_device(struct mpath_device *mpath_device)
+{
 }
 
 #define mpath_device_groups NULL

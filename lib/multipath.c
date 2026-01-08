@@ -732,6 +732,12 @@ void mpath_init_device(struct mpath_head *mpath_head, struct mpath_device *mpath
 }
 EXPORT_SYMBOL_GPL(mpath_init_device);
 
+void mpath_uninit_device(struct mpath_device *mpath_device)
+{
+	list_del_rcu(&mpath_device->siblings);
+}
+EXPORT_SYMBOL_GPL(mpath_uninit_device);
+
 bool mpath_head_device_added(struct mpath_head *mpath_head)
 {
 	return !list_empty(&mpath_head->dev_list);
