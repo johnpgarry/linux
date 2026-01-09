@@ -677,8 +677,8 @@ static void nvme_free_ns_head(struct kref *ref)
 	pr_err("%s head=%pS calling nvme_mpath_put_disk\n",
 		__func__, head);
 	nvme_mpath_put_disk(head);
-	pr_err("%s1 head=%pS calling ida_free\n",
-		__func__, head);
+	pr_err("%s1 head=%pS calling ida_free head->instance=%d\n",
+		__func__, head, head->instance);
 	ida_free(&head->subsys->ns_ida, head->instance);
 	#ifdef sdsd
 	pr_err("%s2 head=%pS calling cleanup_srcu_struct\n",
@@ -4185,6 +4185,8 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	} else {
 		mpath_head = &head->mpath_head;
 		ret = -EINVAL;
+		pr_err("%s info->is_shared=%d head->shared=%d ns_count=%d\n",
+			__func__, info->is_shared, head->shared, atomic_read(&head->ns_count));
 		if ((!info->is_shared || !head->shared) &&
 			atomic_read(&head->ns_count)) {
 			dev_err(ctrl->device,
@@ -4320,6 +4322,9 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	 */
 	if (nvme_ns_head_multipath(ns->head)) {
 		pr_err("%s2.1 nvme_ns_head_multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
+		pr_err("%s2.1.1 ctrl->subsys->instance=%d\n", __func__, ctrl->subsys->instance);
+		pr_err("%s2.1.2 ctrl->instance=%d\n", __func__, ctrl->instance);
+		pr_err("%s2.1.2 ns->head->instance=%d\n", __func__, ns->head->instance);
 		sprintf(disk->disk_name, "nvme%dc%dn%d", ctrl->subsys->instance,
 			ctrl->instance, ns->head->instance);
 		pr_err("%s2.1.1 nvme_ns_head_multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);

@@ -1144,6 +1144,7 @@ static DEVICE_ATTR(preferred_path, S_IRUGO, sdev_show_preferred_path, NULL);
 static struct attribute *scsi_mpath_disk_attrs[] = {
 	&scsi_mpath_wwid.attr,
 	&scsi_mpath_iopolicy.attr,
+	&scsi_mpath_delayed_removal_secs.attr,
 	NULL
 };
 

@@ -165,6 +165,7 @@ extern struct device_attribute scsi_mpath_numa_nodes;
 extern struct device_attribute scsi_mpath_nr_active;
 extern struct device_attribute scsi_mpath_nr_total;
 extern struct device_attribute scsi_mpath_iopolicy;
+extern struct device_attribute scsi_mpath_delayed_removal_secs;
 
 
 /* scsi_netlink.c */

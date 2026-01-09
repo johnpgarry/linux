@@ -1063,6 +1063,57 @@ struct device_attribute scsi_mpath_iopolicy = \
 		__ATTR(iopolicy, S_IRUGO | S_IWUSR, scsi_mpath_iopolicy_show, scsi_mpath_iopolicy_store);
 EXPORT_SYMBOL_GPL(scsi_mpath_iopolicy);
 
+
+static ssize_t scsi_mpath_delayed_removal_secs_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	unsigned int sec;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &sec);
+	if (ret < 0)
+		return ret;
+
+	mutex_lock(&mpath_head->lock);
+	mpath_head->delayed_removal_secs = sec;
+//	if (sec)
+//		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
+//	else
+//		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
+	mutex_unlock(&mpath_head->lock);
+	/*
+	 * Ensure that update to NVME_NSHEAD_QUEUE_IF_NO_PATH is seen
+	 * by its reader.
+	 */
+	//synchronize_srcu(&head->srcu);
+	mpath_synchronize_head(mpath_head);
+
+	return count;
+}
+
+static ssize_t scsi_mpath_delayed_removal_secs_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	int ret;
+
+	mutex_lock(&mpath_head->lock);
+	ret = sysfs_emit(buf, "%u\n", mpath_head->delayed_removal_secs);
+	mutex_unlock(&mpath_head->lock);
+	return ret;
+
+}
+
+struct device_attribute scsi_mpath_delayed_removal_secs = \
+		__ATTR(delayed_removal_secs, S_IRUGO | S_IWUSR, scsi_mpath_delayed_removal_secs_show,
+			scsi_mpath_delayed_removal_secs_store);
+EXPORT_SYMBOL_GPL(scsi_mpath_delayed_removal_secs);
+
 int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 {
 	struct request *req = scsi_cmd_to_rq(scmd);

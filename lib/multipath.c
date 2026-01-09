@@ -1360,6 +1360,8 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 	if (!list_empty(&mpath_head->dev_list))
 		goto out;
 
+	pr_err("%s2 mpath_head=%pS mpath_head->delayed_removal_secs=%d\n",
+		__func__, mpath_head, mpath_head->delayed_removal_secs);
 	if (mpath_head->delayed_removal_secs) {
 		/*
 		 * Ensure that no one could remove this module while the head
