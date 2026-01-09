@@ -1344,7 +1344,7 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 	if (!disk)
 		return;
 
-	//mutex_lock(&mpath_subsys->lock);
+	mutex_lock(&mpath_head->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -1376,7 +1376,7 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 		remove = true;
 	}
 out:
-	//mutex_unlock(&mpath_subsys->lock);
+	mutex_unlock(&mpath_head->lock);
 	if (remove) {
 		pr_err("%s9 calling nvme_remove_head mpath_head=%pS\n",
 			__func__, mpath_head);
