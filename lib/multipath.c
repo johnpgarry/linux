@@ -1237,14 +1237,14 @@ int mpath_add_head(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_add_head);
 
-//nvme_mpath_put_disk
-void mpath_put_disk(struct mpath_head *mpath_head)
+//
+static __maybe_unused void mpath_put_disk1(struct mpath_head *mpath_head)
 {
 	pr_err("%s mpath_head=%pS calling kref_put -> mpath_free_disk\n",
 		__func__, mpath_head);
 	kref_put(&mpath_head->ref, mpath_free_disk);
 }
-EXPORT_SYMBOL_GPL(mpath_put_disk);
+//EXPORT_SYMBOL_GPL(mpath_put_disk1);
 
 void mpath_revalidate_path(struct gendisk *disk, sector_t capacity)
 {
@@ -1375,6 +1375,8 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 		//list_del_init(&mpath_head->entry); fixme
 		remove = true;
 	}
+	pr_err("%s3 mpath_head=%pS remove=%d\n",
+		__func__, mpath_head, remove);
 out:
 	mutex_unlock(&mpath_head->lock);
 	if (remove) {
@@ -1382,6 +1384,27 @@ out:
 			__func__, mpath_head);
 		mpath_remove_head(mpath_head);
 	}
+}
+
+// nvme_mpath_put_disk 
+void mpath_put_disk(struct mpath_head *mpath_head)
+{
+	struct gendisk *disk = mpath_head->disk;
+	pr_err("%s mpath_head=%pS disk=%pS\n", __func__, mpath_head, disk);
+	if (!disk)
+		return;
+	pr_err("%s1 mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
+		__func__, mpath_head);
+	/* make sure all pending bios are cleaned up */
+	kblockd_schedule_work(&mpath_head->requeue_work);
+	flush_work(&mpath_head->requeue_work);
+	pr_err("%s3 mpath_head=%pS calling flush_work partition_scan_work\n",
+		__func__, mpath_head);
+	flush_work(&mpath_head->partition_scan_work);
+
+	pr_err("%s4 mpath_head=%pS disk=%pS not calling put_disk\n",
+		__func__, mpath_head, disk);
+	put_disk(mpath_head->disk);
 }
 
 // nvme_ns_remove

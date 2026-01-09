@@ -904,27 +904,6 @@ out:
 }
 #endif
 
-void nvme_mpath_put_disk(struct nvme_ns_head *head)
-{
-	struct mpath_head *mpath_head = &head->mpath_head;
-	struct gendisk *disk = mpath_head->disk;
-	pr_err("%s head=%pS disk=%pS\n", __func__, head, disk);
-	if (!disk)
-		return;
-	pr_err("%s1 mpath_head=%pS calling kblockd_schedule_work requeue_work\n",
-		__func__, mpath_head);
-	/* make sure all pending bios are cleaned up */
-	kblockd_schedule_work(&mpath_head->requeue_work);
-	flush_work(&mpath_head->requeue_work);
-	pr_err("%s3 head=%pS calling flush_work partition_scan_work\n",
-		__func__, head);
-	flush_work(&mpath_head->partition_scan_work);
-
-	pr_err("%s4 head=%pS disk=%pS not calling put_disk\n",
-		__func__, head, disk);
-//	put_disk(head->disk); fixme
-}
-
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl)
 {
 	pr_err("%s ctrl=%pS\n", __func__, ctrl);

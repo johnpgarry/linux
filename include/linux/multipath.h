@@ -209,6 +209,8 @@ void mpath_remove_disk(struct mpath_device *mpath_device);
 void mpath_add_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device);
 void mpath_delete_device(struct mpath_device *mpath_device);
 
+void mpath_put_disk(struct mpath_head *mpath_head);
+
 int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device));
 void mpath_iterate_devices(struct mpath_head *mpath_head, void (*cb)(struct mpath_device *mpath_device));
 void mpath_clear_paths(struct mpath_head *mpath_head);
@@ -281,6 +283,9 @@ static inline void mpath_add_device(struct mpath_head *mpath_head, struct mpath_
 {
 }
 static inline void mpath_delete_device(struct mpath_device *mpath_device)
+{
+}
+static inline void mpath_put_disk(struct mpath_head *mpath_head)
 {
 }
 static inline int mpath_call_for_device(struct mpath_head *mpath_head, int (*cb)(struct mpath_device *mpath_device))

@@ -673,10 +673,11 @@ static void nvme_free_ns_head(struct kref *ref)
 {
 	struct nvme_ns_head *head =
 		container_of(ref, struct nvme_ns_head, ref);
+	struct mpath_head *mpath_head = &head->mpath_head;
 
-	pr_err("%s head=%pS calling nvme_mpath_put_disk\n",
+	pr_err("%s head=%pS calling mpath_put_disk\n",
 		__func__, head);
-	nvme_mpath_put_disk(head);
+	mpath_put_disk(mpath_head);
 	pr_err("%s1 head=%pS calling ida_free head->instance=%d\n",
 		__func__, head, head->instance);
 	ida_free(&head->subsys->ns_ida, head->instance);
@@ -687,11 +688,9 @@ static void nvme_free_ns_head(struct kref *ref)
 	#endif 
 	nvme_put_subsystem(head->subsys);
 	kfree(head->plids);
-	#ifdef sdsd
 	pr_err("%s4 head=%pS calling kfree(head)\n",
 		__func__, head);
-	kfree(head);
-	#endif 
+	//kfree(head);
 }
 
 bool nvme_tryget_ns_head(struct nvme_ns_head *head)
