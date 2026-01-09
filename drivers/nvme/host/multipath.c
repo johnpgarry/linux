@@ -409,7 +409,7 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 
 		pr_err("%s4 head=%pS calling synchronize_srcu\n",
 			__func__, head);
-		mpath_synchronize(mpath_head);
+		mpath_synchronize_head(mpath_head);
 
 		pr_err("%s5 head=%pS calling del_gendisk\n",
 			__func__, head);
@@ -781,6 +781,7 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 	 * by its reader.
 	 */
 	//synchronize_srcu(&head->srcu);
+	mpath_synchronize_head(mpath_head);
 
 	return count;
 }
