@@ -426,7 +426,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = &head->mpath_head;
 	struct nvme_subsystem *subsys = ctrl->subsys;
-	struct gendisk *gendisk = mpath_head->disk;
+	struct kref *ref = &head->ref;
 	int ret;
 
 	mpath_head->parent = &subsys->dev;
@@ -460,10 +460,15 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 
 //	sprintf(head->disk->disk_name, "nvme%dn%d",
 //			ctrl->subsys->instance, head->instance);
+	pr_err("%s snake ctrl->subsys->instance=%d head->instance=%d mpath_head->disk=%pS\n",
+			__func__, ctrl->subsys->instance, head->instance, mpath_head->disk);
 	sprintf(mpath_head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
-	pr_err("%s9 gendisk name=%s\n", __func__, gendisk->disk_name);
+	pr_err("%s4 head=%pS calling nvme_tryget_ns_head ref=%pS refcount=%d\n",
+		__func__, head, ref, refcount_read(&ref->refcount)); // is 
 	nvme_tryget_ns_head(head);
+	pr_err("%s5 head=%pS called nvme_tryget_ns_head ref=%pS refcount=%d\n",
+		__func__, head, ref, refcount_read(&ref->refcount)); // is 
 	return 0;
 }
 

@@ -384,7 +384,8 @@ static int mpath_open(struct gendisk *disk, blk_mode_t mode)
 static void mpath_release(struct gendisk *disk)
 {
 	struct mpath_head *mpath_head = disk->private_data;
-	pr_err("%s mpath_head=%pS disk=%pS calling kref_put\n", __func__, mpath_head, disk);
+	pr_err("%s mpath_head=%pS disk=%pS calling kref_put &mpath_head->ref=%pS refcount=%d\n",
+		__func__, mpath_head, disk, &mpath_head->ref, refcount_read(&mpath_head->ref.refcount));
 	kref_put(&mpath_head->ref, mpath_free_disk);
 }
 
@@ -716,7 +717,6 @@ void mpath_requeue_work(struct work_struct *work)
 	__maybe_unused
 	struct bio *bio, *next;
 
-
 	spin_lock_irq(&mpath_head->requeue_lock);
 	next = bio_list_get(&mpath_head->requeue_list);
 	pr_err("%s mpath_head=%pS next=%pS\n", __func__, mpath_head, next);
@@ -753,8 +753,6 @@ EXPORT_SYMBOL_GPL(mpath_delete_device);
 
 void mpath_init_head(struct mpath_head *mpath_head)
 {
-//	int ret;
-
 	pr_err("%s5 sdev=%pS sdev->scsi_mpath_dev=%pS shost=%pS shost_dev=%pS mpath_head=%pS mpath_device=%pS\n",
 		__func__, NULL, NULL, NULL, NULL, mpath_head, NULL);
 	//if (!mpath_head)
@@ -772,9 +770,10 @@ void mpath_init_head(struct mpath_head *mpath_head)
 	//INIT_LIST_HEAD(&scsi_mpath_head->entry);
 	INIT_LIST_HEAD(&mpath_head->dev_list);
 	INIT_WORK(&mpath_head->partition_scan_work, multipath_partition_scan_work);
-	pr_err("%s6\n", __func__);
 	mutex_init(&mpath_head->lock);
 	kref_init(&mpath_head->ref);
+	pr_err("%s6 &mpath_head->ref=%pS refcount=%d after kref_init\n",
+		__func__, &mpath_head->ref, refcount_read(&mpath_head->ref.refcount));
 
 	//mpath_head->dev.class = mpdt->class; //&scsi_mpath_head_class;
 
@@ -846,8 +845,8 @@ static void mpath_put_head(struct mpath_head *mpath_head)
 {
 	struct kref *kref = &mpath_head->ref;
 
-	pr_err("%s mpath_head=%pS calling kref_put -> mpath_free_head kref refcount=%d\n",
-		__func__, mpath_head, refcount_read(&kref->refcount));
+	pr_err("%s mpath_head=%pS kref=%pS calling kref_put -> mpath_free_head kref refcount=%d\n",
+		__func__, mpath_head, kref, refcount_read(&kref->refcount));
 	kref_put(&mpath_head->ref, mpath_free_head);
 }
 
@@ -891,7 +890,7 @@ static void mpath_remove_head_work(struct work_struct *work)
 			struct mpath_head, remove_work);
 	bool remove = false;
 
-	pr_err("%s mpath_head=%pS remove=%d\n", __func__, mpath_head, remove);
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
 
 //	mutex_lock(&head->subsys->lock);
 //	if (list_empty(&mpath_head->dev_list)) {
@@ -899,6 +898,7 @@ static void mpath_remove_head_work(struct work_struct *work)
 //		remove = true;
 //	}
 //	mutex_unlock(&head->subsys->lock);
+	pr_err("%s2 mpath_head=%pS remove=%d\n", __func__, mpath_head, remove);
 	if (remove) {
 		mpath_remove_head(mpath_head);
 	}
@@ -921,15 +921,15 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	mpath_head->delayed_removal_secs = 0;
 
 	blk_set_stacking_limits(&lim);
-	pr_err("%s8 mpath_head->parent=%pS\n", __func__, mpath_head->parent);
+	pr_err("%s8 mpath_head->parent=%pS ref=%pS\n", __func__, mpath_head->parent, ref);
 
 	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT | BLK_FEAT_POLL;
 	lim.max_zone_append_sectors = 0;
 	lim.dma_alignment = 3;
 
 	mpath_head->disk = blk_alloc_disk(&lim, 0 /* dev_to_node(mpath_head->parent) mpath_head->parent NOT SET YET*/);
-	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS mpath_iopolicy=%pS\n",
-		__func__, NULL, NULL, mpath_head->disk, NULL);
+	pr_err("%s9 dev=%pS sdev->scsi_mpath_dev=%pS mpath_head->disk=%pS mpath_iopolicy=%pS ref=%pS\n",
+		__func__, NULL, NULL, mpath_head->disk, NULL, ref);
 	if (IS_ERR(mpath_head->disk))
 		return -ENOMEM;
 
@@ -1444,6 +1444,7 @@ EXPORT_SYMBOL_GPL(mpath_remove_device);
 
 int mpath_get_disk(struct mpath_head *mpath_head)
 {
+	pr_err("%s mpath_head=%pS &mpath_head->ref=%pS\n", __func__, mpath_head, &mpath_head->ref);
 	if (!kref_get_unless_zero(&mpath_head->ref)) {
 		pr_err("%s1 mpath_head=%pS ENXIO\n", __func__, mpath_head);
 		return -ENXIO;
