@@ -556,6 +556,7 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 
 static int nvme_ns_head_open(struct gendisk *disk, blk_mode_t mode)
 {
+	pr_err("%s calling nvme_tryget_ns_head\n", __func__);
 	if (!nvme_tryget_ns_head(disk->private_data))
 		return -ENXIO;
 	return 0;
@@ -563,6 +564,7 @@ static int nvme_ns_head_open(struct gendisk *disk, blk_mode_t mode)
 
 static void nvme_ns_head_release(struct gendisk *disk)
 {
+	pr_err("%s calling nvme_put_ns_head\n", __func__);
 	nvme_put_ns_head(disk->private_data);
 }
 
@@ -675,9 +677,9 @@ static void nvme_requeue_work(struct work_struct *work)
 		container_of(work, struct nvme_ns_head, requeue_work);
 	struct bio *bio, *next;
 
-	pr_err("%s head=%pS\n", __func__, head);
 	spin_lock_irq(&head->requeue_lock);
 	next = bio_list_get(&head->requeue_list);
+	pr_err("%s head=%pS next=%pS\n", __func__, head, next);
 	spin_unlock_irq(&head->requeue_lock);
 
 	while ((bio = next) != NULL) {
@@ -722,12 +724,14 @@ static void nvme_remove_head_work(struct work_struct *work)
 			struct nvme_ns_head, remove_work);
 	bool remove = false;
 
+	pr_err("%s head=%pS\n", __func__, head);
 	mutex_lock(&head->subsys->lock);
 	if (list_empty(&head->list)) {
 		list_del_init(&head->entry);
 		remove = true;
 	}
 	mutex_unlock(&head->subsys->lock);
+	pr_err("%s2 head=%pS remove=%d\n", __func__, head, remove);
 	if (remove)
 		nvme_remove_head(head);
 
@@ -737,9 +741,10 @@ static void nvme_remove_head_work(struct work_struct *work)
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct queue_limits lim;
+	struct kref *ref = &head->ref;
 
 	pr_err("%s ctrl=%pS head=%pS\n", __func__, ctrl, head);
-	mutex_init(&head->lock);
+//	mutex_init(&head->lock);
 	bio_list_init(&head->requeue_list);
 	spin_lock_init(&head->requeue_lock);
 	INIT_WORK(&head->requeue_work, nvme_requeue_work);
@@ -791,10 +796,15 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	 * scan_work.
 	 */
 	set_bit(GD_SUPPRESS_PART_SCAN, &head->disk->state);
+	pr_err("%s snake ctrl->subsys->instance=%d head->instance=%d head->disk=%pS\n",
+			__func__, ctrl->subsys->instance, head->instance, head->disk);
 	sprintf(head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
-	pr_err("%s4 head=%pS calling nvme_tryget_ns_head\n", __func__, head);
+	pr_err("%s4 head=%pS calling nvme_tryget_ns_head ref=%pS refcount=%d\n",
+		__func__, head, ref, refcount_read(&ref->refcount)); // is 1
 	nvme_tryget_ns_head(head);
+	pr_err("%s5 head=%pS called nvme_tryget_ns_head ref=%pS refcount=%d\n",
+		__func__, head, ref, refcount_read(&ref->refcount)); // is 2
 	return 0;
 }
 
@@ -803,7 +813,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	struct nvme_ns_head *head = ns->head;
 	int rc;
 
-	dev_err(disk_to_dev(head->disk), "%s ns=%pS\n", __func__, ns);
+	//dev_err(disk_to_dev(head->disk), "%s ns=%pS\n", __func__, ns);
 
 	if (!head->disk)
 		return;
@@ -826,7 +836,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 
 	nvme_mpath_add_sysfs_link(ns->head);
 
-	mutex_lock(&head->lock);
+//	mutex_lock(&head->lock);
 	if (nvme_path_is_optimized(ns)) {
 		int node, srcu_idx;
 
@@ -835,7 +845,7 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 			__nvme_find_path(head, node);
 		srcu_read_unlock(&head->srcu, srcu_idx);
 	}
-	mutex_unlock(&head->lock);
+//	mutex_unlock(&head->lock);
 
 	synchronize_srcu(&head->srcu);
 	kblockd_schedule_work(&head->requeue_work);
@@ -1355,6 +1365,8 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	if (!list_empty(&head->list))
 		goto out;
 
+	pr_err("%s2 head=%pS mpath_head->delayed_removal_secs=%d\n",
+		__func__, head, head->delayed_removal_secs);
 	if (head->delayed_removal_secs) {
 		/*
 		 * Ensure that no one could remove this module while the head
@@ -1368,6 +1380,8 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 		list_del_init(&head->entry);
 		remove = true;
 	}
+	pr_err("%s3 head=%pS remove=%d\n",
+		__func__, head, remove);
 out:
 	mutex_unlock(&head->subsys->lock);
 	if (remove) {

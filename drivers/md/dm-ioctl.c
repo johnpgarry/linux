@@ -1266,7 +1266,7 @@ static int dev_status(struct file *filp, struct dm_ioctl *param, size_t param_si
 
 	md = find_device(param);
 	if (!md) {
-		pr_err("%s could not find device\n", __func__);
+		pr_err_ratelimited("%s could not find device file=%s\n", __func__, __FILE__);
 		return -ENXIO;
 	}
 

@@ -667,11 +667,11 @@ static void nvme_free_ns_head(struct kref *ref)
 	struct nvme_ns_head *head =
 		container_of(ref, struct nvme_ns_head, ref);
 
-	pr_err("%s head=%pS calling nvme_mpath_put_disk\n",
-		__func__, head);
+	pr_err("%s head=%pS calling nvme_mpath_put_disk ref=%pS refcount=%d\n",
+		__func__, head, ref, refcount_read(&ref->refcount));
 	nvme_mpath_put_disk(head);
-	pr_err("%s1 head=%pS calling ida_free\n",
-		__func__, head);
+	pr_err("%s1 head=%pS calling ida_free head->instance=%d\n",
+		__func__, head, head->instance);
 	ida_free(&head->subsys->ns_ida, head->instance);
 	pr_err("%s2 head=%pS calling cleanup_srcu_struct\n",
 		__func__, head);
@@ -687,13 +687,22 @@ static void nvme_free_ns_head(struct kref *ref)
 
 bool nvme_tryget_ns_head(struct nvme_ns_head *head)
 {
-	return kref_get_unless_zero(&head->ref);
+	struct kref *kref = &head->ref;
+	bool res;
+	pr_err("%s head=%pS calling kref_get_unless_zero kref=%pS refcount=%d\n",
+		__func__, head, kref, refcount_read(&kref->refcount));
+	res = kref_get_unless_zero(&head->ref);
+	pr_err("%s1 head=%pS called kref_get_unless_zero kref=%pS refcount=%d\n",
+		__func__, head, kref, refcount_read(&kref->refcount));
+
+	return res;
 }
 
 void nvme_put_ns_head(struct nvme_ns_head *head)
 {
-	pr_err("%s head=%pS calling kref_put -> nvme_free_ns_head\n",
-		__func__, head);
+	struct kref *kref = &head->ref;
+	pr_err("%s head=%pS calling kref_put -> nvme_free_ns_head kref=%pS refcount=%d\n",
+		__func__, head, kref, refcount_read(&kref->refcount));
 	kref_put(&head->ref, nvme_free_ns_head);
 }
 
@@ -707,7 +716,7 @@ static void nvme_free_ns(struct kref *kref)
 	nvme_put_ns_head(ns->head);
 	pr_err("%s2 ns=%pS calling nvme_put_ctrl\n", __func__, ns);
 	nvme_put_ctrl(ns->ctrl);
-	pr_err("%s3 ns=%pS calling kfree\n", __func__, ns);
+	pr_err("%s3 ns=%pS calling kfree(ns)\n", __func__, ns);
 	kfree(ns);
 }
 
@@ -3794,6 +3803,7 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 	lockdep_assert_held(&ctrl->subsys->lock);
 
 	list_for_each_entry(h, &ctrl->subsys->nsheads, entry) {
+		struct kref *ref;
 		/*
 		 * Private namespaces can share NSIDs under some conditions.
 		 * In that case we can't use the same ns_head for namespaces
@@ -3801,6 +3811,9 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 		 */
 		if (h->ns_id != nsid || !nvme_is_unique_nsid(ctrl, h))
 			continue;
+		ref = &h->ref;
+		pr_err("%s h=%pS ref=%pS refcount=%d calling nvme_tryget_ns_head\n",
+			__func__, h, ref, refcount_read(&ref->refcount));
 		if (nvme_tryget_ns_head(h))
 			return h;
 	}
@@ -3939,7 +3952,8 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	} else
 		head->effects = ctrl->effects;
 
-	pr_err("%s2 ctrl=%pS info=%pS head=%pS calling nvme_mpath_alloc_disk\n", __func__, ctrl, info, head);
+	pr_err("%s2 ctrl=%pS info=%pS head=%pS calling nvme_mpath_alloc_disk &head->ref=%pS refcount=%d\n",
+		__func__, ctrl, info, head, &head->ref, refcount_read(&head->ref.refcount)); // refcount is 1
 	ret = nvme_mpath_alloc_disk(ctrl, head);
 	if (ret)
 		goto out_cleanup_srcu;
@@ -4051,7 +4065,10 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			goto out_unlock;
 		}
 	} else {
+		struct kref *ref = &head->ref;
 		ret = -EINVAL;
+		pr_err("%s info->is_shared=%d head->shared=%d list_empty=%d ref=%pS refcount=%d\n",
+			__func__, info->is_shared, head->shared, list_empty(&head->list), ref, refcount_read(&ref->refcount));
 		if ((!info->is_shared || !head->shared) &&
 		    !list_empty(&head->list)) {
 			dev_err(ctrl->device,
@@ -4179,6 +4196,10 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	pr_err("%s3 ctrl=%pS nvme_ns_head_multipath=%d multipath=%d calling sprintf\n",
 		__func__, ctrl, nvme_ns_head_multipath(ns->head), multipath);
 	if (nvme_ns_head_multipath(ns->head)) {
+		pr_err("%s2.1 nvme_ns_head_multipath=true ns=%pS ctrl=%pS info=%pS disk=%pS\n", __func__, ns, ctrl, info, disk);
+		pr_err("%s2.1.1 ctrl->subsys->instance=%d\n", __func__, ctrl->subsys->instance);
+		pr_err("%s2.1.2 ctrl->instance=%d\n", __func__, ctrl->instance);
+		pr_err("%s2.1.2 ns->head->instance=%d\n", __func__, ns->head->instance);
 		sprintf(disk->disk_name, "nvme%dc%dn%d", ctrl->subsys->instance,
 			ctrl->instance, ns->head->instance);
 		disk->flags |= GENHD_FL_HIDDEN;
@@ -4260,11 +4281,14 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 static void nvme_ns_remove(struct nvme_ns *ns)
 {
 	bool last_path = false;
+	struct nvme_ns_head *head = ns->head;
+	struct kref *kref = &head->ref;
 
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
 		return;
 
-	pr_err("%s ns=%pS\n", __func__, ns);
+	pr_err("%s ns=%pS head kref=%pS refcount=%d\n",
+		__func__, ns, kref, refcount_read(&kref->refcount));
 
 	clear_bit(NVME_NS_READY, &ns->flags);
 	set_capacity(ns->disk, 0);
@@ -4310,13 +4334,13 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	list_del_rcu(&ns->list);
 	mutex_unlock(&ns->ctrl->namespaces_lock);
 	synchronize_srcu(&ns->ctrl->srcu);
-
+	pr_err("%s6 last_path=%d\n", __func__, last_path);
 	if (last_path) {
-		pr_err("%s6 ns=%pS calling nvme_mpath_remove_disk head=%pS\n",
+		pr_err("%s7 ns=%pS calling nvme_mpath_remove_disk head=%pS\n",
 			__func__, ns, ns->head);
 		nvme_mpath_remove_disk(ns->head);
 	}
-	pr_err("%s7 ns=%pS calling nvme_put_ns\n",
+	pr_err("%s8 ns=%pS calling nvme_put_ns\n",
 			__func__, ns);
 	nvme_put_ns(ns);
 }
