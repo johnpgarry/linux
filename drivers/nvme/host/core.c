@@ -4186,7 +4186,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		mpath_head = &head->mpath_head;
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
-			mpath_head_device_added(mpath_head)) {
+			atomic_read(&head->ns_count)) {
 			dev_err(ctrl->device,
 				"Duplicate unshared namespace %d\n",
 				info->nsid);
@@ -4210,6 +4210,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	pr_err("%s22.0 mpath_head=%pS mpath_device=%pS calling mpath_add_device\n",
 		__func__, mpath_head, mpath_device);
 	mpath_add_device(mpath_head, mpath_device);
+	atomic_inc(&head->ns_count);
 	ns->head = head;
 	pr_err("%s22.1 mpath_head=%pS ns=%pS head=%pS\n",
 		__func__, mpath_head, ns, head);
@@ -4388,6 +4389,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
 	mpath_delete_device(&ns->mpath_device);
+	atomic_dec(&ns->head->ns_count);
 	#ifdef dsddd
 	if (list_empty(&ns->head->list)) {
 		//list_del_init(&ns->head->entry);
@@ -4443,10 +4445,11 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 
 	mutex_lock(&ns->ctrl->subsys->lock);
 	mpath_delete_device(&ns->mpath_device);
+	atomic_dec(&head->ns_count);
 
-	pr_err("%s2 ns=%pS checking mpath_head_device_added=%d\n",
-		__func__, ns, mpath_head_device_added(mpath_head));
-	if (!mpath_head_device_added(mpath_head)) {
+	pr_err("%s2 ns=%pS checking atomic_read(&head->ns_count)=%d\n",
+		__func__, ns, atomic_read(&head->ns_count));
+	if (!atomic_read(&head->ns_count)) {
 		if (!mpath_head_queue_if_no_path(mpath_head)) {
 			list_del_init(&ns->head->entry);
 		}

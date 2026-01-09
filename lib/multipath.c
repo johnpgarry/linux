@@ -745,12 +745,6 @@ void mpath_delete_device(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_delete_device);
 
-bool mpath_head_device_added(struct mpath_head *mpath_head)
-{
-	return !list_empty(&mpath_head->dev_list);
-}
-EXPORT_SYMBOL_GPL(mpath_head_device_added);
-
 void mpath_init_head(struct mpath_head *mpath_head)
 {
 //	int ret;

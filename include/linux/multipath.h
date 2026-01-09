@@ -220,7 +220,6 @@ extern const struct attribute_group mpath_attr_group;
 extern const struct file_operations mpath_generic_chr_fops;
 
 bool is_mpath_head(struct gendisk *disk);
-bool mpath_head_device_added(struct mpath_head *mpath_head);
 #else // CONFIG_LIBMULTIPATH
 
 struct mpath_head_template {
@@ -276,10 +275,6 @@ static inline enum mpath_iopolicy_e mpath_read_iopolicy(struct mpath_iopolicy *m
 }
 static inline void mpath_add_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device)
 {
-}
-static inline bool mpath_head_device_added(struct mpath_head *mpath_head)
-{
-	return false; //?? this all needs to be checked
 }
 static inline void mpath_delete_device(struct mpath_device *mpath_device)
 {
