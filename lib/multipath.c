@@ -820,24 +820,9 @@ static void mpath_free_head(struct kref *ref)
 	struct mpath_head *mpath_head =
 		container_of(ref, struct mpath_head, ref);
 
-	pr_err("%s mpath_head=%pS calling mpath_put_disk\n",
-		__func__, mpath_head);
-	mpath_put_disk(mpath_head);
-	pr_err("%s1 mpath_head=%pS calling ida_free\n",
-		__func__, mpath_head);
-	//ida_free(&head->subsys->ns_ida, head->instance);
-	#ifdef sdsd
-	pr_err("%s2 head=%pS calling cleanup_srcu_struct\n",
-		__func__, head);
-	cleanup_srcu_struct(&head->srcu);
-	#endif 
-	//nvme_put_subsystem(head->subsys);
-	//kfree(head->plids);
-	#ifdef sdsd
-	pr_err("%s4 head=%pS calling kfree(head)\n",
-		__func__, head);
-	kfree(head);
-	#endif 
+	pr_err("%s ref=%pS mpath_head=%pS calling cleanup_srcu_struct\n",
+		__func__, ref, mpath_head);
+	cleanup_srcu_struct(&mpath_head->srcu);
 }
 
 // nvme_put_ns_head
@@ -853,8 +838,10 @@ static void mpath_put_head(struct mpath_head *mpath_head)
 // nvme_remove_head
 static void mpath_remove_head(struct mpath_head *mpath_head)
 {
-	pr_err("%s mpath_head=%pS MPATH_HEAD_DISK_LIVE set=%d\n",
-		__func__, mpath_head, test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags));
+	struct kref *ref = &mpath_head->ref;
+	pr_err("%s mpath_head=%pS MPATH_HEAD_DISK_LIVE set=%d ref=%pS refcount=%d\n",
+		__func__, mpath_head, test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags),
+		ref, refcount_read(&ref->refcount));
 	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
 		struct gendisk *disk = mpath_head->disk;
 		/*
@@ -906,7 +893,7 @@ static void mpath_remove_head_work(struct work_struct *work)
 	module_put(THIS_MODULE);
 }
 
-static bool mpath_tryget_head(struct mpath_head *mpath_head)
+static __maybe_unused bool mpath_tryget_head(struct mpath_head *mpath_head)
 {
 	return kref_get_unless_zero(&mpath_head->ref);
 }
@@ -960,7 +947,7 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head)
 	pr_err("%s12.3 ret=%d after bio_list_init mpath_head=%pS sdev->scsi_mpath_dev=%pS\n",
 		__func__, ret, NULL, NULL);
 
-	mpath_tryget_head(mpath_head);
+	//mpath_tryget_head(mpath_head);
 
 	//mpath_init_subsys(mpath_head->mpath_subsys);
 
