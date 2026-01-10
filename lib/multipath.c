@@ -881,12 +881,12 @@ static void mpath_remove_head_work(struct work_struct *work)
 
 	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
 
-//	mutex_lock(&head->subsys->lock);
-//	if (list_empty(&mpath_head->dev_list)) {
-//		list_del_init(&mpath_head->dev_list);
-//		remove = true;
-//	}
-//	mutex_unlock(&head->subsys->lock);
+	mutex_lock(&mpath_head->lock);
+	if (list_empty(&mpath_head->dev_list)) {
+		list_del_init(&mpath_head->dev_list);
+		remove = true;
+	}
+	mutex_unlock(&mpath_head->lock);
 	pr_err("%s2 mpath_head=%pS remove=%d\n", __func__, mpath_head, remove);
 	if (remove) {
 		mpath_remove_head(mpath_head);
@@ -1361,7 +1361,7 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 		mod_delayed_work(mpath_wq, &mpath_head->remove_work,
 				mpath_head->delayed_removal_secs * HZ);
 	} else {
-		//list_del_init(&mpath_head->entry); fixme
+		list_del_init(&mpath_head->dev_list); // checkme
 		remove = true;
 	}
 	pr_err("%s3 mpath_head=%pS remove=%d\n",
