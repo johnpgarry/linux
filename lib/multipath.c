@@ -855,7 +855,7 @@ static void mpath_remove_head(struct mpath_head *mpath_head)
 		kblockd_schedule_work(&mpath_head->requeue_work);
 
 
-		pr_err("%s3 mpath_head=%pS not calling nvme_cdev_del\n",
+		pr_err("%s3 mpath_head=%pS calling mpath_head_del_cdev\n",
 			__func__, mpath_head);
 		mpath_head_del_cdev(mpath_head);
 
@@ -1408,46 +1408,51 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 	mpath_head = mpath_device->mpath_head;
 	//mpath_subsys = mpath_head->mpath_subsys;
 
-	pr_err("%s1 mpath_device=%pS mpath_subsys=%pS calling mpath_remove_sysfs_link\n",
+	pr_err("%s1 mpath_device=%pS mpath_subsys=%pS calling mpath_synchronize_device\n",
 		__func__, mpath_device, NULL);
-	mpath_remove_sysfs_link(mpath_device);
-
 	mpath_synchronize_device(mpath_device);
 
+	pr_err("%s2 mpath_device=%pS mpath_subsys=%pS calling mpath_clear_current_path\n",
+		__func__, mpath_device, NULL);
 	/* wait for concurrent submissions */
-	if (mpath_clear_current_path(mpath_device))
+	if (mpath_clear_current_path(mpath_device)) {
+		pr_err("%s2.1 mpath_device=%pS mpath_subsys=%pS calling mpath_synchronize_device\n",
+		__func__, mpath_device, NULL);
 		mpath_synchronize_device(mpath_device);
+	}
 
-	pr_err("%s2 mpath_device=%pS called scsi_mpath_remove_sysfs_link\n",
+	pr_err("%s3 mpath_device=%pS called mpath_delete_device\n",
 		__func__, mpath_device);
-//	put_disk(sdev->scsi_mpath_dev->scsi_mpath_head->disk);
-//	if (!sdev->is_shared)
-//		return;
 
-	/* Make sure All pending bio's are cleaned up */
-	kblockd_schedule_work(&mpath_head->requeue_work);
-	flush_work(&mpath_head->requeue_work);
-	//put_disk(sdev->scsi_mpath_dev);
 
-	//mutex_lock(&mpath_subsys->lock);
+	mpath_delete_device(mpath_device);
 	
-	list_del_rcu(&mpath_device->siblings);
-	pr_err("%s3 list_empty=%d\n", __func__, list_empty(&mpath_head->dev_list));
+	mutex_lock(&mpath_head->lock);
+	pr_err("%s4 list_empty(dev_list)=%d\n", __func__, list_empty(&mpath_head->dev_list));
 	if (list_empty(&mpath_head->dev_list)) {
 		if (!mpath_head_queue_if_no_path(mpath_head)) {
-		//	list_del_init(&ns->head->entry);
+			pr_err("%s4.1 list_del_init ????\n", __func__);
+			// list_del_init(&mpath_head->dev_list);
 		}
 		last_path = true;
 	}
-	//mutex_unlock(&mpath_subsys->lock);
+	mutex_unlock(&mpath_head->lock);
 
-	pr_err("%s4 last_path=%d\n",
+	pr_err("%s5 mpath_synchronize_device\n", __func__);
+	/* guarantee not available in head->list */
+	mpath_synchronize_device(mpath_device);
+
+	pr_err("%s6 mpath_remove_sysfs_link\n", __func__);
+	mpath_remove_sysfs_link(mpath_device);
+
+	pr_err("%s7 last_path=%d\n",
 		__func__, last_path);
 
 	if (last_path) {
+		pr_err("%s8 mpath_device=%pS calling mpath_remove_disk\n", __func__, mpath_device);
 		mpath_remove_disk(mpath_device);
 	}
-	pr_err("%s9 mpath_device=%pS calling mpath_put_disk\n", __func__, mpath_device);
+	
 
 	pr_err("%s10 mpath_device=%pS\n", __func__, mpath_device);
 }

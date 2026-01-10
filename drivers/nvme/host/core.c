@@ -4479,7 +4479,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (!nvme_ns_head_multipath(ns->head))
 		nvme_cdev_del(&ns->cdev, &ns->cdev_device);
 
-	pr_err("%s4 ns=%pS calling nvme_mpath_remove_sysfs_link\n",
+	pr_err("%s4 ns=%pS calling mpath_remove_sysfs_link\n",
 		__func__, ns);
 	mpath_remove_sysfs_link(&ns->mpath_device);
 	pr_err("%s5 ns=%pS calling del_gendisk ns->disk=%pS\n",
