@@ -997,6 +997,15 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 	return mpath_read_iopolicy(&subsys->iopolicy);
 }
 
+static void nvme_mpath_free_head(struct mpath_head *mpath_head)
+{
+	struct nvme_ns_head *head = container_of(mpath_head, struct nvme_ns_head, mpath_head);
+	struct kref *ref = &head->ref;
+
+	pr_err("%s mpath_head=%pS head=%pS ref=%pS refcount=%d\n",
+		__func__, mpath_head, head, ref, refcount_read(&ref->refcount));
+}
+
 static const struct mpath_head_template mpdt = {
 //	.class = &scsi_mpath_head_class,
 //	.cdev_class = &scsi_mpath_generic_class,
@@ -1012,4 +1021,5 @@ static const struct mpath_head_template mpdt = {
 	.pr_ops = &nvme_mpath_pr_ops,
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
+	.free_head = nvme_mpath_free_head,
 };

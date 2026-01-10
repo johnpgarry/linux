@@ -823,6 +823,7 @@ static void mpath_free_head(struct kref *ref)
 	pr_err("%s ref=%pS mpath_head=%pS calling cleanup_srcu_struct\n",
 		__func__, ref, mpath_head);
 	cleanup_srcu_struct(&mpath_head->srcu);
+	mpath_head->mpdt->free_head(mpath_head);
 }
 
 // nvme_put_ns_head
@@ -1367,7 +1368,7 @@ void mpath_remove_disk(struct mpath_device *mpath_device)
 out:
 	mutex_unlock(&mpath_head->lock);
 	if (remove) {
-		pr_err("%s9 calling nvme_remove_head mpath_head=%pS\n",
+		pr_err("%s9 calling mpath_remove_head mpath_head=%pS\n",
 			__func__, mpath_head);
 		mpath_remove_head(mpath_head);
 	}
@@ -1444,7 +1445,6 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 
 	if (last_path) {
 		mpath_remove_disk(mpath_device);
-		
 	}
 	pr_err("%s9 mpath_device=%pS calling mpath_put_disk\n", __func__, mpath_device);
 

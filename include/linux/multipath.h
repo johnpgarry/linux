@@ -134,6 +134,7 @@ struct mpath_head_template {
 	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags);
+	void (*free_head)(struct mpath_head *);
 	enum mpath_iopolicy_e (*get_iopolicy)(struct mpath_head *);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct mpath_pr_ops *pr_ops;
