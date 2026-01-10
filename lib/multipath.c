@@ -11,6 +11,7 @@
 #include <linux/hdreg.h>
 
 static int mpath_head_add_cdev(struct mpath_head *mpath_head);
+static void mpath_head_del_cdev(struct mpath_head *mpath_head);
 static void mpath_free_disk(struct kref *ref);
 
 #define SCSI_MPATH_DISK_MINORS		(1U << MINORBITS)
@@ -856,7 +857,7 @@ static void mpath_remove_head(struct mpath_head *mpath_head)
 
 		pr_err("%s3 mpath_head=%pS not calling nvme_cdev_del\n",
 			__func__, mpath_head);
-		//nvme_cdev_del(&head->cdev, &head->cdev_device);
+		mpath_head_del_cdev(mpath_head);
 
 		pr_err("%s4 mpath_head=%pS calling synchronize_srcu\n",
 			__func__, mpath_head);
@@ -1470,6 +1471,12 @@ int mpath_head_add_cdev(struct mpath_head *mpath_head)
 	return mpath_head->mpdt->add_cdev(mpath_head);
 }
 
+void mpath_head_del_cdev(struct mpath_head *mpath_head)
+{
+	pr_err("%s mpath_head->mpdt->del_cdev=%pS head=%pS\n",
+		__func__, mpath_head->mpdt->del_cdev, mpath_head);
+	mpath_head->mpdt->del_cdev(mpath_head);
+}
 
 static struct attribute dummy_attr = {
 	.name = "dummy",

@@ -384,6 +384,15 @@ int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
 	return ret;
 }
 
+static void nvme_mpath_del_cdev(struct mpath_head *mpath_head)
+{
+	//struct mpath_head *mpath_head = mpath_priv_to_head(head);
+	struct nvme_ns_head *head = container_of(mpath_head, struct nvme_ns_head, mpath_head);
+	
+	pr_err("%s mpath_head=%pS head=%pS calling nvme_cdev_del\n", __func__, mpath_head, head);
+
+	nvme_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
+}
 
 #ifdef dsdsdd
 static void nvme_remove_head(struct nvme_ns_head *head)
@@ -1002,14 +1011,16 @@ static void nvme_mpath_free_head(struct mpath_head *mpath_head)
 	struct nvme_ns_head *head = container_of(mpath_head, struct nvme_ns_head, mpath_head);
 	struct kref *ref = &head->ref;
 
-	pr_err("%s mpath_head=%pS head=%pS ref=%pS refcount=%d\n",
+	pr_err("%s mpath_head=%pS head=%pS ref=%pS refcount=%d calling nvme_put_ns_head\n",
 		__func__, mpath_head, head, ref, refcount_read(&ref->refcount));
+	nvme_put_ns_head(head);
 }
 
 static const struct mpath_head_template mpdt = {
 //	.class = &scsi_mpath_head_class,
 //	.cdev_class = &scsi_mpath_generic_class,
 	.add_cdev = nvme_mpath_add_cdev,
+	.del_cdev = nvme_mpath_del_cdev,
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
 	.ioctl = nvme_mpath_ioctl,

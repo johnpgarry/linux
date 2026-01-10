@@ -673,11 +673,11 @@ static void nvme_free_ns_head(struct kref *ref)
 {
 	struct nvme_ns_head *head =
 		container_of(ref, struct nvme_ns_head, ref);
-	struct mpath_head *mpath_head = &head->mpath_head;
+	__maybe_unused struct mpath_head *mpath_head = &head->mpath_head;
 
-	pr_err("%s head=%pS calling mpath_put_disk\n",
+	pr_err("%s head=%pS not calling mpath_put_disk\n",
 		__func__, head);
-	mpath_put_disk(mpath_head);
+	//mpath_put_disk(mpath_head);
 	pr_err("%s1 head=%pS calling ida_free head->instance=%d\n",
 		__func__, head, head->instance);
 	ida_free(&head->subsys->ns_ida, head->instance);
@@ -686,11 +686,13 @@ static void nvme_free_ns_head(struct kref *ref)
 		__func__, head);
 	cleanup_srcu_struct(&head->srcu);
 	#endif 
+	pr_err("%s3 head=%pS calling nvme_put_subsystem\n",
+		__func__, head);
 	nvme_put_subsystem(head->subsys);
 	kfree(head->plids);
 	pr_err("%s4 head=%pS calling kfree(head)\n",
 		__func__, head);
-	//kfree(head);
+	kfree(head);
 }
 
 bool nvme_tryget_ns_head(struct nvme_ns_head *head)
@@ -5215,10 +5217,15 @@ EXPORT_SYMBOL_GPL(nvme_remove_io_tag_set);
 
 void nvme_stop_ctrl(struct nvme_ctrl *ctrl)
 {
+	pr_err("%s calling nvme_mpath_stop\n", __func__);
 	nvme_mpath_stop(ctrl);
+	pr_err("%s1 calling nvme_auth_stop\n", __func__);
 	nvme_auth_stop(ctrl);
+	pr_err("%s2 calling nvme_stop_failfast_work\n", __func__);
 	nvme_stop_failfast_work(ctrl);
+	pr_err("%s3 calling flush_work async_event_work\n", __func__);
 	flush_work(&ctrl->async_event_work);
+	pr_err("%s4 calling cancel_work_sync fw_act_work\n", __func__);
 	cancel_work_sync(&ctrl->fw_act_work);
 	if (ctrl->ops->stop_ctrl)
 		ctrl->ops->stop_ctrl(ctrl);
@@ -5258,12 +5265,19 @@ EXPORT_SYMBOL_GPL(nvme_start_ctrl);
 
 void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
 {
+	pr_err("%s ctrl=%pS calling nvme_stop_keep_alive\n", __func__, ctrl);
 	nvme_stop_keep_alive(ctrl);
+	pr_err("%s1 ctrl=%pS calling nvme_hwmon_exit\n", __func__, ctrl);
 	nvme_hwmon_exit(ctrl);
+	pr_err("%s2 ctrl=%pS calling nvme_fault_inject_fini\n", __func__, ctrl);
 	nvme_fault_inject_fini(&ctrl->fault_inject);
+	pr_err("%s3 ctrl=%pS calling dev_pm_qos_hide_latency_tolerance\n", __func__, ctrl);
 	dev_pm_qos_hide_latency_tolerance(ctrl->device);
+	pr_err("%s4 ctrl=%pS calling cdev_device_del\n", __func__, ctrl);
 	cdev_device_del(&ctrl->cdev, ctrl->device);
+	pr_err("%s5 ctrl=%pS calling nvme_put_ctrl\n", __func__, ctrl);
 	nvme_put_ctrl(ctrl);
+	pr_err("%s6 ctrl=%pS called nvme_put_ctrl\n", __func__, ctrl);
 }
 EXPORT_SYMBOL_GPL(nvme_uninit_ctrl);
 

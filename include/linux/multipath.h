@@ -123,6 +123,7 @@ struct mpath_head_template {
 	//const struct class *class;
 	//const struct class *cdev_class;
 	int (*add_cdev)(struct mpath_head *);
+	void (*del_cdev)(struct mpath_head *);
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*ioctl)(struct mpath_device *, blk_mode_t mode,
