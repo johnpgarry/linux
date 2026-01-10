@@ -632,6 +632,14 @@ static void scsi_mpath_del_cdev(struct mpath_head *mpath_head)
 	put_device(&mpath_head->cdev_device);
 }
 
+static void scsi_mpath_free_head(struct mpath_head *mpath_head)
+{
+	struct scsi_mpath_head *scsi_mpath_head = container_of(mpath_head, struct scsi_mpath_head, mpath_head);
+
+	pr_err("%s mpath_head=%pS scsi_mpath_head=%pS\n",
+		__func__, mpath_head, scsi_mpath_head);
+}
+
 static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_head)
 {
 	struct scsi_mpath_head *scsi_mpath_head = container_of(mpath_head, struct scsi_mpath_head, mpath_head);
@@ -670,6 +678,7 @@ struct mpath_head_template smpdt = {
 	.add_cdev = scsi_mpath_add_cdev,
 	.del_cdev = scsi_mpath_del_cdev,
 	.get_iopolicy = scsi_mpath_get_iopolicy,
+	.free_head = scsi_mpath_free_head,
 };
 
 /*

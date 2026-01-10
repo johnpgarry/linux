@@ -821,8 +821,8 @@ static void mpath_free_head(struct kref *ref)
 	struct mpath_head *mpath_head =
 		container_of(ref, struct mpath_head, ref);
 
-	pr_err("%s ref=%pS mpath_head=%pS calling cleanup_srcu_struct\n",
-		__func__, ref, mpath_head);
+	pr_err("%s ref=%pS mpath_head=%pS calling cleanup_srcu_struct mpdt->free_head=%pS\n",
+		__func__, ref, mpath_head, mpath_head->mpdt->free_head);
 	cleanup_srcu_struct(&mpath_head->srcu);
 	mpath_head->mpdt->free_head(mpath_head);
 }
