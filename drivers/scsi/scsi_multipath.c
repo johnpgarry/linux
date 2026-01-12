@@ -19,7 +19,6 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_multipath.h>
 #include <scsi/scsi_ioctl.h>
-#include "scsi_alua.h"
 #include "scsi_priv.h"
 
 static dev_t mpath_head_chr_devt;
@@ -901,7 +900,6 @@ static void scsi_mpath_free_head(struct kref *ref)
 	device_unregister(&scsi_mpath_head->dev);
 	pr_err("%s4 scsi_mpath_head=%pS calling kfree(scsi_mpath_head)\n", __func__, scsi_mpath_head);
 	kfree(scsi_mpath_head);
-	msleep(500);
 }
 
 static int scsi_mpath_get_head(struct scsi_mpath_head *scsi_mpath_head)
