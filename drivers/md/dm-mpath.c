@@ -672,7 +672,7 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
 	struct multipath *m = ti->private;
 	struct dm_mpath_io *mpio = NULL;
 
-	pr_err("%s m=%pS %s\n", __func__, m, __FILE__);
+	pr_err_once("%s m=%pS %s\n", __func__, m, __FILE__);
 	multipath_init_per_bio_data(bio, &mpio);
 	return __multipath_map_bio(m, bio, mpio);
 }
