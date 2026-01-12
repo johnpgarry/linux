@@ -33,17 +33,9 @@ enum mpath_access_state {
 
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
 
-#ifdef dsdsdsd
-struct mpath_subsys {
-	enum mpath_iopolicy	iopolicy;
-	struct mutex            lock;
-	struct list_head		heads;
-};
-#else
 struct mpath_iopolicy {
 	enum mpath_iopolicy_e	iopolicy;
 };
-#endif
 
 struct mpath_head {
 	struct srcu_struct 	srcu;
@@ -240,6 +232,8 @@ struct mpath_device {
 struct mpath_head {
 };
 struct mpath_iopolicy {
+};
+struct mpath_request {
 };
 
 static inline struct mpath_head *mpath_disk_to_head(struct gendisk *disk)
