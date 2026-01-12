@@ -224,7 +224,12 @@ extern const struct attribute_group mpath_attr_group;
 
 extern const struct file_operations mpath_generic_chr_fops;
 
-bool is_mpath_head(struct gendisk *disk);
+static inline bool is_mpath_head(struct gendisk *disk)
+{
+	return disk->fops == &mpath_ops;
+}
+
+
 void mpath_head_set_queue_if_no_path(struct mpath_head *mpath_head, unsigned int sec);
 #else // CONFIG_LIBMULTIPATH
 
@@ -306,6 +311,10 @@ static inline void mpath_clear_paths(struct mpath_head *mpath_head)
 }
 static inline void mpath_head_set_queue_if_no_path(struct mpath_head *mpath_head, unsigned int sec)
 {
+}
+static inline bool is_mpath_head(struct gendisk *disk)
+{
+	return false;
 }
 #define mpath_device_groups NULL
 

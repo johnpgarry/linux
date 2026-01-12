@@ -1491,11 +1491,6 @@ static struct attribute *mpath_attrs[] = {
 	NULL
 };
 
-bool is_mpath_head(struct gendisk *disk)
-{
-	return disk->fops == &mpath_ops;
-}
-
 static bool multipath_sysfs_group_visible(struct kobject *kobj)
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
