@@ -32,6 +32,7 @@ MODULE_IMPORT_NS("SCSI_DH_ALUA");
 
 
 bool scsi_multipath = false; //todo: turn off
+EXPORT_SYMBOL_GPL(scsi_multipath);
 static bool scsi_multipath_always_on;
 
 static void scsi_mpath_put_head(struct scsi_mpath_head *scsi_mpath_head);
