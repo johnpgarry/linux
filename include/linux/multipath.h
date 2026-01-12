@@ -210,6 +210,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_remove_disk(struct mpath_device *mpath_device);
 void mpath_add_device(struct mpath_head *mpath_head, struct mpath_device *mpath_device);
 void mpath_delete_device(struct mpath_device *mpath_device);
+void mpath_remove_head(struct mpath_head *mpath_head);
 
 void mpath_put_disk(struct mpath_head *mpath_head);
 
@@ -285,6 +286,9 @@ static inline void mpath_add_device(struct mpath_head *mpath_head, struct mpath_
 {
 }
 static inline void mpath_delete_device(struct mpath_device *mpath_device)
+{
+}
+static inline void mpath_remove_head(struct mpath_head *mpath_head)
 {
 }
 static inline void mpath_put_disk(struct mpath_head *mpath_head)

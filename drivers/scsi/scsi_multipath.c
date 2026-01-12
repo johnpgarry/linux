@@ -875,7 +875,9 @@ static void scsi_mpath_free_head(struct kref *ref)
 //	mpath_put_disk(mpath_head);
 	pr_err("%s4 scsi_mpath_head=%pS calling\n", __func__, scsi_mpath_head);
 	device_unregister(&scsi_mpath_head->dev);
+	pr_err("%s4 scsi_mpath_head=%pS calling kfree(scsi_mpath_head)\n", __func__, scsi_mpath_head);
 	kfree(scsi_mpath_head);
+	msleep(500);
 }
 
 static int scsi_mpath_get_head(struct scsi_mpath_head *scsi_mpath_head)

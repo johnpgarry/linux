@@ -4494,7 +4494,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (last_path) {
 		pr_err("%s7 ns=%pS calling mpath_remove_disk ns->head=%pS\n",
 			__func__, ns, ns->head);
-		mpath_remove_disk(mpath_device);
+		nvme_mpath_remove_disk(ns->head);
 	}
 	pr_err("%s8 ns=%pS calling nvme_put_ns\n",
 			__func__, ns);

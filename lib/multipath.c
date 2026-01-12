@@ -838,7 +838,7 @@ static void mpath_put_head(struct mpath_head *mpath_head)
 }
 
 // nvme_remove_head
-static void mpath_remove_head(struct mpath_head *mpath_head)
+void mpath_remove_head(struct mpath_head *mpath_head)
 {
 	struct kref *ref = &mpath_head->ref;
 	pr_err("%s mpath_head=%pS MPATH_HEAD_DISK_LIVE set=%d ref=%pS refcount=%d\n",
@@ -872,6 +872,7 @@ static void mpath_remove_head(struct mpath_head *mpath_head)
 			__func__, mpath_head);
 	mpath_put_head(mpath_head);
 }
+EXPORT_SYMBOL_GPL(mpath_remove_head);
 
 static void mpath_remove_head_work(struct work_struct *work)
 {
@@ -1452,7 +1453,6 @@ void mpath_remove_device(struct mpath_device *mpath_device)
 		pr_err("%s8 mpath_device=%pS calling mpath_remove_disk\n", __func__, mpath_device);
 		mpath_remove_disk(mpath_device);
 	}
-	
 
 	pr_err("%s10 mpath_device=%pS\n", __func__, mpath_device);
 }

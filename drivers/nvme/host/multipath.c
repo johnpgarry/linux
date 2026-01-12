@@ -861,7 +861,6 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 #endif
 }
 
-#ifdef dsdsd
 void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	bool remove = false;
@@ -871,10 +870,10 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 
 	pr_err("%s head=%pS disk=%pS\n",
 		__func__, head, disk);
-	if (!disk)
+	if (!mpath_head->disk)
 		return;
 
-	mutex_lock(&mpath_subsys->lock);
+	mutex_lock(&head->subsys->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -887,9 +886,8 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	 
 	pr_err("%s1 head=%pS list_empty(dev_list)=%d\n",
 		__func__, head, list_empty(&mpath_head->dev_list));
-	if (!mpath_head_device_added(mpath_head))
+	if (atomic_read(&head->ns_count))
 		goto out;
-
 	if (mpath_head->delayed_removal_secs) {
 		/*
 		 * Ensure that no one could remove this module while the head
@@ -900,18 +898,17 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 		mod_delayed_work(nvme_wq, &mpath_head->remove_work,
 				mpath_head->delayed_removal_secs * HZ);
 	} else {
-		list_del_init(&mpath_head->entry);
+		list_del_init(&head->entry);
 		remove = true;
 	}
 out:
-	mutex_unlock(&mpath_subsys->lock);
+	mutex_unlock(&head->subsys->lock);
 	if (remove) {
-		pr_err("%s9 calling nvme_remove_head head=%pS\n",
-			__func__, head);
-		nvme_remove_head(head);
+		pr_err("%s9 calling mpath_remove_head mpath_head=%pS\n",
+			__func__, mpath_head);
+		mpath_remove_head(mpath_head);
 	}
 }
-#endif
 
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl)
 {
