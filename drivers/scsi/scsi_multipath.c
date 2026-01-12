@@ -652,6 +652,28 @@ static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_he
 	return mpath_read_iopolicy(&scsi_mpath_head->iopolicy);
 }
 
+static void scsi_remove_head_work(struct mpath_head *mpath_head)
+{
+	struct scsi_mpath_head *scsi_mpath_head = container_of(mpath_head, struct scsi_mpath_head, mpath_head);
+	bool remove = false;
+
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
+
+	mutex_lock(&mpath_head->lock);
+	if (list_empty(&mpath_head->dev_list)) {
+		pr_err("%s1 scsi_mpath_head=%pS calling list_del_init\n", __func__, scsi_mpath_head);
+		list_del_init(&scsi_mpath_head->entry);
+		remove = true;
+	}
+	mutex_unlock(&mpath_head->lock);
+	pr_err("%s2 mpath_head=%pS remove=%d\n", __func__, mpath_head, remove);
+	if (remove) {
+		mpath_remove_head(mpath_head);
+	}
+
+	module_put(THIS_MODULE);
+}
+
 static const struct mpath_pr_ops mapth_pr_ops = {
 	#ifdef dsdsd
 	.pr_register	= sd_pr_register,
@@ -684,6 +706,7 @@ struct mpath_head_template smpdt = {
 	.del_cdev = scsi_mpath_del_cdev,
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.free_head = scsi_mpath_free_head_xxx,
+	.remove_head_work = scsi_remove_head_work,
 };
 
 /*
