@@ -1685,8 +1685,8 @@ static int sd_ioctl(struct block_device *bdev, blk_mode_t mode,
 	void __user *p = (void __user *)arg;
 	int error;
     
-	 sd_printk(KERN_INFO, sdkp, "sd_ioctl: disk=%s cmd=0x%x arg=%ld partition=%d is_sed_ioctl=%d\n",
-	 	disk->disk_name, cmd, arg, bdev_is_partition(bdev), is_sed_ioctl(cmd));
+//	 sd_printk(KERN_INFO, sdkp, "sd_ioctl: disk=%s cmd=0x%x arg=%ld partition=%d is_sed_ioctl=%d\n",
+//	 	disk->disk_name, cmd, arg, bdev_is_partition(bdev), is_sed_ioctl(cmd));
 
 	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO))
 		return -ENOIOCTLCMD;
@@ -4162,7 +4162,7 @@ static int sd_probe(struct device *dev)
 
 
 	error = device_add_disk(dev, gd, mpath_device_groups);
-	pr_err("%s error from device_add_disk = %d gd=%pS\n", __func__, error, gd);
+	//pr_err("%s error from device_add_disk = %d gd=%pS\n", __func__, error, gd);
 	if (error) {
 		device_unregister(&sdkp->disk_dev);
 		put_disk(gd);

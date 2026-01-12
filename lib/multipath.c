@@ -1496,7 +1496,7 @@ static bool multipath_sysfs_group_visible(struct kobject *kobj)
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct gendisk *disk = dev_to_disk(dev);
 
-	dev_err(dev, "%s dev=%pS disk=%pS fops=%pS\n", __func__, dev, disk, disk->fops);
+	//dev_err(dev, "%s dev=%pS disk=%pS fops=%pS\n", __func__, dev, disk, disk->fops);
 	return is_mpath_head(disk);
 }
 

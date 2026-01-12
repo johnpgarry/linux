@@ -1604,7 +1604,7 @@ static void scsi_complete(struct request *rq)
 
 
 
-	if (cmd->result) {
+	if (cmd->result && 0) {
 		pr_err("%s0.0 cmd=%pS rq=%pS bytes=%d bio=%pS\n",
 			__func__, cmd, rq, blk_rq_bytes(rq), rq->bio);
 		pr_err("%s0.1 cmd=%pS rq=%pS bytes=%d bio=%pS bi_size=%d\n",

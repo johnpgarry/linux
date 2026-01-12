@@ -515,8 +515,8 @@ void bdev_add(struct block_device *bdev, dev_t dev)
 	if (bdev_stable_writes(bdev))
 		mapping_set_stable_writes(bdev->bd_mapping);
 
-	pr_err("%s bdev=%pS dev=%d\n",
-			__func__, bdev, dev);
+//	pr_err("%s bdev=%pS dev=%d\n",
+//			__func__, bdev, dev);
 	bdev->bd_dev = dev;
 	inode->i_rdev = dev;
 	inode->i_ino = dev;

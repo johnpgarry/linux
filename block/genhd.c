@@ -406,24 +406,24 @@ static void add_disk_final(struct gendisk *disk)
 {
 	struct device *ddev = disk_to_dev(disk);
 
-	dev_err(ddev, "%s0  disk->part0=%pS ddev=%pS ddev->devt=%d GENHD_FL_HIDDEN=%d\n",
-			__func__, disk->part0, ddev, ddev->devt, !!(disk->flags & GENHD_FL_HIDDEN));
+//	dev_err(ddev, "%s0  disk->part0=%pS ddev=%pS ddev->devt=%d GENHD_FL_HIDDEN=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt, !!(disk->flags & GENHD_FL_HIDDEN));
 	if (!(disk->flags & GENHD_FL_HIDDEN)) {
 		/* Make sure the first partition scan will be proceed */
 		if (get_capacity(disk) && disk_has_partscan(disk))
 			set_bit(GD_NEED_PART_SCAN, &disk->state);
 
-		dev_err(ddev, "%s1 calling bdev_add disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-			__func__, disk->part0, ddev, ddev->devt);
+//		dev_err(ddev, "%s1 calling bdev_add disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt);
 		bdev_add(disk->part0, ddev->devt);
-		dev_err(ddev, "%s1.1 called bdev_add disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-			__func__, disk->part0, ddev, ddev->devt);
+//		dev_err(ddev, "%s1.1 called bdev_add disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt);
 		if (get_capacity(disk)) {
-			dev_err(ddev, "%s1.2 calling disk_scan_partitions disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-				__func__, disk->part0, ddev, ddev->devt);
+//			dev_err(ddev, "%s1.2 calling disk_scan_partitions disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//				__func__, disk->part0, ddev, ddev->devt);
 			disk_scan_partitions(disk, BLK_OPEN_READ);
-			dev_err(ddev, "%s1.3 called disk_scan_partitions disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-				__func__, disk->part0, ddev, ddev->devt);
+//			dev_err(ddev, "%s1.3 called disk_scan_partitions disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//				__func__, disk->part0, ddev, ddev->devt);
 		}
 
 		/*
@@ -432,21 +432,21 @@ static void add_disk_final(struct gendisk *disk)
 		 */
 		dev_set_uevent_suppress(ddev, 0);
 		disk_uevent(disk, KOBJ_ADD);
-		dev_err(ddev, "%s2 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-			__func__, disk->part0, ddev, ddev->devt);
+//		dev_err(ddev, "%s2 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt);
 	}
 
-	dev_err(ddev, "%s3 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-			__func__, disk->part0, ddev, ddev->devt);
+//	dev_err(ddev, "%s3 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt);
 	blk_apply_bdi_limits(disk->bdi, &disk->queue->limits);
-	dev_err(ddev, "%s4 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-			__func__, disk->part0, ddev, ddev->devt);
+//	dev_err(ddev, "%s4 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt);
 	disk_add_events(disk);
-	dev_err(ddev, "%s5 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-			__func__, disk->part0, ddev, ddev->devt);
+//	dev_err(ddev, "%s5 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt);
 	set_bit(GD_ADDED, &disk->state);
-	dev_err(ddev, "%s10 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
-			__func__, disk->part0, ddev, ddev->devt);
+//	dev_err(ddev, "%s10 disk->part0=%pS ddev=%pS ddev->devt=%d\n",
+//			__func__, disk->part0, ddev, ddev->devt);
 }
 
 static int __add_disk(struct device *parent, struct gendisk *disk,
@@ -615,15 +615,15 @@ int __must_check add_disk_fwnode(struct device *parent, struct gendisk *disk,
 		set = disk->queue->tag_set;
 		memflags = memalloc_noio_save();
 		down_read(&set->update_nr_hwq_lock);
-		dev_err(parent, "%s disk=%pS calling __add_disk queue_is_mq groups=%pS\n", __func__, disk, groups);
+	//	dev_err(parent, "%s disk=%pS calling __add_disk queue_is_mq groups=%pS\n", __func__, disk, groups);
 		ret = __add_disk(parent, disk, groups, fwnode);
-		dev_err(parent, "%s0 disk=%pS called __add_disk queue_is_mq ret=%d\n", __func__, disk, ret);
+	//	dev_err(parent, "%s0 disk=%pS called __add_disk queue_is_mq ret=%d\n", __func__, disk, ret);
 		up_read(&set->update_nr_hwq_lock);
 		memalloc_noio_restore(memflags);
 	} else {
-		dev_err(parent, "%s2 disk=%pS calling __add_disk !queue_is_mq groups=%pS\n", __func__, disk, groups);
+	//	dev_err(parent, "%s2 disk=%pS calling __add_disk !queue_is_mq groups=%pS\n", __func__, disk, groups);
 		ret = __add_disk(parent, disk, groups, fwnode);
-		dev_err(parent, "%s2.1 disk=%pS called __add_disk !queue_is_mq ret=%d\n", __func__, disk, ret);
+	//	dev_err(parent, "%s2.1 disk=%pS called __add_disk !queue_is_mq ret=%d\n", __func__, disk, ret);
 	}
 
 	/*
@@ -632,7 +632,7 @@ int __must_check add_disk_fwnode(struct device *parent, struct gendisk *disk,
 	 * lock dependency on `disk->open_mutex` from scanning partition.
 	 */
 	if (!ret) {
-		dev_err(parent, "%s3 disk=%pS calling add_disk_final\n", __func__, disk);
+	//	dev_err(parent, "%s3 disk=%pS calling add_disk_final\n", __func__, disk);
 		add_disk_final(disk);
 	}
 	return ret;
