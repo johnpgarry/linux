@@ -431,6 +431,28 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 }
 #endif
 
+static void nvme_remove_head_work(struct mpath_head *mpath_head)
+{
+	struct nvme_ns_head *head = container_of(mpath_head, struct nvme_ns_head, mpath_head);
+	bool remove = false;
+
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
+
+	mutex_lock(&head->subsys->lock);
+	if (list_empty(&mpath_head->dev_list)) {
+		pr_err("%s1 head=%pS calling list_del_init\n", __func__, head);
+		list_del_init(&head->entry);
+		remove = true;
+	}
+	mutex_unlock(&head->subsys->lock);
+	pr_err("%s2 mpath_head=%pS remove=%d\n", __func__, mpath_head, remove);
+	if (remove) {
+		mpath_remove_head(mpath_head);
+	}
+
+	module_put(THIS_MODULE);
+}
+
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = &head->mpath_head;
@@ -784,11 +806,7 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 		return ret;
 
 	mutex_lock(&head->subsys->lock);
-	mpath_head->delayed_removal_secs = sec;
-//	if (sec)
-//		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
-//	else
-//		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
+	mpath_head_set_queue_if_no_path(mpath_head, sec);
 	mutex_unlock(&head->subsys->lock);
 	/*
 	 * Ensure that update to NVME_NSHEAD_QUEUE_IF_NO_PATH is seen
@@ -1030,4 +1048,5 @@ static const struct mpath_head_template mpdt = {
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 	.free_head = nvme_mpath_free_head,
+	.remove_head_work = nvme_remove_head_work,
 };

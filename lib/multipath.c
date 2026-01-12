@@ -878,22 +878,9 @@ static void mpath_remove_head_work(struct work_struct *work)
 {
 	struct mpath_head *mpath_head = container_of(to_delayed_work(work),
 			struct mpath_head, remove_work);
-	bool remove = false;
 
 	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
-
-	mutex_lock(&mpath_head->lock);
-	if (list_empty(&mpath_head->dev_list)) {
-		list_del_init(&mpath_head->dev_list);
-		remove = true;
-	}
-	mutex_unlock(&mpath_head->lock);
-	pr_err("%s2 mpath_head=%pS remove=%d\n", __func__, mpath_head, remove);
-	if (remove) {
-		mpath_remove_head(mpath_head);
-	}
-
-	module_put(THIS_MODULE);
+	mpath_head->mpdt->remove_head_work(mpath_head);
 }
 
 static __maybe_unused bool mpath_tryget_head(struct mpath_head *mpath_head)
@@ -1001,6 +988,18 @@ void mpath_clear_paths(struct mpath_head *mpath_head)
 		rcu_assign_pointer(mpath_head->current_path[node], NULL);
 }
 EXPORT_SYMBOL_GPL(mpath_clear_paths);
+
+void mpath_head_set_queue_if_no_path(struct mpath_head *mpath_head, unsigned int sec)
+{
+	pr_err("%s mpath_head=%pS sec=%d\n", __func__, mpath_head, sec);
+
+	mpath_head->delayed_removal_secs = sec;
+	if (sec)
+		set_bit(MPATH_HEAD_QUEUE_IF_NO_PATH, &mpath_head->flags);
+	else
+		clear_bit(MPATH_HEAD_QUEUE_IF_NO_PATH, &mpath_head->flags);
+}
+EXPORT_SYMBOL_GPL(mpath_head_set_queue_if_no_path);
 
 void mpath_device_set_live(struct mpath_device *mpath_device)
 {

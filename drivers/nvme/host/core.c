@@ -3876,11 +3876,13 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 		unsigned nsid)
 {
 	struct nvme_ns_head *h;
+	pr_err("%s ctrl=%pS nsid=%d\n", __func__, ctrl, nsid);
 
 	lockdep_assert_held(&ctrl->subsys->lock);
 
 	list_for_each_entry(h, &ctrl->subsys->nsheads, entry) {
 		struct kref *ref;
+		pr_err("%s2 h=%pS\n", __func__, h);
 		/*
 		 * Private namespaces can share NSIDs under some conditions.
 		 * In that case we can't use the same ns_head for namespaces
@@ -3888,6 +3890,7 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 		 */
 		if (h->ns_id != nsid || !nvme_is_unique_nsid(ctrl, h))
 			continue;
+		pr_err("%s3 h=%pS\n", __func__, h);
 		ref = &h->ref;
 		pr_err("%s h=%pS ref=%pS refcount=%d calling nvme_tryget_ns_head\n",
 			__func__, h, ref, refcount_read(&ref->refcount));
@@ -4174,7 +4177,6 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	pr_err("%s ns=%pS calling nvme_find_ns_head info->nsid=0x%x mpath_device=%pS\n", __func__, ns, info->nsid, mpath_device);
 	head = nvme_find_ns_head(ctrl, info->nsid);
 
-
 	pr_err("%s1 ns=%pS called nvme_find_ns_head info->nsid=0x%x head=%pS mpath_head=%pS\n", __func__, ns, info->nsid, head, mpath_head);
 	if (!head) {
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, &info->ids);
@@ -4406,6 +4408,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	atomic_dec(&ns->head->ns_count);
 	#ifdef dsddd
 	if (list_empty(&ns->head->list)) {
+		BUG();
 		//list_del_init(&ns->head->entry);
 		/*
 		 * If multipath is not configured, we still create a namespace
@@ -4464,7 +4467,10 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	pr_err("%s2 ns=%pS checking atomic_read(&head->ns_count)=%d\n",
 		__func__, ns, atomic_read(&head->ns_count));
 	if (!atomic_read(&head->ns_count)) {
+		pr_err("%s2.0 mpath_head_queue_if_no_path=%d\n",
+			__func__, mpath_head_queue_if_no_path(mpath_head));
 		if (!mpath_head_queue_if_no_path(mpath_head)) {
+			pr_err("%s2.1 ns=%pS calling list_del_init\n", __func__, ns);
 			list_del_init(&ns->head->entry);
 		}
 		last_path = true;

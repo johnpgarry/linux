@@ -117,8 +117,6 @@ struct mpath_pr_ops {
 			struct pr_held_reservation *rsv);
 };
 
-
-
 struct mpath_head_template {
 	//const struct class *class;
 	//const struct class *cdev_class;
@@ -136,6 +134,7 @@ struct mpath_head_template {
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags);
 	void (*free_head)(struct mpath_head *);
+	void (*remove_head_work)(struct mpath_head *);
 	enum mpath_iopolicy_e (*get_iopolicy)(struct mpath_head *);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct mpath_pr_ops *pr_ops;
@@ -226,6 +225,7 @@ extern const struct attribute_group mpath_attr_group;
 extern const struct file_operations mpath_generic_chr_fops;
 
 bool is_mpath_head(struct gendisk *disk);
+void mpath_head_set_queue_if_no_path(struct mpath_head *mpath_head, unsigned int sec);
 #else // CONFIG_LIBMULTIPATH
 
 struct mpath_head_template {
@@ -302,6 +302,9 @@ static inline void mpath_iterate_devices(struct mpath_head *mpath_head, void (*c
 {
 }
 static inline void mpath_clear_paths(struct mpath_head *mpath_head)
+{
+}
+static inline void mpath_head_set_queue_if_no_path(struct mpath_head *mpath_head, unsigned int sec)
 {
 }
 #define mpath_device_groups NULL
