@@ -539,6 +539,7 @@ struct nvme_ns_head {
 	struct nvme_effects_log *effects;
 	u64			nuse;
 	unsigned		ns_id;
+	int			ns_count;
 	int			instance;
 #ifdef CONFIG_BLK_DEV_ZONED
 	u64			zsze;

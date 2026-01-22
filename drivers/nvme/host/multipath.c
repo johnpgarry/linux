@@ -686,7 +686,7 @@ static void nvme_remove_head_work(struct work_struct *work)
 	bool remove = false;
 
 	mutex_lock(&head->subsys->lock);
-	if (list_empty(&head->list)) {
+	if (!head->ns_count) {
 		list_del_init(&head->entry);
 		remove = true;
 	}
@@ -1290,7 +1290,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	 * head->list here. If it is no longer empty then we skip enqueuing the
 	 * delayed head removal work.
 	 */
-	if (!list_empty(&head->list))
+	if (head->ns_count)
 		goto out;
 
 	/*
