@@ -3799,11 +3799,13 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 		unsigned nsid)
 {
 	struct nvme_ns_head *h;
+	pr_err("%s ctrl=%pS nsid=%d\n", __func__, ctrl, nsid);
 
 	lockdep_assert_held(&ctrl->subsys->lock);
 
 	list_for_each_entry(h, &ctrl->subsys->nsheads, entry) {
 		struct kref *ref;
+		pr_err("%s2 h=%pS\n", __func__, h);
 		/*
 		 * Private namespaces can share NSIDs under some conditions.
 		 * In that case we can't use the same ns_head for namespaces
@@ -3811,6 +3813,7 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_ctrl *ctrl,
 		 */
 		if (h->ns_id != nsid || !nvme_is_unique_nsid(ctrl, h))
 			continue;
+		pr_err("%s3 h=%pS\n", __func__, h);
 		ref = &h->ref;
 		pr_err("%s h=%pS ref=%pS refcount=%d calling nvme_tryget_ns_head\n",
 			__func__, h, ref, refcount_read(&ref->refcount));
@@ -3847,12 +3850,15 @@ static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 
 static void nvme_cdev_rel(struct device *dev)
 {
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
 	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
 }
 
 void nvme_cdev_del(struct cdev *cdev, struct device *cdev_device)
 {
+	dev_err(cdev_device, "%s cdev_device=%pS calling cdev_device_del\n", __func__, cdev_device);
 	cdev_device_del(cdev, cdev_device);
+	dev_err(cdev_device, "%s cdev_device=%pS calling\n", __func__, cdev_device);
 	put_device(cdev_device);
 }
 
@@ -4310,8 +4316,12 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	pr_err("%s2 ns=%pS checking list_empty(head->list)=%d\n",
 		__func__, ns, list_empty(&ns->head->list));
 	if (list_empty(&ns->head->list)) {
-		if (!nvme_mpath_queue_if_no_path(ns->head))
+		pr_err("%s2.0 nvme_mpath_queue_if_no_path=%d\n",
+			__func__, nvme_mpath_queue_if_no_path(ns->head));
+		if (!nvme_mpath_queue_if_no_path(ns->head)) {
+			pr_err("%s2.1 ns=%pS calling list_del_init\n", __func__, ns);
 			list_del_init(&ns->head->entry);
+		}
 		last_path = true;
 	}
 	pr_err("%s3 ns=%pS last_path=%d\n", __func__, ns, last_path);
@@ -5047,10 +5057,15 @@ EXPORT_SYMBOL_GPL(nvme_remove_io_tag_set);
 
 void nvme_stop_ctrl(struct nvme_ctrl *ctrl)
 {
+	pr_err("%s calling nvme_mpath_stop\n", __func__);
 	nvme_mpath_stop(ctrl);
+	pr_err("%s1 calling nvme_auth_stop\n", __func__);
 	nvme_auth_stop(ctrl);
+	pr_err("%s2 calling nvme_stop_failfast_work\n", __func__);
 	nvme_stop_failfast_work(ctrl);
+	pr_err("%s3 calling flush_work async_event_work\n", __func__);
 	flush_work(&ctrl->async_event_work);
+	pr_err("%s4 calling cancel_work_sync fw_act_work\n", __func__);
 	cancel_work_sync(&ctrl->fw_act_work);
 	if (ctrl->ops->stop_ctrl)
 		ctrl->ops->stop_ctrl(ctrl);
@@ -5092,12 +5107,19 @@ EXPORT_SYMBOL_GPL(nvme_start_ctrl);
 
 void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
 {
+	pr_err("%s ctrl=%pS calling nvme_stop_keep_alive\n", __func__, ctrl);
 	nvme_stop_keep_alive(ctrl);
+	pr_err("%s1 ctrl=%pS calling nvme_hwmon_exit\n", __func__, ctrl);
 	nvme_hwmon_exit(ctrl);
+	pr_err("%s2 ctrl=%pS calling nvme_fault_inject_fini\n", __func__, ctrl);
 	nvme_fault_inject_fini(&ctrl->fault_inject);
+	pr_err("%s3 ctrl=%pS calling dev_pm_qos_hide_latency_tolerance\n", __func__, ctrl);
 	dev_pm_qos_hide_latency_tolerance(ctrl->device);
+	pr_err("%s4 ctrl=%pS calling cdev_device_del\n", __func__, ctrl);
 	cdev_device_del(&ctrl->cdev, ctrl->device);
+	pr_err("%s5 ctrl=%pS calling nvme_put_ctrl\n", __func__, ctrl);
 	nvme_put_ctrl(ctrl);
+	pr_err("%s6 ctrl=%pS called nvme_put_ctrl\n", __func__, ctrl);
 }
 EXPORT_SYMBOL_GPL(nvme_uninit_ctrl);
 

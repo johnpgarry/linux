@@ -615,15 +615,15 @@ int __must_check add_disk_fwnode(struct device *parent, struct gendisk *disk,
 		set = disk->queue->tag_set;
 		memflags = memalloc_noio_save();
 		down_read(&set->update_nr_hwq_lock);
-		dev_err(parent, "%s disk=%pS calling __add_disk queue_is_mq groups=%pS\n", __func__, disk, groups);
+	//	dev_err(parent, "%s disk=%pS calling __add_disk queue_is_mq groups=%pS\n", __func__, disk, groups);
 		ret = __add_disk(parent, disk, groups, fwnode);
-		dev_err(parent, "%s0 disk=%pS called __add_disk queue_is_mq ret=%d\n", __func__, disk, ret);
+	//	dev_err(parent, "%s0 disk=%pS called __add_disk queue_is_mq ret=%d\n", __func__, disk, ret);
 		up_read(&set->update_nr_hwq_lock);
 		memalloc_noio_restore(memflags);
 	} else {
-		dev_err(parent, "%s2 disk=%pS calling __add_disk !queue_is_mq groups=%pS\n", __func__, disk, groups);
+	//	dev_err(parent, "%s2 disk=%pS calling __add_disk !queue_is_mq groups=%pS\n", __func__, disk, groups);
 		ret = __add_disk(parent, disk, groups, fwnode);
-		dev_err(parent, "%s2.1 disk=%pS called __add_disk !queue_is_mq ret=%d\n", __func__, disk, ret);
+	//	dev_err(parent, "%s2.1 disk=%pS called __add_disk !queue_is_mq ret=%d\n", __func__, disk, ret);
 	}
 
 	/*
@@ -632,7 +632,7 @@ int __must_check add_disk_fwnode(struct device *parent, struct gendisk *disk,
 	 * lock dependency on `disk->open_mutex` from scanning partition.
 	 */
 	if (!ret) {
-		dev_err(parent, "%s3 disk=%pS calling add_disk_final\n", __func__, disk);
+	//	dev_err(parent, "%s3 disk=%pS calling add_disk_final\n", __func__, disk);
 		add_disk_final(disk);
 	}
 	return ret;

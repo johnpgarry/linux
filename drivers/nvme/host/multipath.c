@@ -676,10 +676,11 @@ static void nvme_requeue_work(struct work_struct *work)
 	struct nvme_ns_head *head =
 		container_of(work, struct nvme_ns_head, requeue_work);
 	struct bio *bio, *next;
+	pr_err("%s head=%pS\n", __func__, head);
 
 	spin_lock_irq(&head->requeue_lock);
 	next = bio_list_get(&head->requeue_list);
-	pr_err("%s head=%pS next=%pS\n", __func__, head, next);
+	pr_err("%s2 head=%pS next=%pS\n", __func__, head, next);
 	spin_unlock_irq(&head->requeue_lock);
 
 	while ((bio = next) != NULL) {
