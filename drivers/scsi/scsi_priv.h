@@ -18,6 +18,8 @@ struct scsi_nl_hdr;
 
 #define SCSI_CMD_RETRIES_NO_LIMIT -1
 
+#define SCSI_MAX_QUEUE_DEPTH 4096
+
 /*
  * Error codes used by scsi-ml internally. These must not be used by drivers.
  */
