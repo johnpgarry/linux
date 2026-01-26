@@ -702,12 +702,12 @@ static void nvme_remove_head_work(struct work_struct *work)
 			struct nvme_ns_head, remove_work);
 	bool remove = false;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&head->lock);
 	if (list_empty(&head->list)) {
 		list_del_init(&head->entry);
 		remove = true;
 	}
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&head->lock);
 	if (remove)
 		nvme_remove_head(head);
 
@@ -1297,7 +1297,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	if (!head->disk)
 		return;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&head->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -1324,7 +1324,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 		remove = true;
 	}
 out:
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&head->lock);
 	if (remove)
 		nvme_remove_head(head);
 }

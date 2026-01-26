@@ -4019,13 +4019,16 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	} else {
 		ret = -EINVAL;
+		mutex_lock(&head->lock);
 		if ((!info->is_shared || !head->shared) &&
 		    !list_empty(&head->list)) {
+			mutex_unlock(&head->lock);
 			dev_err(ctrl->device,
 				"Duplicate unshared namespace %d\n",
 				info->nsid);
 			goto out_put_ns_head;
 		}
+		mutex_unlock(&head->lock);
 		if (!nvme_ns_ids_equal(&head->ids, &info->ids)) {
 			dev_err(ctrl->device,
 				"IDs don't match for shared namespace %d\n",
@@ -4041,10 +4044,12 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 				"Shared namespace support requires core_nvme.multipath=Y.\n");
 		}
 	}
+	mutex_unlock(&ctrl->subsys->lock);
 
+	mutex_lock(&head->lock);
 	list_add_tail_rcu(&ns->siblings, &head->list);
 	ns->head = head;
-	mutex_unlock(&ctrl->subsys->lock);
+	mutex_unlock(&head->lock);
 
 #ifdef CONFIG_NVME_MULTIPATH
 	cancel_delayed_work(&head->remove_work);
@@ -4193,7 +4198,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	mutex_unlock(&ctrl->namespaces_lock);
 	synchronize_srcu(&ctrl->srcu);
  out_unlink_ns:
-	mutex_lock(&ctrl->subsys->lock);
+	mutex_lock(&ns->head->lock);
 	list_del_rcu(&ns->siblings);
 	if (list_empty(&ns->head->list)) {
 		list_del_init(&ns->head->entry);
@@ -4208,7 +4213,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		if (ns->head->disk)
 			last_path = true;
 	}
-	mutex_unlock(&ctrl->subsys->lock);
+	mutex_unlock(&ns->head->lock);
 	if (last_path)
 		nvme_put_ns_head(ns->head);
 	nvme_put_ns_head(ns->head);
@@ -4239,14 +4244,14 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (nvme_mpath_clear_current_path(ns))
 		synchronize_srcu(&ns->head->srcu);
 
-	mutex_lock(&ns->ctrl->subsys->lock);
+	mutex_lock(&ns->head->lock);
 	list_del_rcu(&ns->siblings);
 	if (list_empty(&ns->head->list)) {
 		if (!nvme_mpath_queue_if_no_path(ns->head))
 			list_del_init(&ns->head->entry);
 		last_path = true;
 	}
-	mutex_unlock(&ns->ctrl->subsys->lock);
+	mutex_unlock(&ns->head->lock);
 
 	/* guarantee not available in head->list */
 	synchronize_srcu(&ns->head->srcu);
