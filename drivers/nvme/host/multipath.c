@@ -1310,7 +1310,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	if (!list_empty(&head->list))
 		goto out;
 
-	if (head->delayed_removal_secs) {
+	if (nvme_mpath_queue_if_no_path(head)) {
 		/*
 		 * Ensure that no one could remove this module while the head
 		 * remove work is pending.
