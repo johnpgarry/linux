@@ -1069,6 +1069,7 @@ static void llbitmap_start_write(struct mddev *mddev, sector_t offset,
 
 	llbitmap_state_machine(llbitmap, start, end, BitmapActionStartwrite);
 
+	pr_err("%s offset=%lld sectors=%ld\n", __func__, offset, sectors);
 	while (page_start <= page_end) {
 		llbitmap_raise_barrier(llbitmap, page_start);
 		page_start++;
@@ -1084,6 +1085,7 @@ static void llbitmap_end_write(struct mddev *mddev, sector_t offset,
 	int page_start = (start + BITMAP_DATA_OFFSET) >> PAGE_SHIFT;
 	int page_end = (end + BITMAP_DATA_OFFSET) >> PAGE_SHIFT;
 
+	pr_err("%s offset=%lld sectors=%ld\n", __func__, offset, sectors);
 	while (page_start <= page_end) {
 		llbitmap_release_barrier(llbitmap, page_start);
 		page_start++;
@@ -1132,6 +1134,8 @@ static void llbitmap_unplug_fn(struct work_struct *work)
 
 	blk_start_plug(&plug);
 
+	pr_err("%s llbitmap->nr_pages=%d\n", __func__, llbitmap->nr_pages);
+
 	for (i = 0; i < llbitmap->nr_pages; i++) {
 		if (!test_bit(LLPageDirty, &llbitmap->pctl[i]->flags) ||
 		    !test_and_clear_bit(LLPageDirty, &llbitmap->pctl[i]->flags))
@@ -1164,6 +1168,8 @@ static void llbitmap_unplug(struct mddev *mddev, bool sync)
 		.llbitmap = llbitmap,
 		.done = &done,
 	};
+
+	pr_err("%s sync=%d llbitmap_dirty=%d\n", __func__, sync, llbitmap_dirty(llbitmap));
 
 	if (!llbitmap_dirty(llbitmap))
 		return;

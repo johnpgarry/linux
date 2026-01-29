@@ -9190,6 +9190,7 @@ static void md_bitmap_start(struct mddev *mddev,
 			   mddev->bitmap_ops->start_discard :
 			   mddev->bitmap_ops->start_write;
 
+	pr_err("%s mddev=%pS fn=%pS\n", __func__, mddev, fn);
 	if (mddev->pers->bitmap_sector)
 		mddev->pers->bitmap_sector(mddev, &md_io_clone->offset,
 					   &md_io_clone->sectors);
@@ -9239,6 +9240,10 @@ static void md_clone_bio(struct mddev *mddev, struct bio **bio)
 	if (blk_queue_io_stat(bdev->bd_disk->queue))
 		md_io_clone->start_time = bio_start_io_acct(*bio);
 
+	pr_err("%s *bio=%pS bi_sector=%lld bi_size=%d md_bitmap_enabled=%d WRITE=%d\n",
+		__func__, *bio, (*bio)->bi_iter.bi_sector, (*bio)->bi_iter.bi_size,
+		md_bitmap_enabled(mddev, false),
+		bio_data_dir(*bio) == WRITE);
 	if (bio_data_dir(*bio) == WRITE && md_bitmap_enabled(mddev, false)) {
 		md_io_clone->offset = (*bio)->bi_iter.bi_sector;
 		md_io_clone->sectors = bio_sectors(*bio);

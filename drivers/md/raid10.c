@@ -1256,6 +1256,8 @@ static void raid10_write_one_disk(struct mddev *mddev, struct r10bio *r10_bio,
 	rdev = replacement ? conf->mirrors[devnum].replacement :
 			     conf->mirrors[devnum].rdev;
 
+	pr_err("%s bio=%pS bi_sector=%lld bi_size=%d rdev=%pS\n",
+		__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size, rdev);
 	mbio = bio_alloc_clone(rdev->bdev, bio, GFP_NOIO, &mddev->bio_set);
 	mbio->bi_opf &= ~REQ_NOWAIT;
 	if (replacement)
@@ -1349,6 +1351,8 @@ static void raid10_write_request(struct mddev *mddev, struct bio *bio,
 	sector_t sectors;
 	int max_sectors;
 
+	pr_err("%s bio=%pS bi_sector=%lld bi_size=%d\n",
+		__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
 	if ((mddev_is_clustered(mddev) &&
 	     mddev->cluster_ops->area_resyncing(mddev, WRITE,
 						bio->bi_iter.bi_sector,
@@ -1869,6 +1873,9 @@ static bool raid10_make_request(struct mddev *mddev, struct bio *bio)
 	int chunk_sects = chunk_mask + 1;
 	int sectors = bio_sectors(bio);
 
+	pr_err("%s bio=%pS bi_sector=%lld bi_size=%d bio_data_dir(bi)=%d WRITE=%d\n",
+		__func__, bio, bio->bi_iter.bi_sector, bio->bi_iter.bi_size,
+		bio_data_dir(bio), WRITE);
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)
 	    && md_flush_request(mddev, bio))
 		return true;
