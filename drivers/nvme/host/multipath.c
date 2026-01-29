@@ -702,12 +702,14 @@ static void nvme_remove_head_work(struct work_struct *work)
 			struct nvme_ns_head, remove_work);
 	bool remove = false;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&head->lock);
 	if (list_empty(&head->list)) {
+		mutex_lock(&head->subsys->lock);
 		list_del_init(&head->entry);
+		mutex_unlock(&head->subsys->lock);
 		remove = true;
 	}
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&head->lock);
 	if (remove)
 		nvme_remove_head(head);
 
@@ -1131,9 +1133,9 @@ static ssize_t delayed_removal_secs_show(struct device *dev,
 	struct nvme_ns_head *head = disk->private_data;
 	int ret;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&head->lock);
 	ret = sysfs_emit(buf, "%u\n", head->delayed_removal_secs);
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&head->lock);
 	return ret;
 }
 
@@ -1149,13 +1151,13 @@ static ssize_t delayed_removal_secs_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&head->lock);
 	head->delayed_removal_secs = sec;
 	if (sec)
 		set_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
 	else
 		clear_bit(NVME_NSHEAD_QUEUE_IF_NO_PATH, &head->flags);
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&head->lock);
 	/*
 	 * Ensure that update to NVME_NSHEAD_QUEUE_IF_NO_PATH is seen
 	 * by its reader.
@@ -1296,7 +1298,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	if (!head->disk)
 		return;
 
-	mutex_lock(&head->subsys->lock);
+	mutex_lock(&head->lock);
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_remove_ns() and
@@ -1319,11 +1321,13 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 		mod_delayed_work(nvme_wq, &head->remove_work,
 				head->delayed_removal_secs * HZ);
 	} else {
+		mutex_lock(&head->subsys->lock);
 		list_del_init(&head->entry);
+		mutex_unlock(&head->subsys->lock);
 		remove = true;
 	}
 out:
-	mutex_unlock(&head->subsys->lock);
+	mutex_unlock(&head->lock);
 	if (remove)
 		nvme_remove_head(head);
 }

@@ -3968,19 +3968,23 @@ static int nvme_add_ns_to_head(struct nvme_ns_head *head, struct nvme_ns *ns,
 			struct nvme_ns_info *info)
 {
 	struct nvme_ctrl *ctrl = ns->ctrl;
+	int ret = 0;
 
+	mutex_lock(&head->lock);
 	if ((!info->is_shared || !head->shared) &&
 	    !list_empty(&head->list)) {
 		dev_err(ctrl->device,
 			"Duplicate unshared namespace %d\n",
 			info->nsid);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 	if (!nvme_ns_ids_equal(&head->ids, &info->ids)) {
 		dev_err(ctrl->device,
 			"IDs don't match for shared namespace %d\n",
 				info->nsid);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	if (!multipath) {
@@ -3993,8 +3997,9 @@ static int nvme_add_ns_to_head(struct nvme_ns_head *head, struct nvme_ns *ns,
 
 	list_add_tail_rcu(&ns->siblings, &head->list);
 	ns->head = head;
-
-	return 0;
+out:
+	mutex_unlock(&head->lock);
+	return ret;
 }
 
 static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
@@ -4058,20 +4063,21 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 		list_add_tail_rcu(&ns->siblings, &head->list);
 		ns->head = head;
+		mutex_unlock(&ctrl->subsys->lock);
 	} else {
+		mutex_unlock(&ctrl->subsys->lock);
 		ret = nvme_add_ns_to_head(head, ns, info);
-		if (ret)
-			goto out_put_ns_head;
+		if (ret) {
+			nvme_put_ns_head(head);
+			return ret;
+		}
 	}
-	mutex_unlock(&ctrl->subsys->lock);
 
 #ifdef CONFIG_NVME_MULTIPATH
 	cancel_delayed_work(&head->remove_work);
 #endif
 	return 0;
 
-out_put_ns_head:
-	nvme_put_ns_head(head);
 out_unlock:
 	mutex_unlock(&ctrl->subsys->lock);
 	return ret;
