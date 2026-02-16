@@ -5,6 +5,7 @@
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
 #include <linux/cdev.h>
+#include <linux/pr.h>
 #include <linux/srcu.h>
 #include <linux/io_uring/cmd.h>
 
