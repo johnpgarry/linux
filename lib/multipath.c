@@ -491,11 +491,193 @@ static void mpath_bdev_release(struct gendisk *disk)
 	mpath_put_head(mpath_head);
 }
 
+static int mpath_pr_register(struct block_device *bdev, u64 old_key,
+			u64 new_key, unsigned int flags)
+{
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_register) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_register(mpath_device->disk->part0,
+				old_key, new_key, flags);
+	}
+unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+
+static int mpath_pr_reserve(struct block_device *bdev, u64 key,
+		enum pr_type type, unsigned flags)
+{
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_reserve) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_reserve(mpath_device->disk->part0, key,
+				type, flags);
+	}
+unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+
+static int mpath_pr_release(struct block_device *bdev, u64 key,
+				enum pr_type type)
+{
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_release) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_release(mpath_device->disk->part0, key, type);
+	}
+unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+
+static int mpath_pr_preempt(struct block_device *bdev, u64 old, u64 new,
+		enum pr_type type, bool abort)
+{
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_preempt) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_preempt(mpath_device->disk->part0, old,
+				new, type, abort);
+	}
+unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+
+static int mpath_pr_clear(struct block_device *bdev, u64 key)
+{
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_clear) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_clear(mpath_device->disk->part0, key);
+	}
+unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+
+static int mpath_pr_read_keys(struct block_device *bdev,
+		struct pr_keys *keys_info)
+{
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_read_keys) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_read_keys(mpath_device->disk->part0, keys_info);
+	}
+unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+
+static int mpath_pr_read_reservation(struct block_device *bdev,
+		struct pr_held_reservation *resv)
+{
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
+	struct mpath_device *mpath_device;
+	int srcu_idx, ret = -EWOULDBLOCK;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_read_reservation) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_read_reservation(mpath_device->disk->part0,
+				resv);
+	}
+unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+
+static const struct pr_ops mpath_pr_ops = {
+	.pr_register	= mpath_pr_register,
+	.pr_reserve	= mpath_pr_reserve,
+	.pr_release	= mpath_pr_release,
+	.pr_preempt	= mpath_pr_preempt,
+	.pr_clear	= mpath_pr_clear,
+	.pr_read_keys	= mpath_pr_read_keys,
+	.pr_read_reservation = mpath_pr_read_reservation,
+};
+
 const struct block_device_operations mpath_ops = {
 	.owner          = THIS_MODULE,
 	.open		= mpath_bdev_open,
 	.release	= mpath_bdev_release,
 	.submit_bio	= mpath_bdev_submit_bio,
+	.pr_ops		= &mpath_pr_ops,
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 
