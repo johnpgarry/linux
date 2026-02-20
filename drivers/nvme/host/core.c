@@ -409,7 +409,7 @@ static inline enum nvme_disposition nvme_decide_disposition(struct request *req)
 	if ((nvme_req(req)->status & NVME_SCT_SC_MASK) == NVME_SC_AUTH_REQUIRED)
 		return AUTHENTICATE;
 
-	if (req->cmd_flags & REQ_NVME_MPATH) {
+	if (nvme_is_mpath_request(req)) {
 		if (nvme_is_path_error(nvme_req(req)->status) ||
 		    blk_queue_dying(req->q))
 			return FAILOVER;
@@ -442,7 +442,7 @@ static inline void __nvme_end_req(struct request *req)
 	}
 	nvme_end_req_zoned(req);
 	nvme_trace_bio_complete(req);
-	if (req->cmd_flags & REQ_NVME_MPATH)
+	if (nvme_is_mpath_request(req))
 		nvme_mpath_end_request(req);
 }
 
@@ -762,7 +762,7 @@ blk_status_t nvme_fail_nonready_command(struct nvme_ctrl *ctrl,
 	    state != NVME_CTRL_DELETING &&
 	    state != NVME_CTRL_DEAD &&
 	    !test_bit(NVME_CTRL_FAILFAST_EXPIRED, &ctrl->flags) &&
-	    !blk_noretry_request(rq) && !(rq->cmd_flags & REQ_NVME_MPATH))
+	    !blk_noretry_request(rq) && !nvme_is_mpath_request(rq))
 		return BLK_STS_RESOURCE;
 
 	if (!(rq->rq_flags & RQF_DONTPREP))

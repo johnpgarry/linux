@@ -1048,11 +1048,16 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head);
 void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
 
+static inline bool nvme_is_mpath_request(struct request *req)
+{
+	return req->cmd_flags & REQ_NVME_MPATH;
+}
+
 static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
 
-	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio)
+	if (nvme_is_mpath_request(req) && req->bio)
 		trace_block_bio_complete(ns->head->disk->queue, req->bio);
 }
 
@@ -1151,6 +1156,10 @@ static inline void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 static inline void nvme_mpath_default_iopolicy(struct nvme_subsystem *subsys)
 {
 }
+static inline bool nvme_is_mpath_request(struct request *req)
+{
+	return false;
+}
 static inline void nvme_mpath_start_request(struct request *rq)
 {
 }
@@ -1219,7 +1228,7 @@ static inline void nvme_hwmon_exit(struct nvme_ctrl *ctrl)
 
 static inline void nvme_start_request(struct request *rq)
 {
-	if (rq->cmd_flags & REQ_NVME_MPATH)
+	if (nvme_is_mpath_request(rq))
 		nvme_mpath_start_request(rq);
 	blk_mq_start_request(rq);
 }
