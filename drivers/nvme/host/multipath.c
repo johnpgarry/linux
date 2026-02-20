@@ -608,8 +608,17 @@ static int nvme_ns_head_report_zones(struct gendisk *disk, sector_t sector,
 	srcu_read_unlock(&head->srcu, srcu_idx);
 	return ret;
 }
+
+static int nvme_mpath_report_zones(struct mpath_device *mpath_device,
+		sector_t sector, unsigned int nr_zones,
+		struct blk_report_zones_args *args)
+{
+	return nvme_ns_report_zones(nvme_mpath_to_ns(mpath_device), sector,
+				nr_zones, args);
+}
 #else
 #define nvme_ns_head_report_zones	NULL
+#define nvme_mpath_report_zones		NULL
 #endif /* CONFIG_BLK_DEV_ZONED */
 
 const struct block_device_operations nvme_ns_head_ops = {
@@ -1482,6 +1491,9 @@ static const struct mpath_head_template mpdt = {
 	.get_access_state = nvme_mpath_get_access_state,
 	.bdev_ioctl = nvme_mpath_bdev_ioctl,
 	.cdev_ioctl = nvme_mpath_cdev_ioctl,
+	#ifdef CONFIG_BLK_DEV_ZONED
+	.report_zones = nvme_mpath_report_zones,
+	#endif
 	.pr_ops = &nvme_mpath_pr_ops,
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
