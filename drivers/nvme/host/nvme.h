@@ -13,6 +13,7 @@
 #include <linux/blk-mq.h>
 #include <linux/sed-opal.h>
 #include <linux/fault-inject.h>
+#include <linux/multipath.h>
 #include <linux/rcupdate.h>
 #include <linux/wait.h>
 #include <linux/t10-pi.h>
@@ -555,6 +556,8 @@ struct nvme_ns_head {
 
 	u16			nr_plids;
 	u16			*plids;
+
+	struct mpath_disk	*mpath_disk;
 #ifdef CONFIG_NVME_MULTIPATH
 	struct bio_list		requeue_list;
 	spinlock_t		requeue_lock;
@@ -582,6 +585,7 @@ enum nvme_ns_features {
 };
 
 struct nvme_ns {
+	struct mpath_device mpath_device;
 	struct list_head list;
 
 	struct nvme_ctrl *ctrl;
@@ -607,6 +611,8 @@ struct nvme_ns {
 
 	struct nvme_fault_inject fault_inject;
 };
+
+#define nvme_mpath_to_ns(d) container_of(d, struct nvme_ns, mpath_device)
 
 /* NVMe ns supports metadata actions by the controller (generate/strip) */
 static inline bool nvme_ns_has_pi(struct nvme_ns_head *head)

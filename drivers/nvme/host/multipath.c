@@ -12,6 +12,8 @@
 bool multipath = true;
 static bool multipath_always_on;
 
+static const struct mpath_head_template mpdt;
+
 static int multipath_param_set(const char *val, const struct kernel_param *kp)
 {
 	int ret;
@@ -1388,3 +1390,7 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 	ctrl->ana_log_buf = NULL;
 	ctrl->ana_log_size = 0;
 }
+
+__maybe_unused
+static const struct mpath_head_template mpdt = {
+};

@@ -17,6 +17,7 @@ config BLK_DEV_NVME
 config NVME_MULTIPATH
 	bool "NVMe multipath support"
 	depends on NVME_CORE
+	select LIBMULTIPATH
 	help
 	  This option controls support for multipath access to NVMe
 	  subsystems. If this option is enabled support for NVMe multipath
