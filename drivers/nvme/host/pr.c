@@ -116,6 +116,51 @@ static int nvme_send_pr_command(struct block_device *bdev, u32 cdw10, u32 cdw11,
 	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
 }
 
+static int __nvme_send_pr_command_ns(struct nvme_ns *ns, u32 cdw10,
+		u32 cdw11, u8 op, void *data, unsigned int data_len)
+{
+	struct nvme_command c = { 0 };
+
+	c.common.opcode = op;
+	c.common.cdw10 = cpu_to_le32(cdw10);
+	c.common.cdw11 = cpu_to_le32(cdw11);
+
+	return nvme_send_ns_pr_command(ns, &c, data, data_len);
+}
+
+static int nvme_send_pr_command_ns(struct nvme_ns *ns, u32 cdw10, u32 cdw11,
+		u8 op, void *data, unsigned int data_len)
+{
+	int ret;
+
+	ret = __nvme_send_pr_command_ns(ns, cdw10, cdw11, op, data, data_len);
+	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
+}
+
+__maybe_unused
+static int nvme_pr_register_ns(struct nvme_ns *ns, u64 old_key, u64 new_key,
+			u32 flags)
+{
+	struct nvmet_pr_register_data data = { 0 };
+	u32 cdw10;
+	int ret;
+
+	if (flags & ~PR_FL_IGNORE_KEY)
+		return -EOPNOTSUPP;
+
+	data.crkey = cpu_to_le64(old_key);
+	data.nrkey = cpu_to_le64(new_key);
+
+	cdw10 = old_key ? NVME_PR_REGISTER_ACT_REPLACE :
+		NVME_PR_REGISTER_ACT_REG;
+	cdw10 |= (flags & PR_FL_IGNORE_KEY) ? NVME_PR_IGNORE_KEY : 0;
+	cdw10 |= NVME_PR_CPTPL_PERSIST;
+
+	ret = nvme_send_pr_command_ns(ns, cdw10, 0, nvme_cmd_resv_register,
+			&data, sizeof(data));
+	return ret;
+}
+
 static int nvme_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
 		unsigned int flags)
 {
@@ -134,6 +179,26 @@ static int nvme_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
 	cdw10 |= NVME_PR_CPTPL_PERSIST;
 
 	return nvme_send_pr_command(bdev, cdw10, 0, nvme_cmd_resv_register,
+			&data, sizeof(data));
+}
+
+__maybe_unused
+static int nvme_pr_reserve_ns(struct nvme_ns *ns, u64 key, enum pr_type type,
+		u32 flags)
+{
+	struct nvmet_pr_acquire_data data = { 0 };
+	u32 cdw10;
+
+	if (flags & ~PR_FL_IGNORE_KEY)
+		return -EOPNOTSUPP;
+
+	data.crkey = cpu_to_le64(key);
+
+	cdw10 = NVME_PR_ACQUIRE_ACT_ACQUIRE;
+	cdw10 |= nvme_pr_type_from_blk(type) << 8;
+	cdw10 |= (flags & PR_FL_IGNORE_KEY) ? NVME_PR_IGNORE_KEY : 0;
+
+	return nvme_send_pr_command_ns(ns, cdw10, 0, nvme_cmd_resv_acquire,
 			&data, sizeof(data));
 }
 
@@ -156,6 +221,24 @@ static int nvme_pr_reserve(struct block_device *bdev, u64 key,
 			&data, sizeof(data));
 }
 
+__maybe_unused
+static int nvme_pr_preempt_ns(struct nvme_ns *ns, u64 old, u64 new,
+		enum pr_type type, bool abort)
+{
+	struct nvmet_pr_acquire_data data = { 0 };
+	u32 cdw10;
+
+	data.crkey = cpu_to_le64(old);
+	data.prkey = cpu_to_le64(new);
+
+	cdw10 = abort ? NVME_PR_ACQUIRE_ACT_PREEMPT_AND_ABORT :
+			NVME_PR_ACQUIRE_ACT_PREEMPT;
+	cdw10 |= nvme_pr_type_from_blk(type) << 8;
+
+	return nvme_send_pr_command_ns(ns, cdw10, 0, nvme_cmd_resv_acquire,
+			&data, sizeof(data));
+}
+
 static int nvme_pr_preempt(struct block_device *bdev, u64 old, u64 new,
 		enum pr_type type, bool abort)
 {
@@ -170,6 +253,21 @@ static int nvme_pr_preempt(struct block_device *bdev, u64 old, u64 new,
 	cdw10 |= nvme_pr_type_from_blk(type) << 8;
 
 	return nvme_send_pr_command(bdev, cdw10, 0, nvme_cmd_resv_acquire,
+			&data, sizeof(data));
+}
+
+__maybe_unused
+static int nvme_pr_clear_ns(struct nvme_ns *ns, u64 key)
+{
+	struct nvmet_pr_release_data data = { 0 };
+	u32 cdw10;
+
+	data.crkey = cpu_to_le64(key);
+
+	cdw10 = NVME_PR_RELEASE_ACT_CLEAR;
+	cdw10 |= key ? 0 : NVME_PR_IGNORE_KEY;
+
+	return nvme_send_pr_command_ns(ns, cdw10, 0, nvme_cmd_resv_release,
 			&data, sizeof(data));
 }
 
@@ -202,6 +300,45 @@ static int nvme_pr_release(struct block_device *bdev, u64 key, enum pr_type type
 			&data, sizeof(data));
 }
 
+__maybe_unused
+static int nvme_pr_release_ns(struct nvme_ns *ns, u64 key, enum pr_type type)
+{
+	struct nvmet_pr_release_data data = { 0 };
+	u32 cdw10;
+
+	data.crkey = cpu_to_le64(key);
+
+	cdw10 = NVME_PR_RELEASE_ACT_RELEASE;
+	cdw10 |= nvme_pr_type_from_blk(type) << 8;
+	cdw10 |= key ? 0 : NVME_PR_IGNORE_KEY;
+
+	return nvme_send_pr_command_ns(ns, cdw10, 0, nvme_cmd_resv_release,
+			&data, sizeof(data));
+}
+
+static int nvme_mpath_pr_resv_report_ns(struct nvme_ns *ns, void *data,
+		u32 data_len, bool *eds)
+{
+	u32 cdw10, cdw11;
+	int ret;
+
+	cdw10 = nvme_bytes_to_numd(data_len);
+	cdw11 = NVME_EXTENDED_DATA_STRUCT;
+	*eds = true;
+
+retry:
+	ret = __nvme_send_pr_command_ns(ns, cdw10, cdw11, nvme_cmd_resv_report,
+			data, data_len);
+	if (ret == NVME_SC_HOST_ID_INCONSIST &&
+	    cdw11 == NVME_EXTENDED_DATA_STRUCT) {
+		cdw11 = 0;
+		*eds = false;
+		goto retry;
+	}
+
+	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
+}
+
 static int nvme_pr_resv_report(struct block_device *bdev, void *data,
 		u32 data_len, bool *eds)
 {
@@ -223,6 +360,52 @@ retry:
 	}
 
 	return ret < 0 ? ret : nvme_status_to_pr_err(ret);
+}
+
+__maybe_unused
+static int nvme_pr_read_keys_ns(struct nvme_ns *ns, struct pr_keys *keys_info)
+{
+	size_t rse_len;
+	u32 num_keys = keys_info->num_keys;
+	struct nvme_reservation_status_ext *rse;
+	int ret, i;
+	bool eds;
+
+	/*
+	 * Assume we are using 128-bit host IDs and allocate a buffer large
+	 * enough to get enough keys to fill the return keys buffer.
+	 */
+	rse_len = struct_size(rse, regctl_eds, num_keys);
+	if (rse_len > U32_MAX)
+		return -EINVAL;
+
+	rse = kzalloc(rse_len, GFP_KERNEL);
+	if (!rse)
+		return -ENOMEM;
+
+	ret = nvme_mpath_pr_resv_report_ns(ns, rse, rse_len, &eds);
+	if (ret)
+		goto free_rse;
+
+	keys_info->generation = le32_to_cpu(rse->gen);
+	keys_info->num_keys = get_unaligned_le16(&rse->regctl);
+
+	num_keys = min(num_keys, keys_info->num_keys);
+	for (i = 0; i < num_keys; i++) {
+		if (eds) {
+			keys_info->keys[i] =
+					le64_to_cpu(rse->regctl_eds[i].rkey);
+		} else {
+			struct nvme_reservation_status *rs;
+
+			rs = (struct nvme_reservation_status *)rse;
+			keys_info->keys[i] = le64_to_cpu(rs->regctl_ds[i].rkey);
+		}
+	}
+
+free_rse:
+	kfree(rse);
+	return ret;
 }
 
 static int nvme_pr_read_keys(struct block_device *bdev,
@@ -268,6 +451,70 @@ static int nvme_pr_read_keys(struct block_device *bdev,
 
 free_rse:
 	kvfree(rse);
+	return ret;
+}
+
+__maybe_unused
+static int nvme_pr_read_reservation_ns(struct nvme_ns *ns,
+				  struct pr_held_reservation *resv)
+{
+	struct nvme_reservation_status_ext tmp_rse, *rse;
+	int ret, i, num_regs;
+	u32 rse_len;
+	bool eds;
+
+get_num_regs:
+	/*
+	 * Get the number of registrations so we know how big to allocate
+	 * the response buffer.
+	 */
+	ret = nvme_mpath_pr_resv_report_ns(ns, &tmp_rse, sizeof(tmp_rse),
+					&eds);
+	if (ret)
+		return ret;
+
+	num_regs = get_unaligned_le16(&tmp_rse.regctl);
+	if (!num_regs) {
+		resv->generation = le32_to_cpu(tmp_rse.gen);
+		return 0;
+	}
+
+	rse_len = struct_size(rse, regctl_eds, num_regs);
+	rse = kzalloc(rse_len, GFP_KERNEL);
+	if (!rse)
+		return -ENOMEM;
+
+	ret = nvme_mpath_pr_resv_report_ns(ns, rse, rse_len, &eds);
+	if (ret)
+		goto free_rse;
+
+	if (num_regs != get_unaligned_le16(&rse->regctl)) {
+		kfree(rse);
+		goto get_num_regs;
+	}
+
+	resv->generation = le32_to_cpu(rse->gen);
+	resv->type = block_pr_type_from_nvme(rse->rtype);
+
+	for (i = 0; i < num_regs; i++) {
+		if (eds) {
+			if (rse->regctl_eds[i].rcsts) {
+				resv->key = le64_to_cpu(rse->regctl_eds[i].rkey);
+				break;
+			}
+		} else {
+			struct nvme_reservation_status *rs;
+
+			rs = (struct nvme_reservation_status *)rse;
+			if (rs->regctl_ds[i].rcsts) {
+				resv->key = le64_to_cpu(rs->regctl_ds[i].rkey);
+				break;
+			}
+		}
+	}
+
+free_rse:
+	kfree(rse);
 	return ret;
 }
 
@@ -332,6 +579,73 @@ free_rse:
 	kfree(rse);
 	return ret;
 }
+
+#if defined(CONFIG_NVME_MULTIPATH)
+static int nvme_mpath_pr_register(struct mpath_device *mpath_device,
+		u64 old_key, u64 new_key, unsigned int flags)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_pr_register_ns(ns, old_key, new_key, flags);
+}
+
+static int nvme_mpath_pr_reserve(struct mpath_device *mpath_device, u64 key,
+		enum pr_type type, unsigned flags)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_pr_reserve_ns(ns, key, type, flags);
+}
+
+static int nvme_mpath_pr_release(struct mpath_device *mpath_device, u64 key,
+		enum pr_type type)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_pr_release_ns(ns, key, type);
+}
+
+static int nvme_mpath_pr_preempt(struct mpath_device *mpath_device, u64 old,
+		u64 new, enum pr_type type, bool abort)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_pr_preempt_ns(ns, old, new, type, abort);
+}
+
+static int nvme_mpath_pr_clear(struct mpath_device *mpath_device, u64 key)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_pr_clear_ns(ns, key);
+}
+
+static int nvme_mpath_pr_read_keys(struct mpath_device *mpath_device,
+		struct pr_keys *keys_info)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_pr_read_keys_ns(ns, keys_info);
+}
+
+static int nvme_mpath_pr_read_reservation(struct mpath_device *mpath_device,
+		struct pr_held_reservation *resv)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_pr_read_reservation_ns(ns, resv);
+}
+
+const struct mpath_pr_ops nvme_mpath_pr_ops = {
+	.pr_register	= nvme_mpath_pr_register,
+	.pr_reserve	= nvme_mpath_pr_reserve,
+	.pr_release	= nvme_mpath_pr_release,
+	.pr_preempt	= nvme_mpath_pr_preempt,
+	.pr_clear	= nvme_mpath_pr_clear,
+	.pr_read_keys	= nvme_mpath_pr_read_keys,
+	.pr_read_reservation = nvme_mpath_pr_read_reservation,
+};
+#endif
 
 const struct pr_ops nvme_pr_ops = {
 	.pr_register	= nvme_pr_register,
