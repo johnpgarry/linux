@@ -709,6 +709,15 @@ static int nvme_mpath_device_ctrl_ioctl(struct mpath_device *mpath_device,
 	return ret;
 }
 
+int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
+		struct io_uring_cmd *ioucmd,
+		unsigned int issue_flags)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return nvme_ns_uring_cmd(ns, ioucmd, issue_flags);
+}
+
 static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
 		void __user *argp, struct nvme_ns_head *head, int srcu_idx,
 		bool open_for_write)
