@@ -625,26 +625,6 @@ const struct block_device_operations nvme_ns_head_ops = {
 	.pr_ops		= &nvme_pr_ops,
 };
 
-static int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
-{
-	struct nvme_ns_head *head = mpath_head->drvdata;
-	int ret;
-
-	mpath_head->cdev_device.parent = &head->subsys->dev;
-	ret = dev_set_name(&mpath_head->cdev_device, "ng%dn%d",
-			   head->subsys->instance, head->instance);
-	if (ret)
-		return ret;
-	ret = nvme_cdev_add(&mpath_head->cdev, &mpath_head->cdev_device,
-			    &mpath_generic_chr_fops, THIS_MODULE);
-	return ret;
-}
-
-static void nvme_mpath_del_cdev(struct mpath_head *mpath_head)
-{
-	nvme_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
-}
-
 static inline struct nvme_ns_head *cdev_to_ns_head(struct cdev *cdev)
 {
 	return container_of(cdev, struct nvme_ns_head, cdev);
@@ -672,6 +652,26 @@ static const struct file_operations nvme_ns_head_chr_fops = {
 	.uring_cmd	= nvme_ns_head_chr_uring_cmd,
 	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 };
+
+static int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
+{
+	struct nvme_ns_head *head = mpath_head->drvdata;
+	int ret;
+
+	mpath_head->cdev_device.parent = &head->subsys->dev;
+	ret = dev_set_name(&mpath_head->cdev_device, "ng%dn%d",
+			   head->subsys->instance, head->instance);
+	if (ret)
+		return ret;
+	ret = nvme_cdev_add(&mpath_head->cdev, &mpath_head->cdev_device,
+			    &mpath_generic_chr_fops, THIS_MODULE);
+	return ret;
+}
+
+static void nvme_mpath_del_cdev(struct mpath_head *mpath_head)
+{
+	nvme_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
+}
 
 static int nvme_add_ns_head_cdev(struct nvme_ns_head *head)
 {
@@ -1471,4 +1471,6 @@ static const struct mpath_head_template mpdt = {
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
 	.get_access_state = nvme_mpath_get_access_state,
+	.bdev_ioctl = nvme_mpath_bdev_ioctl,
+	.cdev_ioctl = nvme_mpath_cdev_ioctl,
 };

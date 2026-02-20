@@ -1053,6 +1053,12 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl);
 void nvme_mpath_remove_disk(struct nvme_ns_head *head);
 void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
+int nvme_mpath_bdev_ioctl(struct block_device *bdev,
+		struct mpath_device *mpath_device, blk_mode_t mode,
+		unsigned int cmd, unsigned long arg, int srcu_idx);
+int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
+		struct mpath_device *mpath_head, blk_mode_t mode,
+		unsigned int cmd, unsigned long arg, int srcu_idx);
 
 static inline bool nvme_is_mpath_request(struct request *req)
 {

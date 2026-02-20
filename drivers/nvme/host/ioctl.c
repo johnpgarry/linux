@@ -690,6 +690,25 @@ int nvme_ns_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 	return 0;
 }
 #ifdef CONFIG_NVME_MULTIPATH
+static int nvme_mpath_device_ctrl_ioctl(struct mpath_device *mpath_device,
+			unsigned int cmd, void __user *argp,
+			struct nvme_ns_head *head, int srcu_idx,
+			bool open_for_write)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct nvme_ctrl *ctrl = ns->ctrl;
+	int ret;
+
+	nvme_get_ctrl(ns->ctrl);
+	mpath_head_read_unlock(mpath_head, srcu_idx);
+	ret = nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
+
+	nvme_put_ctrl(ctrl);
+	return ret;
+}
+
 static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
 		void __user *argp, struct nvme_ns_head *head, int srcu_idx,
 		bool open_for_write)
@@ -703,6 +722,63 @@ static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
 	ret = nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
 
 	nvme_put_ctrl(ctrl);
+	return ret;
+}
+
+int nvme_mpath_bdev_ioctl(struct block_device *bdev,
+			struct mpath_device *mpath_device, blk_mode_t mode,
+			unsigned int cmd, unsigned long arg, int srcu_idx)
+{
+	struct gendisk *disk = bdev->bd_disk;
+	struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+	struct nvme_ns_head *head = ns->head;
+	bool open_for_write = mode & BLK_OPEN_WRITE;
+	void __user *argp = (void __user *)arg;
+	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	int ret = -EWOULDBLOCK;
+	unsigned int flags = 0;
+
+	if (bdev_is_partition(bdev))
+		flags |= NVME_IOCTL_PARTITION;
+
+	/*
+	 * Handle ioctls that apply to the controller instead of the namespace
+	 * separately and drop the ns SRCU reference early.  This avoids a
+	 * deadlock when deleting namespaces using the passthrough interface.
+	 */
+	if (is_ctrl_ioctl(cmd))
+		return nvme_mpath_device_ctrl_ioctl(mpath_device, cmd, argp,
+				head, srcu_idx, open_for_write);
+
+	ret = nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
+	mpath_head_read_unlock(mpath_head, srcu_idx);
+
+	return ret;
+}
+
+int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_head,
+			struct mpath_device *mpath_device, blk_mode_t mode,
+			unsigned int cmd, unsigned long arg, int srcu_idx)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+	struct nvme_ns_head *head = ns->head;
+	bool open_for_write = mode & BLK_OPEN_WRITE;
+	void __user *argp = (void __user *)arg;
+	int ret = -EWOULDBLOCK;
+
+	/*
+	 * Handle ioctls that apply to the controller instead of the namespace
+	 * separately and drop the ns SRCU reference early.  This avoids a
+	 * deadlock when deleting namespaces using the passthrough interface.
+	 */
+	if (is_ctrl_ioctl(cmd))
+		return nvme_mpath_device_ctrl_ioctl(mpath_device, cmd, argp,
+				head, srcu_idx, open_for_write);
+
+	ret = nvme_ns_ioctl(ns, cmd, argp, 0, open_for_write);
+	mpath_head_read_unlock(mpath_head, srcu_idx);
+
 	return ret;
 }
 
