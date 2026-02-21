@@ -1058,6 +1058,7 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl);
 void nvme_mpath_remove_disk(struct nvme_ns_head *head);
 void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
+bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head);
 int nvme_mpath_bdev_ioctl(struct block_device *bdev,
 		struct mpath_device *mpath_device, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
@@ -1199,6 +1200,10 @@ static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
 	return false;
 }
 static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
+{
+	return false;
+}
+static inline bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {
 	return false;
 }
