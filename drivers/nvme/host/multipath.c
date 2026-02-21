@@ -1445,6 +1445,24 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 	ctrl->ana_log_size = 0;
 }
 
+static enum mpath_access_state nvme_mpath_get_access_state(
+				struct mpath_device *mpath_device)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	switch (ns->ana_state) {
+	case NVME_ANA_OPTIMIZED:
+		return MPATH_STATE_OPTIMIZED;
+	case NVME_ANA_NONOPTIMIZED:
+		return MPATH_STATE_ACTIVE;
+	case NVME_ANA_INACCESSIBLE:
+	case NVME_ANA_PERSISTENT_LOSS:
+	case NVME_ANA_CHANGE:
+	default:
+		return MPATH_STATE_INVALID;
+	}
+}
+
 __maybe_unused
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
@@ -1452,4 +1470,5 @@ static const struct mpath_head_template mpdt = {
 	.del_cdev = nvme_mpath_del_cdev,
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
+	.get_access_state = nvme_mpath_get_access_state,
 };
