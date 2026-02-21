@@ -505,6 +505,25 @@ static bool nvme_available_path(struct nvme_ns_head *head)
 	return nvme_mpath_queue_if_no_path(head);
 }
 
+static bool nvme_mpath_available_path(struct mpath_device *mpath_device)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	if (test_bit(NVME_CTRL_FAILFAST_EXPIRED, &ns->ctrl->flags))
+		return false;
+
+	switch (nvme_ctrl_state(ns->ctrl)) {
+	case NVME_CTRL_LIVE:
+	case NVME_CTRL_RESETTING:
+	case NVME_CTRL_CONNECTING:
+		return true;
+	default:
+		break;
+	}
+
+	return false;
+}
+
 static void nvme_ns_head_submit_bio(struct bio *bio)
 {
 	struct nvme_ns_head *head = bio->bi_bdev->bd_disk->private_data;
@@ -1499,4 +1518,5 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 
 __maybe_unused
 static const struct mpath_head_template mpdt = {
+	.available_path = nvme_mpath_available_path,
 };
