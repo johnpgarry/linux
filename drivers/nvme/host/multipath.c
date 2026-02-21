@@ -305,6 +305,11 @@ static bool nvme_path_is_disabled(struct nvme_ns *ns)
 	return false;
 }
 
+static bool nvme_mpath_is_disabled(struct mpath_device *mpath_device)
+{
+	return nvme_path_is_disabled(nvme_mpath_to_ns(mpath_device));
+}
+
 static struct nvme_ns *__nvme_find_path(struct nvme_ns_head *head, int node)
 {
 	int found_distance = INT_MAX, fallback_distance = INT_MAX, distance;
@@ -445,6 +450,11 @@ static inline bool nvme_path_is_optimized(struct nvme_ns *ns)
 {
 	return nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE &&
 		ns->ana_state == NVME_ANA_OPTIMIZED;
+}
+
+static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
+{
+	return nvme_path_is_optimized(nvme_mpath_to_ns(mpath_device));
 }
 
 static struct nvme_ns *nvme_numa_path(struct nvme_ns_head *head)
@@ -1539,4 +1549,6 @@ static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
 	.add_cdev = nvme_mpath_add_cdev,
 	.del_cdev = nvme_mpath_del_cdev,
+	.is_disabled = nvme_mpath_is_disabled,
+	.is_optimized = nvme_mpath_is_optimized,
 };
