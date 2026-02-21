@@ -955,6 +955,16 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	}
 }
 
+void nvme_mpath_synchronize(struct nvme_ns_head *head)
+{
+	struct mpath_disk *mpath_disk = head->mpath_disk;
+
+	if (!mpath_disk)
+		return;
+
+	mpath_synchronize(mpath_disk->mpath_head);
+}
+
 static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
 		struct nvme_ana_group_desc *desc, void *data)
 {
