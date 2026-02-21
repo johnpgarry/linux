@@ -593,6 +593,12 @@ static int nvme_ns_head_get_unique_id(struct gendisk *disk, u8 id[16],
 	return ret;
 }
 
+static int nvme_mpath_get_unique_id(struct mpath_device *mpath_device,
+		u8 id[16], enum blk_unique_id type)
+{
+	return nvme_ns_get_unique_id(nvme_mpath_to_ns(mpath_device), id, type);
+}
+
 #ifdef CONFIG_BLK_DEV_ZONED
 static int nvme_ns_head_report_zones(struct gendisk *disk, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args)
@@ -1498,4 +1504,5 @@ static const struct mpath_head_template mpdt = {
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 	.get_iopolicy = nvme_mpath_get_iopolicy,
+	.get_unique_id = nvme_mpath_get_unique_id,
 };
