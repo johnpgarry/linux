@@ -1079,6 +1079,11 @@ void nvme_mpath_ioctl_begin(struct mpath_device *mpath_device,
 			unsigned int cmd, void **opaque);
 void nvme_mpath_ioctl_finish(void *opaque);
 
+static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
+{
+	mpath_synchronize(&head->mpath_head);
+}
+
 static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
@@ -1113,6 +1118,9 @@ static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
 static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 {
 	return false;
+}
+static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
+{
 }
 static inline void nvme_failover_req(struct request *req)
 {
