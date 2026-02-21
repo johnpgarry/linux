@@ -1551,4 +1551,5 @@ static const struct mpath_head_template mpdt = {
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 	.get_iopolicy = nvme_mpath_get_iopolicy,
 	.get_unique_id = nvme_mpath_get_unique_id,
+	.device_groups = nvme_ns_attr_groups,
 };
