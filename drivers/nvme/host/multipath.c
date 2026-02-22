@@ -965,6 +965,32 @@ void nvme_mpath_synchronize(struct nvme_ns_head *head)
 	mpath_synchronize(mpath_disk->mpath_head);
 }
 
+void nvme_mpath_add_ns(struct nvme_ns *ns)
+{
+	struct nvme_ns_head *head = ns->head;
+	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head;
+
+	if (!mpath_disk)
+		return;
+
+	mpath_head = mpath_disk->mpath_head;
+
+	ns->mpath_device.disk = ns->disk;
+	mpath_add_device(mpath_head, &ns->mpath_device);
+}
+
+void nvme_mpath_delete_ns(struct nvme_ns *ns)
+{
+	struct nvme_ns_head *head = ns->head;
+	struct mpath_disk *mpath_disk = head->mpath_disk;
+
+	if (!mpath_disk)
+		return;
+
+	mpath_delete_device(mpath_disk->mpath_head, &ns->mpath_device);
+}
+
 static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
 		struct nvme_ana_group_desc *desc, void *data)
 {

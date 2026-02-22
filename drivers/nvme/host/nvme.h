@@ -1034,6 +1034,8 @@ static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 }
 
 void nvme_mpath_synchronize(struct nvme_ns_head *head);
+void nvme_mpath_add_ns(struct nvme_ns *ns);
+void nvme_mpath_delete_ns(struct nvme_ns *ns);
 void nvme_mpath_unfreeze(struct nvme_subsystem *subsys);
 void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys);
 void nvme_mpath_start_freeze(struct nvme_subsystem *subsys);
@@ -1103,6 +1105,12 @@ static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 	return false;
 }
 static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
+{
+}
+static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
+{
+}
+static inline void nvme_mpath_delete_ns(struct nvme_ns *ns)
 {
 }
 static inline void nvme_failover_req(struct request *req)
