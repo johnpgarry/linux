@@ -1965,10 +1965,9 @@ static int sd_scsi_to_pr_err(struct scsi_sense_hdr *sshdr, int result)
 	}
 }
 
-static int sd_pr_in_command(struct block_device *bdev, u8 sa,
+static int sd_pr_in_command(struct scsi_disk *sdkp, u8 sa,
 			    unsigned char *data, int data_len)
 {
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
 	struct scsi_device *sdev = sdkp->device;
 	struct scsi_sense_hdr sshdr;
 	u8 cmd[10] = { PERSISTENT_RESERVE_IN, sa };
@@ -2007,7 +2006,8 @@ static int sd_pr_in_command(struct block_device *bdev, u8 sa,
 	return sd_scsi_to_pr_err(&sshdr, result);
 }
 
-static int sd_pr_read_keys(struct block_device *bdev, struct pr_keys *keys_info)
+static int sd_pr_read_keys_disk(struct scsi_disk *sdkp,
+			struct pr_keys *keys_info)
 {
 	int result, i, data_offset, num_copy_keys;
 	u32 num_keys = keys_info->num_keys;
@@ -2028,7 +2028,7 @@ static int sd_pr_read_keys(struct block_device *bdev, struct pr_keys *keys_info)
 	if (!data)
 		return -ENOMEM;
 
-	result = sd_pr_in_command(bdev, READ_KEYS, data, data_len);
+	result = sd_pr_in_command(sdkp, READ_KEYS, data, data_len);
 	if (result)
 		goto free_data;
 
@@ -2048,15 +2048,22 @@ free_data:
 	return result;
 }
 
-static int sd_pr_read_reservation(struct block_device *bdev,
-				  struct pr_held_reservation *rsv)
+static int sd_pr_read_keys(struct block_device *bdev,
+			struct pr_keys *keys_info)
 {
 	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
+
+	return sd_pr_read_keys_disk(sdkp, keys_info);
+}
+
+static int sd_pr_read_reservation_disk(struct scsi_disk *sdkp,
+				  struct pr_held_reservation *rsv)
+{
 	struct scsi_device *sdev = sdkp->device;
 	u8 data[24] = { };
 	int result, len;
 
-	result = sd_pr_in_command(bdev, READ_RESERVATION, data, sizeof(data));
+	result = sd_pr_in_command(sdkp, READ_RESERVATION, data, sizeof(data));
 	if (result)
 		return result;
 
@@ -2077,11 +2084,17 @@ static int sd_pr_read_reservation(struct block_device *bdev,
 	rsv->type = scsi_pr_type_to_block(data[21] & 0x0f);
 	return 0;
 }
-
-static int sd_pr_out_command(struct block_device *bdev, u8 sa, u64 key,
-			     u64 sa_key, enum scsi_pr_type type, u8 flags)
+static int sd_pr_read_reservation(struct block_device *bdev,
+				  struct pr_held_reservation *rsv)
 {
 	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
+
+	return sd_pr_read_reservation_disk(sdkp, rsv);
+}
+
+static int sd_pr_out_command(struct scsi_disk *sdkp, u8 sa, u64 key,
+			     u64 sa_key, enum scsi_pr_type type, u8 flags)
+{
 	struct scsi_device *sdev = sdkp->device;
 	struct scsi_sense_hdr sshdr;
 	struct scsi_failure failure_defs[] = {
@@ -2130,41 +2143,82 @@ static int sd_pr_out_command(struct block_device *bdev, u8 sa, u64 key,
 	return sd_scsi_to_pr_err(&sshdr, result);
 }
 
-static int sd_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
+static int sd_pr_register_disk(struct scsi_disk *sdkp, u64 old_key, u64 new_key,
 		u32 flags)
 {
 	if (flags & ~PR_FL_IGNORE_KEY)
 		return -EOPNOTSUPP;
-	return sd_pr_out_command(bdev, (flags & PR_FL_IGNORE_KEY) ? 0x06 : 0x00,
+
+	return sd_pr_out_command(sdkp,
+			(flags & PR_FL_IGNORE_KEY) ? 0x06 : 0x00,
 			old_key, new_key, 0,
 			(1 << 0) /* APTPL */);
 }
 
-static int sd_pr_reserve(struct block_device *bdev, u64 key, enum pr_type type,
+static int sd_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
 		u32 flags)
+{
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
+
+	return sd_pr_register_disk(sdkp, old_key, new_key, flags);
+}
+
+static int sd_pr_reserve_disk(struct scsi_disk *sdkp, u64 key,
+		enum pr_type type, u32 flags)
 {
 	if (flags)
 		return -EOPNOTSUPP;
-	return sd_pr_out_command(bdev, 0x01, key, 0,
+	return sd_pr_out_command(sdkp, 0x01, key, 0,
+				 block_pr_type_to_scsi(type), 0);
+}
+
+static int sd_pr_reserve(struct block_device *bdev, u64 key,
+			enum pr_type type, u32 flags)
+{
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
+
+	return sd_pr_reserve_disk(sdkp, key, type, flags);
+}
+
+static int sd_pr_release_disk(struct scsi_disk *sdkp, u64 key,
+				enum pr_type type)
+{
+	return sd_pr_out_command(sdkp, 0x02, key, 0,
 				 block_pr_type_to_scsi(type), 0);
 }
 
 static int sd_pr_release(struct block_device *bdev, u64 key, enum pr_type type)
 {
-	return sd_pr_out_command(bdev, 0x02, key, 0,
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
+
+	return sd_pr_release_disk(sdkp, key, type);
+}
+
+static int sd_pr_preempt_disk(struct scsi_disk *sdkp, u64 old_key, u64 new_key,
+		enum pr_type type, bool abort)
+{
+	return sd_pr_out_command(sdkp, abort ? 0x05 : 0x04, old_key, new_key,
 				 block_pr_type_to_scsi(type), 0);
 }
 
 static int sd_pr_preempt(struct block_device *bdev, u64 old_key, u64 new_key,
 		enum pr_type type, bool abort)
 {
-	return sd_pr_out_command(bdev, abort ? 0x05 : 0x04, old_key, new_key,
-				 block_pr_type_to_scsi(type), 0);
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
+
+	return sd_pr_preempt_disk(sdkp, old_key, new_key, type, abort);
+}
+
+static int sd_pr_clear_disk(struct scsi_disk *sdkp, u64 key)
+{
+	return sd_pr_out_command(sdkp, 0x03, key, 0, 0, 0);
 }
 
 static int sd_pr_clear(struct block_device *bdev, u64 key)
 {
-	return sd_pr_out_command(bdev, 0x03, key, 0, 0, 0);
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
+
+	return sd_pr_clear_disk(sdkp, key);
 }
 
 static const struct pr_ops sd_pr_ops = {
