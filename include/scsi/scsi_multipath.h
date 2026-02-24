@@ -25,6 +25,7 @@ struct scsi_mpath_head {
 	int			dev_count;
 	struct ida		ida;
 	struct mutex		lock;
+	struct mpath_iopolicy	iopolicy;
 	struct mpath_head	*mpath_head;
 	struct device		dev;
 	int			index;
