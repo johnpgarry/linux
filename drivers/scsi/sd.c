@@ -4080,6 +4080,14 @@ static int sd_mpath_ioctl(struct scsi_device *sdp, blk_mode_t mode,
 	return sd_ioctl(bdev, mode, cmd, arg);
 }
 
+static struct mpath_disk *sd_mpath_to_disk(struct request *req)
+{
+	struct scsi_disk *sdkp = req->part->bd_disk->private_data;
+	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
+
+	return sd_mpath_disk->mpath_disk;
+}
+
 static int sd_mpath_pr_register(struct scsi_device *sdp, u64 old_key,
 			u64 new_key, u32 flags)
 {
@@ -4581,6 +4589,7 @@ static struct scsi_driver sd_template = {
 	.mpath_end_cmd		= sd_mpath_end_command,
 	.mpath_ioctl		= sd_mpath_ioctl,
 	.mpath_pr_ops		= &sd_mpath_pr_ops,
+	.to_mpath_disk		= sd_mpath_to_disk,
 	#endif
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,
