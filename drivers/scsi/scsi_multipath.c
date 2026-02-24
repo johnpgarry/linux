@@ -72,6 +72,23 @@ module_param_cb(scsi_multipath_always, &multipath_always_on_ops,
 MODULE_PARM_DESC(scsi_multipath_always,
 	"create multipath node always even for no ALUA support");
 
+static int iopolicy = MPATH_IOPOLICY_NUMA;
+
+static int scsi_set_iopolicy(const char *val, const struct kernel_param *kp)
+{
+	return mpath_set_iopolicy(val, &iopolicy);
+}
+
+static int scsi_get_iopolicy(char *buf, const struct kernel_param *kp)
+{
+	return mpath_get_iopolicy(buf, iopolicy);
+}
+
+module_param_call(iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
+	&iopolicy, 0644);
+MODULE_PARM_DESC(iopolicy,
+	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
+
 static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
@@ -116,8 +133,40 @@ static ssize_t scsi_mpath_device_wwid_show(struct device *dev,
 
 static DEVICE_ATTR(wwid, S_IRUGO, scsi_mpath_device_wwid_show, NULL);
 
+static void scsi_mpath_device_iopolicy_store_update(void *data)
+{
+	struct scsi_mpath_head *scsi_mpath_head = data;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+
+	mpath_clear_paths(mpath_head);
+	kblockd_schedule_work(&mpath_head->requeue_work);
+}
+
+static ssize_t scsi_mpath_device_iopolicy_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+
+	return mpath_iopolicy_store(&scsi_mpath_head->iopolicy, buf, count,
+		scsi_mpath_device_iopolicy_store_update, scsi_mpath_head);
+}
+
+static ssize_t scsi_mpath_device_iopolicy_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+
+	return mpath_iopolicy_show(&scsi_mpath_head->iopolicy, buf);
+}
+
+static DEVICE_ATTR(iopolicy, S_IRUGO | S_IWUSR,
+		scsi_mpath_device_iopolicy_show, scsi_mpath_device_iopolicy_store);
+
 static struct attribute *scsi_mpath_device_attrs[] = {
 	&dev_attr_wwid.attr,
+	&dev_attr_iopolicy.attr,
 	NULL
 };
 
@@ -211,7 +260,15 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	return 0;
 }
 
+static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_head)
+{
+	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
+
+	return mpath_read_iopolicy(&scsi_mpath_head->iopolicy);
+}
+
 struct mpath_head_template smpdt_pr = {
+	.get_iopolicy = scsi_mpath_get_iopolicy,
 };
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
