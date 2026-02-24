@@ -23,6 +23,8 @@ struct scsi_driver {
 	int (*eh_action)(struct scsi_cmnd *, int);
 	void (*eh_reset)(struct scsi_cmnd *);
 	#ifdef CONFIG_SCSI_MULTIPATH
+	void (*mpath_start_cmd)(struct scsi_cmnd *);
+	void (*mpath_end_cmd)(struct scsi_cmnd *);
 	struct mpath_disk *(*to_mpath_disk)(struct request *);
 	#endif
 };
