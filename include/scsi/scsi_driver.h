@@ -28,6 +28,7 @@ struct scsi_driver {
 	int (*mpath_ioctl)(struct scsi_device *sdev, blk_mode_t mode,
 					unsigned int cmd, unsigned long arg);
 	struct mpath_disk *(*to_mpath_disk)(struct request *);
+	const struct scsi_mpath_pr_ops *mpath_pr_ops;
 	#endif
 };
 #define to_scsi_driver(drv) \
