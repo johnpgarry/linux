@@ -1552,6 +1552,57 @@ static void sd_uninit_command(struct scsi_cmnd *SCpnt)
 		mempool_free(rq->special_vec.bv_page, sd_page_pool);
 }
 
+#ifdef CONFIG_SCSI_MULTIPATH
+static void sd_mpath_start_command(struct scsi_cmnd *scmd)
+{
+	struct request *req = scsi_cmd_to_rq(scmd);
+	struct scsi_disk *sdkp = scsi_disk(req->q->disk);
+	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
+	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
+	struct scsi_device *sdev = scmd->device;
+	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
+	struct gendisk *disk = mpath_disk->disk;
+
+	if (mpath_qd_iopolicy(&scsi_mpath_head->iopolicy) &&
+	    !(scmd->flags & SCMD_MPATH_CNT_ACTIVE)) {
+		struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+
+		atomic_inc(&scsi_mpath_dev->nr_active);
+		scmd->flags |= SCMD_MPATH_CNT_ACTIVE;
+	}
+
+	if (!blk_queue_io_stat(disk->queue) || blk_rq_is_passthrough(req) ||
+	    (scmd->flags & SCMD_MPATH_IO_STATS))
+		return;
+
+	scmd->flags |= SCMD_MPATH_IO_STATS;
+	scmd->start_time = bdev_start_io_acct(disk->part0, req_op(req),
+						      jiffies);
+}
+
+static void sd_mpath_end_command(struct scsi_cmnd *scmd)
+{
+	struct request *req = scsi_cmd_to_rq(scmd);
+	struct scsi_disk *sdkp = scsi_disk(req->q->disk);
+	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
+	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
+	struct scsi_device *sdev = scmd->device;
+
+	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE) {
+		struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+
+		atomic_dec_if_positive(&scsi_mpath_dev->nr_active);
+	}
+
+	if (!(scmd->flags & SCMD_MPATH_IO_STATS))
+		return;
+	bdev_end_io_acct(mpath_disk->disk->part0, req_op(req),
+			 blk_rq_bytes(req) >> SECTOR_SHIFT,
+			 scmd->start_time);
+}
+#endif
+
 static bool sd_need_revalidate(struct gendisk *disk, struct scsi_disk *sdkp)
 {
 	if (sdkp->device->removable || sdkp->write_prot) {
@@ -4457,6 +4508,10 @@ static struct scsi_driver sd_template = {
 	.resume			= sd_resume,
 	.init_command		= sd_init_command,
 	.uninit_command		= sd_uninit_command,
+	#ifdef CONFIG_SCSI_MULTIPATH
+	.mpath_start_cmd	= sd_mpath_start_command,
+	.mpath_end_cmd		= sd_mpath_end_command,
+	#endif
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,
 	.eh_reset		= sd_eh_reset,
