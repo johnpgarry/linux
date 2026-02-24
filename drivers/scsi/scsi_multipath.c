@@ -85,6 +85,69 @@ static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 	return 0;
 }
 
+static void scsi_mpath_delete_head(struct scsi_mpath_head *scsi_mpath_head)
+{
+	mutex_lock(&scsi_mpath_heads_lock);
+	list_del_init(&scsi_mpath_head->entry);
+	mutex_unlock(&scsi_mpath_heads_lock);
+}
+
+static void scsi_mpath_head_release(struct device *dev)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+
+	scsi_mpath_delete_head(scsi_mpath_head);
+	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
+	mpath_put_head(mpath_head);
+	kfree(scsi_mpath_head);
+}
+
+static ssize_t scsi_mpath_device_wwid_show(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+
+	return sysfs_emit(buf, "%s\n", scsi_mpath_head->wwid);
+}
+
+static DEVICE_ATTR(wwid, S_IRUGO, scsi_mpath_device_wwid_show, NULL);
+
+static struct attribute *scsi_mpath_device_attrs[] = {
+	&dev_attr_wwid.attr,
+	NULL
+};
+
+static const struct attribute_group scsi_mpath_device_attrs_group = {
+	.attrs = scsi_mpath_device_attrs,
+};
+
+static bool scsi_multipath_sysfs_group_visible(struct kobject *kobj)
+{
+	return true;
+}
+
+static bool scsi_multipath_sysfs_attr_visible(struct kobject *kobj,
+		struct attribute *attr, int n)
+{
+	return false;
+}
+DEFINE_SYSFS_GROUP_VISIBLE(scsi_multipath_sysfs)
+
+const struct attribute_group *scsi_mpath_device_groups[] = {
+	&scsi_mpath_device_attrs_group,
+	NULL
+};
+
+static const struct class scsi_mpath_device_class = {
+	.name = "scsi_mpath_device",
+	.dev_groups = scsi_mpath_device_groups,
+	.dev_release = scsi_mpath_head_release,
+};
+
 static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
@@ -129,6 +192,7 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 		goto out_put_head;
 
 	device_initialize(&scsi_mpath_head->dev);
+	scsi_mpath_head->dev.class = &scsi_mpath_device_class;
 	ret = dev_set_name(&scsi_mpath_head->dev, "%d", scsi_mpath_head->index);
 	if (ret) {
 		put_device(&scsi_mpath_head->dev);
@@ -294,11 +358,12 @@ EXPORT_SYMBOL_GPL(scsi_mpath_put_head);
 
 int __init scsi_multipath_init(void)
 {
-	return 0;
+	return class_register(&scsi_mpath_device_class);
 }
 
 void __exit scsi_multipath_exit(void)
 {
+	class_unregister(&scsi_mpath_device_class);
 }
 
 MODULE_LICENSE("GPL");
