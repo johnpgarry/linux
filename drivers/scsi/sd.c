@@ -4069,6 +4069,19 @@ static int sd_format_disk_name(char *prefix, int index, char *buf, int buflen)
 	return 0;
 }
 
+#ifdef CONFIG_SCSI_MULTIPATH
+static int sd_mpath_ioctl(struct scsi_device *sdp, blk_mode_t mode,
+		    unsigned int cmd, unsigned long arg)
+{
+	struct scsi_disk *sdkp = dev_get_drvdata(&sdp->sdev_gendev);
+	struct gendisk *disk = sdkp->disk;
+	struct block_device *bdev = disk->part0;
+
+	return sd_ioctl(bdev, mode, cmd, arg);
+}
+
+#else /* CONFIG_SCSI_MULTIPATH */
+#endif
 /**
  *	sd_probe - called during driver initialization and whenever a
  *	new scsi device is attached to the system. It is called once
@@ -4511,6 +4524,7 @@ static struct scsi_driver sd_template = {
 	#ifdef CONFIG_SCSI_MULTIPATH
 	.mpath_start_cmd	= sd_mpath_start_command,
 	.mpath_end_cmd		= sd_mpath_end_command,
+	.mpath_ioctl		= sd_mpath_ioctl,
 	#endif
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,
