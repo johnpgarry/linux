@@ -46,6 +46,8 @@ void scsi_mpath_dev_release(struct scsi_device *sdev);
 int scsi_multipath_init(void);
 void scsi_multipath_exit(void);
 void scsi_mpath_remove_device(struct scsi_mpath_device *scsi_mpath_dev);
+void scsi_mpath_add_sysfs_link(struct scsi_device *sdev);
+void scsi_mpath_remove_sysfs_link(struct scsi_device *sdev);
 int scsi_mpath_get_head(struct scsi_mpath_head *);
 void scsi_mpath_put_head(struct scsi_mpath_head *);
 #else /* CONFIG_SCSI_MULTIPATH */
@@ -78,6 +80,12 @@ static inline int scsi_mpath_get_head(struct scsi_mpath_head *)
 	return 0;
 }
 static inline void scsi_mpath_put_head(struct scsi_mpath_head *)
+{
+}
+static inline void scsi_mpath_add_sysfs_link(struct scsi_device *sdev)
+{
+}
+static inline void scsi_mpath_remove_sysfs_link(struct scsi_device *sdev)
 {
 }
 #endif /* CONFIG_SCSI_MULTIPATH */
