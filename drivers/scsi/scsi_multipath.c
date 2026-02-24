@@ -340,8 +340,53 @@ static int scsi_mpath_ioctl(struct block_device *bdev,
 	return err;
 }
 
+static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
+{
+	struct scsi_mpath_device *scsi_mpath_dev =
+				to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	enum scsi_device_state sdev_state = sdev->sdev_state;
+
+	if (sdev_state == SDEV_RUNNING || sdev_state == SDEV_CANCEL)
+		return false;
+
+	return true;
+}
+
+static bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
+{
+	if (scsi_mpath_is_disabled(mpath_device))
+		return false;
+	return true;
+}
+
+/* Until we have ALUA support, we're always optimised */
+static enum mpath_access_state scsi_mpath_get_access_state(
+				struct mpath_device *mpath_device)
+{
+	if (scsi_mpath_is_disabled(mpath_device))
+		return MPATH_STATE_INVALID;
+	return MPATH_STATE_OPTIMIZED;
+}
+
+static bool scsi_mpath_available_path(struct mpath_device *mpath_device, bool *available)
+{
+	struct scsi_mpath_device *scsi_mpath_dev =
+				to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+
+	if (scsi_device_blocked(sdev))
+		return false;
+
+	return scsi_device_online(sdev);
+}
+
 struct mpath_head_template smpdt_pr = {
+	.is_disabled = scsi_mpath_is_disabled,
+	.is_optimized = scsi_mpath_is_optimized,
+	.get_access_state = scsi_mpath_get_access_state,
 	.bdev_ioctl = scsi_mpath_ioctl,
+	.available_path = scsi_mpath_available_path,
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.clone_bio = scsi_mpath_clone_bio,
 };
