@@ -151,6 +151,17 @@ static void scsi_mpath_device_iopolicy_store_update(void *data)
 	kblockd_schedule_work(&mpath_head->requeue_work);
 }
 
+void scsi_mpath_dev_clear_path(struct scsi_mpath_device *scsi_mpath_dev)
+{
+	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+	struct scsi_mpath_head *scsi_mpath_head = scsi_mpath_dev->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+
+	if (mpath_clear_current_path(mpath_head, mpath_device))
+		mpath_synchronize(mpath_head);
+}
+EXPORT_SYMBOL_GPL(scsi_mpath_dev_clear_path);
+
 static ssize_t scsi_mpath_device_iopolicy_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
