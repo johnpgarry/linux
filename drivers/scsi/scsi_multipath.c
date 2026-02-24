@@ -16,6 +16,10 @@
 bool scsi_multipath;
 static bool scsi_multipath_always;
 
+static LIST_HEAD(scsi_mpath_heads_list);
+static DEFINE_MUTEX(scsi_mpath_heads_lock);
+static DEFINE_IDA(scsi_multipath_dev_ida);
+
 static int multipath_param_set(const char *val, const struct kernel_param *kp)
 {
 	int ret;
@@ -99,6 +103,73 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	return 0;
 }
 
+struct mpath_head_template smpdt_pr = {
+};
+
+static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
+{
+	struct scsi_mpath_head *scsi_mpath_head;
+	int ret;
+
+	scsi_mpath_head = kzalloc(sizeof(*scsi_mpath_head), GFP_KERNEL);
+	if (!scsi_mpath_head)
+		return NULL;
+
+	ida_init(&scsi_mpath_head->ida);
+	mutex_init(&scsi_mpath_head->lock);
+
+	scsi_mpath_head->mpath_head = mpath_alloc_head();
+	if (IS_ERR(scsi_mpath_head->mpath_head))
+		goto out_free;
+	scsi_mpath_head->mpath_head->mpdt = &smpdt_pr;
+	scsi_mpath_head->mpath_head->drvdata = scsi_mpath_head;
+
+	scsi_mpath_head->index = ida_alloc(&scsi_multipath_dev_ida, GFP_KERNEL);
+	if (scsi_mpath_head->index < 0)
+		goto out_put_head;
+
+	device_initialize(&scsi_mpath_head->dev);
+	ret = dev_set_name(&scsi_mpath_head->dev, "%d", scsi_mpath_head->index);
+	if (ret) {
+		put_device(&scsi_mpath_head->dev);
+		goto out_free_ida;
+	}
+
+	return scsi_mpath_head;
+
+out_free_ida:
+	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
+out_put_head:
+	mpath_put_head(scsi_mpath_head->mpath_head);
+out_free:
+	kfree(scsi_mpath_head);
+	return NULL;
+}
+
+static struct scsi_mpath_head *scsi_mpath_find_head(
+			struct scsi_mpath_device *scsi_mpath_dev)
+{
+	struct scsi_mpath_head *scsi_mpath_head;
+	int ret;
+
+	mutex_lock(&scsi_mpath_heads_lock);
+	list_for_each_entry(scsi_mpath_head, &scsi_mpath_heads_list, entry) {
+		ret = scsi_mpath_get_head(scsi_mpath_head);
+		if (ret)
+			continue;
+		if (strncmp(scsi_mpath_head->wwid,
+			scsi_mpath_dev->device_id_str,
+			SCSI_MPATH_DEVICE_ID_LEN) == 0) {
+
+			mutex_unlock(&scsi_mpath_heads_lock);
+			return scsi_mpath_head;
+		}
+		scsi_mpath_put_head(scsi_mpath_head);
+	}
+
+	return NULL;
+}
+
 static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 {
 	kfree(sdev->scsi_mpath_dev);
@@ -107,6 +178,7 @@ static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 
 int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
+	struct scsi_mpath_head *scsi_mpath_head;
 	int ret;
 
 	if (!scsi_multipath)
@@ -127,11 +199,73 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 		goto out_uninit;
 	}
 
+	scsi_mpath_head = scsi_mpath_find_head(sdev->scsi_mpath_dev);
+	if (scsi_mpath_head)
+		goto found;
+	/* scsi_mpath_disks_list lock held */
+	scsi_mpath_head = scsi_mpath_alloc_head();
+	if (!scsi_mpath_head)
+		goto out_uninit;
+
+	strcpy(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str);
+
+	ret = device_add(&scsi_mpath_head->dev);
+	if (ret)
+		goto out_put_head;
+
+	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
+
+	mutex_unlock(&scsi_mpath_heads_lock);
+	sdev->scsi_mpath_dev->scsi_mpath_head = scsi_mpath_head;
+
+found:
+	sdev->scsi_mpath_dev->index = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
+	if (sdev->scsi_mpath_dev->index < 0) {
+		ret = sdev->scsi_mpath_dev->index;
+		goto out_put_head;
+	}
+
+	mutex_lock(&scsi_mpath_head->lock);
+	scsi_mpath_head->dev_count++;
+	mutex_unlock(&scsi_mpath_head->lock);
+
+	sdev->scsi_mpath_dev->scsi_mpath_head = scsi_mpath_head;
 	return 0;
 
+out_put_head:
+	scsi_mpath_put_head(scsi_mpath_head);
 out_uninit:
+	mutex_unlock(&scsi_mpath_heads_lock);
 	scsi_multipath_sdev_uninit(sdev);
 	return ret;
+}
+
+static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+			scsi_mpath_dev->scsi_mpath_head;
+	bool last_path = false;
+
+	mutex_lock(&scsi_mpath_head->lock);
+	scsi_mpath_head->dev_count--;
+	if (scsi_mpath_head->dev_count == 0)
+		last_path = true;
+	mutex_unlock(&scsi_mpath_head->lock);
+
+	if (last_path)
+		device_del(&scsi_mpath_head->dev);
+
+	scsi_mpath_dev->scsi_mpath_head = NULL;
+	scsi_mpath_put_head(scsi_mpath_head);
+}
+
+void scsi_mpath_remove_device(struct scsi_mpath_device *scsi_mpath_dev)
+{
+	struct scsi_mpath_head *scsi_mpath_head = scsi_mpath_dev->scsi_mpath_head;
+
+	ida_free(&scsi_mpath_head->ida, scsi_mpath_dev->index);
+
+	scsi_mpath_remove_head(scsi_mpath_dev);
 }
 
 void scsi_mpath_dev_release(struct scsi_device *sdev)
@@ -142,8 +276,21 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 		return;
 
 	scsi_multipath_sdev_uninit(sdev);
-
 }
+
+int scsi_mpath_get_head(struct scsi_mpath_head *scsi_mpath_head)
+{
+	if (!get_device(&scsi_mpath_head->dev))
+		return -ENXIO;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(scsi_mpath_get_head);
+
+void scsi_mpath_put_head(struct scsi_mpath_head *scsi_mpath_head)
+{
+	put_device(&scsi_mpath_head->dev);
+}
+EXPORT_SYMBOL_GPL(scsi_mpath_put_head);
 
 int __init scsi_multipath_init(void)
 {
