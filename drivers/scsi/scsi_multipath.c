@@ -518,6 +518,86 @@ void scsi_mpath_put_head(struct scsi_mpath_head *scsi_mpath_head)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_put_head);
 
+bool scsi_is_mpath_request(struct request *req)
+{
+	return is_mpath_request(req);
+}
+EXPORT_SYMBOL_GPL(scsi_is_mpath_request);
+
+static inline void bio_list_add_clone_master(struct bio_list *bl,
+				struct bio *clone)
+{
+	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
+	struct bio *master_bio;
+
+	if (clone->bi_next)
+		bio_list_add_clone_master(bl, clone->bi_next);
+
+	scsi_mpath_clone_bio = scsi_mpath_to_master_bio(clone);
+	master_bio = scsi_mpath_clone_bio->master_bio;
+
+	if (bl->tail)
+		bl->tail->bi_next = master_bio;
+	else
+		bl->head = master_bio;
+
+	bl->tail = master_bio;
+
+	bio_put(clone);
+}
+
+void scsi_mpath_failover_req(struct request *req)
+{
+	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
+	struct scsi_device *sdev = scmd->device;
+	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
+	struct mpath_disk *mpath_disk = drv->to_mpath_disk(req);
+	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	unsigned long flags;
+
+	scsi_mpath_dev_clear_path(scsi_mpath_dev);
+
+	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
+	bio_list_add_clone_master(&mpath_head->requeue_list, req->bio);
+	spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
+	req->bio = NULL;
+	req->biotail = NULL;
+	req->__data_len = 0;
+
+	/* End old request with clone detached */
+	scmd->result = 0;
+	blk_mq_end_request(req, 0);
+
+	kblockd_schedule_work(&mpath_head->requeue_work);
+}
+
+static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
+{
+	struct scsi_device *sdev = scmd->device;
+
+	if (sdev->sdev_state == SDEV_TRANSPORT_OFFLINE)
+		return true;
+	return false;
+}
+
+int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
+{
+	struct request *req = scsi_cmd_to_rq(scmd);
+
+	if (is_mpath_request(req)) {
+		if (scsi_is_mpath_error(scmd) ||
+		    blk_queue_dying(req->q))
+			return FAILOVER;
+		return NEEDS_RETRY;
+	} else {
+		if (blk_queue_dying(req->q))
+			return SUCCESS;
+	}
+
+	return SUCCESS;
+}
+
 int __init scsi_multipath_init(void)
 {
 	return class_register(&scsi_mpath_device_class);
