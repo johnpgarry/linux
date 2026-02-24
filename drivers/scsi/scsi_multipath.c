@@ -89,6 +89,14 @@ module_param_call(iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
 MODULE_PARM_DESC(iopolicy,
 	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
 
+struct scsi_mpath_clone_bio {
+	struct bio		*master_bio;
+	struct bio		clone;
+};
+
+#define scsi_mpath_to_master_bio(clone) \
+		container_of(clone, struct scsi_mpath_clone_bio, clone)
+
 static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
@@ -116,6 +124,7 @@ static void scsi_mpath_head_release(struct device *dev)
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
 	scsi_mpath_delete_head(scsi_mpath_head);
+	bioset_exit(&scsi_mpath_head->bio_pool);
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
 	mpath_put_head(mpath_head);
 	kfree(scsi_mpath_head);
@@ -260,6 +269,39 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	return 0;
 }
 
+static void scsi_mpath_clone_end_io(struct bio *clone)
+{
+	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio =
+			scsi_mpath_to_master_bio(clone);
+	struct bio *master_bio = scsi_mpath_clone_bio->master_bio;
+
+	master_bio->bi_status = clone->bi_status;
+	bio_put(clone);
+	bio_endio(master_bio);
+}
+
+static struct bio *scsi_mpath_clone_bio(struct bio *bio)
+{
+	struct mpath_disk *mpath_disk = bio->bi_bdev->bd_disk->private_data;
+	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
+	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
+	struct bio *clone;
+
+	clone = bio_alloc_clone(bio->bi_bdev, bio, GFP_NOWAIT,
+				&scsi_mpath_head->bio_pool);
+	if (!clone)
+		return NULL;
+
+	clone->bi_end_io = scsi_mpath_clone_end_io;
+
+	scsi_mpath_clone_bio = container_of(clone,
+					struct scsi_mpath_clone_bio, clone);
+	scsi_mpath_clone_bio->master_bio = bio;
+
+	return clone;
+}
+
 static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_head)
 {
 	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
@@ -269,6 +311,7 @@ static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_he
 
 struct mpath_head_template smpdt_pr = {
 	.get_iopolicy = scsi_mpath_get_iopolicy,
+	.clone_bio = scsi_mpath_clone_bio,
 };
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
@@ -283,9 +326,13 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 	ida_init(&scsi_mpath_head->ida);
 	mutex_init(&scsi_mpath_head->lock);
 
+	if (bioset_init(&scsi_mpath_head->bio_pool, SCSI_MAX_QUEUE_DEPTH,
+			offsetof(struct scsi_mpath_clone_bio, clone),
+			BIOSET_NEED_BVECS|BIOSET_PERCPU_CACHE))
+		goto out_free;
 	scsi_mpath_head->mpath_head = mpath_alloc_head();
 	if (IS_ERR(scsi_mpath_head->mpath_head))
-		goto out_free;
+		goto out_bioset_exit;
 	scsi_mpath_head->mpath_head->mpdt = &smpdt_pr;
 	scsi_mpath_head->mpath_head->drvdata = scsi_mpath_head;
 
@@ -307,6 +354,8 @@ out_free_ida:
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
 out_put_head:
 	mpath_put_head(scsi_mpath_head->mpath_head);
+out_bioset_exit:
+	bioset_exit(&scsi_mpath_head->bio_pool);
 out_free:
 	kfree(scsi_mpath_head);
 	return NULL;
