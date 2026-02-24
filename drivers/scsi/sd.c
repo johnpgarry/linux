@@ -4080,6 +4080,61 @@ static int sd_mpath_ioctl(struct scsi_device *sdp, blk_mode_t mode,
 	return sd_ioctl(bdev, mode, cmd, arg);
 }
 
+static int sd_mpath_pr_register(struct scsi_device *sdp, u64 old_key,
+			u64 new_key, u32 flags)
+{
+	return sd_pr_register_disk(dev_get_drvdata(&sdp->sdev_gendev), old_key,
+			new_key, flags);
+}
+
+static int sd_mpath_pr_reserve(struct scsi_device *sdp, u64 key,
+			enum pr_type type, u32 flags)
+{
+	return sd_pr_reserve_disk(dev_get_drvdata(&sdp->sdev_gendev), key, type,
+			flags);
+}
+
+static int sd_mpath_pr_release(struct scsi_device *sdp, u64 key,
+			enum pr_type type)
+{
+	return sd_pr_release_disk(dev_get_drvdata(&sdp->sdev_gendev), key, type);
+}
+
+static int sd_mpath_pr_preempt(struct scsi_device *sdp, u64 old,
+			u64 new, enum pr_type type, bool abort)
+{
+	return sd_pr_preempt_disk(dev_get_drvdata(&sdp->sdev_gendev), old, new,
+			type, abort);
+}
+
+static int sd_mpath_pr_clear(struct scsi_device *sdp, u64 key)
+{
+	return sd_pr_clear_disk(dev_get_drvdata(&sdp->sdev_gendev), key);
+}
+
+static int sd_mpath_pr_read_keys(struct scsi_device *sdp,
+			struct pr_keys *keys_info)
+{
+	return sd_pr_read_keys_disk(dev_get_drvdata(&sdp->sdev_gendev),
+			keys_info);
+}
+
+static int sd_mpath_pr_read_reservation(struct scsi_device *sdp,
+			struct pr_held_reservation *resv)
+{
+	return sd_pr_read_reservation_disk(dev_get_drvdata(&sdp->sdev_gendev),
+			resv);
+}
+
+static const struct scsi_mpath_pr_ops sd_mpath_pr_ops = {
+	.pr_register	= sd_mpath_pr_register,
+	.pr_reserve	= sd_mpath_pr_reserve,
+	.pr_release	= sd_mpath_pr_release,
+	.pr_preempt	= sd_mpath_pr_preempt,
+	.pr_clear	= sd_mpath_pr_clear,
+	.pr_read_keys	= sd_mpath_pr_read_keys,
+	.pr_read_reservation = sd_mpath_pr_read_reservation,
+};
 #else /* CONFIG_SCSI_MULTIPATH */
 #endif
 /**
@@ -4525,6 +4580,7 @@ static struct scsi_driver sd_template = {
 	.mpath_start_cmd	= sd_mpath_start_command,
 	.mpath_end_cmd		= sd_mpath_end_command,
 	.mpath_ioctl		= sd_mpath_ioctl,
+	.mpath_pr_ops		= &sd_mpath_pr_ops,
 	#endif
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,
