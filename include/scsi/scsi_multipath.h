@@ -43,6 +43,9 @@ struct scsi_mpath_device {
 #define to_scsi_mpath_device(d) \
 	container_of(d, struct scsi_mpath_device, mpath_device)
 
+void scsi_mpath_failover_req(struct request *);
+int scsi_mpath_failover_disposition(struct scsi_cmnd *);
+bool scsi_is_mpath_request(struct request *req);
 int scsi_mpath_dev_alloc(struct scsi_device *sdev);
 void scsi_mpath_dev_release(struct scsi_device *sdev);
 int scsi_multipath_init(void);
@@ -60,6 +63,17 @@ struct scsi_mpath_head {
 struct scsi_mpath_device {
 };
 
+static inline void scsi_mpath_failover_req(struct request *)
+{
+}
+static inline int scsi_mpath_failover_disposition(struct scsi_cmnd *)
+{
+	return 0;
+}
+static inline bool scsi_is_mpath_request(struct request *req)
+{
+	return false;
+}
 static inline int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	return 0;

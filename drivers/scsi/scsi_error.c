@@ -40,6 +40,7 @@
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi_dh.h>
 #include <scsi/scsi_devinfo.h>
+#include <scsi/scsi_multipath.h>
 #include <scsi/sg.h>
 
 #include "scsi_priv.h"
@@ -1934,12 +1935,16 @@ check_type:
 enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 {
 	enum scsi_disposition rtn;
+	struct request *req = scsi_cmd_to_rq(scmd);
 
 	/*
 	 * if the device is offline, then we clearly just pass the result back
 	 * up to the top level.
 	 */
 	if (!scsi_device_online(scmd->device)) {
+		if (scsi_is_mpath_request(req))
+			return scsi_mpath_failover_disposition(scmd);
+
 		SCSI_LOG_ERROR_RECOVERY(5, scmd_printk(KERN_INFO, scmd,
 			"%s: device offline - report as SUCCESS\n", __func__));
 		return SUCCESS;
@@ -2102,6 +2107,13 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 	return FAILED;
 
 maybe_retry:
+
+	/*
+	 * For SCSI Multipath check if there are path errors to
+	 * trigger failover to available path
+	 */
+	if (scsi_is_mpath_request(req))
+		return scsi_mpath_failover_disposition(scmd);
 
 	/* we requeue for retry because the error was retryable, and
 	 * the request was not marked fast fail.  Note that above,

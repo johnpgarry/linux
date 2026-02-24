@@ -1559,7 +1559,7 @@ static void scsi_complete(struct request *rq)
 		atomic_inc(&cmd->device->ioerr_cnt);
 
 	disposition = scsi_decide_disposition(cmd);
-	if (disposition != SUCCESS && scsi_cmd_runtime_exceeced(cmd))
+	if (disposition != SUCCESS && disposition != FAILOVER && scsi_cmd_runtime_exceeced(cmd))
 		disposition = SUCCESS;
 
 	scsi_log_completion(cmd, disposition);
@@ -1573,6 +1573,9 @@ static void scsi_complete(struct request *rq)
 		break;
 	case ADD_TO_MLQUEUE:
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
+		break;
+	case FAILOVER:
+		scsi_mpath_failover_req(rq);
 		break;
 	default:
 		scsi_eh_scmd_add(cmd);
@@ -1944,6 +1947,10 @@ out_put_budget:
 		if (req->rq_flags & RQF_DONTPREP)
 			scsi_mq_uninit_cmd(cmd);
 		scsi_run_queue_async(sdev);
+		if (!scsi_device_online(sdev) && scsi_is_mpath_request(req)) {
+			scsi_mpath_failover_req(req);
+			return 0;
+		}
 		break;
 	}
 	return ret;
