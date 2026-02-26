@@ -76,6 +76,13 @@ config SCSI_LIB_KUNIT_TEST
 
 	  If unsure say N.
 
+config SCSI_ALUA
+	tristate "SPC-3 ALUA support"
+	depends on SCSI
+	help
+	  SCSI support for generic SPC-3 Asymmetric Logical Unit
+	  Access (ALUA).
+
 comment "SCSI support type (disk, tape, CD-ROM)"
 	depends on SCSI
 
