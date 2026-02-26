@@ -86,6 +86,15 @@ config SCSI_MULTIPATH
 
 	  If unsure say N.
 
+config SCSI_ALUA
+	tristate "SPC-3 ALUA support"
+	depends on SCSI
+	help
+	  SCSI support for generic SPC-3 Asymmetric Logical Unit
+	  Access (ALUA).
+
+	  If unsure say Y.
+
 comment "SCSI support type (disk, tape, CD-ROM)"
 	depends on SCSI
 
