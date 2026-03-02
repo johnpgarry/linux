@@ -64,8 +64,8 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 	unsigned long flags;
 
 	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS h=%pS\n", __func__, sdev, h);
-	pr_err("%s\n", __func__);
 	group_id = scsi_vpd_tpg_id(sdev, &rel_port);
+	sdev_printk(KERN_ERR, sdev, "%s1 sdev=%pS h=%pS group_id=%d\n", __func__, sdev, h, group_id);
 	if (group_id < 0) {
 		/*
 		 * Internal error; TPGS supported but required
@@ -79,6 +79,8 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 	}
 
 	pg = alua_alloc_pg(sdev, group_id, tpgs);
+	sdev_printk(KERN_ERR, sdev, "%s2 sdev=%pS h=%pS group_id=%d pg=%pS\n",
+		__func__, sdev, h, group_id, pg);
 	if (IS_ERR(pg)) {
 		if (PTR_ERR(pg) == -ENOMEM)
 			return SCSI_DH_NOMEM;
@@ -118,6 +120,8 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 
 	spin_unlock(&h->pg_lock);
 
+	sdev_printk(KERN_ERR, sdev, "%s3 sdev=%pS h=%pS group_id=%d pg=%pS calling alua_rtpg_queue\n",
+			__func__, sdev, h, group_id, pg);
 	alua_rtpg_queue(pg, sdev, NULL, true);
 	alua_put_pg(pg);
 
@@ -133,7 +137,7 @@ static void alua_handle_state_transition(struct scsi_device *sdev)
 	struct alua_dh_data *h = sdev->handler_data;
 	struct alua_port_group *pg;
 
-	pr_err("%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	rcu_read_lock();
 	pg = rcu_dereference(h->pg);
 	if (pg)
@@ -145,7 +149,7 @@ static void alua_handle_state_transition(struct scsi_device *sdev)
 static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr)
 {
-	pr_err("%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	switch (sense_hdr->sense_key) {
 	case NOT_READY:
 		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
@@ -238,7 +242,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	unsigned long flags;
 	bool transitioning_sense = false;
 
-	pr_err("%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS pg=%pS\n", __func__, sdev, pg);
 	group_id_old = pg->group_id;
 	state_old = pg->state;
 	pref_old = pg->pref;
@@ -259,6 +263,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  retry:
 	err = 0;
+	sdev_printk(KERN_ERR, sdev, "%s1 sdev=%pS pg=%pS calling submit_rtpg\n", __func__, sdev, pg);
 	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr, pg->flags);
 
 	if (retval) {
@@ -480,7 +485,7 @@ static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	int retval;
 	struct scsi_sense_hdr sense_hdr;
 
-	pr_err("%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s pg=%pS\n", __func__, pg);
 	if (!(pg->tpgs & TPGS_MODE_EXPLICIT)) {
 		/* Only implicit ALUA supported, retry */
 		return SCSI_DH_RETRY;
@@ -507,7 +512,9 @@ static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			    ALUA_DH_NAME, pg->state);
 		return SCSI_DH_NOSYS;
 	}
+	sdev_printk(KERN_ERR, sdev, "%s1 calling submit_stpg pg=%pS pg->group_id=%d\n", __func__, pg, pg->group_id);
 	retval = submit_stpg(sdev, pg->group_id, &sense_hdr);
+	sdev_printk(KERN_ERR, sdev, "%s1.1 called submit_stpg pg=%pS\n", __func__, pg);
 
 	if (retval) {
 		if (retval < 0 || !scsi_sense_valid(&sense_hdr)) {
@@ -536,7 +543,7 @@ alua_rtpg_select_sdev(struct alua_port_group *pg)
 	struct alua_dh_data *h;
 	struct scsi_device *sdev = NULL, *prev_sdev;
 
-	pr_err("%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	lockdep_assert_held(&pg->lock);
 	if (WARN_ON(!pg->rtpg_sdev))
 		return NULL;
@@ -590,7 +597,7 @@ static void alua_rtpg_work(struct work_struct *work)
 
 	spin_lock_irqsave(&pg->lock, flags);
 	sdev = pg->rtpg_sdev;
-	pr_err("%s pg=%pS state=%d sdev=%pS OPTIMAL=%d\n", __func__, pg, pg->state, sdev, SCSI_ACCESS_STATE_OPTIMAL);
+	sdev_printk(KERN_ERR, sdev, "%s pg=%pS state=%d sdev=%pS OPTIMAL=%d\n", __func__, pg, pg->state, sdev, SCSI_ACCESS_STATE_OPTIMAL);
 	if (!sdev) {
 		WARN_ON(pg->flags & ALUA_PG_RUN_RTPG);
 		WARN_ON(pg->flags & ALUA_PG_RUN_STPG);
@@ -618,9 +625,9 @@ static void alua_rtpg_work(struct work_struct *work)
 			}
 			/* Send RTPG on failure or if TUR indicates SUCCESS */
 		}
-		pr_err("%s1 pg=%pS sdev=%pS calling alua_rtpg\n", __func__, pg, sdev);
+		sdev_printk(KERN_ERR, sdev, "%s1 pg=%pS sdev=%pS calling alua_rtpg\n", __func__, pg, sdev);
 		err = alua_rtpg(sdev, pg);
-		pr_err("%s1.1 pg=%pS sdev=%pS called alua_rtpg err=%d\n", __func__, pg, sdev, err);
+		sdev_printk(KERN_ERR, sdev, "%s1.1 pg=%pS sdev=%pS called alua_rtpg err=%d\n", __func__, pg, sdev, err);
 		spin_lock_irqsave(&pg->lock, flags);
 
 		/* If RTPG failed on the current device, try using another */
@@ -645,7 +652,7 @@ static void alua_rtpg_work(struct work_struct *work)
 	if (pg->flags & ALUA_PG_RUN_STPG) {
 		pg->flags &= ~ALUA_PG_RUN_STPG;
 		spin_unlock_irqrestore(&pg->lock, flags);
-		pr_err("%s2 pg=%pS sdev=%pS calling alua_stpg\n", __func__, pg, sdev);
+		sdev_printk(KERN_ERR, sdev, "%s2 pg=%pS sdev=%pS calling alua_stpg\n", __func__, pg, sdev);
 		err = alua_stpg(sdev, pg);
 		spin_lock_irqsave(&pg->lock, flags);
 		if (err == SCSI_DH_RETRY || pg->flags & ALUA_PG_RUN_RTPG) {
@@ -671,7 +678,7 @@ static void alua_rtpg_work(struct work_struct *work)
 		scsi_device_put(prev_sdev);
 
 	list_for_each_entry_safe(qdata, tmp, &qdata_list, entry) {
-		pr_err("%s4 looping qdata_list pg=%pS qdata=%pS callback_fn=%pS callback_data=%pS\n",
+		sdev_printk(KERN_ERR, sdev, "%s4 looping qdata_list pg=%pS qdata=%pS callback_fn=%pS callback_data=%pS\n",
 			__func__, pg, qdata, qdata->callback_fn, qdata->callback_data);
 		list_del(&qdata->entry);
 		if (qdata->callback_fn)
@@ -712,7 +719,7 @@ static bool alua_rtpg_queue(struct alua_port_group *pg,
 	int start_queue = 0;
 	unsigned long flags;
 
-	pr_err("%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s pg=%pS sdev=%pS\n", __func__, pg, sdev);
 	if (WARN_ON_ONCE(!pg) || scsi_device_get(sdev))
 		return false;
 
@@ -745,6 +752,8 @@ static bool alua_rtpg_queue(struct alua_port_group *pg,
 
 	spin_unlock_irqrestore(&pg->lock, flags);
 
+	sdev_printk(KERN_ERR, sdev, "%s3 pg=%pS sdev=%pS start_queue=%d\n",
+		__func__, pg, sdev, start_queue);
 	if (start_queue) {
 		if (queue_delayed_work(kaluad_wq, &pg->rtpg_work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS)))
@@ -769,15 +778,15 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 {
 	int err = SCSI_DH_DEV_UNSUPP, tpgs;
 
-	pr_err("%s sdev=%pS h=%pS calling alua_check_tpgs\n", __func__, sdev, h);
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS h=%pS calling alua_check_tpgs\n", __func__, sdev, h);
 	mutex_lock(&h->init_mutex);
 	h->disabled = false;
 	tpgs = alua_check_tpgs(sdev);
-	pr_err("%s2 sdev=%pS h=%pS called alua_check_tpgs tpgs=%d\n", __func__, sdev, h, tpgs);
+	sdev_printk(KERN_ERR, sdev, "%s1 sdev=%pS h=%pS called alua_check_tpgs tpgs=%d\n", __func__, sdev, h, tpgs);
 	if (tpgs != TPGS_MODE_NONE) {
-		pr_err("%s2 sdev=%pS h=%pS calling alua_check_vpd tpgs=%d\n", __func__, sdev, h, tpgs);
+		sdev_printk(KERN_ERR, sdev, "%s2 sdev=%pS h=%pS calling alua_check_vpd tpgs=%d\n", __func__, sdev, h, tpgs);
 		err = alua_check_vpd(sdev, h, tpgs);
-		pr_err("%s2.1 sdev=%pS h=%pS called alua_check_vpd tpgs=%d err=%d\n",
+		sdev_printk(KERN_ERR, sdev, "%s2.1 sdev=%pS h=%pS called alua_check_vpd tpgs=%d err=%d\n",
 			__func__, sdev, h, tpgs, err);
 	}
 	h->init_error = err;
@@ -846,7 +855,8 @@ static int alua_activate(struct scsi_device *sdev,
 	struct alua_queue_data *qdata;
 	struct alua_port_group *pg;
 
-	pr_err("%s\n", __func__);
+	WARN_ON_ONCE(1);
+
 	qdata = kzalloc(sizeof(*qdata), GFP_KERNEL);
 	sdev_printk(KERN_ERR, sdev, "%s data=%pS\n", __func__, data);
 
@@ -870,6 +880,7 @@ static int alua_activate(struct scsi_device *sdev,
 	rcu_read_unlock();
 	mutex_unlock(&h->init_mutex);
 
+	sdev_printk(KERN_ERR, sdev, "%s2 data=%pS calling alua_rtpg_queue\n", __func__, data);
 	if (alua_rtpg_queue(pg, sdev, qdata, true)) {
 		fn = NULL;
 	} else {
@@ -894,7 +905,7 @@ static void alua_check(struct scsi_device *sdev, bool force)
 	struct alua_dh_data *h = sdev->handler_data;
 	struct alua_port_group *pg;
 
-	pr_err("%s\n", __func__);
+	sdev_printk(KERN_ERR, sdev, "%s\n", __func__);
 	rcu_read_lock();
 	pg = rcu_dereference(h->pg);
 	if (!pg || !kref_get_unless_zero(&pg->kref)) {
@@ -954,7 +965,7 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	int err;
 
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
-	pr_err("%s sdev=%pS\n", __func__, sdev);
+	sdev_printk(KERN_ERR, sdev, "%s sdev=%pS\n", __func__, sdev);
 	if (!h)
 		return SCSI_DH_NOMEM;
 	spin_lock_init(&h->pg_lock);

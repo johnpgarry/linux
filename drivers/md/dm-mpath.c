@@ -1547,6 +1547,7 @@ static void pg_init_done(void *data, int errors)
 	unsigned long flags;
 	bool delay_retry = false;
 
+	pr_err("%s pgpath=%pS errors=%d\n", __func__, pgpath, errors);
 	/* device or driver problems */
 	switch (errors) {
 	case SCSI_DH_OK:
