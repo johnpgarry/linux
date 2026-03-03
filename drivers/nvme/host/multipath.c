@@ -388,14 +388,27 @@ static void nvme_remove_head_work(struct work_struct *work)
 			struct mpath_head, remove_work);
 	struct nvme_ns_head *head = mpath_head->drvdata;
 	bool remove = false;
+	struct kref *ref_head;
+	struct kref *ref_mpath_head;
 
+	ref_head = &head->ref;
+	ref_mpath_head = &mpath_head->ref;
 	mutex_lock(&head->subsys->lock);
+	pr_err("%s mpath_head=%pS head=%pS head->ns_count=%d\n",
+		__func__, mpath_head, head, head->ns_count);
 	if (!head->ns_count) {
 		list_del_init(&head->entry);
 		remove = true;
 	}
 	mutex_unlock(&head->subsys->lock);
 
+	pr_err("%s8 head=%pS refcount=%d remove=%d\n",
+		__func__,
+			head, refcount_read(&ref_head->refcount),
+			remove);
+	pr_err("%s8.1 mpath_head=%pS refcount=%d\n",
+		__func__,
+			mpath_head, refcount_read(&ref_mpath_head->refcount));
 	if (remove) {
 		mpath_unregister_disk(mpath_head);
 		nvme_put_ns_head(head);
@@ -410,6 +423,8 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	struct queue_limits lim;
 	int ret;
 
+
+	pr_err("%s ctrl=%pS head=%pS\n", __func__, ctrl, head);
 	/*
 	 * If "multipath_always_on" is enabled, a multipath node is added
 	 * regardless of whether the disk is single/multi ported, and whether
@@ -436,6 +451,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 		lim.features |= BLK_FEAT_ZONED;
 
 	mpath_head = mpath_alloc_head();
+	pr_err("%s2 mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 	if (IS_ERR(mpath_head))
 		return PTR_ERR(mpath_head);
 
@@ -445,6 +461,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 		return ret;
 	}
 
+	pr_err("%s3 mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
 	mpath_head->drvdata = head;
 
 	head->mpath_head = mpath_head;
@@ -453,6 +470,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	mpath_head->mpdt = &mpdt;
 	INIT_DELAYED_WORK(&mpath_head->remove_work, nvme_remove_head_work);
 
+	pr_err("%s4 mpath_head=%pS calling nvme_tryget_ns_head\n", __func__, mpath_head);
 	sprintf(mpath_head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
 	nvme_tryget_ns_head(head);
@@ -799,6 +817,7 @@ static int nvme_lookup_ana_group_desc(struct nvme_ctrl *ctrl,
 void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 {
 	struct nvme_ns_head *head = ns->head;
+	pr_err("%s head=%pS head->mpath_head=%pS\n", __func__, head, head->mpath_head);
 
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
 		struct nvme_ana_group_desc desc = {
@@ -832,13 +851,23 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	struct mpath_head *mpath_head = head->mpath_head;
+	struct kref *ref_head;
+	struct kref *ref_mpath_head;
 	bool remove = false;
 
+	pr_err("%s head=%pS mpath_head=%pS\n",
+		__func__, head, mpath_head);
 	if (!mpath_head)
 		return;
 
-	mutex_lock(&head->subsys->lock);
+	ref_head = &head->ref;
+	ref_mpath_head = &mpath_head->ref;
 
+	mutex_lock(&head->subsys->lock);
+	pr_err("%s head=%pS refcount=%d mpath_head=%pS refcount=%d\n",
+		__func__,
+			head, refcount_read(&ref_head->refcount),
+			mpath_head, refcount_read(&ref_mpath_head->refcount));
 	/*
 	 * We are called when all paths have been removed, and at that point
 	 * head->list is expected to be empty. However, nvme_ns_remove() and
@@ -848,17 +877,27 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	 * head->list here. If it is no longer empty then we skip enqueuing the
 	 * delayed head removal work.
 	 */
-
+	pr_err("%s1 head=%pS head->ns_count=%d\n",
+		__func__,
+			head, head->ns_count);
 	if (head->ns_count)
 		goto out;
 
 	if (mpath_can_remove_head(mpath_head)) {
+		pr_err("%s2 head=%pS mpath_can_remove_head returned true\n",
+		__func__, head);
 		list_del_init(&head->entry);
 		remove = true;
 	}
 out:
 	mutex_unlock(&head->subsys->lock);
-
+	pr_err("%s8 head=%pS refcount=%d remove=%d\n",
+		__func__,
+			head, refcount_read(&ref_head->refcount),
+			remove);
+	pr_err("%s8.1 mpath_head=%pS refcount=%d\n",
+		__func__,
+			mpath_head, refcount_read(&ref_mpath_head->refcount));
 	if (remove) {
 		mpath_unregister_disk(mpath_head);
 		nvme_put_ns_head(head);

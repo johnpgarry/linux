@@ -666,20 +666,30 @@ static void nvme_free_ns_head(struct kref *ref)
 {
 	struct nvme_ns_head *head =
 		container_of(ref, struct nvme_ns_head, ref);
-
+	pr_err("%s head=%pS\n", __func__, head);
 	ida_free(&head->subsys->ns_ida, head->instance);
 	nvme_put_subsystem(head->subsys);
+	mpath_put_head(head->mpath_head);
 	kfree(head->plids);
+	pr_err("%s3 head=%pS calling kfree(head)\n", __func__, head);
 	kfree(head);
 }
 
 bool nvme_tryget_ns_head(struct nvme_ns_head *head)
 {
+	struct kref *ref = &head->ref;
+	pr_err("%s head=%pS ref=%pS refcount=%d calling kref_get_unless_zero\n",
+		__func__, head, ref,
+		refcount_read(&ref->refcount));
 	return kref_get_unless_zero(&head->ref);
 }
 
 void nvme_put_ns_head(struct nvme_ns_head *head)
 {
+	struct kref *ref = &head->ref;
+	pr_err("%s head=%pS ref=%pS refcount=%d calling kref_put\n",
+		__func__, head, ref,
+		refcount_read(&ref->refcount));
 	kref_put(&head->ref, nvme_free_ns_head);
 }
 
@@ -688,6 +698,7 @@ static void nvme_free_ns(struct kref *kref)
 	struct nvme_ns *ns = container_of(kref, struct nvme_ns, kref);
 
 	put_disk(ns->disk);
+	pr_err("%s ns=%pS calling nvme_put_ns_head\n", __func__, ns);
 	nvme_put_ns_head(ns->head);
 	nvme_put_ctrl(ns->ctrl);
 	kfree(ns);
@@ -3205,6 +3216,7 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	int ret;
 
 	subsys = kzalloc(sizeof(*subsys), GFP_KERNEL);
+	pr_err("%s ctrl=%pS subsys=%pS\n", __func__, ctrl, subsys);
 	if (!subsys)
 		return -ENOMEM;
 
@@ -3909,20 +3921,27 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	} else
 		head->effects = ctrl->effects;
 
+	pr_err("%s4 head=%pS\n", __func__, head);
 	ret = nvme_mpath_alloc_disk(ctrl, head);
+	pr_err("%s5 head=%pS\n", __func__, head);
 	if (ret)
 		goto out_ida_free;
 
 	list_add_tail(&head->entry, &ctrl->subsys->nsheads);
 
 	kref_get(&ctrl->subsys->ref);
+	pr_err("%s10 head=%pS\n", __func__, head);
 
 	return head;
+
 out_ida_free:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
+	pr_err("%s12 out_ida_free\n", __func__);
 out_free_head:
+	pr_err("%s13 out_free_head\n", __func__);
 	kfree(head);
 out:
+	pr_err("%s14 out\n", __func__);
 	if (ret > 0)
 		ret = blk_status_to_errno(nvme_error_status(ret));
 	return ERR_PTR(ret);
@@ -4000,6 +4019,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 	mutex_lock(&ctrl->subsys->lock);
 	head = nvme_find_ns_head(ctrl, info->nsid);
+	pr_err("%s1 head=%pS after nvme_find_ns_head\n", __func__, head);
 	if (!head) {
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, &info->ids);
 		if (ret) {
@@ -4009,6 +4029,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			goto out_unlock;
 		}
 		head = nvme_alloc_ns_head(ctrl, info);
+		pr_err("%s2 head=%pS after nvme_alloc_ns_head\n", __func__, head);
 		if (IS_ERR(head)) {
 			ret = PTR_ERR(head);
 			goto out_unlock;
@@ -4037,12 +4058,29 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 				"Shared namespace support requires core_nvme.multipath=Y.\n");
 		}
 	}
+	pr_err("%s3 head=%pS head->mpath_head=%pS\n", __func__, head, head->mpath_head);
+	if (head->mpath_head) {
+		struct mpath_head *mpath_head;
+		struct mpath_device *mpath_device;
 
+		mpath_head = head->mpath_head;
+		pr_err("%s4.2 mpath_head=%pS\n", __func__, mpath_head);
+		mpath_device = &ns->mpath_device;
+		pr_err("%s4.3 mpath_head->disk=%pS\n", __func__, mpath_head->disk);
+
+		pr_err("%s4.4 mpath_device=%pS ns->disk=%pS\n",
+				__func__, mpath_device, ns->disk);
+	}
+	pr_err("%s5 head->ns_count=%d before inc\n", __func__, head->ns_count);
 	head->ns_count++;
+	pr_err("%s6 head->ns_count=%d after inc\n", __func__, head->ns_count);
 	ns->head = head;
 	nvme_mpath_add_ns(ns);
+	pr_err("%s7\n", __func__);
 	mutex_unlock(&ctrl->subsys->lock);
 
+
+	pr_err("%s10\n", __func__);
 	return 0;
 
 out_put_ns_head:
@@ -4211,6 +4249,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	struct nvme_ns_head *head = ns->head;
 	bool last_path = false;
 
+	pr_err("%s ns=%pS\n", __func__, ns);
 	if (test_and_set_bit(NVME_NS_REMOVING, &ns->flags))
 		return;
 
@@ -4222,6 +4261,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	 * Ensure that !NVME_NS_READY is seen by other threads to prevent
 	 * this ns going back into current_path.
 	 */
+	pr_err("%s1 ns=%pS calling nvme_mpath_synchronize\n", __func__, ns);
 	nvme_mpath_synchronize(head);
 
 	/* wait for concurrent submissions */
@@ -4229,6 +4269,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		nvme_mpath_synchronize(head);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
+	pr_err("%s2 ns=%pS calling nvme_mpath_delete_ns\n", __func__, ns);
 	nvme_mpath_delete_ns(ns);
 	head->ns_count--;
 	if (!head->ns_count) {
@@ -4244,6 +4285,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	if (!nvme_ns_head_multipath(ns->head))
 		nvme_cdev_del(&ns->cdev, &ns->cdev_device);
 
+	pr_err("%s3 ns=%pS calling nvme_mpath_remove_sysfs_link\n", __func__, ns);
 	nvme_mpath_remove_sysfs_link(ns);
 
 	del_gendisk(ns->disk);
@@ -4253,8 +4295,10 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	mutex_unlock(&ns->ctrl->namespaces_lock);
 	synchronize_srcu(&ns->ctrl->srcu);
 
+	pr_err("%s4 ns=%pS last_path=%d\n", __func__, ns, last_path);
 	if (last_path)
 		nvme_mpath_remove_disk(ns->head);
+	pr_err("%s5 ns=%pS calling nvme_put_ns\n", __func__, ns);
 	nvme_put_ns(ns);
 }
 
@@ -4540,6 +4584,7 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 {
 	struct nvme_ns *ns, *next;
 	LIST_HEAD(ns_list);
+	pr_err("%s ctrl=%pS calling nvme_mpath_clear_ctrl_paths\n", __func__, ctrl);
 
 	/*
 	 * make sure to requeue I/O to all namespaces as these
@@ -4552,9 +4597,11 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 	 * Unquiesce io queues so any pending IO won't hang, especially
 	 * those submitted from scan work
 	 */
+	pr_err("%s2 ctrl=%pS calling nvme_unquiesce_io_queues\n", __func__, ctrl);
 	nvme_unquiesce_io_queues(ctrl);
 
 	/* prevent racing with ns scanning */
+	pr_err("%s3 ctrl=%pS calling flush_work\n", __func__, ctrl);
 	flush_work(&ctrl->scan_work);
 
 	/*
@@ -4567,6 +4614,7 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 		nvme_mark_namespaces_dead(ctrl);
 
 	/* this is a no-op when called from the controller reset handler */
+	pr_err("%s5 ctrl=%pS calling nvme_change_ctrl_state\n", __func__, ctrl);
 	nvme_change_ctrl_state(ctrl, NVME_CTRL_DELETING_NOIO);
 
 	mutex_lock(&ctrl->namespaces_lock);
@@ -4574,8 +4622,12 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 	mutex_unlock(&ctrl->namespaces_lock);
 	synchronize_srcu(&ctrl->srcu);
 
-	list_for_each_entry_safe(ns, next, &ns_list, list)
+	list_for_each_entry_safe(ns, next, &ns_list, list) {
+
+		pr_err("%s8 ctrl=%pS calling nvme_ns_remove ns=%pS\n",
+			__func__, ctrl, ns);
 		nvme_ns_remove(ns);
+	}
 }
 EXPORT_SYMBOL_GPL(nvme_remove_namespaces);
 
