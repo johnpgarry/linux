@@ -212,12 +212,7 @@ void nvme_mpath_end_request(struct request *rq)
 
 bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return false;
-
-	return mpath_head_queue_if_no_path(mpath_head);
+	return mpath_head_queue_if_no_path(head->mpath_head);
 }
 
 void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
@@ -251,13 +246,7 @@ static const char *nvme_ana_state_names[] = {
 
 bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
 {
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return false;
-
-	return mpath_clear_current_path(mpath_head, &ns->mpath_device);
+	return mpath_clear_current_path(&ns->mpath_device);
 }
 
 void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
@@ -291,12 +280,7 @@ static void nvme_mpath_revalidate_paths_cb(struct mpath_device *mpath_device,
 
 void nvme_mpath_revalidate_paths(struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return;
-
-	mpath_revalidate_paths(mpath_head, nvme_mpath_revalidate_paths_cb);
+	mpath_revalidate_paths(head->mpath_head, nvme_mpath_revalidate_paths_cb);
 }
 
 static bool nvme_path_is_disabled(struct nvme_ns *ns)
@@ -456,8 +440,6 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 		return PTR_ERR(mpath_head);
 
 	ret = mpath_alloc_head_disk(mpath_head, &lim, ctrl->numa_node);
-	pr_err("%s ret=%d from mpath_alloc_head_disk mpath_head=%pS\n",
-		__func__, ret, mpath_head);
 	if (ret) {
 		mpath_put_head(mpath_head);
 		return ret;
@@ -570,46 +552,23 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 
 void nvme_mpath_synchronize(struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return;
-
-	mpath_synchronize(mpath_head);
+	mpath_synchronize(head->mpath_head);
 }
 
 void nvme_mpath_add_ns(struct nvme_ns *ns)
 {
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return;
-
 	ns->mpath_device.disk = ns->disk;
-	mpath_add_device(mpath_head, &ns->mpath_device);
+	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
 }
 
 void nvme_mpath_delete_ns(struct nvme_ns *ns)
 {
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return;
-
-	mpath_delete_device(mpath_head, &ns->mpath_device);
+	mpath_delete_device(ns->head->mpath_head, &ns->mpath_device);
 }
 
 void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 {
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return;
-
-	mpath_remove_sysfs_link(mpath_head, &ns->mpath_device);
+	mpath_remove_sysfs_link(&ns->mpath_device);
 }
 
 static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
@@ -840,10 +799,6 @@ static int nvme_lookup_ana_group_desc(struct nvme_ctrl *ctrl,
 void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 {
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
-
-	if (!mpath_head)
-		return;
 
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
 		struct nvme_ana_group_desc desc = {
@@ -869,8 +824,8 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 	}
 
 #ifdef CONFIG_BLK_DEV_ZONED
-	if (blk_queue_is_zoned(ns->queue) && mpath_head->disk)
-		mpath_head->disk->nr_zones = ns->disk->nr_zones;
+	if (blk_queue_is_zoned(ns->queue) && head->mpath_head)
+		head->mpath_head->disk->nr_zones = ns->disk->nr_zones;
 #endif
 }
 

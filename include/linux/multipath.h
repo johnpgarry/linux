@@ -146,8 +146,7 @@ static inline enum mpath_iopolicy_e mpath_read_iopolicy(
 void mpath_synchronize(struct mpath_head *mpath_head);
 int mpath_set_iopolicy(const char *val, int *iopolicy);
 int mpath_get_iopolicy(char *buf, int iopolicy);
-bool mpath_clear_current_path(struct mpath_head *mpath_head,
-			struct mpath_device *mpath_device);
+bool mpath_clear_current_path(struct mpath_device *mpath_device);
 void mpath_synchronize(struct mpath_head *mpath_head);
 void mpath_add_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device);
@@ -159,8 +158,7 @@ void mpath_clear_paths(struct mpath_head *mpath_head);
 void mpath_revalidate_paths(struct mpath_head *mpath_head,
 	void (*cb)(struct mpath_device *mpath_device, sector_t capacity));
 void mpath_add_sysfs_link(struct mpath_head *mpath_head);
-void mpath_remove_sysfs_link(struct mpath_head *mpath_head,
-				struct mpath_device *mpath_device);
+void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 int mpath_get_head(struct mpath_head *mpath_head);
 void mpath_put_head(struct mpath_head *mpath_head);
@@ -198,6 +196,8 @@ static inline bool mpath_qd_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
 
 static inline bool mpath_head_queue_if_no_path(struct mpath_head *mpath_head)
 {
+	if (!mpath_head)
+		return false;
 	if (test_bit(MPATH_HEAD_QUEUE_IF_NO_PATH, &mpath_head->flags))
 		return true;
 	return false;
