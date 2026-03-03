@@ -65,6 +65,9 @@ static int mpath_bdev_report_zones(struct gendisk *disk, sector_t sector,
 
 void mpath_synchronize(struct mpath_head *mpath_head)
 {
+	if (!mpath_head)
+		return;
+
 	synchronize_srcu(&mpath_head->srcu);
 }
 EXPORT_SYMBOL_GPL(mpath_synchronize);
@@ -72,6 +75,8 @@ EXPORT_SYMBOL_GPL(mpath_synchronize);
 void mpath_add_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device)
 {
+	if (!mpath_head)
+		return;
 	mpath_device->mpath_head = mpath_head;
 	mutex_lock(&mpath_head->lock);
 	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
@@ -83,6 +88,8 @@ EXPORT_SYMBOL_GPL(mpath_add_device);
 void mpath_delete_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device)
 {
+	if (!mpath_head)
+		return;
 	mutex_lock(&mpath_head->lock);
 	list_del_rcu(&mpath_device->siblings);
 	mutex_unlock(&mpath_head->lock);
@@ -105,9 +112,9 @@ int mpath_call_for_device(struct mpath_head *mpath_head,
 }
 EXPORT_SYMBOL_GPL(mpath_call_for_device);
 
-bool mpath_clear_current_path(struct mpath_head *mpath_head,
-			struct mpath_device *mpath_device)
+bool mpath_clear_current_path(struct mpath_device *mpath_device)
 {
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	bool changed = false;
 	int node;
 
@@ -157,6 +164,9 @@ EXPORT_SYMBOL_GPL(mpath_clear_paths);
 void mpath_revalidate_paths(struct mpath_head *mpath_head,
 	void (*cb)(struct mpath_device *mpath_device, sector_t capacity))
 {
+	if (!mpath_head)
+		return;
+
 	mpath_revalidate_paths_iter(mpath_head, cb);
 	mpath_clear_paths(mpath_head);
 
@@ -1162,11 +1172,14 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_add_sysfs_link);
 
-void mpath_remove_sysfs_link(struct mpath_head *mpath_head,
-				struct mpath_device *mpath_device)
+void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 {
 	struct device *target;
 	struct kobject *mpath_gd_kobj;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+
+	if (!mpath_head)
+		return;
 
 	if (!test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
 		return;
