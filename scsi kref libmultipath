@@ -1,0 +1,226 @@
+struct scsi_device
+	struct scsi_mpath_device *scsi_mpath_dev
+	
+struct scsi_disk
+	struct scsi_device *device
+	struct scsi_mpath_disk *scsi_mpath_disk
+
+struct mpath_disk
+	struct mpath_head *mpath_head
+
+struct scsi_mpath_disk
+	struct mpath_disk *mpath_disk
+
+struct scsi_mpath_head
+	struct mpath_head *mpath_head
+	
+struct mpath_head
+	->drvdata = scsi_mpath_head
+
+struct scsi_mpath_device
+	struct mpath_device	mpath_device
+
+struct mpath_device
+
+
+scsi_sequential_lun_scan	
+	scsi_probe_and_add_lun
+		sdev = scsi_alloc_sdev
+			scsi_sysfs_device_initialize
+		scsi_probe_lun (set inq_result)
+		scsi_add_lun (passed inq_result)
+			transport_configure_device
+			scsi_attach_vpd
+	*		scsi_mpath_dev_alloc
+				scsi_mpath_find_head ref + 1 when found
+				scsi_mpath_alloc_head  = scsi_mpath_head 1 initially
+					mpath_alloc_head = mpath_head 1 initially
+					device_add + 1
+				scsi_mpath_dev->index = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL)
+			scsi_sysfs_add_sdev
+				scsi_target_add
+				scsi_mpath_add_sysfs_link
+
+
+
+sd_revalidate_disk
+	*lim = queue_limits_start_update(sdkp->disk->queue);
+	sd_read_capacity(sdkp, lim
+	sd_config_write_same
+	queue_limits_commit_update_frozen	
+		
+scsi_mpath_dev_alloc
+	scsi_multipath_sdev_init
+	scsi_mpath_unique_lun_id
+	
+sd_probe
+	blk_mq_alloc_disk_for_queue
+	sd_mpath_probe
+		sd_mpath_find_disk goto found;
+		sd_mpath_disk = kzalloc
+		sd_mpath_disk->scsi_mpath_head = scsi_mpath_head;
+		sd_mpath_disk->mpath_disk = mpath_alloc_head_disk
+		scsi_mpath_get_head
+		device_add(&sd_mpath_disk->dev)
+		mpath_get_head(mpath_disk->mpath_head) // increase to 2
+		list_add_tail(&sd_mpath_disk->entry, &sd_mpath_disks_list);
+	mpath_get_head(scsi_mpath_head) 
+	sd_format_disk_name
+	scsi_mpath_head_add
+		dev_set_name(&scsi_mpath_head->disk_dev
+		device_add(&scsi_mpath_head->disk_dev)
+		found:
+		gd->flags |= GENHD_FL_HIDDEN;
+		mpath_device->disk = gd;
+
+	device_add(&sdkp->disk_dev)
+	sd_revalidate_disk
+	sd_mpath_revalidate_head
+	device_add_disk
+	sd_mpath_add_disk
+		mpath_add_device
+			list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
+		sd_mpath_disk->disk_count++;
+		mpath_device_set_live
+			set MPATH_HEAD_DISK_LIVE
+				device_add_disk(mpath_head->disk)
+			mpath_add_sysfs_link
+	
+------------------
+
+
+scsi_remove_device
+	__scsi_remove_device
+
+__iscsi_unbind_session
+	scsi_remove_target
+		__scsi_remove_target
+			scsi_remove_device
+				__scsi_remove_device
+					scsi_mpath_remove_sysfs_link
+					device_unregister(&sdev->sdev_dev)
+						sd_remove
+							mpath_delete_device
+								list_del_rcu(&mpath_device->siblings);
+							mpath_remove_sysfs_link
+							list_del(&sdkp->mpath_entry)
+							mpath_remove_disk // if last path
+							device_del(&scsi_mpath_disk->dev) // if last path
+							put_device(&scsi_mpath_disk->dev)
+								sd_mpath_disk_release
+									mpath_put_disk(mpath_disk)
+									ida_free(&sd_index_ida, scsi_mpath_disk->disk_index)
+									scsi_mpath_put_head(scsi_mpath_head) // see sd_probe for taking ref
+									kfree(scsi_mpath_disk)
+							device_del(&sdkp->disk_dev)
+								scsi_disk_release sd
+									ida_free(&sd_index_ida, sdkp->index);
+									kfree(sdkp)
+					scsi_mpath_remove_device
+						mpath_clear_current_path
+						ida_free(&scsi_mpath_head->ida, scsi_mpath_dev->index);
+						scsi_mpath_remove_head
+							mpath_synchronize
+							device_del(&scsi_mpath_head->dev) // if last device
+							scsi_mpath_put_head
+
+			put_device(&sdev->sdev_gendev)
+				scsi_device_dev_release
+					scsi_mpath_dev_release
+						ida_free(&scsi_mpath_head->ida, scsi_mpath_dev->index)
+						scsi_multipath_sdev_uninit
+							kfree(sdev->scsi_mpath_dev)
+					kfree(sdev);
+
+scsi_mpath_head_release
+	scsi_mpath_delete_head
+		list_del_init(&scsi_mpath_head->entry);
+	bioset_exit
+	kfree(scsi_mpath_head)
+	mpath_put_head
+
+scsi_mpath_do_remove_disk
+	device_unregister(&scsi_mpath_head->dev)
+		scsi_mpath_disk_release
+			scsi_mpath_head->free_drv_data = sd_mpath_free_drv_data
+				ida_free(&sd_index_ida, scsi_mpath_head->index)
+	mpath_remove_disk ????
+
+mpath_remove_head_work
+	mpath_head->mpdt->remove_head_work
+		mpath_remove_head -> scsi_remove_head_work
+			list_del_init(&scsi_mpath_head->entry);
+			scsi_mpath_do_remove_disk
+
+sd_probe
+	mpath_put_head
+		kref_put(&mpath_head->ref, mpath_free_head)
+
+mpath_remove_disk
+	test_and_clear_bit(MPATH_HEAD_DISK_LIVE)
+		del_gendisk(disk)
+		
+mpath_put_disk
+	kref_put(&mpath_disk->ref, mpath_free_disk)
+	
+mpath_free_disk
+	put_disk(mpath_disk->disk)
+	kfree(mpath_disk)
+	mpath_put_head(mpath_head)
+	
+mpath_put_head
+	kref_put(&mpath_head->ref, mpath_free_head)
+
+mpath_free_head
+	cleanup_srcu_struct(&mpath_head->srcu)
+	kfree(mpath_head)
+
+
+mpath_uninit_head
+	cleanup_srcu_struct
+
+scsi_mpath_put_head
+	put_device(&scsi_mpath_head->dev) -> scsi_mpath_head_release
+	
+
+
+====
+
+scsi_mpath_is_disabled
+	mpath_device_is_live
+		mpath_device->state == MPATH_STATE_OPTIMIZED or MPATH_STATE_ACTIVE
+		sdev_state == SDEV_RUNNING or SDEV_CANCEL
+	
+	
+mpath_add_device_scsi
+	if mpath_device_is_live
+	WRITE_ONCE(mpath_device->state, MPATH_STATE_OPTIMIZED);
+	mpath_device_set_live
+		device_add_disk
+		mpath_add_sysfs_link
+			
+mpath_device_is_live
+	READ_ONCE(mpath_device->state) == MPATH_STATE_OPTIMIZED or MPATH_STATE_ACTIVE
+
+-----
+static struct class_interface sg_interface = {
+	.add_dev        = sg_add_device,
+	.remove_dev     = sg_remove_device,
+};
+
+
+
+init_sg
+	scsi_register_interface(&sg_interface)
+		intf->class = &sdev_class
+		class_interface_register
+
+scsi_sysfs_device_initialize
+	sdev->sdev_dev.class = &sdev_class;
+
+scsi_sysfs_add_sdev
+	error = device_add(&sdev->sdev_gendev);
+	error = device_add(&sdev->sdev_dev)
+
+sg_add_device(cl_dev) //cl_dev is not "driven", but scsidp is used instead
+	struct scsi_device *scsidp = to_scsi_device(cl_dev->parent);

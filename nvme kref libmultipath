@@ -1,0 +1,95 @@
+
+mpath_disk
+	struct mpath_head *mpath_head
+
+struct nvme_ns
+	struct mpath_device mpath_device
+	struct nvme_ns_head *head
+
+struct nvme_ns_head
+	struct mpath_disk	*mpath_disk
+
+struct mpath_device
+
+struct mpath_head
+	->drvdata = ns_head
+	
+nvme_start_request
+	nvme_mpath_start_request
+	blk_mq_start_request
+
+nvme_end_req
+	__nvme_end_req
+		nvme_mpath_end_request	
+blk_mq_end_request
+
+nvme_alloc_ns	
+	nvme_init_ns_head	
+		nvme_find_ns_head
+			nvme_tryget_ns_head // gets inc to 3
+		OR
+		// no nvme_ns_head available 
+		nvme_alloc_ns_head
+			mpath_init_head
+				kref_init(&mpath_head->ref) // set to 1
+			kref_init(&head->ref) // set to 1
+			nvme_mpath_alloc_disk
+				mpath_alloc_head_disk
+					kref_init(&mpath_disk->ref) // set to 1
+					blk_alloc_disk
+					// deleted mpath_tryget_head // gets inc to 2
+				mpath_disk->mpath_head = mpath_head
+				head->mpath_disk = mpath_disk
+				nvme_tryget_ns_head // gets inc to 2
+		mpath_add_device
+	nvme_mpath_add_disk
+		queue_work(nvme_wq, &ns->ctrl->ana_work);
+		OR
+		mpath_device_set_live
+			 device_add_disk(parent, mpath_disk->disk
+			 mpath_add_sysfs_link
+------------------
+
+nvme_ns_remove
+	clear_bit(NVME_NS_READY
+	mpath_synchronize
+	mpath_clear_current_path -> mpath_synchronize
+	mpath_delete_device
+	mpath_remove_sysfs_link
+	del_gendisk(ns->disk)
+	nvme_mpath_remove_disk	 // if last path
+		mpath_remove_disk // if remove, depends on delayed removal see
+			kblockd_schedule_work(requeue_work)  // if MPATH_HEAD_DISK_LIVE
+			nvme_cdev_del // if NVME_NSHEAD_DISK_LIVE
+			del_gendisk(mpath_head->disk) // if NVME_NSHEAD_DISK_LIVE
+		mpath_put_disk -1
+	nvme_put_ns
+		put_disk(ns->disk)
+		nvme_free_ns
+			nvme_put_ns_head -1
+	
+mpath_free_disk
+	put_disk(mpath_disk->disk)
+	kfree(mpath_disk)
+	mpath_head->mpath_disk = NULL
+	mpath_put_head
+
+mpath_put_disk
+	kref_put(&mpath_disk->ref, mpath_free_disk)
+
+
+nvme_put_ns_head
+	kref_put -> nvme_free_ns_head
+
+mpath_put_head
+	kref_put -> mpath_free_head
+
+mpath_free_head
+	cleanup_srcu_struct
+	-> nvme_mpath_free_head
+		nvme_put_ns_head -1
+
+nvme_free_ns_head
+	nvme_put_subsystem
+	kfree(head->plids)
+	kfree(head)
