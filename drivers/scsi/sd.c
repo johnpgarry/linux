@@ -126,7 +126,6 @@ struct sd_mpath_disk {
 	int				disk_count;
 	struct list_head		entry;
 	struct mutex			lock;
-	struct mpath_disk		*mpath_disk;
 	struct scsi_mpath_head		*scsi_mpath_head;
 };
 
@@ -136,13 +135,14 @@ static void sd_mpath_disk_release(struct device *dev)
 		container_of(dev, struct sd_mpath_disk, dev);
 	struct scsi_mpath_head *scsi_mpath_head =
 		sd_mpath_disk->scsi_mpath_head;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
 
-	mpath_put_disk(mpath_disk);
+	pr_err("%s calling ida_free sd_mpath_disk=%pS disk_index=%d\n",
+		__func__, sd_mpath_disk, sd_mpath_disk->disk_index);
 
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
 	scsi_mpath_put_head(scsi_mpath_head);
 
+	pr_err("%s2 kfree(sd_mpath_disk)\n", __func__);
 	kfree(sd_mpath_disk);
 }
 
@@ -1573,11 +1573,10 @@ static void sd_mpath_start_command(struct scsi_cmnd *scmd)
 	struct request *req = scsi_cmd_to_rq(scmd);
 	struct scsi_disk *sdkp = scsi_disk(req->q->disk);
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
 	struct scsi_device *sdev = scmd->device;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
-	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
-	struct gendisk *disk = mpath_disk->disk;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
 
 	if (mpath_qd_iopolicy(&scsi_mpath_head->iopolicy) &&
 	    !(scmd->flags & SCMD_MPATH_CNT_ACTIVE)) {
@@ -1601,8 +1600,10 @@ static void sd_mpath_end_command(struct scsi_cmnd *scmd)
 	struct request *req = scsi_cmd_to_rq(scmd);
 	struct scsi_disk *sdkp = scsi_disk(req->q->disk);
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
 	struct scsi_device *sdev = scmd->device;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
 
 	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE) {
 		struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
@@ -1612,7 +1613,7 @@ static void sd_mpath_end_command(struct scsi_cmnd *scmd)
 
 	if (!(scmd->flags & SCMD_MPATH_IO_STATS))
 		return;
-	bdev_end_io_acct(mpath_disk->disk->part0, req_op(req),
+	bdev_end_io_acct(disk->part0, req_op(req),
 			 blk_rq_bytes(req) >> SECTOR_SHIFT,
 			 scmd->start_time);
 }
@@ -4102,12 +4103,12 @@ static int sd_mpath_ioctl(struct scsi_device *sdp, blk_mode_t mode,
 	return sd_ioctl(bdev, mode, cmd, arg);
 }
 
-static struct mpath_disk *sd_mpath_to_disk(struct request *req)
+static struct mpath_head *sd_mpath_to_head(struct request *req)
 {
 	struct scsi_disk *sdkp = req->part->bd_disk->private_data;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
 
-	return sd_mpath_disk->mpath_disk;
+	return sd_mpath_disk->scsi_mpath_head->mpath_head;
 }
 
 static int sd_mpath_pr_register(struct scsi_device *sdp, u64 old_key,
@@ -4169,8 +4170,9 @@ static const struct scsi_mpath_pr_ops sd_mpath_pr_ops = {
 static int sd_mpath_revalidate_head(struct scsi_disk *sdkp)
 {
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;;
-	struct gendisk *disk = mpath_disk->disk;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
 	struct queue_limits *sdkp_lim = &sdkp->disk->queue->limits;
 	struct queue_limits lim;
 	unsigned int memflags;
@@ -4205,8 +4207,9 @@ static ssize_t sd_mpath_dev_show(struct device *dev,
 	struct gendisk *gd = dev_to_disk(dev);
 	struct scsi_disk *sdkp = gd->private_data;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
-	struct gendisk *disk = mpath_disk->disk;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
 	struct device *disk_dev = disk_to_dev(disk);
 
 	return print_dev_t(page, disk_dev->devt);
@@ -4222,9 +4225,8 @@ static ssize_t sd_mpath_numa_nodes_show(struct device *dev,
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
-	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 	struct mpath_iopolicy *mpath_iopolicy = &scsi_mpath_head->iopolicy;
 
 	return mpath_numa_nodes_show(mpath_head, mpath_device,
@@ -4241,9 +4243,7 @@ static ssize_t sd_mpath_queue_depth_show(struct device *dev,
 	struct scsi_mpath_device *scsi_mpath_device = sdev->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_device->mpath_device;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
-	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
 
 	if (!mpath_qd_iopolicy(&scsi_mpath_head->iopolicy))
 		return 0;
@@ -4284,6 +4284,7 @@ static const struct attribute_group *sd_mpath_dev_groups[] = {
 	NULL
 };
 
+__maybe_unused
 static int sd_mpath_get_disk(struct sd_mpath_disk *sd_mpath_disk)
 {
 	if (!get_device(&sd_mpath_disk->dev))
@@ -4291,6 +4292,7 @@ static int sd_mpath_get_disk(struct sd_mpath_disk *sd_mpath_disk)
 	return 0;
 }
 
+__maybe_unused
 static void sd_mpath_put_disk(struct sd_mpath_disk *sd_mpath_disk)
 {
 	put_device(&sd_mpath_disk->dev);
@@ -4305,15 +4307,13 @@ static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_device *sdp)
 	mutex_lock(&sd_mpath_disks_lock);
 	list_for_each_entry(sd_mpath_disk, &sd_mpath_disks_list, entry) {
 		struct scsi_mpath_head *scsi_mpath_head;
-		struct mpath_disk *mpath_disk;
 		struct mpath_head *mpath_head;
 
 		ret = sd_mpath_get_disk(sd_mpath_disk);
 		if (ret)
 			continue;
-		mpath_disk = sd_mpath_disk->mpath_disk;
-		mpath_head = mpath_disk->mpath_head;
-		scsi_mpath_head = mpath_head->drvdata;
+		scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+		mpath_head = scsi_mpath_head->mpath_head;
 
 		if (strncmp(scsi_mpath_head->wwid,
 			scsi_mpath_dev->device_id_str,
@@ -4334,12 +4334,12 @@ static void sd_mpath_add_disk(struct scsi_disk *sdkp)
 	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
 	mpath_device->disk = sdkp->disk;
 	mpath_add_device(mpath_head, mpath_device);
-	mpath_device_set_live(mpath_disk, mpath_device);
+	mpath_device_set_live(mpath_device);
 }
 
 static int sd_mpath_probe(struct scsi_disk *sdkp)
@@ -4355,19 +4355,28 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	struct gendisk *disk;
 	int error;
 
+	pr_err("%s sdkp=%pS sdp->scsi_mpath_dev=%pS\n",
+		__func__, sdkp, sdp->scsi_mpath_dev);
 	/*
 	 * sd_mpath_disks_list is kept locked if no disk found.
 	 * Otherwise an extra reference is taken.
 	 */
+	pr_err("%s1 sdp->scsi_mpath_dev=%pS calling sd_mpath_find_disk\n",
+		__func__, sdp->scsi_mpath_dev);
 	sd_mpath_disk = sd_mpath_find_disk(sdp);
+	pr_err("%s1 sd_mpath_disk=%pS after sd_mpath_find_disk\n", __func__, sd_mpath_disk);
 	if (sd_mpath_disk) {
+
 		mutex_lock(&sd_mpath_disk->lock);
+		pr_err("%s1.1 sd_mpath_disk=%pS going to increment sd_mpath_disk->disk_count=%d\n", __func__,
+			sd_mpath_disk, sd_mpath_disk->disk_count);
 		sd_mpath_disk->disk_count++;
 		mutex_unlock(&sd_mpath_disk->lock);
 		goto found;
 	}
 
 	sd_mpath_disk = kzalloc(sizeof(*sd_mpath_disk), GFP_KERNEL);
+	pr_err("%s2 sd_mpath_disk=%pS after kzalloc\n", __func__, sd_mpath_disk);
 	if (!sd_mpath_disk) {
 		error = -ENOMEM;
 		goto out_unlock;
@@ -4383,17 +4392,16 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT |
 		BLK_FEAT_POLL | BLK_FEAT_ATOMIC_WRITES;
 
-	sd_mpath_disk->mpath_disk = mpath_alloc_head_disk(&lim,
+	error = mpath_alloc_head_disk(mpath_head, &lim,
 						dev_to_node(dma_dev));
-	if (!sd_mpath_disk->mpath_disk) {
-		error = -ENOMEM;
+	pr_err("%s5 sd_mpath_disk=%pS error=%d mpath_alloc_head_disk\n",
+		__func__, sd_mpath_disk, error);
+	if (error)
 		goto out_free_disk;
-	}
-	disk = sd_mpath_disk->mpath_disk->disk;
+	disk = mpath_head->disk;
 	mpath_get_head(mpath_head); /* undone in mpath_free_disk() */
 
-	sd_mpath_disk->mpath_disk->mpath_head = mpath_head;
-	sd_mpath_disk->mpath_disk->parent = &sd_mpath_disk->dev;
+	mpath_head->parent = &sd_mpath_disk->dev;
 
 	error = ida_alloc(&sd_index_ida, GFP_KERNEL);
 	if (error < 0) {
@@ -4433,19 +4441,21 @@ found:
 	sdkp->sd_mpath_disk = sd_mpath_disk;
 	sdkp->disk->flags |= GENHD_FL_HIDDEN;
 	snprintf(sdkp->disk->disk_name, DISK_NAME_LEN, "%s:%d",
-		sd_mpath_disk->mpath_disk->disk->disk_name,
+		mpath_head->disk->disk_name,
 		scsi_mpath_dev->index);
-
+	pr_err("%s10 found: %s sd_mpath_disk=%pS\n", __func__,
+		 dev_name(&sdp->sdev_gendev), sd_mpath_disk);
 	sdkp->index = -1;
 	return 0;
 
 out_free_index:
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
 out_put_disk:
-	mpath_put_disk(sd_mpath_disk->mpath_disk);
+	//mpath_put_disk(sd_mpath_disk->mpath_disk);
 out_free_disk:
 	kfree(sd_mpath_disk);
 out_unlock:
+	pr_err("%s15 out_unlock\n", __func__);
 	mutex_unlock(&sd_mpath_disks_lock);
 	return error;
 }
@@ -4456,13 +4466,13 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 	struct scsi_device *sdp = sdkp->device;
 	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
-	struct mpath_disk *mpath_disk = sd_mpath_disk->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 	bool remove = false;
 
 	mpath_synchronize(mpath_head);
 
-	if (mpath_clear_current_path(mpath_head, mpath_device))
+	if (mpath_clear_current_path(mpath_device))
 		mpath_synchronize(mpath_head);
 
 	mpath_delete_device(mpath_head, mpath_device);
@@ -4478,12 +4488,11 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 		remove = true;
 	}
 	mutex_unlock(&sd_mpath_disk->lock);
-	mpath_remove_sysfs_link(mpath_disk, mpath_device);
+	mpath_remove_sysfs_link(mpath_device);
 	mpath_device->disk = NULL;
 
 	if (remove) {
 		device_del(&sd_mpath_disk->dev);
-		mpath_remove_disk(mpath_disk);
 	}
 	sd_mpath_put_disk(sd_mpath_disk);
 }
@@ -4498,13 +4507,11 @@ static void sd_mpath_fail_probe(struct scsi_disk *sdkp)
 	struct scsi_mpath_device *scsi_mpath_dev;
 	struct mpath_device *mpath_device;
 	struct scsi_device *sdp = sdkp->device;
-	struct mpath_disk *mpath_disk;
 	bool remove = false;
 
 	if (!sd_mpath_disk)
 		return;
 
-	mpath_disk = sd_mpath_disk->mpath_disk;
 	scsi_mpath_dev = sdp->scsi_mpath_dev;
 	mpath_device = &scsi_mpath_dev->mpath_device;
 
@@ -4522,7 +4529,6 @@ static void sd_mpath_fail_probe(struct scsi_disk *sdkp)
 
 	if (remove) {
 		device_del(&sd_mpath_disk->dev);
-		mpath_remove_disk(mpath_disk);
 	}
 	sd_mpath_put_disk(sd_mpath_disk);
 }
@@ -5028,7 +5034,7 @@ static struct scsi_driver sd_template = {
 	.mpath_end_cmd		= sd_mpath_end_command,
 	.mpath_ioctl		= sd_mpath_ioctl,
 	.mpath_pr_ops		= &sd_mpath_pr_ops,
-	.to_mpath_disk		= sd_mpath_to_disk,
+	.to_mpath_head		= sd_mpath_to_head,
 	#endif
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,

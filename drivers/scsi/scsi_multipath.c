@@ -127,6 +127,7 @@ static void scsi_mpath_head_release(struct device *dev)
 	bioset_exit(&scsi_mpath_head->bio_pool);
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
 	mpath_put_head(mpath_head);
+	pr_err("%s3 calling kfree(scsi_mpath_head)\n", __func__);
 	kfree(scsi_mpath_head);
 }
 
@@ -157,7 +158,7 @@ void scsi_mpath_dev_clear_path(struct scsi_mpath_device *scsi_mpath_dev)
 	struct scsi_mpath_head *scsi_mpath_head = scsi_mpath_dev->scsi_mpath_head;
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
-	if (mpath_clear_current_path(mpath_head, mpath_device))
+	if (mpath_clear_current_path(mpath_device))
 		mpath_synchronize(mpath_head);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_dev_clear_path);
@@ -293,8 +294,7 @@ static void scsi_mpath_clone_end_io(struct bio *clone)
 
 static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 {
-	struct mpath_disk *mpath_disk = bio->bi_bdev->bd_disk->private_data;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = bio->bi_bdev->bd_disk->private_data;
 	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
 	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
 	struct bio *clone;
@@ -326,8 +326,7 @@ static int scsi_mpath_ioctl(struct block_device *bdev,
 			unsigned long arg, int srcu_idx)
 {
 	struct gendisk *disk = bdev->bd_disk;
-	struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 	struct scsi_mpath_device *scsi_mpath_dev =
 				to_scsi_mpath_device(mpath_device);
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
@@ -691,6 +690,12 @@ EXPORT_SYMBOL_GPL(scsi_mpath_get_head);
 
 void scsi_mpath_put_head(struct scsi_mpath_head *scsi_mpath_head)
 {
+	struct device *dev = &scsi_mpath_head->dev;
+	struct kobject *kobj = &dev->kobj;
+	struct kref *kref = &kobj->kref;
+//	struct kref *ref = &scsi_mpath_head->ref;
+	pr_err("%s calling put_device refcount=%d scsi_mpath_head=%pS\n",
+		__func__, refcount_read(&kref->refcount), scsi_mpath_head);
 	put_device(&scsi_mpath_head->dev);
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_put_head);
@@ -728,9 +733,8 @@ void scsi_mpath_failover_req(struct request *req)
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = scmd->device;
 	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-	struct mpath_disk *mpath_disk = drv->to_mpath_disk(req);
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = drv->to_mpath_head(req);
 	unsigned long flags;
 
 	scsi_mpath_dev_clear_path(scsi_mpath_dev);
