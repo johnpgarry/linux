@@ -34,7 +34,6 @@ struct mpath_disk {
 	struct gendisk		*disk;
 	struct kref		ref;
 	struct work_struct	partition_scan_work;
-	struct mutex		lock;
 	struct mpath_head	*mpath_head;
 	struct device		*parent;
 };

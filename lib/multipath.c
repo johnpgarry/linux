@@ -932,7 +932,6 @@ struct mpath_disk *mpath_alloc_head_disk(struct queue_limits *lim, int numa_node
 
 	INIT_WORK(&mpath_disk->partition_scan_work,
 			multipath_partition_scan_work);
-	mutex_init(&mpath_disk->lock);
 	kref_init(&mpath_disk->ref);
 
 	mpath_disk->disk = blk_alloc_disk(lim, numa_node);
