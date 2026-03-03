@@ -444,12 +444,19 @@ static void mpath_free_head(struct kref *ref)
 	struct mpath_head *mpath_head =
 		container_of(ref, struct mpath_head, ref);
 
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
+
+	pr_err("%s1 mpath_head=%pS calling cleanup_srcu_struct\n", __func__, mpath_head);
 	cleanup_srcu_struct(&mpath_head->srcu);
+	pr_err("%s2 mpath_head=%pS calling kfree(mpath_head)\n", __func__, mpath_head);
 	kfree(mpath_head);
 }
 
 int mpath_get_head(struct mpath_head *mpath_head)
 {
+	if (!mpath_head)
+		return 0;
+
 	if (!kref_get_unless_zero(&mpath_head->ref)) {
 		return -ENXIO;
 	}
@@ -459,46 +466,31 @@ EXPORT_SYMBOL_GPL(mpath_get_head);
 
 void mpath_put_head(struct mpath_head *mpath_head)
 {
+	struct kref *ref;
+
+	if (!mpath_head)
+		return;
+
+	ref = &mpath_head->ref;
+
+	pr_err("%s calling kref_put mpath_head=%pS refcount=%d\n",
+		__func__, mpath_head, refcount_read(&ref->refcount));
 	kref_put(&mpath_head->ref, mpath_free_head);
 }
 EXPORT_SYMBOL_GPL(mpath_put_head);
-
-static void mpath_free_disk(struct kref *ref)
-{
-	struct mpath_head *mpath_head =
-		container_of(ref, struct mpath_head, ref);
-
-	put_disk(mpath_head->disk);
-	mpath_put_head(mpath_head);
-	kfree(mpath_head);
-}
-
-void mpath_put_disk(struct mpath_head *mpath_head)
-{
-	kref_put(&mpath_head->ref, mpath_free_disk);
-}
-EXPORT_SYMBOL_GPL(mpath_put_disk);
-
-static int mpath_get_disk(struct mpath_head *mpath_head)
-{
-	if (!kref_get_unless_zero(&mpath_head->ref)) {
-		return -ENXIO;
-	}
-	return 0;
-}
 
 static int mpath_bdev_open(struct gendisk *disk, blk_mode_t mode)
 {
 	struct mpath_head *mpath_head = disk->private_data;
 
-	return mpath_get_disk(mpath_head);
+	return mpath_get_head(mpath_head);
 }
 
 static void mpath_bdev_release(struct gendisk *disk)
 {
 	struct mpath_head *mpath_head = disk->private_data;
 
-	mpath_put_disk(mpath_head);
+	mpath_put_head(mpath_head);
 }
 
 static int mpath_bdev_get_unique_id(struct gendisk *disk, u8 id[16],
@@ -876,9 +868,13 @@ bool mpath_can_remove_head(struct mpath_head *mpath_head)
 	 * Ensure that no one could remove this module while the head
 	 * remove work is pending.
 	 */
+	pr_err("%s mpath_head=%pS mpath_head_queue_if_no_path=%d\n",
+		__func__, mpath_head, mpath_head_queue_if_no_path(mpath_head));
 	if (mpath_head_queue_if_no_path(mpath_head) &&
 		try_module_get(mpath_head->drv_module)) {
 
+		pr_err("%s3 mpath_head=%pS calling mod_delayed_work\n",
+			__func__, mpath_head);
 		mod_delayed_work(mpath_wq, &mpath_head->remove_work,
 				mpath_head->delayed_removal_secs * HZ);
 	} else {
@@ -892,6 +888,11 @@ EXPORT_SYMBOL_GPL(mpath_can_remove_head);
 
 void mpath_remove_disk(struct mpath_head *mpath_head)
 {
+	struct kref *ref_mpath_head = &mpath_head->ref;
+
+	pr_err("%s mpath_head=%pS refcount=%d\n",
+		__func__,
+			mpath_head, refcount_read(&ref_mpath_head->refcount));
 	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
 		struct gendisk *disk = mpath_head->disk;
 
@@ -903,6 +904,8 @@ void mpath_remove_disk(struct mpath_head *mpath_head)
 
 		mpath_head_del_cdev(mpath_head);
 		mpath_synchronize(mpath_head);
+		pr_err("%s1 mpath_head=%pS calling del_gendisk\n", __func__,
+					mpath_head),
 		del_gendisk(disk);
 	}
 }
@@ -910,8 +913,12 @@ EXPORT_SYMBOL_GPL(mpath_remove_disk);
 
 void mpath_unregister_disk(struct mpath_head *mpath_head)
 {
+	pr_err("%s calling mpath_remove_disk mpath_head=%pS\n",
+		__func__, mpath_head);
 	mpath_remove_disk(mpath_head);
-	mpath_put_disk(mpath_head);
+
+	pr_err("%s1 called mpath_remove_disk mpath_head=%pS\n",
+		__func__, mpath_head);
 }
 EXPORT_SYMBOL_GPL(mpath_unregister_disk);
 

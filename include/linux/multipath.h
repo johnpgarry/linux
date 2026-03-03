@@ -164,7 +164,6 @@ int mpath_get_head(struct mpath_head *mpath_head);
 void mpath_put_head(struct mpath_head *mpath_head);
 void mpath_requeue_work(struct work_struct *work);
 struct mpath_head *mpath_alloc_head(void);
-void mpath_put_disk(struct mpath_head *mpath_head);
 bool mpath_can_remove_head(struct mpath_head *mpath_head);
 void mpath_remove_disk(struct mpath_head *mpath_head);
 void mpath_unregister_disk(struct mpath_head *mpath_head);
