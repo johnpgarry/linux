@@ -96,11 +96,9 @@ void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		struct mpath_disk *mpath_disk = h->mpath_disk;
-
-		if (mpath_disk)
+		if (h->mpath_head)
 			blk_mq_unfreeze_queue_nomemrestore(
-				mpath_disk->disk->queue);
+				h->mpath_head->disk->queue);
 	}
 }
 
@@ -110,10 +108,8 @@ void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		struct mpath_disk *mpath_disk = h->mpath_disk;
-
-		if (mpath_disk)
-			blk_mq_freeze_queue_wait(mpath_disk->disk->queue);
+		if (h->mpath_head)
+			blk_mq_freeze_queue_wait(h->mpath_head->disk->queue);
 	}
 }
 
@@ -123,10 +119,8 @@ void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		struct mpath_disk *mpath_disk = h->mpath_disk;
-
-		if (mpath_disk)
-			blk_freeze_queue_start(mpath_disk->disk->queue);
+		if (h->mpath_head)
+			blk_freeze_queue_start(h->mpath_head->disk->queue);
 	}
 }
 
@@ -134,10 +128,9 @@ void nvme_failover_req(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = head->mpath_head;
 	u16 status = nvme_req(req)->status & NVME_SCT_SC_MASK;
-	struct gendisk *disk = mpath_disk->disk;
+	struct gendisk *disk = mpath_head->disk;
 	unsigned long flags;
 	struct bio *bio;
 
@@ -181,8 +174,8 @@ void nvme_mpath_start_request(struct request *rq)
 {
 	struct nvme_ns *ns = rq->q->queuedata;
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct gendisk *disk = mpath_disk->disk;
+	struct mpath_head *mpath_head = head->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
 	struct nvme_subsystem *subsys = head->subsys;
 
 	if (mpath_qd_iopolicy(&subsys->iopolicy) &&
@@ -205,26 +198,26 @@ void nvme_mpath_end_request(struct request *rq)
 {
 	struct nvme_ns *ns = rq->q->queuedata;
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
 	if (nvme_req(rq)->flags & NVME_MPATH_CNT_ACTIVE)
 		atomic_dec_if_positive(&ns->ctrl->nr_active);
 
 	if (!(nvme_req(rq)->flags & NVME_MPATH_IO_STATS))
 		return;
-	bdev_end_io_acct(mpath_disk->disk->part0, req_op(rq),
+	bdev_end_io_acct(mpath_head->disk->part0, req_op(rq),
 			 blk_rq_bytes(rq) >> SECTOR_SHIFT,
 			 nvme_req(rq)->start_time);
 }
 
 bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return false;
 
-	return mpath_head_queue_if_no_path(mpath_disk->mpath_head);
+	return mpath_head_queue_if_no_path(mpath_head);
 }
 
 void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
@@ -235,17 +228,14 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
-		struct mpath_disk *mpath_disk = ns->head->mpath_disk;
-		struct mpath_head *mpath_head;
-		struct gendisk *disk;
+		struct mpath_head *mpath_head = ns->head->mpath_head;
 
-		if (!mpath_disk)
+		if (!mpath_head)
 			continue;
-		mpath_head = mpath_disk->mpath_head;
-		disk = mpath_disk->disk;
+
 		kblockd_schedule_work(&mpath_head->requeue_work);
 		if (nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE)
-			disk_uevent(disk, KOBJ_CHANGE);
+			disk_uevent(mpath_head->disk, KOBJ_CHANGE);
 	}
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
 }
@@ -262,13 +252,12 @@ static const char *nvme_ana_state_names[] = {
 bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return false;
 
-	return mpath_clear_current_path(mpath_disk->mpath_head,
-				&ns->mpath_device);
+	return mpath_clear_current_path(mpath_head, &ns->mpath_device);
 }
 
 void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
@@ -280,13 +269,13 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
 		struct nvme_ns_head *head = ns->head;
-		struct mpath_disk *mpath_disk = head->mpath_disk;
+		struct mpath_head *mpath_head = head->mpath_head;
 
-		if (!mpath_disk)
+		if (!mpath_head)
 			continue;
 
 		nvme_mpath_clear_current_path(ns);
-		kblockd_schedule_work(&mpath_disk->mpath_head->requeue_work);
+		kblockd_schedule_work(&mpath_head->requeue_work);
 	}
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
 }
@@ -302,12 +291,12 @@ static void nvme_mpath_revalidate_paths_cb(struct mpath_device *mpath_device,
 
 void nvme_mpath_revalidate_paths(struct nvme_ns_head *head)
 {
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
 
-	mpath_revalidate_paths(mpath_disk, nvme_mpath_revalidate_paths_cb);
+	mpath_revalidate_paths(mpath_head, nvme_mpath_revalidate_paths_cb);
 }
 
 static bool nvme_path_is_disabled(struct nvme_ns *ns)
@@ -406,7 +395,7 @@ static void nvme_mpath_del_cdev(struct mpath_head *mpath_head)
 
 bool nvme_mpath_has_disk(struct nvme_ns_head *head)
 {
-	return head->mpath_disk;
+	return head->mpath_head;
 }
 
 static void nvme_remove_head_work(struct work_struct *work)
@@ -414,7 +403,6 @@ static void nvme_remove_head_work(struct work_struct *work)
 	struct mpath_head *mpath_head = container_of(to_delayed_work(work),
 			struct mpath_head, remove_work);
 	struct nvme_ns_head *head = mpath_head->drvdata;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
 	bool remove = false;
 
 	mutex_lock(&head->subsys->lock);
@@ -425,7 +413,7 @@ static void nvme_remove_head_work(struct work_struct *work)
 	mutex_unlock(&head->subsys->lock);
 
 	if (remove) {
-		mpath_unregister_disk(mpath_disk);
+		mpath_unregister_disk(mpath_head);
 		nvme_put_ns_head(head);
 	}
 	module_put(THIS_MODULE);
@@ -433,10 +421,10 @@ static void nvme_remove_head_work(struct work_struct *work)
 
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
-	struct mpath_disk *mpath_disk;
 	struct mpath_head *mpath_head;
 	struct nvme_subsystem *subsys = ctrl->subsys;
 	struct queue_limits lim;
+	int ret;
 
 	/*
 	 * If "multipath_always_on" is enabled, a multipath node is added
@@ -463,26 +451,27 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	if (head->ids.csi == NVME_CSI_ZNS)
 		lim.features |= BLK_FEAT_ZONED;
 
-	mpath_disk = mpath_alloc_head_disk(&lim, ctrl->numa_node);
-	if (!mpath_disk)
-		return -ENOMEM;
-
 	mpath_head = mpath_alloc_head();
-	if (IS_ERR(mpath_head)) {
-		mpath_put_disk(mpath_disk);
+	if (IS_ERR(mpath_head))
 		return PTR_ERR(mpath_head);
+
+	ret = mpath_alloc_head_disk(mpath_head, &lim, ctrl->numa_node);
+	pr_err("%s ret=%d from mpath_alloc_head_disk mpath_head=%pS\n",
+		__func__, ret, mpath_head);
+	if (ret) {
+		mpath_put_head(mpath_head);
+		return ret;
 	}
 
 	mpath_head->drvdata = head;
 
-	head->mpath_disk = mpath_disk;
-	mpath_disk->mpath_head = mpath_head;
-	mpath_disk->parent = &subsys->dev;
+	head->mpath_head = mpath_head;
+	mpath_head->parent = &subsys->dev;
 
 	mpath_head->mpdt = &mpdt;
 	INIT_DELAYED_WORK(&mpath_head->remove_work, nvme_remove_head_work);
 
-	sprintf(mpath_disk->disk->disk_name, "nvme%dn%d",
+	sprintf(mpath_head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
 	nvme_tryget_ns_head(head);
 	return 0;
@@ -541,8 +530,7 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = head->mpath_head;
 	ns->ana_grpid = le32_to_cpu(desc->grpid);
 	ns->ana_state = desc->state;
 	clear_bit(NVME_NS_ANA_PENDING, &ns->flags);
@@ -558,7 +546,7 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	 */
 	if (nvme_state_is_live(ns->ana_state) &&
 	    nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE)
-		mpath_device_set_live(mpath_disk, &ns->mpath_device);
+		mpath_device_set_live(&ns->mpath_device);
 	else {
 		/*
 		 * Add sysfs link from multipath head gendisk node to path
@@ -576,30 +564,27 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		 * head node if head node of the path has already come alive.
 		 */
 		if (test_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags))
-			mpath_add_sysfs_link(mpath_disk);
+			mpath_add_sysfs_link(mpath_head);
 	}
 }
 
 void nvme_mpath_synchronize(struct nvme_ns_head *head)
 {
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
 
-	mpath_synchronize(mpath_disk->mpath_head);
+	mpath_synchronize(mpath_head);
 }
 
 void nvme_mpath_add_ns(struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct mpath_head *mpath_head;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
-
-	mpath_head = mpath_disk->mpath_head;
 
 	ns->mpath_device.disk = ns->disk;
 	mpath_add_device(mpath_head, &ns->mpath_device);
@@ -608,23 +593,23 @@ void nvme_mpath_add_ns(struct nvme_ns *ns)
 void nvme_mpath_delete_ns(struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
 
-	mpath_delete_device(mpath_disk->mpath_head, &ns->mpath_device);
+	mpath_delete_device(mpath_head, &ns->mpath_device);
 }
 
 void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
 
-	mpath_remove_sysfs_link(mpath_disk, &ns->mpath_device);
+	mpath_remove_sysfs_link(mpath_head, &ns->mpath_device);
 }
 
 static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
@@ -814,8 +799,7 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 {
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = head->mpath_head;
 	struct nvme_subsystem *subsys = ns->head->subsys;
 	struct mpath_device *mpath_device = &ns->mpath_device;
 
@@ -826,8 +810,7 @@ DEVICE_ATTR_RO(numa_nodes);
 static ssize_t delayed_removal_secs_show(struct device *bd_device,
 		struct device_attribute *attr, char *buf)
 {
-	struct mpath_disk *mpath_disk = mpath_bd_device_to_disk(bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_bd_device_to_disk(bd_device);
 
 	return mpath_delayed_removal_secs_show(mpath_head, buf);
 }
@@ -835,8 +818,7 @@ static ssize_t delayed_removal_secs_show(struct device *bd_device,
 static ssize_t delayed_removal_secs_store(struct device *bd_device,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct mpath_disk *mpath_disk = mpath_bd_device_to_disk(bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_bd_device_to_disk(bd_device);
 
 	return mpath_delayed_removal_secs_store(mpath_head, buf, count);
 }
@@ -858,9 +840,9 @@ static int nvme_lookup_ana_group_desc(struct nvme_ctrl *ctrl,
 void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 {
 	struct nvme_ns_head *head = ns->head;
-	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = head->mpath_head;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
 
 	if (nvme_ctrl_use_ana(ns->ctrl)) {
@@ -883,25 +865,22 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 		}
 	} else {
 		ns->ana_state = NVME_ANA_OPTIMIZED;
-		mpath_device_set_live(mpath_disk, &ns->mpath_device);
+		mpath_device_set_live(&ns->mpath_device);
 	}
 
 #ifdef CONFIG_BLK_DEV_ZONED
-	if (blk_queue_is_zoned(ns->queue) && mpath_disk->disk)
-		mpath_disk->disk->nr_zones = ns->disk->nr_zones;
+	if (blk_queue_is_zoned(ns->queue) && mpath_head->disk)
+		mpath_head->disk->nr_zones = ns->disk->nr_zones;
 #endif
 }
 
 void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct mpath_head *mpath_head;
+	struct mpath_head *mpath_head = head->mpath_head;
 	bool remove = false;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
-
-	mpath_head = mpath_disk->mpath_head;
 
 	mutex_lock(&head->subsys->lock);
 
@@ -926,7 +905,7 @@ out:
 	mutex_unlock(&head->subsys->lock);
 
 	if (remove) {
-		mpath_unregister_disk(mpath_disk);
+		mpath_unregister_disk(mpath_head);
 		nvme_put_ns_head(head);
 	}
 }

@@ -688,8 +688,7 @@ static int nvme_mpath_device_ctrl_ioctl(struct mpath_device *mpath_device,
 			bool open_for_write)
 {
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = head->mpath_head;
 	struct nvme_ctrl *ctrl = ns->ctrl;
 	int ret;
 
@@ -715,12 +714,11 @@ int nvme_mpath_bdev_ioctl(struct block_device *bdev,
 			unsigned int cmd, unsigned long arg, int srcu_idx)
 {
 	struct gendisk *disk = bdev->bd_disk;
-	struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
+	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
 	struct nvme_ns_head *head = ns->head;
 	bool open_for_write = mode & BLK_OPEN_WRITE;
 	void __user *argp = (void __user *)arg;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
 	int ret = -EWOULDBLOCK;
 	unsigned int flags = 0;
 

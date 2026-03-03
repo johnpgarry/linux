@@ -65,9 +65,9 @@ static inline struct nvme_ns_head *dev_to_ns_head(struct device *dev)
 	struct gendisk *disk = dev_to_disk(dev);
 
 	if (nvme_disk_is_ns_head(disk)) {
-		struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
+		struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 
-		return mpath_disk->mpath_head->drvdata;
+		return mpath_head->drvdata;
 	}
 	return nvme_get_ns_from_dev(dev)->head;
 }
@@ -204,8 +204,7 @@ static int ns_head_update_nuse_cb(struct mpath_device *mpath_device)
 
 static int ns_head_update_nuse(struct nvme_ns_head *head)
 {
-	struct mpath_disk *mpath_disk = head->mpath_disk;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = head->mpath_head;
 	int ret;
 
 	/* Avoid issuing commands too often by rate limiting the update */

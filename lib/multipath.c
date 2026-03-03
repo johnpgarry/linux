@@ -44,8 +44,7 @@ EXPORT_SYMBOL_GPL(mpath_get_iopolicy);
 static int mpath_bdev_report_zones(struct gendisk *disk, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args)
 {
-	struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -73,6 +72,7 @@ EXPORT_SYMBOL_GPL(mpath_synchronize);
 void mpath_add_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device)
 {
+	mpath_device->mpath_head = mpath_head;
 	mutex_lock(&mpath_head->lock);
 	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
 	mutex_unlock(&mpath_head->lock);
@@ -127,11 +127,10 @@ out:
 }
 EXPORT_SYMBOL_GPL(mpath_clear_current_path);
 
-static void mpath_revalidate_paths_iter(struct mpath_disk *mpath_disk,
+static void mpath_revalidate_paths_iter(struct mpath_head *mpath_head,
 	void (*cb)(struct mpath_device *mpath_device, sector_t capacity))
 {
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
-	sector_t capacity = get_capacity(mpath_disk->disk);
+	sector_t capacity = get_capacity(mpath_head->disk);
 	struct mpath_device *mpath_device;
 	int srcu_idx;
 
@@ -155,12 +154,10 @@ void mpath_clear_paths(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_clear_paths);
 
-void mpath_revalidate_paths(struct mpath_disk *mpath_disk,
+void mpath_revalidate_paths(struct mpath_head *mpath_head,
 	void (*cb)(struct mpath_device *mpath_device, sector_t capacity))
 {
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
-
-	mpath_revalidate_paths_iter(mpath_disk, cb);
+	mpath_revalidate_paths_iter(mpath_head, cb);
 	mpath_clear_paths(mpath_head);
 
 	kblockd_schedule_work(&mpath_head->requeue_work);
@@ -396,9 +393,8 @@ static bool mpath_available_path(struct mpath_head *mpath_head)
 
 static void mpath_bdev_submit_bio(struct bio *bio)
 {
-	struct mpath_disk *mpath_disk = bio->bi_bdev->bd_disk->private_data;
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
-	struct device *dev = mpath_disk->parent;
+	struct mpath_head *mpath_head = bio->bi_bdev->bd_disk->private_data;
+	struct device *dev = mpath_head->parent;
 	struct mpath_device *mpath_device;
 	int srcu_idx;
 
@@ -459,24 +455,23 @@ EXPORT_SYMBOL_GPL(mpath_put_head);
 
 static void mpath_free_disk(struct kref *ref)
 {
-	struct mpath_disk *mpath_disk =
-		container_of(ref, struct mpath_disk, ref);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head =
+		container_of(ref, struct mpath_head, ref);
 
-	put_disk(mpath_disk->disk);
+	put_disk(mpath_head->disk);
 	mpath_put_head(mpath_head);
-	kfree(mpath_disk);
+	kfree(mpath_head);
 }
 
-void mpath_put_disk(struct mpath_disk *mpath_disk)
+void mpath_put_disk(struct mpath_head *mpath_head)
 {
-	kref_put(&mpath_disk->ref, mpath_free_disk);
+	kref_put(&mpath_head->ref, mpath_free_disk);
 }
 EXPORT_SYMBOL_GPL(mpath_put_disk);
 
-static int mpath_get_disk(struct mpath_disk *mpath_disk)
+static int mpath_get_disk(struct mpath_head *mpath_head)
 {
-	if (!kref_get_unless_zero(&mpath_disk->ref)) {
+	if (!kref_get_unless_zero(&mpath_head->ref)) {
 		return -ENXIO;
 	}
 	return 0;
@@ -484,23 +479,22 @@ static int mpath_get_disk(struct mpath_disk *mpath_disk)
 
 static int mpath_bdev_open(struct gendisk *disk, blk_mode_t mode)
 {
-	struct mpath_disk *mpath_disk = disk->private_data;
+	struct mpath_head *mpath_head = disk->private_data;
 
-	return mpath_get_disk(mpath_disk);
+	return mpath_get_disk(mpath_head);
 }
 
 static void mpath_bdev_release(struct gendisk *disk)
 {
-	struct mpath_disk *mpath_disk = disk->private_data;
+	struct mpath_head *mpath_head = disk->private_data;
 
-	mpath_put_disk(mpath_disk);
+	mpath_put_disk(mpath_head);
 }
 
 static int mpath_bdev_get_unique_id(struct gendisk *disk, u8 id[16],
     enum blk_unique_id type)
 {
-	struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 	int srcu_idx, ret = -EWOULDBLOCK;
 	struct mpath_device *mpath_device;
 
@@ -516,8 +510,7 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg)
 {
 	struct gendisk *disk = bdev->bd_disk;
-	struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 	struct mpath_device *mpath_device;
 	int srcu_idx, err;
 
@@ -554,8 +547,7 @@ EXPORT_SYMBOL_GPL(mpath_head_read_unlock);
 
 static int mpath_bdev_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 {
-	struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 	int srcu_idx, ret = -EWOULDBLOCK;
 	struct mpath_device *mpath_device;
 
@@ -571,8 +563,7 @@ static int mpath_bdev_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 static int mpath_pr_register(struct block_device *bdev, u64 old_key,
 			u64 new_key, unsigned int flags)
 {
-	struct mpath_disk *mpath_disk = dev_get_drvdata(&bdev->bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -589,8 +580,7 @@ static int mpath_pr_register(struct block_device *bdev, u64 old_key,
 static int mpath_pr_reserve(struct block_device *bdev, u64 key,
 		enum pr_type type, unsigned flags)
 {
-	struct mpath_disk *mpath_disk = dev_get_drvdata(&bdev->bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -608,8 +598,7 @@ static int mpath_pr_reserve(struct block_device *bdev, u64 key,
 
 static int mpath_pr_release(struct block_device *bdev, u64 key, enum pr_type type)
 {
-	struct mpath_disk *mpath_disk = dev_get_drvdata(&bdev->bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -628,8 +617,7 @@ static int mpath_pr_release(struct block_device *bdev, u64 key, enum pr_type typ
 static int mpath_pr_preempt(struct block_device *bdev, u64 old, u64 new,
 		enum pr_type type, bool abort)
 {
-	struct mpath_disk *mpath_disk = dev_get_drvdata(&bdev->bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -647,8 +635,7 @@ static int mpath_pr_preempt(struct block_device *bdev, u64 old, u64 new,
 
 static int mpath_pr_clear(struct block_device *bdev, u64 key)
 {
-	struct mpath_disk *mpath_disk = dev_get_drvdata(&bdev->bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -666,8 +653,7 @@ static int mpath_pr_clear(struct block_device *bdev, u64 key)
 static int mpath_pr_read_keys(struct block_device *bdev,
 		struct pr_keys *keys_info)
 {
-	struct mpath_disk *mpath_disk = dev_get_drvdata(&bdev->bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -686,8 +672,7 @@ static int mpath_pr_read_keys(struct block_device *bdev,
 static int mpath_pr_read_reservation(struct block_device *bdev,
 		struct pr_held_reservation *resv)
 {
-	struct mpath_disk *mpath_disk = dev_get_drvdata(&bdev->bd_device);
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -836,16 +821,16 @@ static int mpath_head_add_cdev(struct mpath_head *mpath_head)
 
 static void multipath_partition_scan_work(struct work_struct *work)
 {
-	struct mpath_disk *mpath_disk =
-		container_of(work, struct mpath_disk, partition_scan_work);
+	struct mpath_head *mpath_head =
+		container_of(work, struct mpath_head, partition_scan_work);
 
 	if (WARN_ON_ONCE(!test_and_clear_bit(GD_SUPPRESS_PART_SCAN,
-					     &mpath_disk->disk->state)))
+					     &mpath_head->disk->state)))
 		return;
 
-	mutex_lock(&mpath_disk->disk->open_mutex);
-	bdev_disk_changed(mpath_disk->disk, false);
-	mutex_unlock(&mpath_disk->disk->open_mutex);
+	mutex_lock(&mpath_head->disk->open_mutex);
+	bdev_disk_changed(mpath_head->disk, false);
+	mutex_unlock(&mpath_head->disk->open_mutex);
 }
 
 void mpath_requeue_work(struct work_struct *work)
@@ -895,12 +880,10 @@ bool mpath_can_remove_head(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_can_remove_head);
 
-void mpath_remove_disk(struct mpath_disk *mpath_disk)
+void mpath_remove_disk(struct mpath_head *mpath_head)
 {
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
-
 	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
-		struct gendisk *disk = mpath_disk->disk;
+		struct gendisk *disk = mpath_head->disk;
 
 		/*
 		 * requeue I/O after MPATH_HEAD_DISK_LIVE has been cleared
@@ -915,52 +898,39 @@ void mpath_remove_disk(struct mpath_disk *mpath_disk)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_disk);
 
-void mpath_unregister_disk(struct mpath_disk *mpath_disk)
+void mpath_unregister_disk(struct mpath_head *mpath_head)
 {
-	mpath_remove_disk(mpath_disk);
-	mpath_put_disk(mpath_disk);
+	mpath_remove_disk(mpath_head);
+	mpath_put_disk(mpath_head);
 }
 EXPORT_SYMBOL_GPL(mpath_unregister_disk);
 
-struct mpath_disk *mpath_alloc_head_disk(struct queue_limits *lim, int numa_node)
+int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim, int numa_node)
 {
-	struct mpath_disk *mpath_disk;
+	mpath_head->disk = blk_alloc_disk(lim, numa_node);
+	if (IS_ERR(mpath_head->disk))
+		return PTR_ERR(mpath_head->disk);
 
-	mpath_disk = kzalloc(sizeof(*mpath_disk), GFP_KERNEL);
-	if (!mpath_disk)
-		return NULL;
+	mpath_head->disk->private_data = mpath_head;
+	mpath_head->disk->fops = &mpath_ops;
 
-	INIT_WORK(&mpath_disk->partition_scan_work,
-			multipath_partition_scan_work);
-	kref_init(&mpath_disk->ref);
+	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->disk->state);
 
-	mpath_disk->disk = blk_alloc_disk(lim, numa_node);
-	if (IS_ERR(mpath_disk->disk)) {
-		kfree(mpath_disk);
-		return NULL;
-	}
-
-	mpath_disk->disk->private_data = mpath_disk;
-	mpath_disk->disk->fops = &mpath_ops;
-
-	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_disk->disk->state);
-
-	return mpath_disk;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mpath_alloc_head_disk);
 
-void mpath_device_set_live(struct mpath_disk *mpath_disk,
-			struct mpath_device *mpath_device)
+void mpath_device_set_live(struct mpath_device *mpath_device)
 {
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	int ret;
 
-	if (!mpath_disk)
+	if (!mpath_head)
 		return;
 
 	if (!test_and_set_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
-		dev_set_drvdata(disk_to_dev(mpath_disk->disk), mpath_disk);
-		ret = device_add_disk(mpath_disk->parent, mpath_disk->disk,
+		dev_set_drvdata(disk_to_dev(mpath_head->disk), mpath_head);
+		ret = device_add_disk(mpath_head->parent, mpath_head->disk,
 				mpath_head->mpdt->device_groups);
 		if (ret) {
 			clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags);
@@ -968,10 +938,10 @@ void mpath_device_set_live(struct mpath_disk *mpath_disk,
 		}
 
 		mpath_head_add_cdev(mpath_head);
-		queue_work(mpath_wq, &mpath_disk->partition_scan_work);
+		queue_work(mpath_wq, &mpath_head->partition_scan_work);
 	}
 
-	mpath_add_sysfs_link(mpath_disk);
+	mpath_add_sysfs_link(mpath_head);
 
 	mutex_lock(&mpath_head->lock);
 	if (mpath_path_is_optimized(mpath_head, mpath_device)) {
@@ -1142,9 +1112,8 @@ ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
 }
 EXPORT_SYMBOL_GPL(mpath_delayed_removal_secs_store);
 
-void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
+void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 {
-	struct mpath_head *mpath_head = mpath_disk->mpath_head;
 	struct device *target;
 	struct device *source;
 	int rc, srcu_idx;
@@ -1155,10 +1124,10 @@ void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
 	 * Ensure head disk node is already added otherwise we may get invalid
 	 * kobj for head disk node
 	 */
-	if (!test_bit(GD_ADDED, &mpath_disk->disk->state))
+	if (!test_bit(GD_ADDED, &mpath_head->disk->state))
 		return;
 
-	mpath_gd_kobj = &disk_to_dev(mpath_disk->disk)->kobj;
+	mpath_gd_kobj = &disk_to_dev(mpath_head->disk)->kobj;
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 
 	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
@@ -1170,7 +1139,7 @@ void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
 			continue;
 
 		target = disk_to_dev(mpath_device->disk);
-		source = disk_to_dev(mpath_disk->disk);
+		source = disk_to_dev(mpath_head->disk);
 		/*
 		 * Create sysfs link from head gendisk kobject @kobj to the
 		 * ns path gendisk kobject @target->kobj.
@@ -1179,7 +1148,7 @@ void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
 				&target->kobj, dev_name(target));
 
 		if (unlikely(rc)) {
-			dev_err(disk_to_dev(mpath_disk->disk),
+			dev_err(disk_to_dev(mpath_head->disk),
 					"failed to create link to %s rc=%d\n",
 					dev_name(target), rc);
 			clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
@@ -1193,7 +1162,7 @@ void mpath_add_sysfs_link(struct mpath_disk *mpath_disk)
 }
 EXPORT_SYMBOL_GPL(mpath_add_sysfs_link);
 
-void mpath_remove_sysfs_link(struct mpath_disk *mpath_disk,
+void mpath_remove_sysfs_link(struct mpath_head *mpath_head,
 				struct mpath_device *mpath_device)
 {
 	struct device *target;
@@ -1203,7 +1172,7 @@ void mpath_remove_sysfs_link(struct mpath_disk *mpath_disk,
 		return;
 
 	target = disk_to_dev(mpath_device->disk);
-	mpath_gd_kobj = &disk_to_dev(mpath_disk->disk)->kobj;
+	mpath_gd_kobj = &disk_to_dev(mpath_head->disk)->kobj;
 
 	sysfs_remove_link_from_group(mpath_gd_kobj, "multipath",
 			dev_name(target));
@@ -1229,6 +1198,9 @@ struct mpath_head *mpath_alloc_head(void)
 	INIT_WORK(&mpath_head->requeue_work, mpath_requeue_work);
 	spin_lock_init(&mpath_head->requeue_lock);
 	bio_list_init(&mpath_head->requeue_list);
+
+	INIT_WORK(&mpath_head->partition_scan_work,
+		multipath_partition_scan_work);
 
 	ret = init_srcu_struct(&mpath_head->srcu);
 	if (ret) {

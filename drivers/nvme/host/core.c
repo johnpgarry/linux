@@ -2487,8 +2487,8 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		struct queue_limits lim;
 		unsigned int memflags;
 		struct nvme_ns_head *head = ns->head;
-		struct mpath_disk *mpath_disk = head->mpath_disk;
-		struct gendisk *disk = mpath_disk->disk;
+		struct mpath_head *mpath_head = head->mpath_head;
+		struct gendisk *disk = mpath_head->disk;
 
 		lim = queue_limits_start_update(disk->queue);
 		memflags = blk_mq_freeze_queue(disk->queue);

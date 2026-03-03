@@ -541,12 +541,12 @@ struct nvme_ns_head {
 	u16			nr_plids;
 	u16			*plids;
 
-	struct mpath_disk	*mpath_disk;
+	struct mpath_head	*mpath_head;
 };
 
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
 {
-	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->mpath_disk;
+	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->mpath_head;
 }
 
 enum nvme_ns_features {
@@ -1040,9 +1040,9 @@ static inline void nvme_trace_bio_complete(struct request *req)
 
 	if (nvme_is_mpath_request(req) && req->bio) {
 		struct nvme_ns_head *head = ns->head;
-		struct mpath_disk *mpath_disk = head->mpath_disk;
+		struct mpath_head *mpath_head = head->mpath_head;
 
-		trace_block_bio_complete(mpath_disk->disk->queue, req->bio);
+		trace_block_bio_complete(mpath_head->disk->queue, req->bio);
 	}
 }
 
