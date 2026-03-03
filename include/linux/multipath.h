@@ -30,17 +30,17 @@ enum mpath_access_state {
 	MPATH_STATE_INVALID	= 0xFF
 };
 
+#ifdef olddsdsd
 struct mpath_disk {
-	struct gendisk		*disk;
 	struct kref		ref;
-	struct work_struct	partition_scan_work;
 	struct mpath_head	*mpath_head;
-	struct device		*parent;
 };
+#endif
 
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
 
 struct mpath_device {
+	struct mpath_head *mpath_head;
 	struct list_head	siblings;
 	atomic_t		nr_active;
 	struct gendisk		*disk;
@@ -116,6 +116,9 @@ struct mpath_head {
 	struct mpath_device __rcu 		*current_path[MAX_NUMNODES];
 	const struct mpath_head_template	*mpdt;
 	void			*drvdata;
+	struct gendisk		*disk;
+	struct work_struct	partition_scan_work;
+	struct device		*parent;
 };
 
 #define REQ_MPATH		REQ_DRV
@@ -125,12 +128,12 @@ static inline bool is_mpath_request(struct request *req)
 	return req->cmd_flags & REQ_MPATH;
 }
 
-static inline struct mpath_disk *mpath_bd_device_to_disk(struct device *dev)
+static inline struct mpath_head *mpath_bd_device_to_disk(struct device *dev)
 {
 	return dev_get_drvdata(dev);
 }
 
-static inline struct mpath_disk *mpath_gendisk_to_disk(struct gendisk *disk)
+static inline struct mpath_head *mpath_gendisk_to_disk(struct gendisk *disk)
 {
 	return mpath_bd_device_to_disk(disk_to_dev(disk));
 }
@@ -153,25 +156,24 @@ void mpath_delete_device(struct mpath_head *mpath_head,
 int mpath_call_for_device(struct mpath_head *mpath_head,
 			int (*cb)(struct mpath_device *mpath_device));
 void mpath_clear_paths(struct mpath_head *mpath_head);
-void mpath_revalidate_paths(struct mpath_disk *mpath_disk,
+void mpath_revalidate_paths(struct mpath_head *mpath_head,
 	void (*cb)(struct mpath_device *mpath_device, sector_t capacity));
-void mpath_add_sysfs_link(struct mpath_disk *mpath_disk);
-void mpath_remove_sysfs_link(struct mpath_disk *mpath_disk,
+void mpath_add_sysfs_link(struct mpath_head *mpath_head);
+void mpath_remove_sysfs_link(struct mpath_head *mpath_head,
 				struct mpath_device *mpath_device);
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 int mpath_get_head(struct mpath_head *mpath_head);
 void mpath_put_head(struct mpath_head *mpath_head);
 void mpath_requeue_work(struct work_struct *work);
 struct mpath_head *mpath_alloc_head(void);
-void mpath_put_disk(struct mpath_disk *mpath_disk);
+void mpath_put_disk(struct mpath_head *mpath_head);
 bool mpath_can_remove_head(struct mpath_head *mpath_head);
-void mpath_remove_disk(struct mpath_disk *mpath_disk);
-void mpath_unregister_disk(struct mpath_disk *mpath_disk);
-struct mpath_disk *mpath_alloc_head_disk(struct queue_limits *lim,
+void mpath_remove_disk(struct mpath_head *mpath_head);
+void mpath_unregister_disk(struct mpath_head *mpath_head);
+int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim,
 			int numa_node);
-void mpath_device_set_live(struct mpath_disk *mpath_disk,
-			struct mpath_device *mpath_device);
-void mpath_unregister_disk(struct mpath_disk *mpath_disk);
+void mpath_device_set_live(struct mpath_device *mpath_device);
+void mpath_unregister_disk(struct mpath_head *mpath_head);
 ssize_t mpath_numa_nodes_show(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device,
 			struct mpath_iopolicy *iopolicy, char *buf);
