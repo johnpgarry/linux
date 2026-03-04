@@ -90,8 +90,6 @@ int alua_check_tpgs(struct scsi_device *sdev);
 struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 					     int group_id, int tpgs);
 
-int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
-		       int bufflen, struct scsi_sense_hdr *sshdr, int flags);
 int alua_tur(struct scsi_device *sdev);
 void alua_put_pg(struct alua_port_group *pg);
 extern bool alua_optimize_stpg;
@@ -101,4 +99,5 @@ char print_alua_state(unsigned char state);
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
 int scsi_alua_init(struct scsi_device *sdev);
+int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg);
 #endif // _SCSI_ALUA_H
