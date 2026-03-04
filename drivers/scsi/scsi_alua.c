@@ -183,7 +183,7 @@ struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
 	//INIT_DELAYED_WORK(&pg->rtpg_work, alua_rtpg_work);
 	INIT_LIST_HEAD(&pg->rtpg_list);
 	INIT_LIST_HEAD(&pg->node);
-	INIT_LIST_HEAD(&pg->dh_list);
+	INIT_LIST_HEAD(&pg->list);
 	spin_lock_init(&pg->lock);
 
 	spin_lock(&port_group_lock);
@@ -345,6 +345,30 @@ int submit_stpg(struct scsi_device *sdev, int group_id,
 				ALUA_FAILOVER_RETRIES, &exec_args);
 }
 EXPORT_SYMBOL_GPL(submit_stpg);
+
+int scsi_alua_init(struct scsi_device *sdev)
+{
+	int tpgs;
+	pr_err("%s sdev=%pS\n", __func__, sdev);
+
+	tpgs = alua_check_tpgs(sdev);
+	pr_err("%s1 sdev=%pS\n", __func__, sdev);
+	if (tpgs == TPGS_MODE_NONE)
+		return 0;
+	sdev->alua = kzalloc(sizeof(*sdev->alua), GFP_KERNEL);
+	if (!sdev->alua)
+		return -ENOMEM;
+
+	spin_lock_init(&sdev->alua->pg_lock);
+	rcu_assign_pointer(sdev->alua->pg, NULL);
+	sdev->alua->init_error = SCSI_DH_OK;
+	sdev->alua->sdev = sdev;
+	INIT_LIST_HEAD(&sdev->alua->node);
+
+	mutex_init(&sdev->alua->init_mutex);
+
+	return 0;
+}
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("scsi_alua");

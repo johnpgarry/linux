@@ -290,6 +290,7 @@ struct scsi_device {
 	unsigned int		sg_timeout;
 	unsigned int		sg_reserved_size;
 
+	struct alua_data	*alua;
 	struct bsg_device	*bsg_dev;
 	unsigned char		access_state;
 	struct mutex		state_mutex;

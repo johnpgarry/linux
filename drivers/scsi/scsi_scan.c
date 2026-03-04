@@ -47,6 +47,8 @@
 #include <scsi/scsi_dh.h>
 #include <scsi/scsi_eh.h>
 
+#include "scsi_alua.h"
+
 #include "scsi_priv.h"
 #include "scsi_logging.h"
 
@@ -1118,6 +1120,9 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 		scsi_attach_vpd(sdev);
 
 	scsi_cdl_check(sdev);
+
+	if (scsi_alua_init(sdev))
+		return SCSI_SCAN_NO_RESPONSE;
 
 	sdev->max_queue_depth = sdev->queue_depth;
 	WARN_ON_ONCE(sdev->max_queue_depth > sdev->budget_map.depth);

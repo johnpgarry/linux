@@ -56,7 +56,7 @@ struct alua_port_group {
 	struct kref		kref;
 	struct rcu_head		rcu;
 	struct list_head	node;
-	struct list_head	dh_list;
+	struct list_head	list;
 	unsigned char		device_id_str[256];
 	int			device_id_len;
 	int			group_id;
@@ -74,6 +74,17 @@ struct alua_port_group {
 	struct scsi_device	*rtpg_sdev;
 };
 
+struct alua_data {
+	struct list_head	node;
+	struct alua_port_group __rcu *pg;
+	int			group_id;
+	spinlock_t		pg_lock;
+	struct scsi_device	*sdev;
+	int			init_error;
+	struct mutex		init_mutex;
+	bool			disabled;
+};
+
 int alua_check_tpgs(struct scsi_device *sdev);
 
 struct alua_port_group *alua_alloc_pg(struct scsi_device *sdev,
@@ -89,4 +100,5 @@ struct alua_port_group *alua_find_get_pg_locked(char *id_str, size_t id_size,
 char print_alua_state(unsigned char state);
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
+int scsi_alua_init(struct scsi_device *sdev);
 #endif // _SCSI_ALUA_H
