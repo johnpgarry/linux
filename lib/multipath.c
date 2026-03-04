@@ -473,7 +473,7 @@ void mpath_put_head(struct mpath_head *mpath_head)
 
 	ref = &mpath_head->ref;
 
-	pr_err("%s calling kref_put mpath_head=%pS refcount=%d\n",
+	pr_err_once("%s calling kref_put mpath_head=%pS refcount=%d\n",
 		__func__, mpath_head, refcount_read(&ref->refcount));
 	kref_put(&mpath_head->ref, mpath_free_head);
 }
