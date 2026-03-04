@@ -392,6 +392,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 					struct alua_dh_data *h;
 
 					tmp_pg->state = desc[0] & 0x0f;
+					pr_err("%s x2 setting %d tmp_pg=%pS\n",
+						__func__, tmp_pg->state, tmp_pg);
 					tmp_pg->pref = desc[0] >> 7;
 					rcu_read_lock();
 					list_for_each_entry_rcu(h,
@@ -413,8 +415,11 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  skip_rtpg:
 	spin_lock_irqsave(&pg->lock, flags);
-	if (transitioning_sense)
+	if (transitioning_sense) {
 		pg->state = SCSI_ACCESS_STATE_TRANSITIONING;
+		pr_err("%s x3 setting SCSI_ACCESS_STATE_TRANSITIONING pg=%pS\n",
+						__func__, pg);
+	}
 
 	if (group_id_old != pg->group_id || state_old != pg->state ||
 		pref_old != pg->pref || valid_states_old != pg->valid_states)
@@ -442,6 +447,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			/* Transitioning time exceeded, set port to standby */
 			err = SCSI_DH_IO;
 			pg->state = SCSI_ACCESS_STATE_STANDBY;
+			pr_err("%s x1 setting SCSI_ACCESS_STATE_STANDBY pg=%pS\n",
+				__func__, pg);
 			pg->expiry = 0;
 			rcu_read_lock();
 			list_for_each_entry_rcu(h, &pg->dh_list, node) {
@@ -490,6 +497,7 @@ static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		/* Only implicit ALUA supported, retry */
 		return SCSI_DH_RETRY;
 	}
+	sdev_printk(KERN_ERR, sdev, "%s0 pg=%pS pg->state=%d\n", __func__, pg, pg->state);
 	switch (pg->state) {
 	case SCSI_ACCESS_STATE_OPTIMAL:
 		return SCSI_DH_OK;
@@ -729,6 +737,8 @@ static bool alua_rtpg_queue(struct alua_port_group *pg,
 		pg->flags |= ALUA_PG_RUN_STPG;
 		force = true;
 	}
+	sdev_printk(KERN_ERR, sdev, "%s2 pg=%pS sdev=%pS pg->rtpg_sdev=%pS\n",
+		__func__, pg, sdev, pg->rtpg_sdev);
 	if (pg->rtpg_sdev == NULL) {
 		struct alua_dh_data *h = sdev->handler_data;
 
@@ -855,7 +865,7 @@ static int alua_activate(struct scsi_device *sdev,
 	struct alua_queue_data *qdata;
 	struct alua_port_group *pg;
 
-	WARN_ON_ONCE(1);
+	//WARN_ON_ONCE(1);
 
 	qdata = kzalloc(sizeof(*qdata), GFP_KERNEL);
 	sdev_printk(KERN_ERR, sdev, "%s data=%pS\n", __func__, data);

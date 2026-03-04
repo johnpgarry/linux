@@ -13,21 +13,6 @@
 
 #define ALUA_NAME "alua"
 
-/* device handler flags */
-#define ALUA_OPTIMIZE_STPG		0x01
-#define ALUA_RTPG_EXT_HDR_UNSUPP	0x02
-/* State machine flags */
-#define ALUA_PG_RUN_RTPG		0x10
-#define ALUA_PG_RUN_STPG		0x20
-#define ALUA_PG_RUNNING			0x40
-
-typedef void (*activate_complete)(void *, int);
-
-struct alua_queue_data {
-	struct list_head	entry;
-	activate_complete	callback_fn;
-	void			*callback_data;
-};
 
 enum {
 	SCSI_DH_OK = 0,
