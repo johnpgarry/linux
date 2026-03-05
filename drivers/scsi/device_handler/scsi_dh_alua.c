@@ -1084,6 +1084,9 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	struct alua_dh_data *h;
 	int err;
 
+	pr_err("%s sdev=%pS sdev->scsi_mpath_dev=%pS\n", __func__, sdev, sdev->scsi_mpath_dev);
+	if (sdev->scsi_mpath_dev)
+		return SCSI_DH_DEV_UNSUPP;
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
 	pr_err("%s sdev=%pS\n", __func__, sdev);
 	if (!h)
