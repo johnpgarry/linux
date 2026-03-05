@@ -11,6 +11,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_multipath.h>
 
+#include "scsi_alua.h"
 #include "scsi_priv.h"
 
 bool scsi_multipath;
@@ -586,8 +587,8 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 	if (!scsi_multipath)
 		return 0;
 
-	if (!scsi_device_tpgs(sdev) && !scsi_multipath_always) {
-		sdev_printk(KERN_NOTICE, sdev, "tpgs are required for multipath support\n");
+	if (!(alua_check_tpgs(sdev) & TPGS_MODE_IMPLICIT) && !scsi_multipath_always) {
+		sdev_printk(KERN_NOTICE, sdev, "implicit tpgs are required for multipath support\n");
 		return 0;
 	}
 
