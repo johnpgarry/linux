@@ -90,14 +90,6 @@ module_param_call(iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
 MODULE_PARM_DESC(iopolicy,
 	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
 
-struct scsi_mpath_clone_bio {
-	struct bio		*master_bio;
-	struct bio		clone;
-};
-
-#define scsi_mpath_to_master_bio(clone) \
-		container_of(clone, struct scsi_mpath_clone_bio, clone)
-
 static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
@@ -284,9 +276,7 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 
 static void scsi_mpath_clone_end_io(struct bio *clone)
 {
-	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio =
-			scsi_mpath_to_master_bio(clone);
-	struct bio *master_bio = scsi_mpath_clone_bio->master_bio;
+	struct bio *master_bio = clone->bi_private;
 
 	master_bio->bi_status = clone->bi_status;
 	bio_put(clone);
@@ -296,7 +286,6 @@ static void scsi_mpath_clone_end_io(struct bio *clone)
 static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 {
 	struct mpath_head *mpath_head = bio->bi_bdev->bd_disk->private_data;
-	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
 	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
 	struct bio *clone;
 
@@ -306,10 +295,7 @@ static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 		return NULL;
 
 	clone->bi_end_io = scsi_mpath_clone_end_io;
-
-	scsi_mpath_clone_bio = container_of(clone,
-					struct scsi_mpath_clone_bio, clone);
-	scsi_mpath_clone_bio->master_bio = bio;
+	clone->bi_private = bio;
 
 	return clone;
 }
@@ -514,9 +500,8 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 	ida_init(&scsi_mpath_head->ida);
 	mutex_init(&scsi_mpath_head->lock);
 
-	if (bioset_init(&scsi_mpath_head->bio_pool, SCSI_MAX_QUEUE_DEPTH,
-			offsetof(struct scsi_mpath_clone_bio, clone),
-			BIOSET_NEED_BVECS|BIOSET_PERCPU_CACHE))
+	if (bioset_init(&scsi_mpath_head->bio_pool, BIO_POOL_SIZE,
+			0, BIOSET_PERCPU_CACHE))
 		goto out_free;
 	scsi_mpath_head->mpath_head = mpath_alloc_head();
 	if (IS_ERR(scsi_mpath_head->mpath_head))
@@ -715,14 +700,12 @@ EXPORT_SYMBOL_GPL(scsi_is_mpath_request);
 static inline void bio_list_add_clone_master(struct bio_list *bl,
 				struct bio *clone)
 {
-	struct scsi_mpath_clone_bio *scsi_mpath_clone_bio;
 	struct bio *master_bio;
 
 	if (clone->bi_next)
 		bio_list_add_clone_master(bl, clone->bi_next);
 
-	scsi_mpath_clone_bio = scsi_mpath_to_master_bio(clone);
-	master_bio = scsi_mpath_clone_bio->master_bio;
+	master_bio = clone->bi_private;
 
 	if (bl->tail)
 		bl->tail->bi_next = master_bio;
