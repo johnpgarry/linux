@@ -582,6 +582,7 @@ static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
+	int rel_port = -1, group_id;
 	int ret;
 
 	if (!scsi_multipath)
@@ -622,6 +623,10 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 	sdev->scsi_mpath_dev->scsi_mpath_head = scsi_mpath_head;
 
 found:
+	group_id = scsi_vpd_tpg_id(sdev, &rel_port);
+	sdev_printk(KERN_NOTICE, sdev, "group_id=%d rel_port=%d\n",
+			rel_port, rel_port);
+
 	sdev->scsi_mpath_dev->index = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
 	if (sdev->scsi_mpath_dev->index < 0) {
 		ret = sdev->scsi_mpath_dev->index;
