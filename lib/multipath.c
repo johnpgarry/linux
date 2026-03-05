@@ -417,8 +417,15 @@ static void mpath_bdev_submit_bio(struct bio *bio)
 
 	if (likely(mpath_device)) {
 		bio->bi_opf |= REQ_MPATH;
-		if (mpath_head->mpdt->clone_bio)
+		if (mpath_head->mpdt->clone_bio) {
+			struct bio *orig = bio;
+
 			bio = mpath_head->mpdt->clone_bio(bio);
+			if (!bio) {
+				bio_io_error(orig);
+				goto out;
+			}
+		}
 		trace_block_bio_remap(bio, disk_devt(mpath_device->disk),
 				      bio->bi_iter.bi_sector);
 		bio_set_dev(bio, mpath_device->disk->part0);
@@ -436,6 +443,7 @@ static void mpath_bdev_submit_bio(struct bio *bio)
 		bio_io_error(bio);
 	}
 
+out:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 }
 
