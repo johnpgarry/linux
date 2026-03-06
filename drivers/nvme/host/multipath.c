@@ -167,7 +167,7 @@ void nvme_failover_req(struct request *req)
 
 	nvme_req(req)->status = 0;
 	nvme_end_req(req);
-	kblockd_schedule_work(&mpath_head->requeue_work);
+	mpath_schedule_requeue_work(mpath_head);
 }
 
 void nvme_mpath_start_request(struct request *rq)
@@ -218,14 +218,11 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
-		struct mpath_head *mpath_head = ns->head->mpath_head;
-
-		if (!mpath_head)
+		if (!ns->head->mpath_head)
 			continue;
-
-		kblockd_schedule_work(&mpath_head->requeue_work);
+		mpath_schedule_requeue_work(ns->head->mpath_head);
 		if (nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE)
-			disk_uevent(mpath_head->disk, KOBJ_CHANGE);
+			disk_uevent(ns->head->mpath_head->disk, KOBJ_CHANGE);
 	}
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
 }
@@ -252,14 +249,8 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
-		struct nvme_ns_head *head = ns->head;
-		struct mpath_head *mpath_head = head->mpath_head;
-
-		if (!mpath_head)
-			continue;
-
 		nvme_mpath_clear_current_path(ns);
-		kblockd_schedule_work(&mpath_head->requeue_work);
+		mpath_schedule_requeue_work(ns->head->mpath_head);
 	}
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
 }

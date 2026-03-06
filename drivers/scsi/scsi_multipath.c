@@ -130,7 +130,7 @@ static void scsi_mpath_device_iopolicy_store_update(void *data)
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
 	mpath_clear_paths(mpath_head);
-	kblockd_schedule_work(&mpath_head->requeue_work);
+	mpath_schedule_requeue_work(mpath_head);
 }
 
 void scsi_mpath_dev_clear_path(struct scsi_mpath_device *scsi_mpath_dev)
@@ -728,7 +728,7 @@ void scsi_mpath_failover_req(struct request *req)
 	scmd->result = 0;
 	blk_mq_end_request(req, 0);
 
-	kblockd_schedule_work(&mpath_head->requeue_work);
+	mpath_schedule_requeue_work(mpath_head);
 }
 
 static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
