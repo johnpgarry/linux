@@ -12,8 +12,6 @@
 bool multipath = true;
 static bool multipath_always_on;
 
-static const struct mpath_head_template mpdt;
-
 static int multipath_param_set(const char *val, const struct kernel_param *kp)
 {
 	int ret;
@@ -400,67 +398,6 @@ static void nvme_remove_head_work(struct work_struct *work)
 		nvme_put_ns_head(head);
 	}
 	module_put(THIS_MODULE);
-}
-
-int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
-{
-	struct mpath_head *mpath_head;
-	struct nvme_subsystem *subsys = ctrl->subsys;
-	struct queue_limits lim;
-	int ret;
-
-
-	pr_err("%s ctrl=%pS head=%pS\n", __func__, ctrl, head);
-	/*
-	 * If "multipath_always_on" is enabled, a multipath node is added
-	 * regardless of whether the disk is single/multi ported, and whether
-	 * the namespace is shared or private. If "multipath_always_on" is not
-	 * enabled, a multipath node is added only if the subsystem supports
-	 * multiple controllers and the "multipath" option is configured. In
-	 * either case, for private namespaces, we ensure that the NSID is
-	 * unique.
-	 */
-	if (!multipath_always_on) {
-		if (!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL) ||
-				!multipath)
-			return 0;
-	}
-
-	if (!nvme_is_unique_nsid(ctrl, head))
-		return 0;
-
-	blk_set_stacking_limits(&lim);
-	lim.dma_alignment = 3;
-	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT |
-		BLK_FEAT_POLL | BLK_FEAT_ATOMIC_WRITES;
-	if (head->ids.csi == NVME_CSI_ZNS)
-		lim.features |= BLK_FEAT_ZONED;
-
-	mpath_head = mpath_alloc_head();
-	pr_err("%s2 mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
-	if (IS_ERR(mpath_head))
-		return PTR_ERR(mpath_head);
-
-	ret = mpath_alloc_head_disk(mpath_head, &lim, ctrl->numa_node);
-	if (ret) {
-		mpath_put_head(mpath_head);
-		return ret;
-	}
-
-	pr_err("%s3 mpath_head=%pS head=%pS\n", __func__, mpath_head, head);
-	mpath_head->drvdata = head;
-
-	head->mpath_head = mpath_head;
-	mpath_head->parent = &subsys->dev;
-
-	mpath_head->mpdt = &mpdt;
-	INIT_DELAYED_WORK(&mpath_head->remove_work, nvme_remove_head_work);
-
-	pr_err("%s4 mpath_head=%pS calling nvme_tryget_ns_head\n", __func__, mpath_head);
-	sprintf(mpath_head->disk->disk_name, "nvme%dn%d",
-			ctrl->subsys->instance, head->instance);
-	nvme_tryget_ns_head(head);
-	return 0;
 }
 
 static int nvme_parse_ana_log(struct nvme_ctrl *ctrl, void *data,
@@ -995,3 +932,57 @@ static const struct mpath_head_template mpdt = {
 	.get_unique_id = nvme_mpath_get_unique_id,
 	.device_groups = nvme_ns_attr_groups,
 };
+
+int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
+{
+	struct mpath_head *mpath_head;
+	struct nvme_subsystem *subsys = ctrl->subsys;
+	struct queue_limits lim;
+	int ret;
+
+	/*
+	 * If "multipath_always_on" is enabled, a multipath node is added
+	 * regardless of whether the disk is single/multi ported, and whether
+	 * the namespace is shared or private. If "multipath_always_on" is not
+	 * enabled, a multipath node is added only if the subsystem supports
+	 * multiple controllers and the "multipath" option is configured. In
+	 * either case, for private namespaces, we ensure that the NSID is
+	 * unique.
+	 */
+	if (!multipath_always_on) {
+		if (!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL) ||
+				!multipath)
+			return 0;
+	}
+
+	if (!nvme_is_unique_nsid(ctrl, head))
+		return 0;
+
+	blk_set_stacking_limits(&lim);
+	lim.dma_alignment = 3;
+	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT |
+		BLK_FEAT_POLL | BLK_FEAT_ATOMIC_WRITES;
+	if (head->ids.csi == NVME_CSI_ZNS)
+		lim.features |= BLK_FEAT_ZONED;
+
+	mpath_head = mpath_alloc_head();
+	if (IS_ERR(mpath_head))
+		return PTR_ERR(mpath_head);
+
+	ret = mpath_alloc_head_disk(mpath_head, &lim, ctrl->numa_node);
+	if (ret) {
+		mpath_put_head(mpath_head);
+		return ret;
+	}
+
+	mpath_head->drvdata = head;
+	head->mpath_head = mpath_head;
+	mpath_head->parent = &subsys->dev;
+	mpath_head->mpdt = &mpdt;
+	INIT_DELAYED_WORK(&mpath_head->remove_work, nvme_remove_head_work);
+
+	sprintf(mpath_head->disk->disk_name, "nvme%dn%d",
+			ctrl->subsys->instance, head->instance);
+	nvme_tryget_ns_head(head);
+	return 0;
+}
