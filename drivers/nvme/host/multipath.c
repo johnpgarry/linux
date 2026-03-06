@@ -449,13 +449,24 @@ static inline bool nvme_state_is_live(enum nvme_ana_state state)
 	return state == NVME_ANA_OPTIMIZED || state == NVME_ANA_NONOPTIMIZED;
 }
 
+static void nvme_mpath_update_ana_state(struct nvme_ns *ns, enum nvme_ana_state ana_state)
+{
+	ns->ana_state = ana_state;
+	if (ana_state == NVME_ANA_OPTIMIZED)
+		ns->mpath_device.access_state = MPATH_STATE_OPTIMIZED;
+	else if (ana_state == NVME_ANA_NONOPTIMIZED)
+		ns->mpath_device.access_state = MPATH_STATE_ACTIVE;
+	else
+		ns->mpath_device.access_state = MPATH_STATE_OTHER;
+}
+
 static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		struct nvme_ns *ns)
 {
 	struct nvme_ns_head *head = ns->head;
 	struct mpath_head *mpath_head = head->mpath_head;
 	ns->ana_grpid = le32_to_cpu(desc->grpid);
-	ns->ana_state = desc->state;
+	nvme_mpath_update_ana_state(ns, desc->state);
 	clear_bit(NVME_NS_ANA_PENDING, &ns->flags);
 
 	/*
@@ -755,7 +766,7 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 			queue_work(nvme_wq, &ns->ctrl->ana_work);
 		}
 	} else {
-		ns->ana_state = NVME_ANA_OPTIMIZED;
+		nvme_mpath_update_ana_state(ns, NVME_ANA_OPTIMIZED);
 		mpath_device_set_live(&ns->mpath_device);
 	}
 
@@ -895,22 +906,6 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 	struct nvme_subsystem *subsys = head->subsys;
 
 	return mpath_read_iopolicy(&subsys->iopolicy);
-}
-
-__maybe_unused
-static enum mpath_access_state nvme_mpath_get_access_state(
-				struct mpath_device *mpath_device)
-{
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-
-	switch (ns->ana_state) {
-	case NVME_ANA_OPTIMIZED:
-		return MPATH_STATE_OPTIMIZED;
-	case NVME_ANA_NONOPTIMIZED:
-		return MPATH_STATE_ACTIVE;
-	default:
-		return MPATH_STATE_INVALID;
-	}
 }
 
 static int nvme_mpath_get_nr_active(struct mpath_device *mpath_device)

@@ -27,7 +27,7 @@ struct mpath_iopolicy {
 enum mpath_access_state {
 	MPATH_STATE_OPTIMIZED,
 	MPATH_STATE_ACTIVE,
-	MPATH_STATE_INVALID	= 0xFF
+	MPATH_STATE_OTHER
 };
 
 #ifdef olddsdsd
