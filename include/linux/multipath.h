@@ -155,7 +155,7 @@ int mpath_call_for_device(struct mpath_head *mpath_head,
 			int (*cb)(struct mpath_device *mpath_device));
 void mpath_clear_paths(struct mpath_head *mpath_head);
 void mpath_revalidate_paths(struct mpath_head *mpath_head,
-	void (*cb)(struct mpath_device *mpath_device, sector_t capacity));
+	void (*not_ready_cb)(struct mpath_device *mpath_device));
 void mpath_add_sysfs_link(struct mpath_head *mpath_head);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);

@@ -134,19 +134,20 @@ out:
 EXPORT_SYMBOL_GPL(mpath_clear_current_path);
 
 static void mpath_revalidate_paths_iter(struct mpath_head *mpath_head,
-	void (*cb)(struct mpath_device *mpath_device, sector_t capacity))
+	void (*not_ready_cb)(struct mpath_device *mpath_device))
 {
 	sector_t capacity = get_capacity(mpath_head->disk);
 	struct mpath_device *mpath_device;
 	int srcu_idx;
 
-	if (!cb)
+	if (!not_ready_cb)
 		return;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
 				 srcu_read_lock_held(&mpath_head->srcu)) {
-		cb(mpath_device, capacity);
+		if (capacity != get_capacity(mpath_device->disk))
+			not_ready_cb(mpath_device);
 	}
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 }
@@ -161,12 +162,12 @@ void mpath_clear_paths(struct mpath_head *mpath_head)
 EXPORT_SYMBOL_GPL(mpath_clear_paths);
 
 void mpath_revalidate_paths(struct mpath_head *mpath_head,
-	void (*cb)(struct mpath_device *mpath_device, sector_t capacity))
+	void (*not_ready_cb)(struct mpath_device *mpath_device))
 {
 	if (!mpath_head)
 		return;
 
-	mpath_revalidate_paths_iter(mpath_head, cb);
+	mpath_revalidate_paths_iter(mpath_head, not_ready_cb);
 	mpath_clear_paths(mpath_head);
 
 	mpath_schedule_requeue_work(mpath_head);
