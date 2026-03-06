@@ -1069,10 +1069,10 @@ ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy,
 }
 EXPORT_SYMBOL_GPL(mpath_iopolicy_store);
 
-ssize_t mpath_numa_nodes_show(struct mpath_head *mpath_head,
-			struct mpath_device *mpath_device,
+ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
 			struct mpath_iopolicy *mpath_iopolicy, char *buf)
 {
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	int node, srcu_idx;
 	nodemask_t numa_nodes;
 	struct mpath_device *current_mpath_dev;
