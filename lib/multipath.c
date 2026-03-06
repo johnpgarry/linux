@@ -170,7 +170,7 @@ void mpath_revalidate_paths(struct mpath_head *mpath_head,
 	mpath_revalidate_paths_iter(mpath_head, cb);
 	mpath_clear_paths(mpath_head);
 
-	kblockd_schedule_work(&mpath_head->requeue_work);
+	mpath_schedule_requeue_work(mpath_head);
 }
 EXPORT_SYMBOL_GPL(mpath_revalidate_paths);
 
@@ -908,7 +908,7 @@ void mpath_remove_disk(struct mpath_head *mpath_head)
 		 * requeue I/O after MPATH_HEAD_DISK_LIVE has been cleared
 		 * to allow multipath to fail all I/O.
 		 */
-		kblockd_schedule_work(&mpath_head->requeue_work);
+		mpath_schedule_requeue_work(mpath_head);
 
 		mpath_head_del_cdev(mpath_head);
 		mpath_synchronize(mpath_head);
@@ -982,7 +982,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 	mutex_unlock(&mpath_head->lock);
 
 	mpath_synchronize(mpath_head);
-	kblockd_schedule_work(&mpath_head->requeue_work);
+	mpath_schedule_requeue_work(mpath_head);
 }
 EXPORT_SYMBOL_GPL(mpath_device_set_live);
 

@@ -201,4 +201,8 @@ static inline bool mpath_head_queue_if_no_path(struct mpath_head *mpath_head)
 	return false;
 }
 
+static inline void mpath_schedule_requeue_work(struct mpath_head *mpath_head)
+{
+	kblockd_schedule_work(&mpath_head->requeue_work);
+}
 #endif // _LIBMULTIPATH_H
