@@ -113,12 +113,12 @@ struct mpath_head {
 	struct module		*drv_module;
 
 	unsigned long		flags;
-	struct mpath_device __rcu 		*current_path[MAX_NUMNODES];
 	const struct mpath_head_template	*mpdt;
 	void			*drvdata;
 	struct gendisk		*disk;
 	struct work_struct	partition_scan_work;
 	struct device		*parent;
+	struct mpath_device __rcu 		*current_path[];
 };
 
 #define REQ_MPATH		REQ_DRV
