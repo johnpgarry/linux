@@ -1037,12 +1037,8 @@ static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
 
-	if (nvme_is_mpath_request(req) && req->bio) {
-		struct nvme_ns_head *head = ns->head;
-		struct mpath_head *mpath_head = head->mpath_head;
-
-		trace_block_bio_complete(mpath_head->disk->queue, req->bio);
-	}
+	if (nvme_is_mpath_request(req) && req->bio)
+		trace_block_bio_complete(ns->head->mpath_head->disk->queue, req->bio);
 }
 
 extern bool multipath;
