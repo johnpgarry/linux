@@ -1193,7 +1193,8 @@ struct mpath_head *mpath_alloc_head(void)
 	struct mpath_head *mpath_head;
 	int ret;
 
-	mpath_head = kzalloc(sizeof(*mpath_head), GFP_KERNEL);
+	mpath_head = kzalloc(struct_size(mpath_head, current_path,
+				num_possible_nodes()), GFP_KERNEL);
 	if (!mpath_head)
 		return ERR_PTR(-ENOMEM);
 	INIT_LIST_HEAD(&mpath_head->dev_list);
