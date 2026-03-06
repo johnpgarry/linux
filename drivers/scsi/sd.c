@@ -4239,14 +4239,13 @@ static ssize_t sd_mpath_queue_depth_show(struct device *dev,
 	struct scsi_disk *sdkp = gd->private_data;
 	struct scsi_device *sdev = sdkp->device;
 	struct scsi_mpath_device *scsi_mpath_device = sdev->scsi_mpath_dev;
-	struct mpath_device *mpath_device = &scsi_mpath_device->mpath_device;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
 	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
 
 	if (!mpath_qd_iopolicy(&scsi_mpath_head->iopolicy))
 		return 0;
 
-	return sysfs_emit(buf, "%d\n", atomic_read(&mpath_device->nr_active));
+	return sysfs_emit(buf, "%d\n", atomic_read(&scsi_mpath_device->nr_active));
 }
 static DEVICE_ATTR(mpath_queue_depth, 0444, sd_mpath_queue_depth_show, NULL);
 

@@ -42,10 +42,10 @@ struct mpath_disk {
 struct mpath_device {
 	struct mpath_head *mpath_head;
 	struct list_head	siblings;
-	atomic_t		nr_active;
 	struct gendisk		*disk;
 	unsigned long		flags;
 	int			numa_node;
+	enum mpath_access_state access_state;
 };
 
 struct mpath_pr_ops {
@@ -70,7 +70,7 @@ struct mpath_head_template {
 	void (*del_cdev)(struct mpath_head *);
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
-	enum mpath_access_state (*get_access_state)(struct mpath_device *);
+	int (*get_nr_active)(struct mpath_device *);
 	int (*bdev_ioctl)(struct block_device *bdev, struct mpath_device *,
 			blk_mode_t mode, unsigned int cmd, unsigned long arg,
 			int srcu_idx);
