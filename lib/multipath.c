@@ -181,11 +181,10 @@ static bool mpath_path_is_disabled(struct mpath_head *mpath_head,
 }
 
 static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
-			enum mpath_iopolicy_e iopolicy, int node)
+	int node)
 {
 	int found_distance = INT_MAX, fallback_distance = INT_MAX, distance;
-	struct mpath_device *mpath_dev_found, *mpath_dev_fallback,
-			*mpath_device;
+	struct mpath_device *found = NULL, *fallback = NULL, *mpath_device;
 
 	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
 		srcu_read_lock_held(&mpath_head->srcu)) {
@@ -193,7 +192,7 @@ static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 			continue;
 
 		if (mpath_device->numa_node != NUMA_NO_NODE &&
-		    (iopolicy == MPATH_IOPOLICY_NUMA))
+		    (mpath_head->mpdt->get_iopolicy(mpath_head) == MPATH_IOPOLICY_NUMA))
 			distance = node_distance(node, mpath_device->numa_node);
 		else
 			distance = LOCAL_DISTANCE;
@@ -202,13 +201,13 @@ static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 		case MPATH_STATE_OPTIMIZED:
 		    if (distance < found_distance) {
 			    found_distance = distance;
-			    mpath_dev_found = mpath_device;
+			    found = mpath_device;
 		    }
 		    break;
 		case MPATH_STATE_ACTIVE:
 		    if (distance < fallback_distance) {
 			    fallback_distance = distance;
-			    mpath_dev_fallback = mpath_device;
+			    fallback = mpath_device;
 		    }
 		    break;
 		default:
@@ -216,14 +215,14 @@ static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 		}
 	}
 
-	if (!mpath_dev_found)
-		mpath_dev_found = mpath_dev_fallback;
+	if (!found)
+		found = fallback;
 
-	if (mpath_dev_found)
+	if (found)
 		rcu_assign_pointer(mpath_head->current_path[node],
-			mpath_dev_found);
+			found);
 
-	return mpath_dev_found;
+	return found;
 }
 
 static struct mpath_device *mpath_next_dev(struct mpath_head *mpath_head,
@@ -240,8 +239,7 @@ static struct mpath_device *mpath_next_dev(struct mpath_head *mpath_head,
 }
 
 static struct mpath_device *mpath_round_robin_path(
-				struct mpath_head *mpath_head,
-				enum mpath_iopolicy_e iopolicy)
+				struct mpath_head *mpath_head)
 {
 	struct mpath_device *mpath_device, *found = NULL;
 	int node = numa_node_id();
@@ -251,7 +249,7 @@ static struct mpath_device *mpath_round_robin_path(
 				&mpath_head->srcu);
 
 	if (unlikely(!old))
-		return __mpath_find_path(mpath_head, iopolicy, node);
+		return __mpath_find_path(mpath_head, node);
 
 	if (list_is_singular(&mpath_head->dev_list)) {
 		if (mpath_path_is_disabled(mpath_head, old))
@@ -336,8 +334,7 @@ static inline bool mpath_path_is_optimized(struct mpath_head *mpath_head,
 	return mpath_head->mpdt->is_optimized(mpath_device);
 }
 
-static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head,
-					enum mpath_iopolicy_e iopolicy)
+static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
 {
 	int node = numa_node_id();
 	struct mpath_device *mpath_device;
@@ -345,9 +342,9 @@ static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head,
 	mpath_device = srcu_dereference(mpath_head->current_path[node],
 					&mpath_head->srcu);
 	if (unlikely(!mpath_device))
-		return __mpath_find_path(mpath_head, iopolicy, node);
+		return __mpath_find_path(mpath_head, node);
 	if (unlikely(!mpath_path_is_optimized(mpath_head, mpath_device)))
-		return __mpath_find_path(mpath_head, iopolicy, node);
+		return __mpath_find_path(mpath_head, node);
 	return mpath_device;
 }
 
@@ -360,9 +357,9 @@ static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head)
 	case MPATH_IOPOLICY_QD:
 		return mpath_queue_depth_path(mpath_head);
 	case MPATH_IOPOLICY_RR:
-		return mpath_round_robin_path(mpath_head, iopolicy);
+		return mpath_round_robin_path(mpath_head);
 	default:
-		return mpath_numa_path(mpath_head, iopolicy);
+		return mpath_numa_path(mpath_head);
 	}
 }
 
@@ -970,9 +967,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 
 		srcu_idx = srcu_read_lock(&mpath_head->srcu);
 		for_each_online_node(node)
-			__mpath_find_path(mpath_head,
-				mpath_head->mpdt->get_iopolicy(mpath_head),
-				node);
+			__mpath_find_path(mpath_head, node);
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	}
 	mutex_unlock(&mpath_head->lock);

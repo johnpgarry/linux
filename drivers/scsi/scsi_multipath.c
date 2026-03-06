@@ -258,6 +258,7 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_device->numa_node = dev_to_node(shost->dma_dev);
+	mpath_device->access_state = MPATH_STATE_OPTIMIZED;
 
 	return 0;
 }
