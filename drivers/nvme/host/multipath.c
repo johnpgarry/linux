@@ -897,6 +897,7 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 	return mpath_read_iopolicy(&subsys->iopolicy);
 }
 
+__maybe_unused
 static enum mpath_access_state nvme_mpath_get_access_state(
 				struct mpath_device *mpath_device)
 {
@@ -907,12 +908,16 @@ static enum mpath_access_state nvme_mpath_get_access_state(
 		return MPATH_STATE_OPTIMIZED;
 	case NVME_ANA_NONOPTIMIZED:
 		return MPATH_STATE_ACTIVE;
-	case NVME_ANA_INACCESSIBLE:
-	case NVME_ANA_PERSISTENT_LOSS:
-	case NVME_ANA_CHANGE:
 	default:
 		return MPATH_STATE_INVALID;
 	}
+}
+
+static int nvme_mpath_get_nr_active(struct mpath_device *mpath_device)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+
+	return atomic_read(&ns->ctrl->nr_active);
 }
 
 static const struct mpath_head_template mpdt = {
@@ -921,7 +926,6 @@ static const struct mpath_head_template mpdt = {
 	.del_cdev = nvme_mpath_del_cdev,
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
-	.get_access_state = nvme_mpath_get_access_state,
 	.bdev_ioctl = nvme_mpath_bdev_ioctl,
 	.cdev_ioctl = nvme_mpath_cdev_ioctl,
 	.report_zones = nvme_mpath_report_zones,
@@ -931,6 +935,7 @@ static const struct mpath_head_template mpdt = {
 	.get_iopolicy = nvme_mpath_get_iopolicy,
 	.get_unique_id = nvme_mpath_get_unique_id,
 	.device_groups = nvme_ns_attr_groups,
+	.get_nr_active = nvme_mpath_get_nr_active,
 };
 
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)

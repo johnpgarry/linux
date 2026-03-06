@@ -334,15 +334,6 @@ static bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 	return true;
 }
 
-/* Until we have ALUA support, we're always optimised */
-static enum mpath_access_state scsi_mpath_get_access_state(
-				struct mpath_device *mpath_device)
-{
-	if (scsi_mpath_is_disabled(mpath_device))
-		return MPATH_STATE_INVALID;
-	return MPATH_STATE_OPTIMIZED;
-}
-
 static bool scsi_mpath_available_path(struct mpath_device *mpath_device, bool *available)
 {
 	struct scsi_mpath_device *scsi_mpath_dev =
@@ -454,6 +445,14 @@ static int scsi_mpath_pr_read_reservation(struct mpath_device *mpath_device,
 	return drv->mpath_pr_ops->pr_read_reservation(sdev, rsv);
 }
 
+static int scsi_mpath_get_nr_active(struct mpath_device *mpath_device)
+{
+	struct scsi_mpath_device *scsi_mpath_dev =
+				to_scsi_mpath_device(mpath_device);
+
+	return atomic_read(&scsi_mpath_dev->nr_active);
+}
+
 static const struct mpath_pr_ops scsi_mpath_pr_ops = {
 	.pr_register	= scsi_mpath_pr_register,
 	.pr_reserve	= scsi_mpath_pr_reserve,
@@ -467,13 +466,13 @@ static const struct mpath_pr_ops scsi_mpath_pr_ops = {
 struct mpath_head_template smpdt_pr = {
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
-	.get_access_state = scsi_mpath_get_access_state,
 	.bdev_ioctl = scsi_mpath_ioctl,
 	.available_path = scsi_mpath_available_path,
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.clone_bio = scsi_mpath_clone_bio,
 	.pr_ops = &scsi_mpath_pr_ops,
 	.device_groups = mpath_device_groups,
+	.get_nr_active = scsi_mpath_get_nr_active,
 };
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
