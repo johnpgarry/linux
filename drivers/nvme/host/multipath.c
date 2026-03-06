@@ -173,12 +173,9 @@ void nvme_failover_req(struct request *req)
 void nvme_mpath_start_request(struct request *rq)
 {
 	struct nvme_ns *ns = rq->q->queuedata;
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
-	struct gendisk *disk = mpath_head->disk;
-	struct nvme_subsystem *subsys = head->subsys;
+	struct gendisk *disk = ns->head->mpath_head->disk;
 
-	if (mpath_qd_iopolicy(&subsys->iopolicy) &&
+	if (mpath_qd_iopolicy(&ns->head->subsys->iopolicy) &&
 	    !(nvme_req(rq)->flags & NVME_MPATH_CNT_ACTIVE)) {
 		atomic_inc(&ns->ctrl->nr_active);
 		nvme_req(rq)->flags |= NVME_MPATH_CNT_ACTIVE;
@@ -197,15 +194,13 @@ EXPORT_SYMBOL_GPL(nvme_mpath_start_request);
 void nvme_mpath_end_request(struct request *rq)
 {
 	struct nvme_ns *ns = rq->q->queuedata;
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
 
 	if (nvme_req(rq)->flags & NVME_MPATH_CNT_ACTIVE)
 		atomic_dec_if_positive(&ns->ctrl->nr_active);
 
 	if (!(nvme_req(rq)->flags & NVME_MPATH_IO_STATS))
 		return;
-	bdev_end_io_acct(mpath_head->disk->part0, req_op(rq),
+	bdev_end_io_acct(ns->head->mpath_head->disk->part0, req_op(rq),
 			 blk_rq_bytes(rq) >> SECTOR_SHIFT,
 			 nvme_req(rq)->start_time);
 }
@@ -711,6 +706,7 @@ static ssize_t nvme_subsys_iopolicy_show(struct device *dev,
 {
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
+
 	return mpath_iopolicy_show(&subsys->iopolicy, buf);
 }
 
@@ -965,7 +961,6 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 	ctrl->ana_log_size = 0;
 }
 
-
 static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_head)
 {
 	struct nvme_ns_head *head = mpath_head->drvdata;
@@ -973,7 +968,6 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 
 	return mpath_read_iopolicy(&subsys->iopolicy);
 }
-
 
 static enum mpath_access_state nvme_mpath_get_access_state(
 				struct mpath_device *mpath_device)
@@ -993,7 +987,6 @@ static enum mpath_access_state nvme_mpath_get_access_state(
 	}
 }
 
-__maybe_unused
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
 	.add_cdev = nvme_mpath_add_cdev,
@@ -1003,9 +996,7 @@ static const struct mpath_head_template mpdt = {
 	.get_access_state = nvme_mpath_get_access_state,
 	.bdev_ioctl = nvme_mpath_bdev_ioctl,
 	.cdev_ioctl = nvme_mpath_cdev_ioctl,
-	#ifdef CONFIG_BLK_DEV_ZONED
 	.report_zones = nvme_mpath_report_zones,
-	#endif
 	.pr_ops = &nvme_mpath_pr_ops,
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
