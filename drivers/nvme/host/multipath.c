@@ -346,10 +346,6 @@ static void nvme_mpath_del_cdev(struct mpath_head *mpath_head)
 	nvme_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
 }
 
-bool nvme_mpath_has_disk(struct nvme_ns_head *head)
-{
-	return head->mpath_head;
-}
 
 static void nvme_remove_head_work(struct work_struct *work)
 {
@@ -735,17 +731,16 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 	}
 
 #ifdef CONFIG_BLK_DEV_ZONED
-	if (blk_queue_is_zoned(ns->queue) && head->mpath_head)
-		head->mpath_head->disk->nr_zones = ns->disk->nr_zones;
+	if (blk_queue_is_zoned(ns->queue) && ns->head->mpath_head)
+		ns->head->mpath_head->disk->nr_zones = ns->disk->nr_zones;
 #endif
 }
 
 void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head = head->mpath_head;
 	bool remove = false;
 
-	if (!mpath_head)
+	if (!head->mpath_head)
 		return;
 
 	mutex_lock(&head->subsys->lock);
@@ -761,18 +756,14 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	if (head->ns_count)
 		goto out;
 
-	/*
-	 * Ensure that no one could remove this module while the head
-	 * remove work is pending.
-	 */
-	if (mpath_can_remove_head(mpath_head)) {
+	if (mpath_can_remove_head(head->mpath_head)) {
 		list_del_init(&head->entry);
 		remove = true;
 	}
 out:
 	mutex_unlock(&head->subsys->lock);
 	if (remove) {
-		mpath_unregister_disk(mpath_head);
+		mpath_unregister_disk(head->mpath_head);
 		nvme_put_ns_head(head);
 	}
 }
