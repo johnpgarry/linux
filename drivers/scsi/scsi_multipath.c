@@ -14,64 +14,52 @@
 #include "scsi_alua.h"
 #include "scsi_priv.h"
 
-bool scsi_multipath;
-static bool scsi_multipath_always;
+enum {
+	SCSI_MULTIPATH_OFF,
+	SCSI_MULTIPATH_ON,
+	SCSI_MULTIPATH_ALWAYS,
+};
+
+static const char *scsi_multipath_modes[] = {
+	[SCSI_MULTIPATH_OFF]	= "off",
+	[SCSI_MULTIPATH_ON]	= "on",
+	[SCSI_MULTIPATH_ALWAYS]	= "always",
+};
+
+static int scsi_multipath = SCSI_MULTIPATH_OFF;
 
 static LIST_HEAD(scsi_mpath_heads_list);
 static DEFINE_MUTEX(scsi_mpath_heads_lock);
 static DEFINE_IDA(scsi_multipath_dev_ida);
 
-static int multipath_param_set(const char *val, const struct kernel_param *kp)
+static int scsi_multipath_param_set(const char *val, const struct kernel_param *kp)
 {
-	int ret;
-	bool *arg = kp->arg;
-
-	ret = param_set_bool(val, kp);
-	if (ret)
-		return ret;
-
-	if (scsi_multipath_always && !*arg) {
-		pr_err("Can't disable multipath when multipath_always_on is configured.\n");
-		*arg = true;
+	if (!val)
 		return -EINVAL;
-	}
+	if (!strncmp(val, "on", 2))
+		scsi_multipath = SCSI_MULTIPATH_ON;
+	else if (!strncmp(val, "always", 6))
+		scsi_multipath = SCSI_MULTIPATH_ALWAYS;
+	else if (!strncmp(val, "off", 3))
+		scsi_multipath = SCSI_MULTIPATH_OFF;
+	else
+		return -EINVAL;
 
 	return 0;
+}
+
+static int scsi_multipath_param_get(char *buf, const struct kernel_param *kp)
+{
+	return sprintf(buf, "%s\n", scsi_multipath_modes[scsi_multipath]);
 }
 
 static const struct kernel_param_ops multipath_param_ops = {
-	.set = multipath_param_set,
-	.get = param_get_bool,
+	.set = scsi_multipath_param_set,
+	.get = scsi_multipath_param_get,
 };
 
 module_param_cb(scsi_multipath, &multipath_param_ops, &scsi_multipath, 0444);
-MODULE_PARM_DESC(scsi_multipath, "turn on native multipath support");
-
-static int multipath_always_on_set(const char *val,
-		const struct kernel_param *kp)
-{
-	int ret;
-	bool *arg = kp->arg;
-
-	ret = param_set_bool(val, kp);
-	if (ret < 0)
-		return ret;
-
-	if (*arg)
-		scsi_multipath = true;
-
-	return 0;
-}
-
-static const struct kernel_param_ops multipath_always_on_ops = {
-	.set = multipath_always_on_set,
-	.get = param_get_bool,
-};
-
-module_param_cb(scsi_multipath_always, &multipath_always_on_ops,
-		&scsi_multipath_always, 0444);
-MODULE_PARM_DESC(scsi_multipath_always,
-	"create multipath node always even for no ALUA support");
+MODULE_PARM_DESC(scsi_multipath, "turn on native multipath support, options: on, off, always");
 
 static int iopolicy = MPATH_IOPOLICY_NUMA;
 
@@ -567,14 +555,15 @@ static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
-	int rel_port = -1, group_id;
+	int rel_port = -1, group_id, tpgs;
 	int ret;
 
-	if (!scsi_multipath)
+	if (scsi_multipath == SCSI_MULTIPATH_OFF)
 		return 0;
 
-	if (!(alua_check_tpgs(sdev) & TPGS_MODE_IMPLICIT) && !scsi_multipath_always) {
-		sdev_printk(KERN_NOTICE, sdev, "implicit tpgs are required for multipath support\n");
+	tpgs = alua_check_tpgs(sdev);
+	if (!(tpgs & TPGS_MODE_IMPLICIT) && (scsi_multipath != SCSI_MULTIPATH_ALWAYS)) {
+		sdev_printk(KERN_DEBUG, sdev, "IMPLICIT TPGS are required for multipath support\n");
 		return 0;
 	}
 
