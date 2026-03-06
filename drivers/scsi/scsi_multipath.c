@@ -285,9 +285,9 @@ static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 	return clone;
 }
 
-static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_head)
+static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(void *drvdata)
 {
-	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
+	struct scsi_mpath_head *scsi_mpath_head = drvdata;
 
 	return mpath_read_iopolicy(&scsi_mpath_head->iopolicy);
 }
