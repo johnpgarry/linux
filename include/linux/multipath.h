@@ -83,7 +83,7 @@ struct mpath_head_template {
 	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags);
-	enum mpath_iopolicy_e (*get_iopolicy)(struct mpath_head *);
+	enum mpath_iopolicy_e (*get_iopolicy)(void *data);
 	struct bio *(*clone_bio)(struct bio *);
 	int (*get_unique_id)(struct mpath_device *, u8 id[16],
 				enum blk_unique_id type);
