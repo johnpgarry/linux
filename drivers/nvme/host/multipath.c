@@ -251,13 +251,11 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 	srcu_read_unlock(&ctrl->srcu, srcu_idx);
 }
 
-static void nvme_mpath_revalidate_paths_cb(struct mpath_device *mpath_device,
-					sector_t capacity)
+static void nvme_mpath_revalidate_paths_cb(struct mpath_device *mpath_device)
 {
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
 
-	if (capacity != get_capacity(ns->disk))
-		clear_bit(NVME_NS_READY, &ns->flags);
+	clear_bit(NVME_NS_READY, &ns->flags);
 }
 
 void nvme_mpath_revalidate_paths(struct nvme_ns_head *head)
