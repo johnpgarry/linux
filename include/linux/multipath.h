@@ -65,7 +65,7 @@ struct mpath_pr_ops {
 };
 
 struct mpath_head_template {
-	bool (*available_path)(struct mpath_device *, bool *);
+	bool (*available_path)(struct mpath_device *);
 	int (*add_cdev)(struct mpath_head *);
 	void (*del_cdev)(struct mpath_head *);
 	bool (*is_disabled)(struct mpath_device *);

@@ -302,8 +302,7 @@ static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
 	return nvme_path_is_optimized(ns);
 }
 
-static bool nvme_mpath_available_path(struct mpath_device *mpath_device,
-					bool *available)
+static bool nvme_mpath_available_path(struct mpath_device *mpath_device)
 {
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
 
@@ -314,12 +313,12 @@ static bool nvme_mpath_available_path(struct mpath_device *mpath_device,
 	case NVME_CTRL_LIVE:
 	case NVME_CTRL_RESETTING:
 	case NVME_CTRL_CONNECTING:
-		*available = true;
+		return true;
 	default:
 		break;
 	}
 
-	return true;
+	return false;
 }
 
 static int nvme_mpath_get_unique_id(struct mpath_device *mpath_device,

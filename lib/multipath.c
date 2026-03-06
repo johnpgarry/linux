@@ -371,12 +371,7 @@ static bool mpath_available_path(struct mpath_head *mpath_head)
 
 	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
 				 srcu_read_lock_held(&mpath_head->srcu)) {
-		bool available = false;
-
-		if (!mpath_head->mpdt->available_path(mpath_device,
-				&available))
-			continue;
-		if (available)
+		if (mpath_head->mpdt->available_path(mpath_device))
 			return true;
 	}
 

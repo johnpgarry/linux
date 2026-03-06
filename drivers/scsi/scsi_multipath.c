@@ -331,7 +331,7 @@ static bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 	return true;
 }
 
-static bool scsi_mpath_available_path(struct mpath_device *mpath_device, bool *available)
+static bool scsi_mpath_available_path(struct mpath_device *mpath_device)
 {
 	struct scsi_mpath_device *scsi_mpath_dev =
 				to_scsi_mpath_device(mpath_device);
