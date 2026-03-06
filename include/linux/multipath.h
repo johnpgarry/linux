@@ -150,8 +150,7 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device);
 void mpath_synchronize(struct mpath_head *mpath_head);
 void mpath_add_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device);
-void mpath_delete_device(struct mpath_head *mpath_head,
-			struct mpath_device *mpath_device);
+void mpath_delete_device(struct mpath_device *mpath_device);
 int mpath_call_for_device(struct mpath_head *mpath_head,
 			int (*cb)(struct mpath_device *mpath_device));
 void mpath_clear_paths(struct mpath_head *mpath_head);
@@ -174,9 +173,8 @@ void mpath_unregister_disk(struct mpath_head *mpath_head);
 ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
 			struct mpath_iopolicy *iopolicy, char *buf);
 ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf);
-ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy,
-			const char *buf, size_t count,
-			void (*update)(void *data), void *);
+bool mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy,
+			const char *buf, size_t count);
 ssize_t mpath_delayed_removal_secs_show(struct mpath_head *mpath_head,
 			char *buf);
 ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
