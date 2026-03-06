@@ -4226,11 +4226,9 @@ static ssize_t sd_mpath_numa_nodes_show(struct device *dev,
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
 	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 	struct mpath_iopolicy *mpath_iopolicy = &scsi_mpath_head->iopolicy;
 
-	return mpath_numa_nodes_show(mpath_head, mpath_device,
-			mpath_iopolicy, buf);
+	return mpath_numa_nodes_show(mpath_device, mpath_iopolicy, buf);
 }
 static DEVICE_ATTR(mpath_numa_nodes, 0444, sd_mpath_numa_nodes_show, NULL);
 
