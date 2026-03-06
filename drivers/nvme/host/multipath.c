@@ -125,10 +125,8 @@ void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 void nvme_failover_req(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
+	struct mpath_head *mpath_head = ns->head->mpath_head;
 	u16 status = nvme_req(req)->status & NVME_SCT_SC_MASK;
-	struct gendisk *disk = mpath_head->disk;
 	unsigned long flags;
 	struct bio *bio;
 
@@ -146,7 +144,7 @@ void nvme_failover_req(struct request *req)
 
 	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
 	for (bio = req->bio; bio; bio = bio->bi_next) {
-		bio_set_dev(bio, disk->part0);
+		bio_set_dev(bio, mpath_head->disk->part0);
 		if (bio->bi_opf & REQ_POLLED) {
 			bio->bi_opf &= ~REQ_POLLED;
 			bio->bi_cookie = BLK_QC_T_NONE;
@@ -463,8 +461,8 @@ static void nvme_mpath_update_ana_state(struct nvme_ns *ns, enum nvme_ana_state 
 static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		struct nvme_ns *ns)
 {
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
+	struct mpath_head *mpath_head = ns->head->mpath_head;
+
 	ns->ana_grpid = le32_to_cpu(desc->grpid);
 	nvme_mpath_update_ana_state(ns, desc->state);
 	clear_bit(NVME_NS_ANA_PENDING, &ns->flags);
@@ -515,7 +513,7 @@ void nvme_mpath_add_ns(struct nvme_ns *ns)
 
 void nvme_mpath_delete_ns(struct nvme_ns *ns)
 {
-	mpath_delete_device(ns->head->mpath_head, &ns->mpath_device);
+	mpath_delete_device(&ns->mpath_device);
 }
 
 void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
@@ -649,29 +647,20 @@ static ssize_t nvme_subsys_iopolicy_show(struct device *dev,
 	return mpath_iopolicy_show(&subsys->iopolicy, buf);
 }
 
-static void nvme_subsys_iopolicy_store_update(void *data)
-{
-	struct nvme_subsystem *subsys = data;
-	struct nvme_ctrl *ctrl;
-
-	mutex_lock(&nvme_subsystems_lock);
-	pr_err("%s subsys=%pS\n", __func__, subsys);
-	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry) {
-		pr_err("%s2 subsys=%pS ctrl=%pS calling nvme_mpath_clear_ctrl_paths\n",
-			__func__, subsys, ctrl);
-		nvme_mpath_clear_ctrl_paths(ctrl);
-	}
-	mutex_unlock(&nvme_subsystems_lock);
-}
-
 static ssize_t nvme_subsys_iopolicy_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
+	struct nvme_ctrl *ctrl;
 
-	return mpath_iopolicy_store(&subsys->iopolicy, buf, count,
-		nvme_subsys_iopolicy_store_update, subsys);
+	if (!mpath_iopolicy_store(&subsys->iopolicy, buf, count))
+		return  -EINVAL;
+	mutex_lock(&nvme_subsystems_lock);
+	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
+		nvme_mpath_clear_ctrl_paths(ctrl);
+	mutex_unlock(&nvme_subsystems_lock);
+	return count;
 }
 SUBSYS_ATTR_RW(iopolicy, S_IRUGO | S_IWUSR,
 		      nvme_subsys_iopolicy_show, nvme_subsys_iopolicy_store);

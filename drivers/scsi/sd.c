@@ -4472,7 +4472,7 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 	if (mpath_clear_current_path(mpath_device))
 		mpath_synchronize(mpath_head);
 
-	mpath_delete_device(mpath_head, mpath_device);
+	mpath_delete_device(mpath_device);
 
 	mutex_lock(&sd_mpath_disk->lock);
 	sd_mpath_disk->disk_count--;

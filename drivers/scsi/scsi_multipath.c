@@ -124,15 +124,6 @@ static ssize_t scsi_mpath_device_wwid_show(struct device *dev,
 
 static DEVICE_ATTR(wwid, S_IRUGO, scsi_mpath_device_wwid_show, NULL);
 
-static void scsi_mpath_device_iopolicy_store_update(void *data)
-{
-	struct scsi_mpath_head *scsi_mpath_head = data;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
-
-	mpath_clear_paths(mpath_head);
-	mpath_schedule_requeue_work(mpath_head);
-}
-
 void scsi_mpath_dev_clear_path(struct scsi_mpath_device *scsi_mpath_dev)
 {
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
@@ -149,9 +140,14 @@ static ssize_t scsi_mpath_device_iopolicy_store(struct device *dev,
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
-	return mpath_iopolicy_store(&scsi_mpath_head->iopolicy, buf, count,
-		scsi_mpath_device_iopolicy_store_update, scsi_mpath_head);
+	if (!mpath_iopolicy_store(&scsi_mpath_head->iopolicy, buf, count))
+		return -EINVAL;
+
+	mpath_clear_paths(mpath_head);
+	mpath_schedule_requeue_work(mpath_head);
+	return count;
 }
 
 static ssize_t scsi_mpath_device_iopolicy_show(struct device *dev,

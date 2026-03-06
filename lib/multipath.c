@@ -85,14 +85,13 @@ void mpath_add_device(struct mpath_head *mpath_head,
 }
 EXPORT_SYMBOL_GPL(mpath_add_device);
 
-void mpath_delete_device(struct mpath_head *mpath_head,
-			struct mpath_device *mpath_device)
+void mpath_delete_device(struct mpath_device *mpath_device)
 {
-	if (!mpath_head)
+	if (!mpath_device->mpath_head)
 		return;
-	mutex_lock(&mpath_head->lock);
+	mutex_lock(&mpath_device->mpath_head->lock);
 	list_del_rcu(&mpath_device->siblings);
-	mutex_unlock(&mpath_head->lock);
+	mutex_unlock(&mpath_device->mpath_head->lock);
 }
 EXPORT_SYMBOL_GPL(mpath_delete_device);
 
@@ -1023,7 +1022,7 @@ ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf)
 EXPORT_SYMBOL_GPL(mpath_iopolicy_show);
 
 static void mpath_iopolicy_update(struct mpath_iopolicy *mpath_iopolicy,
-		int iopolicy, void (*update)(void *), void *data)
+		int iopolicy)
 {
 	int old_iopolicy = READ_ONCE(mpath_iopolicy->iopolicy);
 
@@ -1032,31 +1031,24 @@ static void mpath_iopolicy_update(struct mpath_iopolicy *mpath_iopolicy,
 
 	WRITE_ONCE(mpath_iopolicy->iopolicy, iopolicy);
 
-	/*
-	 * iopolicy changes clear the mpath by design, which @update
-	 * must do.
-	 */
-	update(data);
-
-	pr_err("iopolicy changed from %s to %s\n",
+	pr_notice("iopolicy changed from %s to %s\n",
 		mpath_iopolicy_names[old_iopolicy],
 		mpath_iopolicy_names[iopolicy]);
 }
 
-ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy,
-				const char *buf, size_t count,
-				void (*update)(void *), void *data)
+bool mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy,
+				const char *buf, size_t count)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(mpath_iopolicy_names); i++) {
 		if (sysfs_streq(buf, mpath_iopolicy_names[i])) {
-			mpath_iopolicy_update(mpath_iopolicy, i, update, data);
-			return count;
+			mpath_iopolicy_update(mpath_iopolicy, i);
+			return true;
 		}
 	}
 
-	return -EINVAL;
+	return false;
 }
 EXPORT_SYMBOL_GPL(mpath_iopolicy_store);
 
