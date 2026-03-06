@@ -171,8 +171,7 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *li
 			int numa_node);
 void mpath_device_set_live(struct mpath_device *mpath_device);
 void mpath_unregister_disk(struct mpath_head *mpath_head);
-ssize_t mpath_numa_nodes_show(struct mpath_head *mpath_head,
-			struct mpath_device *mpath_device,
+ssize_t mpath_numa_nodes_show(struct mpath_device *mpath_device,
 			struct mpath_iopolicy *iopolicy, char *buf);
 ssize_t mpath_iopolicy_show(struct mpath_iopolicy *mpath_iopolicy, char *buf);
 ssize_t mpath_iopolicy_store(struct mpath_iopolicy *mpath_iopolicy,

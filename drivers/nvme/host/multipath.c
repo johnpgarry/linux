@@ -712,7 +712,6 @@ static ssize_t nvme_subsys_iopolicy_show(struct device *dev,
 	struct nvme_subsystem *subsys =
 		container_of(dev, struct nvme_subsystem, dev);
 	return mpath_iopolicy_show(&subsys->iopolicy, buf);
-
 }
 
 static void nvme_subsys_iopolicy_store_update(void *data)
@@ -762,9 +761,8 @@ static ssize_t queue_depth_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
-	struct nvme_subsystem *subsys = ns->head->subsys;
 
-	if (!mpath_qd_iopolicy(&subsys->iopolicy))
+	if (!mpath_qd_iopolicy(&ns->head->subsys->iopolicy))
 		return 0;
 
 	return sysfs_emit(buf, "%d\n", atomic_read(&ns->ctrl->nr_active));
@@ -775,29 +773,24 @@ static ssize_t numa_nodes_show(struct device *dev, struct device_attribute *attr
 		char *buf)
 {
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
-	struct nvme_ns_head *head = ns->head;
-	struct mpath_head *mpath_head = head->mpath_head;
-	struct nvme_subsystem *subsys = ns->head->subsys;
-	struct mpath_device *mpath_device = &ns->mpath_device;
 
-	return mpath_numa_nodes_show(mpath_head, mpath_device, &subsys->iopolicy, buf);
+	return mpath_numa_nodes_show(&ns->mpath_device,
+		&ns->head->subsys->iopolicy, buf);
 }
 DEVICE_ATTR_RO(numa_nodes);
 
 static ssize_t delayed_removal_secs_show(struct device *bd_device,
 		struct device_attribute *attr, char *buf)
 {
-	struct mpath_head *mpath_head = mpath_bd_device_to_disk(bd_device);
-
-	return mpath_delayed_removal_secs_show(mpath_head, buf);
+	return mpath_delayed_removal_secs_show(
+		mpath_bd_device_to_disk(bd_device), buf);
 }
 
 static ssize_t delayed_removal_secs_store(struct device *bd_device,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct mpath_head *mpath_head = mpath_bd_device_to_disk(bd_device);
-
-	return mpath_delayed_removal_secs_store(mpath_head, buf, count);
+	return mpath_delayed_removal_secs_store(
+		mpath_bd_device_to_disk(bd_device), buf, count);
 }
 
 DEVICE_ATTR_RW(delayed_removal_secs);
