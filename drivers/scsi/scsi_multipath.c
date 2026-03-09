@@ -4,6 +4,7 @@
  *
  */
 
+#include <linux/kthread.h>
 #include <scsi/scsi_alua.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_driver.h>
@@ -514,6 +515,32 @@ struct mpath_head_template smpdt_pr = {
 	.device_groups = mpath_device_groups,
 };
 
+static void scsi_mpath_cb_ua_thread(struct mpath_device *mpath_device)
+{
+	struct scsi_mpath_device *scsi_mpath_dev =
+			to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	int ret;
+
+	ret = alua_tur(sdev);
+	if (ret)
+		sdev_printk(KERN_NOTICE, sdev,
+			    "%s: No target port descriptors found\n",
+			    __func__);
+}
+
+static int scsi_mpath_ua_thread(void *data)
+{
+	struct scsi_mpath_head *scsi_mpath_head = data;
+
+	while(1) {
+		mpath_call_for_all_devices(scsi_mpath_head->mpath_head,
+			scsi_mpath_cb_ua_thread);
+		msleep(5000);
+	}
+	return 0;
+}
+
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
@@ -547,6 +574,17 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 		put_device(&scsi_mpath_head->dev);
 		goto out_free_ida;
 	}
+
+	scsi_mpath_head->kua = kthread_create(scsi_mpath_ua_thread,
+			scsi_mpath_head, "scsi-multipath-kua-%d",
+			scsi_mpath_head->index);
+	if (IS_ERR(scsi_mpath_head->kua)) {
+		put_device(&scsi_mpath_head->dev);
+		goto out_free_ida;
+	}
+
+	set_user_nice(scsi_mpath_head->kua, 10);
+	wake_up_process(scsi_mpath_head->kua);
 
 	return scsi_mpath_head;
 
