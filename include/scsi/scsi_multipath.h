@@ -38,6 +38,9 @@ struct scsi_mpath_device {
 	int			index;
 	atomic_t		nr_active;
 	struct scsi_mpath_head	*scsi_mpath_head;
+	int			alua_state;
+	int			alua_pref;
+	int			alua_valid_states;
 
 	char			device_id_str[SCSI_MPATH_DEVICE_ID_LEN];
 };
