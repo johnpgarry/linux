@@ -741,8 +741,8 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid)
 	}
 
 #ifdef CONFIG_BLK_DEV_ZONED
-	if (blk_queue_is_zoned(ns->queue) && head->mpath_head)
-		head->mpath_head->disk->nr_zones = ns->disk->nr_zones;
+	if (blk_queue_is_zoned(ns->queue) && ns->head->mpath_head)
+		ns->head->mpath_head->disk->nr_zones = ns->disk->nr_zones;
 #endif
 }
 
