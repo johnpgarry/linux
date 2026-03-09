@@ -772,6 +772,7 @@ found:
 	} else {
 		sdev->scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
 	}
+	sdev->access_state = sdev->scsi_mpath_dev->alua_state;
 
 	sdev->scsi_mpath_dev->index = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
 	if (sdev->scsi_mpath_dev->index < 0) {

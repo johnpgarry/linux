@@ -1113,7 +1113,7 @@ sdev_show_access_state(struct device *dev,
 	unsigned char access_state;
 	const char *access_state_name;
 
-	if (!sdev->handler)
+	if (!sdev->handler && !sdev->scsi_mpath_dev)
 		return -EINVAL;
 
 	access_state = (sdev->access_state & SCSI_ACCESS_STATE_MASK);
