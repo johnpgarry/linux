@@ -153,6 +153,8 @@ void mpath_delete_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device);
 int mpath_call_for_device(struct mpath_head *mpath_head,
 			int (*cb)(struct mpath_device *mpath_device));
+void mpath_call_for_all_devices(struct mpath_head *mpath_head,
+			void (*cb)(struct mpath_device *mpath_device));
 void mpath_clear_paths(struct mpath_head *mpath_head);
 void mpath_revalidate_paths(struct mpath_disk *mpath_disk,
 	void (*cb)(struct mpath_device *mpath_device, sector_t capacity));

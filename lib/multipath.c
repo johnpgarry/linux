@@ -105,6 +105,21 @@ int mpath_call_for_device(struct mpath_head *mpath_head,
 }
 EXPORT_SYMBOL_GPL(mpath_call_for_device);
 
+void mpath_call_for_all_devices(struct mpath_head *mpath_head,
+			void (*cb)(struct mpath_device *mpath_device))
+{
+	struct mpath_device *mpath_device;
+	int srcu_idx;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
+				 srcu_read_lock_held(&mpath_head->srcu)) {
+		cb(mpath_device);
+	}
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+}
+EXPORT_SYMBOL_GPL(mpath_call_for_all_devices);
+
 bool mpath_clear_current_path(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device)
 {
