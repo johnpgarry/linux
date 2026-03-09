@@ -1239,6 +1239,8 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	struct alua_dh_data *h;
 	int err;
 
+	if (sdev->scsi_mpath_dev)
+		return SCSI_DH_DEV_UNSUPP;
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
 	if (!h)
 		return SCSI_DH_NOMEM;
