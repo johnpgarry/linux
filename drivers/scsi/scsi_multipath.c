@@ -541,6 +541,12 @@ static int scsi_mpath_ua_thread(void *data)
 	return 0;
 }
 
+void scsi_multipath_dev_rescan(struct scsi_device *sdev)
+{
+	/* Handle ALUA reconfig */
+	dev_warn_once(&sdev->sdev_gendev, "mulitpath rescan not handled\n");
+}
+
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
