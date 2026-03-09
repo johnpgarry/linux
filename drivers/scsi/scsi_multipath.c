@@ -4,6 +4,7 @@
  *
  */
 
+#include <scsi/scsi_alua.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_proto.h>
@@ -12,8 +13,6 @@
 #include <scsi/scsi_multipath.h>
 
 #include "scsi_priv.h"
-
-#define TPGS_MODE_IMPLICIT		0x1
 
 enum {
 	SCSI_MULTIPATH_OFF,
