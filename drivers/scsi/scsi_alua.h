@@ -54,7 +54,7 @@
 
 int alua_check_tpgs(struct scsi_device *sdev);
 int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
-		       int bufflen, struct scsi_sense_hdr *sshdr, int flags);
+		       int bufflen, struct scsi_sense_hdr *sshdr, bool alua_rtpg_ext_hdr_unsupp);
 int alua_tur(struct scsi_device *sdev);
 char print_alua_state(unsigned char state);
 int submit_stpg(struct scsi_device *sdev, int group_id,

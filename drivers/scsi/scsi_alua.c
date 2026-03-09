@@ -99,7 +99,8 @@ EXPORT_SYMBOL_GPL(alua_tur);
  * @sdev: sdev the command should be sent to
  */
 int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
-		       int bufflen, struct scsi_sense_hdr *sshdr, int flags)
+		       int bufflen, struct scsi_sense_hdr *sshdr,
+		       bool alua_rtpg_ext_hdr_unsupp)
 {
 	u8 cdb[MAX_COMMAND_SIZE];
 	blk_opf_t opf = REQ_OP_DRV_IN | REQ_FAILFAST_DEV |
@@ -112,10 +113,10 @@ int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 	/* Prepare the command. */
 	memset(cdb, 0x0, MAX_COMMAND_SIZE);
 	cdb[0] = MAINTENANCE_IN;
-	if (!(flags & ALUA_RTPG_EXT_HDR_UNSUPP))
-		cdb[1] = MI_REPORT_TARGET_PGS | MI_EXT_HDR_PARAM_FMT;
-	else
+	if (alua_rtpg_ext_hdr_unsupp)
 		cdb[1] = MI_REPORT_TARGET_PGS;
+	else
+		cdb[1] = MI_REPORT_TARGET_PGS | MI_EXT_HDR_PARAM_FMT;
 	put_unaligned_be32(bufflen, &cdb[6]);
 
 	return scsi_execute_cmd(sdev, cdb, opf, buff, bufflen,

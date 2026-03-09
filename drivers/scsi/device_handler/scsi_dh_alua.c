@@ -390,7 +390,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  retry:
 	err = 0;
-	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr, pg->flags);
+	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr,
+				pg->flags & ALUA_RTPG_EXT_HDR_UNSUPP);
 
 	if (retval) {
 		/*
