@@ -50,6 +50,7 @@ struct alua_data {
 	unsigned long		expiry;
 	unsigned long		interval;
 	struct delayed_work	work;
+	unsigned		flags; /* used for optimizing STPG */
 
 	struct scsi_device *sdev;
 };
