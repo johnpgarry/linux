@@ -449,8 +449,6 @@ void scsi_mpath_run_rtpg(struct scsi_device *sdev)
 
 void scsi_alua_init(struct scsi_device *sdev)
 {
-	__maybe_unused int rel_port, ret;
-
 	sdev_printk(KERN_INFO, sdev,
 			    "%s: tpgs=%d\n",
 			    DRV_NAME, scsi_device_tpgs(sdev));
