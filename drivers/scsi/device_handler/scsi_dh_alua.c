@@ -386,8 +386,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  retry:
 	err = 0;
-	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr,
-			pg->flags & ALUA_RTPG_EXT_HDR_UNSUPP);
+	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr);
 
 	if (retval) {
 		/*
@@ -540,9 +539,10 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		pg->state = SCSI_ACCESS_STATE_TRANSITIONING;
 
 	if (group_id_old != pg->group_id || state_old != pg->state ||
-		pref_old != pg->pref || valid_states_old != pg->valid_states)
-		alua_print_info(sdev, pg->group_id, pg->state, pg->pref,
-						pg->valid_states);
+		pref_old != pg->pref || valid_states_old != pg->valid_states) {
+	//	alua_print_info(sdev, pg->group_id, pg->state, pg->pref,
+	//					pg->valid_states);
+	}
 
 	switch (pg->state) {
 	case SCSI_ACCESS_STATE_TRANSITIONING:

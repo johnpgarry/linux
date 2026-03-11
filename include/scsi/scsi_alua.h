@@ -44,16 +44,17 @@ struct alua_data {
 	int			state;
 	int			pref;
 	int			valid_states;
+
+	bool			rtpg_ext_hdr_unsupp;
 };
 
 int alua_check_tpgs(struct scsi_device *sdev);
 int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
-		       int bufflen, struct scsi_sense_hdr *sshdr,
-		       bool alua_rtpg_ext_hdr_unsupp);
+		       int bufflen, struct scsi_sense_hdr *sshdr);
 int alua_tur(struct scsi_device *sdev);
-void alua_print_info(struct scsi_device *sdev, int group_id, int state,
-		int pref, int valid_states);
+void alua_print_info(struct scsi_device *sdev);
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
 int scsi_alua_init(struct scsi_device *sdev);
+int scsi_mpath_run_rtpg(struct scsi_device *sdev);
 #endif // _SCSI_ALUA_H
