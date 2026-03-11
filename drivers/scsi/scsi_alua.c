@@ -17,6 +17,7 @@
 #define ALUA_FAILOVER_RETRIES		5
 #define ALUA_RTPG_RETRY_DELAY		2
 
+#define ALUA_RTPG_DELAY_MSECS		5
 /*
  * alua_check_tpgs - Evaluate TPGS setting
  * @sdev: device to be checked
@@ -201,9 +202,9 @@ int submit_stpg(struct scsi_device *sdev, int group_id,
 }
 EXPORT_SYMBOL_GPL(submit_stpg);
 
-int scsi_mpath_run_rtpg(struct scsi_device *sdev)
+static int alua_rtpg_run(struct alua_data *alua)
 {
-	struct alua_data *alua = sdev->alua;
+	struct scsi_device *sdev = alua->sdev;
 	struct scsi_sense_hdr sense_hdr;
 	//struct alua_port_group *tmp_pg;
 	int len, k, off, bufflen = ALUA_RTPG_SIZE;
@@ -403,6 +404,36 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 	return err;
 }
 
+
+static void alua_work(struct work_struct *work)
+{
+	struct alua_data *alua =
+		container_of(work, struct alua_data, work.work);
+	int ret;
+
+	ret = alua_rtpg_run(alua);
+	pr_err("%s ret=%d from alua_rtpg_run\n", __func__, ret);
+
+	if (ret == -EAGAIN || ret == -EBADF) {
+		if (ret == -EBADF)
+			alua->interval = 0;
+		else if (!alua->interval)
+			alua->interval = ALUA_RTPG_RETRY_DELAY;
+
+		queue_delayed_work(system_wq, &alua->work, alua->interval * HZ);
+	}
+}
+
+int scsi_mpath_run_rtpg(struct scsi_device *sdev)
+{
+	struct alua_data *alua = sdev->alua;
+
+	queue_delayed_work(system_wq, &alua->work,
+		alua->interval ? alua->interval * HZ : msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS));
+
+	return 0;
+}
+
 int scsi_alua_init(struct scsi_device *sdev)
 {
 	int rel_port, ret;
@@ -433,6 +464,9 @@ int scsi_alua_init(struct scsi_device *sdev)
 	sdev->alua->tpgs = scsi_device_tpgs(sdev);
 	sdev->alua->state = SCSI_ACCESS_STATE_OPTIMAL;
 	sdev->alua->valid_states = TPGS_SUPPORT_ALL;
+
+	INIT_DELAYED_WORK(&sdev->alua->work, alua_work);
+	sdev->alua->sdev = sdev;
 
 	ret = scsi_mpath_run_rtpg(sdev);
 

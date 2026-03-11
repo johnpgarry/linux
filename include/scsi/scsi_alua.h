@@ -49,6 +49,9 @@ struct alua_data {
 	unsigned char		transition_tmo;
 	unsigned long		expiry;
 	unsigned long		interval;
+	struct delayed_work	work;
+
+	struct scsi_device *sdev;
 };
 
 int alua_check_tpgs(struct scsi_device *sdev);
