@@ -339,7 +339,7 @@ static int alua_rtpg_run(struct alua_data *alua)
 				    "%s: kmalloc buffer failed\n",__func__);
 			/* Temporary failure, bypass */
 			alua->expiry = 0;
-			return -EBUSY; //SCSI_DH_DEV_TEMP_BUSY
+			return -ENOMEM; //SCSI_DH_DEV_TEMP_BUSY
 		}
 		goto retry;
 	}
