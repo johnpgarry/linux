@@ -30,6 +30,7 @@ struct scsi_mpath_head {
 	struct mpath_head	*mpath_head;
 	struct device		dev;
 	int			index;
+	struct task_struct	*kua;
 };
 
 struct scsi_mpath_device {
