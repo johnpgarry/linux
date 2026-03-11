@@ -61,6 +61,6 @@ int alua_tur(struct scsi_device *sdev);
 void alua_print_info(struct scsi_device *sdev);
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
-int scsi_alua_init(struct scsi_device *sdev);
-int scsi_mpath_run_rtpg(struct scsi_device *sdev);
+void scsi_alua_init(struct scsi_device *sdev);
+void scsi_mpath_run_rtpg(struct scsi_device *sdev);
 #endif // _SCSI_ALUA_H

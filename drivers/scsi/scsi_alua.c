@@ -439,17 +439,15 @@ static void alua_work(struct work_struct *work)
 	}
 }
 
-int scsi_mpath_run_rtpg(struct scsi_device *sdev)
+void scsi_mpath_run_rtpg(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 
 	queue_delayed_work(system_wq, &alua->work,
 		alua->interval ? alua->interval * HZ : msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS));
-
-	return 0;
 }
 
-int scsi_alua_init(struct scsi_device *sdev)
+void scsi_alua_init(struct scsi_device *sdev)
 {
 	__maybe_unused int rel_port, ret;
 
@@ -458,7 +456,7 @@ int scsi_alua_init(struct scsi_device *sdev)
 			    DRV_NAME, scsi_device_tpgs(sdev));
 	sdev->alua = kzalloc(sizeof(*sdev->alua), GFP_KERNEL);
 	if (!sdev->alua)
-		return -ENOMEM;
+		return;
 
 	sdev->alua->group_id = -1;
 	sdev->alua->tpgs = scsi_device_tpgs(sdev);
@@ -468,9 +466,7 @@ int scsi_alua_init(struct scsi_device *sdev)
 	INIT_DELAYED_WORK(&sdev->alua->work, alua_work);
 	sdev->alua->sdev = sdev;
 
-	ret = scsi_mpath_run_rtpg(sdev);
-
-	return 0;
+	scsi_mpath_run_rtpg(sdev);
 }
 
 MODULE_LICENSE("GPL");
