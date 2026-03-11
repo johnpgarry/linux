@@ -46,6 +46,9 @@ struct alua_data {
 	int			valid_states;
 
 	bool			rtpg_ext_hdr_unsupp;
+	unsigned char		transition_tmo;
+	unsigned long		expiry;
+	unsigned long		interval;
 };
 
 int alua_check_tpgs(struct scsi_device *sdev);

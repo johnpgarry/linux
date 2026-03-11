@@ -15,6 +15,7 @@
 #define DRV_NAME "alua"
 
 #define ALUA_FAILOVER_RETRIES		5
+#define ALUA_RTPG_RETRY_DELAY		2
 
 /*
  * alua_check_tpgs - Evaluate TPGS setting
@@ -206,16 +207,27 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 	struct scsi_sense_hdr sense_hdr;
 	//struct alua_port_group *tmp_pg;
 	int len, k, off, bufflen = ALUA_RTPG_SIZE;
-	//int group_id_old, state_old, pref_old, valid_states_old;
+	int group_id_old, state_old, pref_old, valid_states_old;
 	unsigned char *desc, *buff;
 	unsigned err;
 	int retval;
 	unsigned int tpg_desc_tbl_off;
+	unsigned char orig_transition_tmo;
 	bool transitioning_sense = false;
-	unsigned long expiry;
-	unsigned long transition_tmo = ALUA_FAILOVER_TIMEOUT * HZ;
-	expiry = round_jiffies_up(jiffies + transition_tmo);
 
+	group_id_old = alua->group_id;
+	state_old = alua->state;
+	pref_old = alua->pref;
+	valid_states_old = alua->valid_states;
+
+	if (!alua->expiry) {
+		unsigned long transition_tmo = ALUA_FAILOVER_TIMEOUT * HZ;
+
+		if (alua->transition_tmo)
+			transition_tmo = alua->transition_tmo * HZ;
+
+		alua->expiry = round_jiffies_up(jiffies + transition_tmo);
+	}
 	buff = kzalloc(bufflen, GFP_KERNEL);
 	if (!buff)
 		return -ENOMEM;
@@ -284,7 +296,7 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 		if (sense_hdr.sense_key == UNIT_ATTENTION)
 			err = -EAGAIN;//SCSI_DH_RETRY;
 		if (err == -EAGAIN &&
-		    expiry != 0 && time_before(jiffies, expiry)) {
+		    alua->expiry != 0 && time_before(jiffies, alua->expiry)) {
 			sdev_printk(KERN_ERR, sdev, "%s: rtpg retry\n",
 				    DRV_NAME);
 			scsi_print_sense_hdr(sdev, DRV_NAME, &sense_hdr);
@@ -295,7 +307,7 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 			    DRV_NAME);
 		scsi_print_sense_hdr(sdev, DRV_NAME, &sense_hdr);
 		kfree(buff);
-		expiry = 0;
+		alua->expiry = 0;
 		return -EIO; //SCSI_DH_IO
 	}
 
@@ -310,23 +322,22 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 			sdev_printk(KERN_WARNING, sdev,
 				    "%s: kmalloc buffer failed\n",__func__);
 			/* Temporary failure, bypass */
-			expiry = 0;
+			alua->expiry = 0;
 			return -EBUSY; //SCSI_DH_DEV_TEMP_BUSY
 		}
 		goto retry;
 	}
 
 	if ((buff[4] & RTPG_FMT_MASK) == RTPG_FMT_EXT_HDR && buff[5] != 0)
-		transition_tmo = buff[5];
+		alua->transition_tmo = buff[5];
 	else
-		transition_tmo = ALUA_FAILOVER_TIMEOUT;
+		alua->transition_tmo = ALUA_FAILOVER_TIMEOUT;
 
-	// if (orig_transition_tmo != pg->transition_tmo) {
-	if (0) {
+	if (orig_transition_tmo != alua->transition_tmo) {
 		sdev_printk(KERN_INFO, sdev,
 			    "%s: transition timeout set to %d seconds\n",
-			    DRV_NAME, 0/*pg->transition_tmo*/);
-		expiry = jiffies + 0 /*pg->transition_tmo*/ * HZ;
+			    DRV_NAME, alua->transition_tmo);
+		alua->expiry = jiffies + alua->transition_tmo * HZ;
 	}
 
 	if ((buff[4] & RTPG_FMT_MASK) == RTPG_FMT_EXT_HDR)
@@ -339,42 +350,13 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 	     k += off, desc += off) {
 		u16 group_id = get_unaligned_be16(&desc[2]);
 
-		#ifdef olddddd
-		spin_lock_irqsave(&port_group_lock, flags);
-		tmp_pg = alua_find_get_pg(pg->device_id_str, pg->device_id_len,
-					  group_id);
-		spin_unlock_irqrestore(&port_group_lock, flags);
-		if (tmp_pg) {
-			if (spin_trylock_irqsave(&tmp_pg->lock, flags)) {
-				if ((tmp_pg == pg) ||
-				    !(tmp_pg->flags & ALUA_PG_RUNNING)) {
-					struct alua_dh_data *h;
-
-					tmp_pg->state = desc[0] & 0x0f;
-					tmp_pg->pref = desc[0] >> 7;
-					rcu_read_lock();
-					list_for_each_entry_rcu(h,
-						&tmp_pg->dh_list, node) {
-						if (!h->sdev)
-							continue;
-						h->sdev->access_state = desc[0];
-					}
-					rcu_read_unlock();
-				}
-				if (tmp_pg == pg)
-					tmp_pg->valid_states = desc[1];
-				spin_unlock_irqrestore(&tmp_pg->lock, flags);
-			}
-			kref_put(&tmp_pg->kref, release_port_group);
-		}
-		#else
 		if (group_id == alua->group_id) {
 			alua->state = desc[0] & 0x0f;
 			alua->pref = desc[0] >> 7;
 			alua->valid_states = desc[1];
 			sdev->access_state = desc[0];
+			break;
 		}
-		#endif
 		off = 8 + (desc[7] * 4);
 	}
 
@@ -383,23 +365,22 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 	if (transitioning_sense)
 		alua->state = SCSI_ACCESS_STATE_TRANSITIONING;
 
-	//if (group_id_old != pg->group_id || state_old != pg->state ||
-	//	pref_old != pg->pref || valid_states_old != pg->valid_states) {
-	if (1) {
+	if (group_id_old != alua->group_id || state_old != alua->state ||
+	    pref_old != alua->pref || valid_states_old != alua->valid_states) {
 		alua_print_info(sdev);
 	}
 
 	switch (alua->state) {
 	case SCSI_ACCESS_STATE_TRANSITIONING:
-		if (time_before(jiffies, expiry)) {
+		if (time_before(jiffies, alua->expiry)) {
 			/* State transition, retry */
-			//pg->interval = ALUA_RTPG_RETRY_DELAY;
+			alua->interval = ALUA_RTPG_RETRY_DELAY;
 			err = -EAGAIN; //SCSI_DH_RETRY;
 		} else {
 			/* Transitioning time exceeded, set port to standby */
 			err = -EIO;//SCSI_DH_IO;
 			alua->state = SCSI_ACCESS_STATE_STANDBY;
-			expiry = 0;
+			alua->expiry = 0;
 			
 			sdev->access_state = alua->state & SCSI_ACCESS_STATE_MASK;
 			if (alua->pref)
@@ -409,12 +390,12 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 	case SCSI_ACCESS_STATE_OFFLINE:
 		/* Path unusable */
 		err = -ENODEV;//SCSI_DH_DEV_OFFLINED;
-		expiry = 0;
+		alua->expiry = 0;
 		break;
 	default:
 		/* Useable path if active */
 		err = 0;
-		expiry = 0;
+		alua->expiry = 0;
 		break;
 	}
 	//spin_unlock_irqrestore(&pg->lock, flags);
