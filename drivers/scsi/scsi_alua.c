@@ -215,11 +215,26 @@ static int alua_rtpg_run(struct alua_data *alua)
 	unsigned int tpg_desc_tbl_off;
 	unsigned char orig_transition_tmo;
 	bool transitioning_sense = false;
+	int rel_port;
 
 	group_id_old = alua->group_id;
 	state_old = alua->state;
 	pref_old = alua->pref;
 	valid_states_old = alua->valid_states;
+
+	alua->group_id = scsi_vpd_tpg_id(sdev, &rel_port);
+	if (sdev->alua->group_id < 0) {
+		/*
+		 * Internal error; TPGS supported but required
+		 * VPD identification descriptors not present.
+		 * Disable ALUA support.
+		 */
+		sdev_printk(KERN_INFO, sdev,
+			    "%s: No target port descriptors found\n",
+			    __func__);
+		return -EIO;
+
+	}
 
 	if (!alua->expiry) {
 		unsigned long transition_tmo = ALUA_FAILOVER_TIMEOUT * HZ;
@@ -436,7 +451,7 @@ int scsi_mpath_run_rtpg(struct scsi_device *sdev)
 
 int scsi_alua_init(struct scsi_device *sdev)
 {
-	int rel_port, ret;
+	__maybe_unused int rel_port, ret;
 
 	sdev_printk(KERN_INFO, sdev,
 			    "%s: tpgs=%d\n",
@@ -445,22 +460,7 @@ int scsi_alua_init(struct scsi_device *sdev)
 	if (!sdev->alua)
 		return -ENOMEM;
 
-	sdev->alua->group_id = scsi_vpd_tpg_id(sdev, &rel_port);
-	sdev_printk(KERN_INFO, sdev,
-			    "%s: group_id=%d\n",
-			    DRV_NAME, sdev->alua->group_id);
-	if (sdev->alua->group_id < 0) {
-		/*
-		 * Internal error; TPGS supported but required
-		 * VPD identification descriptors not present.
-		 * Disable ALUA support.
-		 */
-		sdev_printk(KERN_INFO, sdev,
-			    "%s: No target port descriptors found\n",
-			    __func__);
-		ret = -EIO;
-		goto out_free_data;
-	}
+	sdev->alua->group_id = -1;
 	sdev->alua->tpgs = scsi_device_tpgs(sdev);
 	sdev->alua->state = SCSI_ACCESS_STATE_OPTIMAL;
 	sdev->alua->valid_states = TPGS_SUPPORT_ALL;
@@ -471,10 +471,6 @@ int scsi_alua_init(struct scsi_device *sdev)
 	ret = scsi_mpath_run_rtpg(sdev);
 
 	return 0;
-out_free_data:
-	kfree(sdev->alua);
-	sdev->alua = NULL;
-	return ret;
 }
 
 MODULE_LICENSE("GPL");
