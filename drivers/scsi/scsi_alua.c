@@ -200,5 +200,40 @@ int submit_stpg(struct scsi_device *sdev, int group_id,
 }
 EXPORT_SYMBOL_GPL(submit_stpg);
 
+int scsi_alua_init(struct scsi_device *sdev)
+{
+	int rel_port, ret;
+
+	sdev_printk(KERN_INFO, sdev,
+			    "%s: tpgs=%d\n",
+			    DRV_NAME, scsi_device_tpgs(sdev));
+	sdev->alua_data = kzalloc(sizeof(*sdev->alua_data), GFP_KERNEL);
+	if (!sdev->alua_data)
+		return -ENOMEM;
+
+	sdev->alua_data->group_id = scsi_vpd_tpg_id(sdev, &rel_port);
+	sdev_printk(KERN_INFO, sdev,
+			    "%s: group_id=%d\n",
+			    DRV_NAME, sdev->alua_data->group_id);
+	if (sdev->alua_data->group_id < 0) {
+		/*
+		 * Internal error; TPGS supported but required
+		 * VPD identification descriptors not present.
+		 * Disable ALUA support.
+		 */
+		sdev_printk(KERN_INFO, sdev,
+			    "%s: No target port descriptors found\n",
+			    __func__);
+		ret = -EIO;
+		goto out_free_data;
+	}
+
+	return 0;
+out_free_data:
+	kfree(sdev->alua_data);
+	sdev->alua_data = NULL;
+	return ret;
+}
+
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("scsi_alua");
