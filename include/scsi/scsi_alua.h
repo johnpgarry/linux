@@ -38,6 +38,14 @@
 #define ALUA_RTPG_SIZE			128
 #define ALUA_FAILOVER_TIMEOUT		60
 
+struct alua_data {
+	int			group_id;
+	int			tpgs;
+	int			state;
+	int			pref;
+	int			valid_states;
+};
+
 int alua_check_tpgs(struct scsi_device *sdev);
 int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 		       int bufflen, struct scsi_sense_hdr *sshdr,
@@ -47,4 +55,5 @@ void alua_print_info(struct scsi_device *sdev, int group_id, int state,
 		int pref, int valid_states);
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
+int scsi_alua_init(struct scsi_device *sdev);
 #endif // _SCSI_ALUA_H

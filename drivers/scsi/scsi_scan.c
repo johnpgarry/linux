@@ -38,6 +38,7 @@
 #include <linux/unaligned.h>
 
 #include <scsi/scsi.h>
+#include <scsi/scsi_alua.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
@@ -1125,6 +1126,9 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 
 	if (scsi_mpath_dev_alloc(sdev))
 		return SCSI_SCAN_NO_RESPONSE;
+
+	if (scsi_device_tpgs(sdev))
+		scsi_alua_init(sdev);
 
 	/*
 	 * Ok, the device is now all set up, we can
