@@ -745,25 +745,16 @@ static bool alua_rtpg_queue(struct scsi_device *sdev,
 		h->flags |= ALUA_PG_RUN_STPG;
 		force = true;
 	}
-	if (0) {
-
-	} else if (!(h->flags & ALUA_PG_RUN_RTPG) && force) {
+	if (!(h->flags & ALUA_PG_RUN_RTPG) && force) {
 		h->flags |= ALUA_PG_RUN_RTPG;
-		/* Do not queue if the worker is already running */
-		if (1) {
-			
-			start_queue = 1;
-		}
+		start_queue = 1;
 	}
-
-	
 
 	if (start_queue) {
 		if (queue_delayed_work(kaluad_wq, &h->rtpg_work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS)))
 			sdev = NULL;
-		else {
-		}
+
 	}
 	if (sdev)
 		scsi_device_put(sdev);
