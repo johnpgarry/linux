@@ -44,6 +44,13 @@ struct alua_data {
 	int			state;
 	int			pref;
 	int			valid_states;
+
+	bool			rtpg_ext_hdr_unsupp;
+	unsigned char		transition_tmo;
+	unsigned long		expiry;
+	unsigned long		interval;
+	struct delayed_work	work;
+	struct scsi_device *sdev;
 };
 
 int alua_check_tpgs(struct scsi_device *sdev);
@@ -56,4 +63,6 @@ void alua_print_info(struct scsi_device *sdev, int group_id, int state,
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
 int scsi_alua_init(struct scsi_device *sdev);
+bool alua_rtpg_queue2(struct scsi_device *sdev);
+
 #endif // _SCSI_ALUA_H
