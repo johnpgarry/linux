@@ -213,6 +213,59 @@ bool alua_rtpg_queue2(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL_GPL(alua_rtpg_queue2);
 
+int alua_stpg2(struct scsi_device *sdev)
+{
+	int retval;
+	struct scsi_sense_hdr sense_hdr;
+	struct alua_data *alua = sdev->alua;
+
+	if (!(alua->tpgs & TPGS_MODE_EXPLICIT)) {
+		/* Only implicit ALUA supported, retry */
+		return -EAGAIN;//SCSI_DH_RETRY;
+	}
+	switch (alua->state) {
+	case SCSI_ACCESS_STATE_OPTIMAL:
+		return 0;
+	case SCSI_ACCESS_STATE_ACTIVE:
+		if (1/*(alua->flags & ALUA_OPTIMIZE_STPG)*/ && //fixme
+		    !alua->pref &&
+		    (alua->tpgs & TPGS_MODE_IMPLICIT))
+			return 0;
+		break;
+	case SCSI_ACCESS_STATE_STANDBY:
+	case SCSI_ACCESS_STATE_UNAVAILABLE:
+		break;
+	case SCSI_ACCESS_STATE_OFFLINE:
+		return -EIO;//SCSI_DH_IO;
+	case SCSI_ACCESS_STATE_TRANSITIONING:
+		break;
+	default:
+		sdev_printk(KERN_INFO, sdev,
+			    "%s: stpg failed, unhandled TPGS state %d",
+			    DRV_NAME, alua->state);
+		return -ENODEV;//SCSI_DH_NOSYS;
+	}
+	retval = submit_stpg(sdev, alua->group_id, &sense_hdr);
+
+	if (retval) {
+		if (retval < 0 || !scsi_sense_valid(&sense_hdr)) {
+			sdev_printk(KERN_INFO, sdev,
+				    "%s: stpg failed, result %d",
+				    DRV_NAME, retval);
+			if (retval < 0)
+				return -EINVAL;//SCSI_DH_DEV_TEMP_BUSY;
+		} else {
+			sdev_printk(KERN_INFO, sdev, "%s: stpg failed\n",
+				    DRV_NAME);
+			scsi_print_sense_hdr(sdev, DRV_NAME, &sense_hdr);
+		}
+	}
+	/* Retry RTPG */
+	return -EAGAIN;//SCSI_DH_RETRY;
+}
+EXPORT_SYMBOL_GPL(alua_stpg2);
+
+
 int alua_rtpg2(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;

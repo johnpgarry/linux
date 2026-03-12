@@ -299,6 +299,7 @@ static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
  * Returns SCSI_DH_DEV_OFFLINED if the path is
  * found to be unusable.
  */
+__maybe_unused
 static int alua_rtpg(struct scsi_device *sdev)
 {
 	struct scsi_sense_hdr sense_hdr;
@@ -536,6 +537,7 @@ static int alua_rtpg(struct scsi_device *sdev)
  * a re-evaluation of the target group state or SCSI_DH_OK
  * if no further action needs to be taken.
  */
+__maybe_unused
 static unsigned alua_stpg(struct scsi_device *sdev)
 {
 	int retval;
@@ -648,6 +650,7 @@ static void alua_rtpg_work(struct work_struct *work)
 	int err = SCSI_DH_OK;
 	struct alua_queue_data *qdata, *tmp;
 
+	pr_err("%s sdev=%pS h=%pS\n", __func__, sdev, h);
 	if (h->flags & ALUA_PG_RUN_RTPG) {
 		int state = h->state;
 
@@ -666,11 +669,18 @@ static void alua_rtpg_work(struct work_struct *work)
 			}
 			/* Send RTPG on failure or if TUR indicates SUCCESS */
 		}
-		err = alua_rtpg(sdev);
+		err = alua_rtpg2(sdev);
 
-		if (err == SCSI_DH_RETRY || err == SCSI_DH_IMM_RETRY ||
+		/* If RTPG failed on the current device, try using another */
+		#ifdef dsdds
+		if (err == -EBADF &&
+		    (prev_sdev = alua_rtpg_select_sdev(pg)))
+			err = -ETXTBSY;//SCSI_DH_IMM_RETRY;
+		#endif
+
+		if (err == -EAGAIN || err == -ETXTBSY ||
 		    h->flags & ALUA_PG_RUN_RTPG) {
-			if (err == SCSI_DH_IMM_RETRY)
+			if (err == -ETXTBSY)
 				h->interval = 0;
 			else if (!h->interval && !(h->flags & ALUA_PG_RUN_RTPG))
 				h->interval = ALUA_RTPG_RETRY_DELAY;
@@ -678,15 +688,15 @@ static void alua_rtpg_work(struct work_struct *work)
 			
 			goto queue_rtpg;
 		}
-		if (err != SCSI_DH_OK)
+		if (err != 0)
 			h->flags &= ~ALUA_PG_RUN_STPG;
 	}
 	if (h->flags & ALUA_PG_RUN_STPG) {
 		h->flags &= ~ALUA_PG_RUN_STPG;
 		
-		err = alua_stpg(sdev);
+		err = alua_stpg2(sdev);
 		
-		if (err == SCSI_DH_RETRY || h->flags & ALUA_PG_RUN_RTPG) {
+		if (err == -EAGAIN || h->flags & ALUA_PG_RUN_RTPG) {
 			h->flags |= ALUA_PG_RUN_RTPG;
 			h->interval = 0;
 			
@@ -702,6 +712,7 @@ static void alua_rtpg_work(struct work_struct *work)
 	h->disabled = false;
 
 
+	pr_err("%s2 sdev=%pS h=%pS checking qdata_list\n", __func__, sdev, h);
 	list_for_each_entry_safe(qdata, tmp, &qdata_list, entry) {
 		list_del(&qdata->entry);
 		if (qdata->callback_fn)
@@ -754,7 +765,6 @@ static bool alua_rtpg_queue(struct scsi_device *sdev,
 		if (queue_delayed_work(kaluad_wq, &h->rtpg_work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS)))
 			sdev = NULL;
-
 	}
 	if (sdev)
 		scsi_device_put(sdev);
@@ -838,13 +848,14 @@ static int alua_activate(struct scsi_device *sdev,
 	}
 	qdata->callback_fn = fn;
 	qdata->callback_data = data;
-
+	pr_err("%s sdev=%pS calling alua_rtpg_queue\n", __func__, sdev);
 	if (alua_rtpg_queue(sdev, qdata, true)) {
 		fn = NULL;
 	} else {
 		kfree(qdata);
 		err = SCSI_DH_DEV_OFFLINED;
 	}
+	pr_err("%s2 sdev=%pS called alua_rtpg_queue fn=%pS\n", __func__, sdev, fn);
 	
 out:
 	if (fn)
@@ -904,6 +915,7 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	struct alua_dh_data *h;
 	int err;
 
+	pr_err("%s sdev->alua=%pS\n", __func__, sdev);
 	if (sdev->scsi_mpath_dev)
 		return SCSI_DH_DEV_UNSUPP;
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
@@ -917,6 +929,7 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	mutex_init(&h->init_mutex);
 	sdev->handler_data = h;
 	err = alua_initialize(sdev, h);
+	pr_err("%s2 sdev->alua=%pS err=%d\n", __func__, sdev, err);
 	if (err != SCSI_DH_OK && err != SCSI_DH_DEV_OFFLINED)
 		goto failed;
 
