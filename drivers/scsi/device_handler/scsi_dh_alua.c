@@ -71,9 +71,6 @@ struct alua_dh_data {
 	unsigned		flags; /* used for optimizing STPG */
 
 	/* alua stuff */
-	int			pref;
-	int			valid_states;
-	int			tpgs;
 	unsigned char		transition_tmo;
 	unsigned long		expiry;
 	unsigned long		interval;
