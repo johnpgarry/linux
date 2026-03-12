@@ -218,7 +218,7 @@ static int alua_rtpg2(struct scsi_device *sdev)
 	int len, k, off, bufflen = ALUA_RTPG_SIZE;
 	int group_id_old, state_old, pref_old, valid_states_old;
 	unsigned char *desc, *buff;
-	unsigned err;
+	int err;
 	int retval;
 	unsigned int tpg_desc_tbl_off;
 	unsigned char orig_transition_tmo;
