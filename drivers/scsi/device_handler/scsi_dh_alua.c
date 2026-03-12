@@ -71,7 +71,6 @@ struct alua_dh_data {
 	unsigned		flags; /* used for optimizing STPG */
 
 	/* alua stuff */
-	int			state;
 	int			pref;
 	int			valid_states;
 	int			tpgs;
@@ -188,6 +187,7 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 	return SCSI_DH_OK;
 }
 
+#ifdef dsdsdsd
 static char print_alua_state(unsigned char state)
 {
 	switch (state) {
@@ -209,12 +209,13 @@ static char print_alua_state(unsigned char state)
 		return 'X';
 	}
 }
+#endif
 
 static void alua_handle_state_transition(struct scsi_device *sdev)
 {
-	struct alua_dh_data *h = sdev->handler_data;
+	struct alua_data *alua = sdev->alua;
 
-	WRITE_ONCE(h->state, SCSI_ACCESS_STATE_TRANSITIONING);
+	WRITE_ONCE(alua->state, SCSI_ACCESS_STATE_TRANSITIONING);
 
 	alua_check(sdev, false);
 }
@@ -291,6 +292,7 @@ static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 	return SCSI_RETURN_NOT_HANDLED;
 }
 
+#ifdef olddsddsd
 /*
  * alua_rtpg - Evaluate REPORT TARGET GROUP STATES
  * @sdev: the device to be evaluated.
@@ -299,7 +301,6 @@ static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
  * Returns SCSI_DH_DEV_OFFLINED if the path is
  * found to be unusable.
  */
-__maybe_unused
 static int alua_rtpg(struct scsi_device *sdev)
 {
 	struct scsi_sense_hdr sense_hdr;
@@ -537,7 +538,6 @@ static int alua_rtpg(struct scsi_device *sdev)
  * a re-evaluation of the target group state or SCSI_DH_OK
  * if no further action needs to be taken.
  */
-__maybe_unused
 static unsigned alua_stpg(struct scsi_device *sdev)
 {
 	int retval;
@@ -589,7 +589,6 @@ static unsigned alua_stpg(struct scsi_device *sdev)
 	return SCSI_DH_RETRY;
 }
 
-#ifdef oldddsds
 /*
  * The caller must call scsi_device_put() on the returned pointer if it is not
  * NULL.
@@ -649,10 +648,11 @@ static void alua_rtpg_work(struct work_struct *work)
 	LIST_HEAD(qdata_list);
 	int err = SCSI_DH_OK;
 	struct alua_queue_data *qdata, *tmp;
+	struct alua_data *alua = sdev->alua;
 
 	pr_err("%s sdev=%pS h=%pS\n", __func__, sdev, h);
 	if (h->flags & ALUA_PG_RUN_RTPG) {
-		int state = h->state;
+		int state = alua->state;
 
 		h->flags &= ~ALUA_PG_RUN_RTPG;
 		
@@ -882,10 +882,10 @@ static void alua_check(struct scsi_device *sdev, bool force)
  */
 static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 {
-	struct alua_dh_data *h = sdev->handler_data;
+	struct alua_data *alua = sdev->alua;
 	unsigned char state = SCSI_ACCESS_STATE_OPTIMAL;
 
-	state = READ_ONCE(h->state);
+	state = READ_ONCE(alua->state);
 
 	switch (state) {
 	case SCSI_ACCESS_STATE_OPTIMAL:
