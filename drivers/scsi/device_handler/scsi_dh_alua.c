@@ -75,7 +75,6 @@ struct alua_dh_data {
 	unsigned long		expiry;
 	unsigned long		interval;
 	struct delayed_work	rtpg_work;
-	bool rtpg_ext_hdr_unsupp;
 	struct list_head	rtpg_list;
 };
 
