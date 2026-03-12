@@ -207,15 +207,15 @@ int scsi_alua_init(struct scsi_device *sdev)
 	sdev_printk(KERN_INFO, sdev,
 			    "%s: tpgs=%d\n",
 			    DRV_NAME, scsi_device_tpgs(sdev));
-	sdev->alua_data = kzalloc(sizeof(*sdev->alua_data), GFP_KERNEL);
-	if (!sdev->alua_data)
+	sdev->alua = kzalloc(sizeof(*sdev->alua), GFP_KERNEL);
+	if (!sdev->alua)
 		return -ENOMEM;
 
-	sdev->alua_data->group_id = scsi_vpd_tpg_id(sdev, &rel_port);
+	sdev->alua->group_id = scsi_vpd_tpg_id(sdev, &rel_port);
 	sdev_printk(KERN_INFO, sdev,
 			    "%s: group_id=%d\n",
-			    DRV_NAME, sdev->alua_data->group_id);
-	if (sdev->alua_data->group_id < 0) {
+			    DRV_NAME, sdev->alua->group_id);
+	if (sdev->alua->group_id < 0) {
 		/*
 		 * Internal error; TPGS supported but required
 		 * VPD identification descriptors not present.
@@ -230,8 +230,8 @@ int scsi_alua_init(struct scsi_device *sdev)
 
 	return 0;
 out_free_data:
-	kfree(sdev->alua_data);
-	sdev->alua_data = NULL;
+	kfree(sdev->alua);
+	sdev->alua = NULL;
 	return ret;
 }
 
