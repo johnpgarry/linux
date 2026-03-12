@@ -64,5 +64,6 @@ int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
 int scsi_alua_init(struct scsi_device *sdev);
 bool alua_rtpg_queue2(struct scsi_device *sdev);
+int alua_rtpg2(struct scsi_device *sdev);
 
 #endif // _SCSI_ALUA_H

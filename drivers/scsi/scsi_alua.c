@@ -206,12 +206,14 @@ bool alua_rtpg_queue2(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 
+	pr_err("%s sdev=%pS calling queue_delayed_work\n",
+		__func__, sdev);
 	return queue_delayed_work(system_wq, &alua->work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS));
 }
 EXPORT_SYMBOL_GPL(alua_rtpg_queue2);
 
-static int alua_rtpg2(struct scsi_device *sdev)
+int alua_rtpg2(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 	struct scsi_sense_hdr sense_hdr;
@@ -225,12 +227,17 @@ static int alua_rtpg2(struct scsi_device *sdev)
 	bool transitioning_sense = false;
 	int rel_port;
 
+	pr_err("%s sdev=%pS\n",
+		__func__, sdev);
 	group_id_old = alua->group_id;
 	state_old = alua->state;
 	pref_old = alua->pref;
 	valid_states_old = alua->valid_states;
 
 	alua->group_id = scsi_vpd_tpg_id(sdev, &rel_port);
+
+	pr_err("%s2 sdev=%pS alua->group_id=%d\n",
+		__func__, sdev, alua->group_id);
 	if (sdev->alua->group_id < 0) {
 		/*
 		 * Internal error; TPGS supported but required
@@ -257,9 +264,11 @@ static int alua_rtpg2(struct scsi_device *sdev)
 		return -ENOMEM;
 
  retry:
+	pr_err("%s3 retry: sdev=%pS\n", __func__, sdev);
 	err = 0;
 	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr,
 					alua->rtpg_ext_hdr_unsupp);
+	pr_err("%s3.1 sdev=%pS\n", __func__, sdev);
 
 	if (retval) {
 		/*
@@ -336,6 +345,7 @@ static int alua_rtpg2(struct scsi_device *sdev)
 		return -EIO; //-EIO
 	}
 
+	pr_err("%s4 sdev=%pS\n", __func__, sdev);
 	len = get_unaligned_be32(&buff[0]) + 4;
 
 	if (len > bufflen) {
@@ -386,6 +396,7 @@ static int alua_rtpg2(struct scsi_device *sdev)
 	}
 
  skip_rtpg:
+	pr_err("%s5  skip_rtpg: sdev=%pS\n", __func__, sdev);
 	//spin_lock_irqsave(&alua->lock, flags);
 	if (transitioning_sense)
 		alua->state = SCSI_ACCESS_STATE_TRANSITIONING;
@@ -425,8 +436,10 @@ static int alua_rtpg2(struct scsi_device *sdev)
 	}
 	//spin_unlock_irqrestore(&alua->lock, flags);
 	kfree(buff);
+	pr_err("%s10 sdev=%pS err=%d\n", __func__, sdev, err);
 	return err;
 }
+EXPORT_SYMBOL_GPL(alua_rtpg2);
 
 static void alua_rtpg_work2(struct work_struct *work)
 {
