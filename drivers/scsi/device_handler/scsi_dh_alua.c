@@ -51,7 +51,7 @@ struct alua_port_group {
 	int			valid_states;
 	unsigned		flags; /* used for optimizing STPG */
 	unsigned char		transition_tmo;
-	unsigned long		expiry;
+	//unsigned long		expiry;
 	//unsigned long		interval;
 	struct delayed_work	rtpg_work;
 	spinlock_t		lock;
@@ -72,7 +72,7 @@ struct alua_dh_data {
 
 	/* alua stuff */
 	unsigned char		transition_tmo;
-	unsigned long		expiry;
+	//unsigned long		expiry;
 	//unsigned long		interval;
 	struct delayed_work	rtpg_work;
 	struct list_head	rtpg_list;
