@@ -16,6 +16,7 @@
 #include <linux/bsg.h>
 
 #include <scsi/scsi.h>
+#include <scsi/scsi_alua.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
@@ -1113,7 +1114,7 @@ sdev_show_access_state(struct device *dev,
 	unsigned char access_state;
 	const char *access_state_name;
 
-	if (!sdev->handler)
+	if (!sdev->handler && !alua_implicit(sdev))
 		return -EINVAL;
 
 	access_state = (sdev->access_state & SCSI_ACCESS_STATE_MASK);
@@ -1401,6 +1402,11 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 				    error);
 			sdev->bsg_dev = NULL;
 		}
+	}
+
+	if (!sdev->handler && alua_implicit(sdev)) {
+		alua_check_tpgs(sdev);
+		alua_rtpg_queue2(sdev);
 	}
 
 	scsi_autopm_put_device(sdev);

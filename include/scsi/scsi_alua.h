@@ -53,6 +53,13 @@ struct alua_data {
 	struct scsi_device *sdev;
 };
 
+static inline bool alua_implicit(struct scsi_device *sdev)
+{
+	if (!sdev->alua)
+		return false;
+	return sdev->alua->tpgs & TPGS_MODE_IMPLICIT;
+}
+
 int alua_check_tpgs(struct scsi_device *sdev);
 int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 		       int bufflen, struct scsi_sense_hdr *sshdr,
