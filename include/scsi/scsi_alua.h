@@ -60,6 +60,15 @@ static inline bool alua_implicit(struct scsi_device *sdev)
 	return sdev->alua->tpgs & TPGS_MODE_IMPLICIT;
 }
 
+static inline bool alua_any(struct scsi_device *sdev)
+{
+	if (!sdev->alua)
+		return false;
+	return sdev->alua->tpgs & (TPGS_MODE_IMPLICIT | TPGS_MODE_EXPLICIT);
+}
+
+blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req);
+
 int alua_check_tpgs(struct scsi_device *sdev);
 int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 		       int bufflen, struct scsi_sense_hdr *sshdr,

@@ -785,31 +785,6 @@ static void alua_check(struct scsi_device *sdev)
 	alua_rtpg_queue(sdev, NULL, true);
 }
 
-/*
- * alua_prep_fn - request callback
- *
- * Fail I/O to all paths not in state
- * active/optimized or active/non-optimized.
- */
-static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
-{
-	struct alua_data *alua = sdev->alua;
-	unsigned char state = SCSI_ACCESS_STATE_OPTIMAL;
-
-	state = READ_ONCE(alua->state);
-
-	switch (state) {
-	case SCSI_ACCESS_STATE_OPTIMAL:
-	case SCSI_ACCESS_STATE_ACTIVE:
-	case SCSI_ACCESS_STATE_LBA:
-	case SCSI_ACCESS_STATE_TRANSITIONING:
-		return BLK_STS_OK;
-	default:
-		req->rq_flags |= RQF_QUIET;
-		return BLK_STS_IOERR;
-	}
-}
-
 static void alua_rescan(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h = sdev->handler_data;
@@ -867,7 +842,6 @@ static struct scsi_device_handler alua_dh = {
 	.module = THIS_MODULE,
 	.attach = alua_bus_attach,
 	.detach = alua_bus_detach,
-	.prep_fn = alua_prep_fn,
 	.check_sense = alua_dh_check_sense,
 	.activate = alua_activate,
 	.rescan = alua_rescan,

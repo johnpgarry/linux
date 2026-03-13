@@ -298,6 +298,32 @@ void alua_rtpg_queue2(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL_GPL(alua_rtpg_queue2);
 
+/*
+ * alua_prep_fn - request callback
+ *
+ * Fail I/O to all paths not in state
+ * active/optimized or active/non-optimized.
+ */
+blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
+{
+	struct alua_data *alua = sdev->alua;
+	unsigned char state = SCSI_ACCESS_STATE_OPTIMAL;
+
+	state = READ_ONCE(alua->state);
+
+	switch (state) {
+	case SCSI_ACCESS_STATE_OPTIMAL:
+	case SCSI_ACCESS_STATE_ACTIVE:
+	case SCSI_ACCESS_STATE_LBA:
+	case SCSI_ACCESS_STATE_TRANSITIONING:
+		return BLK_STS_OK;
+	default:
+		req->rq_flags |= RQF_QUIET;
+		return BLK_STS_IOERR;
+	}
+}
+EXPORT_SYMBOL_GPL(alua_prep_fn);
+
 int alua_stpg2(struct scsi_device *sdev, bool optimize)
 {
 	int retval;

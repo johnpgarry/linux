@@ -1746,6 +1746,14 @@ int scsi_rescan_device(struct scsi_device *sdev)
 	scsi_cdl_check(sdev);
 
 	if (sdev->handler && sdev->handler->rescan)
+		sdev_printk(KERN_NOTICE, sdev, "%s sdev->handler->rescan=%pS alua=%pS\n",
+			__func__, sdev->handler->rescan, sdev->alua);
+	else
+		sdev_printk(KERN_NOTICE, sdev, "%s sdev->handler=%pS alua=%pS\n",
+			__func__, sdev->handler, sdev->alua);
+
+
+	if (sdev->handler && sdev->handler->rescan)
 		sdev->handler->rescan(sdev);
 
 	if (dev->driver && try_module_get(dev->driver->owner)) {
