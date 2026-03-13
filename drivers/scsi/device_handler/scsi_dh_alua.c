@@ -44,7 +44,7 @@ struct alua_port_group {
 	struct list_head	dh_list;
 	unsigned char		device_id_str[256];
 	int			device_id_len;
-	int			group_id;
+	//int			group_id;
 	int			tpgs;
 	int			state;
 	int			pref;
@@ -61,7 +61,7 @@ struct alua_port_group {
 #endif
 
 struct alua_dh_data {
-	int			group_id;
+	//int			group_id;
 	struct scsi_device	*sdev;
 	int			init_error;
 	struct mutex		init_mutex;
