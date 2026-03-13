@@ -378,7 +378,7 @@ int alua_stpg2(struct scsi_device *sdev, bool optimize)
 EXPORT_SYMBOL_GPL(alua_stpg2);
 
 
-int alua_rtpg2(struct scsi_device *sdev)
+int alua_rtpg(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 	struct scsi_sense_hdr sense_hdr;
@@ -604,15 +604,15 @@ int alua_rtpg2(struct scsi_device *sdev)
 	pr_err("%s10 sdev=%pS err=%d\n", __func__, sdev, err);
 	return err;
 }
-EXPORT_SYMBOL_GPL(alua_rtpg2);
+EXPORT_SYMBOL_GPL(alua_rtpg);
 
-static void alua_rtpg_work2(struct work_struct *work)
+static void alua_rtpg_work(struct work_struct *work)
 {
 	struct alua_data *alua =
 		container_of(work, struct alua_data, work.work);
 	int ret;
 
-	ret = alua_rtpg2(alua->sdev);
+	ret = alua_rtpg(alua->sdev);
 	pr_err("%s ret=%d from alua_rtpg_run\n", __func__, ret);
 
 	if (ret == -EAGAIN || ret == -EBADF) {
@@ -652,7 +652,7 @@ int scsi_alua_init(struct scsi_device *sdev)
 		ret = -EIO;
 		goto out_free_data;
 	}
-	INIT_DELAYED_WORK(&sdev->alua->work, alua_rtpg_work2);
+	INIT_DELAYED_WORK(&sdev->alua->work, alua_rtpg_work);
 	sdev->alua->sdev = sdev;
 	sdev->alua->tpgs = scsi_device_tpgs(sdev);
 
