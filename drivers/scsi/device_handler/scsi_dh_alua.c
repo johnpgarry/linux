@@ -125,7 +125,75 @@ static int alua_dh_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 static enum scsi_disposition alua_dh_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr)
 {
-	return alua_check_sense(sdev, sense_hdr, alua_dh_check);
+	switch (sense_hdr->sense_key) {
+	case NOT_READY:
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
+			/*
+			 * LUN Not Accessible - ALUA state transition
+			 */
+			alua_handle_state_transition(sdev);
+			alua_dh_check(sdev);
+			return NEEDS_RETRY;
+		}
+		break;
+	case UNIT_ATTENTION:
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
+			/*
+			 * LUN Not Accessible - ALUA state transition
+			 */
+			alua_handle_state_transition(sdev);
+			alua_dh_check(sdev);
+			return NEEDS_RETRY;
+		}
+		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x00) {
+			/*
+			 * Power On, Reset, or Bus Device Reset.
+			 * Might have obscured a state transition,
+			 * so schedule a recheck.
+			 */
+			alua_dh_check(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x04)
+			/*
+			 * Device internal reset
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x01)
+			/*
+			 * Mode Parameters Changed
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x06) {
+			/*
+			 * ALUA state changed
+			 */
+			alua_dh_check(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07) {
+			/*
+			 * Implicit ALUA state transition failed
+			 */
+			alua_dh_check(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x03)
+			/*
+			 * Inquiry data has changed
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x0e)
+			/*
+			 * REPORTED_LUNS_DATA_HAS_CHANGED is reported
+			 * when switching controllers on targets like
+			 * Intel Multi-Flex. We can just retry.
+			 */
+			return ADD_TO_MLQUEUE;
+		break;
+	}
+
+	return SCSI_RETURN_NOT_HANDLED;
 }
 
 static void alua_dh_rtpg_work(struct work_struct *work)

@@ -76,6 +76,6 @@ void alua_rtpg_scan(struct scsi_device *sdev);
 int alua_rtpg(struct scsi_device *sdev);
 int alua_stpg(struct scsi_device *sdev, bool optimize);
 enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
-					      struct scsi_sense_hdr *sense_hdr,
-					     void (*alua_check)(struct scsi_device *sdev));
+					struct scsi_sense_hdr *sense_hdr);
+void alua_handle_state_transition(struct scsi_device *sdev);
 #endif // _SCSI_ALUA_H

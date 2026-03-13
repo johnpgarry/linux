@@ -18,18 +18,16 @@
 #define ALUA_RTPG_DELAY_MSECS		5
 #define ALUA_RTPG_RETRY_DELAY		2
 
-
-
-static void alua_handle_state_transition(struct scsi_device *sdev)
+void alua_handle_state_transition(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 
 	WRITE_ONCE(alua->state, SCSI_ACCESS_STATE_TRANSITIONING);
 }
+EXPORT_SYMBOL_GPL(alua_handle_state_transition);
 
 enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
-					      struct scsi_sense_hdr *sense_hdr,
-					     void (*alua_check)(struct scsi_device *sdev))
+					      struct scsi_sense_hdr *sense_hdr)
 {
 	switch (sense_hdr->sense_key) {
 	case NOT_READY:
@@ -38,7 +36,7 @@ enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 			 * LUN Not Accessible - ALUA state transition
 			 */
 			alua_handle_state_transition(sdev);
-			alua_check(sdev);
+			alua_rtpg_scan(sdev);
 			return NEEDS_RETRY;
 		}
 		break;
@@ -48,7 +46,7 @@ enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 			 * LUN Not Accessible - ALUA state transition
 			 */
 			alua_handle_state_transition(sdev);
-			alua_check(sdev);
+			alua_rtpg_scan(sdev);
 			return NEEDS_RETRY;
 		}
 		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x00) {
@@ -57,7 +55,7 @@ enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 			 * Might have obscured a state transition,
 			 * so schedule a recheck.
 			 */
-			alua_check(sdev);
+			alua_rtpg_scan(sdev);
 			return ADD_TO_MLQUEUE;
 		}
 		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x04)
@@ -74,14 +72,14 @@ enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 			/*
 			 * ALUA state changed
 			 */
-			alua_check(sdev);
+			alua_rtpg_scan(sdev);
 			return ADD_TO_MLQUEUE;
 		}
 		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07) {
 			/*
 			 * Implicit ALUA state transition failed
 			 */
-			alua_check(sdev);
+			alua_rtpg_scan(sdev);
 			return ADD_TO_MLQUEUE;
 		}
 		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x03)
@@ -101,7 +99,6 @@ enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 
 	return SCSI_RETURN_NOT_HANDLED;
 }
-EXPORT_SYMBOL_GPL(alua_check_sense);
 
 /*
  * alua_check_tpgs - Evaluate TPGS setting

@@ -574,7 +574,7 @@ enum scsi_disposition scsi_check_sense(struct scsi_cmnd *scmd)
 	} else if (alua_implicit(sdev)) {
 		enum scsi_disposition rc;
 
-		rc = alua_check_sense(sdev, &sshdr, alua_rtpg_scan);
+		rc = alua_check_sense(sdev, &sshdr);
 		if (rc != SCSI_RETURN_NOT_HANDLED)
 			return rc;
 	}
