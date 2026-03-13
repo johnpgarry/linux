@@ -233,22 +233,22 @@ static char print_alua_state(unsigned char state)
 	}
 }
 
-void alua_print_info(struct scsi_device *sdev, int group_id, int state,
-		int pref, int valid_states)
+static void alua_print_info(struct scsi_device *sdev)
 {
+	struct alua_data *alua = sdev->alua;
+
 	sdev_printk(KERN_INFO, sdev,
 		"alua: port group %02x state %c %s supports %c%c%c%c%c%c%c\n",
-		group_id, print_alua_state(state),
-		pref ? "preferred" : "non-preferred",
-		valid_states&TPGS_SUPPORT_TRANSITION?'T':'t',
-		valid_states&TPGS_SUPPORT_OFFLINE?'O':'o',
-		valid_states&TPGS_SUPPORT_LBA_DEPENDENT?'L':'l',
-		valid_states&TPGS_SUPPORT_UNAVAILABLE?'U':'u',
-		valid_states&TPGS_SUPPORT_STANDBY?'S':'s',
-		valid_states&TPGS_SUPPORT_NONOPTIMIZED?'N':'n',
-		valid_states&TPGS_SUPPORT_OPTIMIZED?'A':'a');
+		alua->group_id, print_alua_state(alua->state),
+		alua->pref ? "preferred" : "non-preferred",
+		alua->valid_states&TPGS_SUPPORT_TRANSITION?'T':'t',
+		alua->valid_states&TPGS_SUPPORT_OFFLINE?'O':'o',
+		alua->valid_states&TPGS_SUPPORT_LBA_DEPENDENT?'L':'l',
+		alua->valid_states&TPGS_SUPPORT_UNAVAILABLE?'U':'u',
+		alua->valid_states&TPGS_SUPPORT_STANDBY?'S':'s',
+		alua->valid_states&TPGS_SUPPORT_NONOPTIMIZED?'N':'n',
+		alua->valid_states&TPGS_SUPPORT_OPTIMIZED?'A':'a');
 }
-EXPORT_SYMBOL_GPL(alua_print_info);
 
 /*
  * submit_stpg - Issue a SET TARGET PORT GROUP command
@@ -566,7 +566,7 @@ int alua_rtpg(struct scsi_device *sdev)
 
 	if (group_id_old != alua->group_id || state_old != alua->state ||
 	    pref_old != alua->pref || valid_states_old != alua->valid_states) {
-		alua_print_info(sdev, alua->group_id, alua->state, alua->pref, alua->valid_states);
+		alua_print_info(sdev);
 	}
 
 	switch (alua->state) {
