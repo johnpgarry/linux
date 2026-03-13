@@ -287,13 +287,13 @@ int submit_stpg(struct scsi_device *sdev, int group_id,
 }
 EXPORT_SYMBOL_GPL(submit_stpg);
 
-bool alua_rtpg_queue2(struct scsi_device *sdev)
+void alua_rtpg_queue2(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 
 	pr_err("%s sdev=%pS calling queue_delayed_work\n",
 		__func__, sdev);
-	return queue_delayed_work(system_wq, &alua->work,
+	queue_delayed_work(system_wq, &alua->work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS));
 }
 EXPORT_SYMBOL_GPL(alua_rtpg_queue2);
