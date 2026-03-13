@@ -74,7 +74,7 @@ int alua_tur(struct scsi_device *sdev);
 int scsi_alua_init(struct scsi_device *sdev);
 void alua_rtpg_scan(struct scsi_device *sdev);
 int alua_rtpg(struct scsi_device *sdev);
-int alua_stpg2(struct scsi_device *sdev, bool optimize);
+int alua_stpg(struct scsi_device *sdev, bool optimize);
 enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr,
 					     void (*alua_check)(struct scsi_device *sdev));

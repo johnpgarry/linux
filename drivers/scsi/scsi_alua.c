@@ -322,7 +322,7 @@ blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 }
 EXPORT_SYMBOL_GPL(alua_prep_fn);
 
-int alua_stpg2(struct scsi_device *sdev, bool optimize)
+int alua_stpg(struct scsi_device *sdev, bool optimize)
 {
 	int retval;
 	struct scsi_sense_hdr sense_hdr;
@@ -373,7 +373,7 @@ int alua_stpg2(struct scsi_device *sdev, bool optimize)
 	/* Retry RTPG */
 	return -EAGAIN;//SCSI_DH_RETRY;
 }
-EXPORT_SYMBOL_GPL(alua_stpg2);
+EXPORT_SYMBOL_GPL(alua_stpg);
 
 
 int alua_rtpg(struct scsi_device *sdev)

@@ -172,7 +172,7 @@ static void alua_dh_rtpg_work(struct work_struct *work)
 	if (h->flags & ALUA_PG_RUN_STPG) {
 		h->flags &= ~ALUA_PG_RUN_STPG;
 		
-		err = alua_stpg2(sdev, h->flags & ALUA_OPTIMIZE_STPG);
+		err = alua_stpg(sdev, h->flags & ALUA_OPTIMIZE_STPG);
 		
 		if (err == -EAGAIN || h->flags & ALUA_PG_RUN_RTPG) {
 			h->flags |= ALUA_PG_RUN_RTPG;
