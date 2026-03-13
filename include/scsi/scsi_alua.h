@@ -73,8 +73,6 @@ int alua_check_tpgs(struct scsi_device *sdev);
 int alua_tur(struct scsi_device *sdev);
 void alua_print_info(struct scsi_device *sdev, int group_id, int state,
 		int pref, int valid_states);
-int submit_stpg(struct scsi_device *sdev, int group_id,
-		       struct scsi_sense_hdr *sshdr);
 int scsi_alua_init(struct scsi_device *sdev);
 void alua_rtpg_scan(struct scsi_device *sdev);
 int alua_rtpg(struct scsi_device *sdev);

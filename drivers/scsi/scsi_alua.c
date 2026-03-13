@@ -257,7 +257,7 @@ EXPORT_SYMBOL_GPL(alua_print_info);
  * to 'active/optimized' and let the array firmware figure out
  * the states of the remaining groups.
  */
-int submit_stpg(struct scsi_device *sdev, int group_id,
+static int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr)
 {
 	u8 cdb[MAX_COMMAND_SIZE];
@@ -284,7 +284,6 @@ int submit_stpg(struct scsi_device *sdev, int group_id,
 				stpg_len, ALUA_FAILOVER_TIMEOUT * HZ,
 				ALUA_FAILOVER_RETRIES, &exec_args);
 }
-EXPORT_SYMBOL_GPL(submit_stpg);
 
 void alua_rtpg_scan(struct scsi_device *sdev)
 {
