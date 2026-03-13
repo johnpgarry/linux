@@ -1756,7 +1756,7 @@ int scsi_rescan_device(struct scsi_device *sdev)
 	if (sdev->handler && sdev->handler->rescan)
 		sdev->handler->rescan(sdev);
 	else if (alua_implicit(sdev))
-		alua_rtpg_scan(sdev);
+		alua_rtpg_rescan(sdev);
 
 	if (dev->driver && try_module_get(dev->driver->owner)) {
 		struct scsi_driver *drv = to_scsi_driver(dev->driver);

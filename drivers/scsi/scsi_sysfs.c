@@ -1404,10 +1404,8 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		}
 	}
 
-	if (!sdev->handler && alua_implicit(sdev)) {
-		alua_check_tpgs(sdev);
-		alua_rtpg_scan(sdev);
-	}
+	if (!sdev->handler && alua_implicit(sdev))
+		alua_rtpg_rescan(sdev);
 
 	scsi_autopm_put_device(sdev);
 	return error;

@@ -53,6 +53,19 @@ struct alua_data {
 	struct scsi_device *sdev;
 };
 
+blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req);
+
+int alua_check_tpgs(struct scsi_device *sdev);
+int alua_tur(struct scsi_device *sdev);
+int scsi_alua_init(struct scsi_device *sdev);
+void alua_rtpg_scan(struct scsi_device *sdev);
+int alua_rtpg(struct scsi_device *sdev);
+int alua_stpg(struct scsi_device *sdev, bool optimize);
+enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
+					struct scsi_sense_hdr *sense_hdr);
+void alua_handle_state_transition(struct scsi_device *sdev);
+
+
 static inline bool alua_implicit(struct scsi_device *sdev)
 {
 	if (!sdev->alua)
@@ -67,15 +80,14 @@ static inline bool alua_any(struct scsi_device *sdev)
 	return sdev->alua->tpgs & (TPGS_MODE_IMPLICIT | TPGS_MODE_EXPLICIT);
 }
 
-blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req);
+static inline int alua_rtpg_rescan(struct scsi_device *sdev)
+{
+	sdev->alua->tpgs = alua_check_tpgs(sdev);
 
-int alua_check_tpgs(struct scsi_device *sdev);
-int alua_tur(struct scsi_device *sdev);
-int scsi_alua_init(struct scsi_device *sdev);
-void alua_rtpg_scan(struct scsi_device *sdev);
-int alua_rtpg(struct scsi_device *sdev);
-int alua_stpg(struct scsi_device *sdev, bool optimize);
-enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
-					struct scsi_sense_hdr *sense_hdr);
-void alua_handle_state_transition(struct scsi_device *sdev);
+	if (sdev->alua->tpgs & TPGS_MODE_IMPLICIT)
+		alua_rtpg_scan(sdev);
+
+	return 0;
+}
+
 #endif // _SCSI_ALUA_H
