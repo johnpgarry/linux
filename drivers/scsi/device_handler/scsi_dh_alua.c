@@ -24,11 +24,10 @@
 #define ALUA_RTPG_RETRY_DELAY		2
 
 /* device handler flags */
-#define ALUA_OPTIMIZE_STPG		0x01
+#define ALUA_OPTIMIZE_STPG	0
 /* State machine flags */
-#define ALUA_PG_RUN_RTPG		0x10
-#define ALUA_PG_RUN_STPG		0x20
-//#define ALUA_PG_RUNNING			0x40
+#define ALUA_PG_RUN_RTPG	1
+#define ALUA_PG_RUN_STPG	2
 
 static uint optimize_stpg;
 module_param(optimize_stpg, uint, S_IRUGO|S_IWUSR);
@@ -68,7 +67,7 @@ struct alua_dh_data {
 	bool			disabled;
 
 
-	unsigned		flags; /* used for optimizing STPG */
+	unsigned long		flags; /* used for optimizing STPG */
 
 	/* alua stuff */
 	//unsigned char		transition_tmo;
@@ -208,15 +207,15 @@ static void alua_dh_rtpg_work(struct work_struct *work)
 	unsigned long interval = 0;
 
 	pr_err("%s sdev=%pS h=%pS\n", __func__, sdev, h);
-	if (h->flags & ALUA_PG_RUN_RTPG) {
+	if (test_bit(ALUA_PG_RUN_RTPG, &h->flags)) {
 		int state = alua->state;
 
-		h->flags &= ~ALUA_PG_RUN_RTPG;
+		clear_bit(ALUA_PG_RUN_RTPG, &h->flags);
 		
 		if (state == SCSI_ACCESS_STATE_TRANSITIONING) {
 			if (alua_tur(sdev) == -EAGAIN) {
 
-				h->flags |= ALUA_PG_RUN_RTPG;
+				set_bit(ALUA_PG_RUN_RTPG, &h->flags);
 				
 				queue_delayed_work(kaluad_wq, &h->rtpg_work,
 						   ALUA_RTPG_RETRY_DELAY * HZ);
@@ -227,23 +226,21 @@ static void alua_dh_rtpg_work(struct work_struct *work)
 		err = alua_rtpg(sdev);
 
 		/* -EAGAIN Retry on any other UNIT ATTENTION occurred. */
-		if (err == -EAGAIN || h->flags & ALUA_PG_RUN_RTPG) {
-			if (!interval && !(h->flags & ALUA_PG_RUN_RTPG))
+		if (err == -EAGAIN || test_bit(ALUA_PG_RUN_RTPG, &h->flags)) {
+			if (!interval && !test_bit(ALUA_PG_RUN_RTPG, &h->flags))
 				interval = ALUA_RTPG_RETRY_DELAY;
-			h->flags |= ALUA_PG_RUN_RTPG;
+			set_bit(ALUA_PG_RUN_RTPG, &h->flags);
 			
 			goto queue_rtpg;
 		}
 		if (err != 0)
-			h->flags &= ~ALUA_PG_RUN_STPG;
+			clear_bit(ALUA_PG_RUN_STPG, &h->flags);
 	}
-	if (h->flags & ALUA_PG_RUN_STPG) {
-		h->flags &= ~ALUA_PG_RUN_STPG;
+	if (test_and_clear_bit(ALUA_PG_RUN_STPG, &h->flags)) {
 		
-		err = alua_stpg(sdev, h->flags & ALUA_OPTIMIZE_STPG);
-		
-		if (err == -EAGAIN || h->flags & ALUA_PG_RUN_RTPG) {
-			h->flags |= ALUA_PG_RUN_RTPG;
+		err = alua_stpg(sdev, test_bit(ALUA_OPTIMIZE_STPG, &h->flags));
+		if (err == -EAGAIN || test_bit(ALUA_PG_RUN_RTPG, &h->flags)) {
+			set_bit(ALUA_PG_RUN_RTPG, &h->flags);
 			interval = 0;
 			
 			goto queue_rtpg;
@@ -299,11 +296,11 @@ static bool alua_dh_rtpg_queue(struct scsi_device *sdev,
 	
 	if (qdata) {
 		list_add_tail(&qdata->entry, &h->rtpg_list);
-		h->flags |= ALUA_PG_RUN_STPG;
+		set_bit(ALUA_PG_RUN_STPG, &h->flags);
 		force = true;
 	}
-	if (!(h->flags & ALUA_PG_RUN_RTPG) && force) {
-		h->flags |= ALUA_PG_RUN_RTPG;
+	if (!test_bit(ALUA_PG_RUN_RTPG, &h->flags) && force) {
+		set_bit(ALUA_PG_RUN_RTPG, &h->flags);
 		start_queue = 1;
 	}
 
@@ -364,9 +361,9 @@ static int alua_dh_set_params(struct scsi_device *sdev, const char *params)
 
 	//spin_lock_irqsave(&pg->lock, flags); maybe should lock this
 	if (optimize)
-		h->flags |= ALUA_OPTIMIZE_STPG;
+		set_bit(ALUA_OPTIMIZE_STPG, &h->flags);
 	else
-		h->flags &= ~ALUA_OPTIMIZE_STPG;
+		clear_bit(ALUA_OPTIMIZE_STPG, &h->flags);
 
 	return result;
 }
