@@ -287,7 +287,7 @@ int submit_stpg(struct scsi_device *sdev, int group_id,
 }
 EXPORT_SYMBOL_GPL(submit_stpg);
 
-void alua_rtpg_queue2(struct scsi_device *sdev)
+void alua_rtpg_scan(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 
@@ -296,7 +296,7 @@ void alua_rtpg_queue2(struct scsi_device *sdev)
 	queue_delayed_work(system_wq, &alua->work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS));
 }
-EXPORT_SYMBOL_GPL(alua_rtpg_queue2);
+EXPORT_SYMBOL_GPL(alua_rtpg_scan);
 
 /*
  * alua_prep_fn - request callback
