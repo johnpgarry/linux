@@ -89,9 +89,9 @@ int alua_tur(struct scsi_device *sdev)
 	if ((sense_hdr.sense_key == NOT_READY ||
 	     sense_hdr.sense_key == UNIT_ATTENTION) &&
 	    sense_hdr.asc == 0x04 && sense_hdr.ascq == 0x0a)
-		return -EAGAIN;
+		return -EAGAIN; //SCSI_DH_RETRY
 	else if (retval)
-		return -EIO;
+		return -EIO; //SCSI_DH_IO
 	else
 		return 0;
 }

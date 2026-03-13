@@ -52,7 +52,7 @@ struct alua_port_group {
 	unsigned		flags; /* used for optimizing STPG */
 	unsigned char		transition_tmo;
 	unsigned long		expiry;
-	unsigned long		interval;
+	//unsigned long		interval;
 	struct delayed_work	rtpg_work;
 	spinlock_t		lock;
 	struct list_head	rtpg_list;
@@ -73,7 +73,7 @@ struct alua_dh_data {
 	/* alua stuff */
 	unsigned char		transition_tmo;
 	unsigned long		expiry;
-	unsigned long		interval;
+	//unsigned long		interval;
 	struct delayed_work	rtpg_work;
 	struct list_head	rtpg_list;
 };
@@ -645,6 +645,7 @@ static void alua_rtpg_work(struct work_struct *work)
 	int err = SCSI_DH_OK;
 	struct alua_queue_data *qdata, *tmp;
 	struct alua_data *alua = sdev->alua;
+	unsigned long interval = 0;
 
 	pr_err("%s sdev=%pS h=%pS\n", __func__, sdev, h);
 	if (h->flags & ALUA_PG_RUN_RTPG) {
@@ -653,33 +654,22 @@ static void alua_rtpg_work(struct work_struct *work)
 		h->flags &= ~ALUA_PG_RUN_RTPG;
 		
 		if (state == SCSI_ACCESS_STATE_TRANSITIONING) {
-			if (alua_tur(sdev) == SCSI_DH_RETRY) {
+			if (alua_tur(sdev) == -EAGAIN) {
 
 				h->flags |= ALUA_PG_RUN_RTPG;
-				if (!h->interval)
-					h->interval = ALUA_RTPG_RETRY_DELAY;
 				
 				queue_delayed_work(kaluad_wq, &h->rtpg_work,
-						   h->interval * HZ);
+						   ALUA_RTPG_RETRY_DELAY * HZ);
 				return;
 			}
 			/* Send RTPG on failure or if TUR indicates SUCCESS */
 		}
 		err = alua_rtpg2(sdev);
 
-		/* If RTPG failed on the current device, try using another */
-		#ifdef dsdds
-		if (err == -EBADF &&
-		    (prev_sdev = alua_rtpg_select_sdev(pg)))
-			err = -ETXTBSY;//SCSI_DH_IMM_RETRY;
-		#endif
-
-		if (err == -EAGAIN || err == -ETXTBSY ||
-		    h->flags & ALUA_PG_RUN_RTPG) {
-			if (err == -ETXTBSY)
-				h->interval = 0;
-			else if (!h->interval && !(h->flags & ALUA_PG_RUN_RTPG))
-				h->interval = ALUA_RTPG_RETRY_DELAY;
+		/* -EAGAIN Retry on any other UNIT ATTENTION occurred. */
+		if (err == -EAGAIN || h->flags & ALUA_PG_RUN_RTPG) {
+			if (!interval && !(h->flags & ALUA_PG_RUN_RTPG))
+				interval = ALUA_RTPG_RETRY_DELAY;
 			h->flags |= ALUA_PG_RUN_RTPG;
 			
 			goto queue_rtpg;
@@ -694,7 +684,7 @@ static void alua_rtpg_work(struct work_struct *work)
 		
 		if (err == -EAGAIN || h->flags & ALUA_PG_RUN_RTPG) {
 			h->flags |= ALUA_PG_RUN_RTPG;
-			h->interval = 0;
+			interval = 0;
 			
 			goto queue_rtpg;
 		}
@@ -721,7 +711,7 @@ static void alua_rtpg_work(struct work_struct *work)
 	return;
 
 queue_rtpg:
-	queue_delayed_work(kaluad_wq, &h->rtpg_work, h->interval * HZ);
+	queue_delayed_work(kaluad_wq, &h->rtpg_work, interval * HZ);
 }
 
 /**
