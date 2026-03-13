@@ -90,7 +90,7 @@ struct alua_queue_data {
 static void alua_rtpg_work(struct work_struct *work);
 static bool alua_rtpg_queue(struct scsi_device *sdev,
 			    struct alua_queue_data *qdata, bool force);
-static void alua_check(struct scsi_device *sdev, bool force);
+static void alua_check(struct scsi_device *sdev);
 
 #ifdef oldss
 /*
@@ -207,85 +207,10 @@ static char print_alua_state(unsigned char state)
 }
 #endif
 
-static void alua_handle_state_transition(struct scsi_device *sdev)
-{
-	struct alua_data *alua = sdev->alua;
-
-	WRITE_ONCE(alua->state, SCSI_ACCESS_STATE_TRANSITIONING);
-
-	alua_check(sdev, false);
-}
-
-static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
+static enum scsi_disposition alua_dh_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr)
 {
-	switch (sense_hdr->sense_key) {
-	case NOT_READY:
-		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
-			/*
-			 * LUN Not Accessible - ALUA state transition
-			 */
-			alua_handle_state_transition(sdev);
-			return NEEDS_RETRY;
-		}
-		break;
-	case UNIT_ATTENTION:
-		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
-			/*
-			 * LUN Not Accessible - ALUA state transition
-			 */
-			alua_handle_state_transition(sdev);
-			return NEEDS_RETRY;
-		}
-		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x00) {
-			/*
-			 * Power On, Reset, or Bus Device Reset.
-			 * Might have obscured a state transition,
-			 * so schedule a recheck.
-			 */
-			alua_check(sdev, true);
-			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x04)
-			/*
-			 * Device internal reset
-			 */
-			return ADD_TO_MLQUEUE;
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x01)
-			/*
-			 * Mode Parameters Changed
-			 */
-			return ADD_TO_MLQUEUE;
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x06) {
-			/*
-			 * ALUA state changed
-			 */
-			alua_check(sdev, true);
-			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07) {
-			/*
-			 * Implicit ALUA state transition failed
-			 */
-			alua_check(sdev, true);
-			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x03)
-			/*
-			 * Inquiry data has changed
-			 */
-			return ADD_TO_MLQUEUE;
-		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x0e)
-			/*
-			 * REPORTED_LUNS_DATA_HAS_CHANGED is reported
-			 * when switching controllers on targets like
-			 * Intel Multi-Flex. We can just retry.
-			 */
-			return ADD_TO_MLQUEUE;
-		break;
-	}
-
-	return SCSI_RETURN_NOT_HANDLED;
+	return alua_check_sense(sdev, sense_hdr, alua_check);
 }
 
 #ifdef olddsddsd
@@ -855,9 +780,9 @@ out:
  *
  * Check the device status
  */
-static void alua_check(struct scsi_device *sdev, bool force)
+static void alua_check(struct scsi_device *sdev)
 {
-	alua_rtpg_queue(sdev, NULL, force);
+	alua_rtpg_queue(sdev, NULL, true);
 }
 
 /*
@@ -943,7 +868,7 @@ static struct scsi_device_handler alua_dh = {
 	.attach = alua_bus_attach,
 	.detach = alua_bus_detach,
 	.prep_fn = alua_prep_fn,
-	.check_sense = alua_check_sense,
+	.check_sense = alua_dh_check_sense,
 	.activate = alua_activate,
 	.rescan = alua_rescan,
 	.set_params = alua_set_params,
