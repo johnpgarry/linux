@@ -542,6 +542,7 @@ int scsi_alua_init(struct scsi_device *sdev)
 	}
 	INIT_DELAYED_WORK(&sdev->alua->work, alua_rtpg_work2);
 	sdev->alua->sdev = sdev;
+	sdev->alua->tpgs = scsi_device_tpgs(sdev);
 
 	return 0;
 out_free_data:
