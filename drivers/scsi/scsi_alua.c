@@ -186,7 +186,7 @@ EXPORT_SYMBOL_GPL(alua_tur);
  * submit_rtpg - Issue a REPORT TARGET GROUP STATES command
  * @sdev: sdev the command should be sent to
  */
-int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
+static int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 		       int bufflen, struct scsi_sense_hdr *sshdr,
 		       bool alua_rtpg_ext_hdr_unsupp)
 {
@@ -210,7 +210,6 @@ int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 				ALUA_FAILOVER_TIMEOUT * HZ,
 				ALUA_FAILOVER_RETRIES, &exec_args);
 }
-EXPORT_SYMBOL_GPL(submit_rtpg);
 
 static char print_alua_state(unsigned char state)
 {

@@ -70,9 +70,6 @@ static inline bool alua_any(struct scsi_device *sdev)
 blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req);
 
 int alua_check_tpgs(struct scsi_device *sdev);
-int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
-		       int bufflen, struct scsi_sense_hdr *sshdr,
-		       bool alua_rtpg_ext_hdr_unsupp);
 int alua_tur(struct scsi_device *sdev);
 void alua_print_info(struct scsi_device *sdev, int group_id, int state,
 		int pref, int valid_states);
