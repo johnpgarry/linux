@@ -213,7 +213,7 @@ bool alua_rtpg_queue2(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL_GPL(alua_rtpg_queue2);
 
-int alua_stpg2(struct scsi_device *sdev)
+int alua_stpg2(struct scsi_device *sdev, bool optimize)
 {
 	int retval;
 	struct scsi_sense_hdr sense_hdr;
@@ -221,13 +221,14 @@ int alua_stpg2(struct scsi_device *sdev)
 
 	if (!(alua->tpgs & TPGS_MODE_EXPLICIT)) {
 		/* Only implicit ALUA supported, retry */
+		sdev_printk(KERN_ERR, sdev, "Only implicit ALUA supported in alua_stpg2\n");
 		return -EAGAIN;//SCSI_DH_RETRY;
 	}
 	switch (alua->state) {
 	case SCSI_ACCESS_STATE_OPTIMAL:
 		return 0;
 	case SCSI_ACCESS_STATE_ACTIVE:
-		if (1/*(alua->flags & ALUA_OPTIMIZE_STPG)*/ && //fixme
+		if (optimize &&
 		    !alua->pref &&
 		    (alua->tpgs & TPGS_MODE_IMPLICIT))
 			return 0;
