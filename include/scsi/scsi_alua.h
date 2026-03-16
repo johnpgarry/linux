@@ -39,6 +39,8 @@ int scsi_alua_stpg_run(struct scsi_device *sdev, bool optimize);
 
 blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req);
 
+bool scsi_device_alua_implicit(struct scsi_device *sdev);
+
 int scsi_alua_init(void);
 void scsi_exit_alua(void);
 #else //CONFIG_SCSI_ALUA
@@ -61,6 +63,10 @@ static inline
 blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req)
 {
 	return BLK_STS_OK;
+}
+static inline bool scsi_device_alua_implicit(struct scsi_device *sdev)
+{
+	return false;
 }
 static inline int scsi_alua_sdev_init(struct scsi_device *sdev)
 {
