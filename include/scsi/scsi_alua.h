@@ -8,6 +8,7 @@
 #ifndef _SCSI_ALUA_H
 #define _SCSI_ALUA_H
 
+#include <linux/blk-mq.h>
 #include <scsi/scsi.h>
 
 #ifdef CONFIG_SCSI_ALUA
@@ -36,6 +37,8 @@ int scsi_alua_check_tpgs(struct scsi_device *sdev);
 int scsi_alua_rtpg_run(struct scsi_device *sdev);
 int scsi_alua_stpg_run(struct scsi_device *sdev, bool optimize);
 
+blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req);
+
 int scsi_alua_init(void);
 void scsi_exit_alua(void);
 #else //CONFIG_SCSI_ALUA
@@ -53,6 +56,11 @@ static inline int scsi_alua_rtpg_run(struct scsi_device *sdev)
 }
 static inline int scsi_alua_stpg_run(struct scsi_device *sdev, bool optimize)
 {
+}
+static inline
+blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req)
+{
+	return BLK_STS_OK;
 }
 static inline int scsi_alua_sdev_init(struct scsi_device *sdev)
 {
