@@ -1574,7 +1574,6 @@ static void pg_init_done(void *data, int errors)
 		/* Wait before retrying. */
 		delay_retry = true;
 		fallthrough;
-	case SCSI_DH_IMM_RETRY:
 	case SCSI_DH_RES_TEMP_UNAVAIL:
 		if (pg_init_limit_reached(m, pgpath))
 			fail_path(pgpath);
