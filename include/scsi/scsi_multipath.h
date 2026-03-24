@@ -17,7 +17,7 @@
 #include <scsi/scsi_driver.h>
 
 #ifdef CONFIG_SCSI_MULTIPATH
-#define SCSI_MPATH_DEVICE_ID_LEN 40
+#define SCSI_MPATH_DEVICE_ID_LEN 256
 
 struct scsi_mpath_head {
 	char			wwid[SCSI_MPATH_DEVICE_ID_LEN];
