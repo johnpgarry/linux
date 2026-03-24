@@ -35,6 +35,10 @@ int scsi_alua_tur(struct scsi_device *sdev);
 int scsi_alua_rtpg(struct scsi_device *sdev);
 int scsi_alua_check_tpgs(struct scsi_device *sdev);
 
+enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr,
+					      bool *check);
+
 blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req);
 
 int scsi_alua_init(void);
@@ -52,6 +56,13 @@ static inline int scsi_alua_check_tpgs(struct scsi_device *sdev)
 static inline int scsi_alua_rtpg(struct scsi_device *sdev)
 {
 	return 0;
+}
+static inline
+enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr,
+					      bool *check)
+{
+	return SCSI_RETURN_NOT_HANDLED;
 }
 static inline
 blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req)
