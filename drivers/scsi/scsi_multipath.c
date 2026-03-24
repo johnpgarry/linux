@@ -569,31 +569,29 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 
 	mutex_lock(&scsi_mpath_heads_lock);
 	scsi_mpath_head = scsi_mpath_find_head(sdev->scsi_mpath_dev);
-	if (scsi_mpath_head) {
-		mutex_unlock(&scsi_mpath_heads_lock);
+	if (scsi_mpath_head)
 		goto found;
-	}
 	scsi_mpath_head = scsi_mpath_alloc_head();
-	if (!scsi_mpath_head)
+	if (!scsi_mpath_head) {
+		mutex_unlock(&scsi_mpath_heads_lock);
 		goto out_uninit;
+	}
 
 	strcpy(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str);
 
 	ret = device_add(&scsi_mpath_head->dev);
-	if (ret)
-		goto out_put_head;
-
-	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
-
-	mutex_unlock(&scsi_mpath_heads_lock);
-	sdev->scsi_mpath_dev->scsi_mpath_head = scsi_mpath_head;
-
-found:
-	sdev->scsi_mpath_dev->index = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
-	if (sdev->scsi_mpath_dev->index < 0) {
-		ret = sdev->scsi_mpath_dev->index;
+	if (ret) {
+		mutex_unlock(&scsi_mpath_heads_lock);
 		goto out_put_head;
 	}
+
+	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
+found:
+	mutex_unlock(&scsi_mpath_heads_lock);
+	ret = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
+	if (ret < 0)
+		goto out_put_head;
+	sdev->scsi_mpath_dev->index = ret;
 
 	mutex_lock(&scsi_mpath_head->lock);
 	scsi_mpath_head->dev_count++;
@@ -605,7 +603,6 @@ found:
 out_put_head:
 	scsi_mpath_put_head(scsi_mpath_head);
 out_uninit:
-	mutex_unlock(&scsi_mpath_heads_lock);
 	scsi_multipath_sdev_uninit(sdev);
 	return ret;
 }
