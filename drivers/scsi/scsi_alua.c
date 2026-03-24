@@ -489,6 +489,49 @@ int scsi_alua_rtpg(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL_GPL(scsi_alua_rtpg);
 
+static int scsi_alua_rtpg_run(struct scsi_device *sdev)
+{
+       struct alua_data *alua = sdev->alua;
+       unsigned long flags;
+       int state, err;
+
+       spin_lock_irqsave(&alua->lock, flags);
+       state = alua->state;
+       spin_unlock_irqrestore(&alua->lock, flags);
+
+       if (state == SCSI_ACCESS_STATE_TRANSITIONING) {
+               if (scsi_alua_tur(sdev) == -EAGAIN) {
+                       spin_lock_irqsave(&alua->lock, flags);
+                       alua->interval = ALUA_RTPG_RETRY_DELAY;
+                       spin_unlock_irqrestore(&alua->lock, flags);
+                       return -EAGAIN;
+               }
+               /* Send RTPG on failure or if TUR indicates SUCCESS */
+       }
+
+       err = scsi_alua_rtpg(sdev);
+       spin_lock_irqsave(&alua->lock, flags);
+       if (err == -EAGAIN) {
+               alua->interval = ALUA_RTPG_RETRY_DELAY;
+               spin_unlock_irqrestore(&alua->lock, flags);
+               return -EAGAIN;
+       }
+       spin_unlock_irqrestore(&alua->lock, flags);
+       return 0;
+}
+
+static void alua_rtpg_work(struct work_struct *work)
+{
+	struct alua_data *alua =
+		container_of(work, struct alua_data, work.work);
+	int ret;
+
+	ret = scsi_alua_rtpg_run(alua->sdev);
+
+	if (ret == -EAGAIN)
+		queue_delayed_work(kalua_wq, &alua->work, alua->interval * HZ);
+}
+
 int scsi_alua_sdev_init(struct scsi_device *sdev)
 {
 	int rel_port, ret, tpgs;
@@ -518,6 +561,7 @@ int scsi_alua_sdev_init(struct scsi_device *sdev)
 		goto out_free_data;
 	}
 
+	INIT_DELAYED_WORK(&sdev->alua->work, alua_rtpg_work);
 	sdev->alua->sdev = sdev;
 	sdev->alua->tpgs = tpgs;
 	spin_lock_init(&sdev->alua->lock);
@@ -557,6 +601,14 @@ blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req)
 	}
 }
 EXPORT_SYMBOL_GPL(scsi_alua_prep_fn);
+
+void scsi_device_alua_rescan(struct scsi_device *sdev)
+{
+	struct alua_data *alua = sdev->alua;
+
+	queue_delayed_work(kalua_wq, &alua->work,
+				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS));
+}
 
 int scsi_alua_init(void)
 {

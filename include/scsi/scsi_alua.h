@@ -24,6 +24,7 @@ struct alua_data {
 	unsigned char		transition_tmo;
 	unsigned long		expiry;
 	unsigned long		interval;
+	struct delayed_work	work;
 	struct scsi_device	*sdev;
 	spinlock_t		lock;
 };
@@ -40,6 +41,7 @@ enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
 					      bool *check);
 
 blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req);
+void scsi_device_alua_rescan(struct scsi_device *sdev);
 
 int scsi_alua_init(void);
 void scsi_exit_alua(void);
@@ -68,6 +70,9 @@ static inline
 blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req)
 {
 	return BLK_STS_OK;
+}
+static inline void scsi_device_alua_rescan(struct scsi_device *sdev)
+{
 }
 static inline int scsi_alua_sdev_init(struct scsi_device *sdev)
 {

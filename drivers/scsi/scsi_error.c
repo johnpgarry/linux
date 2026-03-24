@@ -29,6 +29,7 @@
 #include <linux/jiffies.h>
 
 #include <scsi/scsi.h>
+#include <scsi/scsi_alua.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_device.h>
@@ -578,6 +579,15 @@ enum scsi_disposition scsi_check_sense(struct scsi_cmnd *scmd)
 		if (rc != SCSI_RETURN_NOT_HANDLED)
 			return rc;
 		/* handler does not care. Drop down to default handling */
+	} else if (sdev->alua) {
+		enum scsi_disposition rc;
+		bool check = false;
+
+		rc = scsi_alua_check_sense(sdev, &sshdr, &check);
+		if (check)
+			scsi_device_alua_rescan(sdev);
+		if (rc != SCSI_RETURN_NOT_HANDLED)
+			return rc;
 	}
 
 	if (scmd->cmnd[0] == TEST_UNIT_READY &&

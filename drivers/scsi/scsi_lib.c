@@ -27,6 +27,7 @@
 #include <linux/unaligned.h>
 
 #include <scsi/scsi.h>
+#include <scsi/scsi_alua.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_device.h>
@@ -1717,7 +1718,12 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 	if (blk_rq_is_passthrough(req))
 		return scsi_setup_scsi_cmnd(sdev, req);
 
-	if (sdev->handler && sdev->handler->prep_fn) {
+	if (sdev->alua) {
+		blk_status_t ret = scsi_alua_prep_fn(sdev, req);
+
+		if (ret != BLK_STS_OK)
+			return ret;
+	} else if (sdev->handler && sdev->handler->prep_fn) {
 		blk_status_t ret = sdev->handler->prep_fn(sdev, req);
 
 		if (ret != BLK_STS_OK)
