@@ -523,7 +523,6 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 	struct scsi_mpath_head *scsi_mpath_head;
 	int ret;
 
-	mutex_lock(&scsi_mpath_heads_lock);
 	list_for_each_entry(scsi_mpath_head, &scsi_mpath_heads_list, entry) {
 		ret = scsi_mpath_get_head(scsi_mpath_head);
 		if (ret)
@@ -531,8 +530,6 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 		if (strncmp(scsi_mpath_head->wwid,
 			scsi_mpath_dev->device_id_str,
 			SCSI_MPATH_DEVICE_ID_LEN) == 0) {
-
-			mutex_unlock(&scsi_mpath_heads_lock);
 			return scsi_mpath_head;
 		}
 		scsi_mpath_put_head(scsi_mpath_head);
@@ -570,10 +567,12 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 		goto out_uninit;
 	}
 
+	mutex_lock(&scsi_mpath_heads_lock);
 	scsi_mpath_head = scsi_mpath_find_head(sdev->scsi_mpath_dev);
-	if (scsi_mpath_head)
+	if (scsi_mpath_head) {
+		mutex_unlock(&scsi_mpath_heads_lock);
 		goto found;
-	/* scsi_mpath_disks_list lock held */
+	}
 	scsi_mpath_head = scsi_mpath_alloc_head();
 	if (!scsi_mpath_head)
 		goto out_uninit;
