@@ -90,20 +90,12 @@ static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 	return 0;
 }
 
-static void scsi_mpath_delete_head(struct scsi_mpath_head *scsi_mpath_head)
-{
-	mutex_lock(&scsi_mpath_heads_lock);
-	list_del_init(&scsi_mpath_head->entry);
-	mutex_unlock(&scsi_mpath_heads_lock);
-}
-
 static void scsi_mpath_head_release(struct device *dev)
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
-	scsi_mpath_delete_head(scsi_mpath_head);
 	bioset_exit(&scsi_mpath_head->bio_pool);
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
 	mpath_put_head(mpath_head);
@@ -481,7 +473,6 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 		return NULL;
 
 	ida_init(&scsi_mpath_head->ida);
-	mutex_init(&scsi_mpath_head->lock);
 
 	if (bioset_init(&scsi_mpath_head->bio_pool, BIO_POOL_SIZE,
 			0, BIOSET_PERCPU_CACHE))
@@ -547,6 +538,7 @@ static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
+	bool last_path = false;
 	int ret;
 
 	if (scsi_multipath == SCSI_MULTIPATH_OFF)
@@ -588,19 +580,25 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 
 	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
 found:
+	scsi_mpath_head->dev_count++;
 	mutex_unlock(&scsi_mpath_heads_lock);
 	ret = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
 	if (ret < 0)
-		goto out_put_head;
+		goto out_dec_count;
 	sdev->scsi_mpath_dev->index = ret;
-
-	mutex_lock(&scsi_mpath_head->lock);
-	scsi_mpath_head->dev_count++;
-	mutex_unlock(&scsi_mpath_head->lock);
 
 	sdev->scsi_mpath_dev->scsi_mpath_head = scsi_mpath_head;
 	return 0;
-
+out_dec_count:
+	mutex_lock(&scsi_mpath_heads_lock);
+	scsi_mpath_head->dev_count--;
+	if (scsi_mpath_head->dev_count == 0) {
+		last_path = true;
+		list_del_init(&scsi_mpath_head->entry);
+	}
+	mutex_unlock(&scsi_mpath_heads_lock);
+	if (last_path)
+		device_del(&scsi_mpath_head->dev);
 out_put_head:
 	scsi_mpath_put_head(scsi_mpath_head);
 out_uninit:
@@ -614,11 +612,13 @@ static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 			scsi_mpath_dev->scsi_mpath_head;
 	bool last_path = false;
 
-	mutex_lock(&scsi_mpath_head->lock);
+	mutex_lock(&scsi_mpath_heads_lock);
 	scsi_mpath_head->dev_count--;
-	if (scsi_mpath_head->dev_count == 0)
+	if (scsi_mpath_head->dev_count == 0) {
 		last_path = true;
-	mutex_unlock(&scsi_mpath_head->lock);
+		list_del_init(&scsi_mpath_head->entry);
+	}
+	mutex_unlock(&scsi_mpath_heads_lock);
 
 	if (last_path)
 		device_del(&scsi_mpath_head->dev);
