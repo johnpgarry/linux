@@ -4312,7 +4312,7 @@ static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_device *sdp)
 		scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
 		mpath_head = scsi_mpath_head->mpath_head;
 
-		if (strncmp(scsi_mpath_head->wwid,
+		if (strncmp(scsi_mpath_head->vpd_id,
 			scsi_mpath_dev->device_id_str,
 			SCSI_MPATH_DEVICE_ID_LEN) == 0) {
 

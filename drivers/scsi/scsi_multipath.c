@@ -103,17 +103,17 @@ static void scsi_mpath_head_release(struct device *dev)
 	kfree(scsi_mpath_head);
 }
 
-static ssize_t scsi_mpath_device_wwid_show(struct device *dev,
+static ssize_t scsi_mpath_device_vpd_id_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
 
-	return sysfs_emit(buf, "%s\n", scsi_mpath_head->wwid);
+	return sysfs_emit(buf, "%s\n", scsi_mpath_head->vpd_id);
 }
 
-static DEVICE_ATTR(wwid, S_IRUGO, scsi_mpath_device_wwid_show, NULL);
+static DEVICE_ATTR(vpd_id, S_IRUGO, scsi_mpath_device_vpd_id_show, NULL);
 
 void scsi_mpath_dev_clear_path(struct scsi_mpath_device *scsi_mpath_dev)
 {
@@ -154,7 +154,7 @@ static DEVICE_ATTR(iopolicy, S_IRUGO | S_IWUSR,
 		scsi_mpath_device_iopolicy_show, scsi_mpath_device_iopolicy_store);
 
 static struct attribute *scsi_mpath_device_attrs[] = {
-	&dev_attr_wwid.attr,
+	&dev_attr_vpd_id.attr,
 	&dev_attr_iopolicy.attr,
 	NULL
 };
@@ -549,7 +549,7 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 		ret = scsi_mpath_get_head(scsi_mpath_head);
 		if (ret)
 			continue;
-		if (strncmp(scsi_mpath_head->wwid,
+		if (strncmp(scsi_mpath_head->vpd_id,
 			scsi_mpath_dev->device_id_str,
 			SCSI_MPATH_DEVICE_ID_LEN) == 0) {
 			return scsi_mpath_head;
@@ -600,7 +600,7 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 		goto out_uninit;
 	}
 
-	strscpy(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str,
+	strscpy(scsi_mpath_head->vpd_id, sdev->scsi_mpath_dev->device_id_str,
 			SCSI_MPATH_DEVICE_ID_LEN);
 
 	ret = device_add(&scsi_mpath_head->dev);

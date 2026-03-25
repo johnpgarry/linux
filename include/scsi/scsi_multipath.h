@@ -20,7 +20,7 @@
 #define SCSI_MPATH_DEVICE_ID_LEN 256
 
 struct scsi_mpath_head {
-	char			wwid[SCSI_MPATH_DEVICE_ID_LEN];
+	char			vpd_id[SCSI_MPATH_DEVICE_ID_LEN];
 	struct list_head	entry;
 	int			dev_count;
 	struct ida		ida;
