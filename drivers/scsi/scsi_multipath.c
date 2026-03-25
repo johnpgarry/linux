@@ -577,7 +577,8 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 		goto out_uninit;
 	}
 
-	strcpy(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str);
+	strscpy(scsi_mpath_head->wwid, sdev->scsi_mpath_dev->device_id_str,
+			SCSI_MPATH_DEVICE_ID_LEN);
 
 	ret = device_add(&scsi_mpath_head->dev);
 	if (ret) {
