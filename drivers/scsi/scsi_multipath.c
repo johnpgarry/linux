@@ -176,13 +176,7 @@ static bool scsi_multipath_sysfs_group_visible(struct kobject *kobj)
 {
 	return true;
 }
-
-static bool scsi_multipath_sysfs_attr_visible(struct kobject *kobj,
-		struct attribute *attr, int n)
-{
-	return false;
-}
-DEFINE_SYSFS_GROUP_VISIBLE(scsi_multipath_sysfs)
+DEFINE_SIMPLE_SYSFS_GROUP_VISIBLE(scsi_multipath_sysfs)
 
 static const struct attribute_group scsi_mpath_attr_group = {
 	.name           = "multipath",
