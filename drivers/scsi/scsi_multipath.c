@@ -303,8 +303,8 @@ static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 	unsigned char access_state = READ_ONCE(sdev->access_state);
 
-	if (sdev->sdev_state == SDEV_RUNNING)
-		return false;
+	if (sdev->sdev_state != SDEV_RUNNING)
+		return true;
 
 	if (access_state == SCSI_ACCESS_STATE_OPTIMAL ||
 	    access_state == SCSI_ACCESS_STATE_ACTIVE)
