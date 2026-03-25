@@ -726,6 +726,7 @@ void scsi_mpath_failover_req(struct request *req)
 	struct mpath_head *mpath_head = drv->to_mpath_head(req);
 	unsigned long flags;
 
+	pr_err("%s req=%pS req->bio=%pS scmd=%pS scsi_mpath_dev=%pS\n", __func__, req, req->bio, scmd, scsi_mpath_dev);
 	scsi_mpath_dev_clear_path(scsi_mpath_dev);
 
 	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
@@ -754,7 +755,11 @@ static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
 int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 {
 	struct request *req = scsi_cmd_to_rq(scmd);
+	struct scsi_device *sdev = scmd->device;
 
+	pr_err("%s scmd=%pS req=%pS scsi_is_mpath_error=%d sdev_state=%d queue_dying=%d\n",
+				__func__, scmd, req, scsi_is_mpath_error(scmd), sdev->sdev_state,
+				blk_queue_dying(req->q));
 	if (is_mpath_request(req)) {
 		if (scsi_is_mpath_error(scmd) ||
 		    blk_queue_dying(req->q))

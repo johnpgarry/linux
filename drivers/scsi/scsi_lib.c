@@ -1577,6 +1577,8 @@ static void scsi_complete(struct request *rq)
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 		break;
 	case FAILOVER:
+		pr_err("%s FAILOVER rq=%pS cmd=%pS calling scsi_mpath_failover_req\n",
+			__func__, rq, cmd);
 		scsi_mpath_failover_req(rq);
 		break;
 	default:
@@ -1952,6 +1954,8 @@ out_put_budget:
 			scsi_mq_uninit_cmd(cmd);
 		scsi_run_queue_async(sdev);
 		if (!scsi_device_online(sdev) && scsi_is_mpath_request(req)) {
+			pr_err("%s !online req=%pS sdev=%pS cmd=%pS calling scsi_mpath_failover_req sdev=%pS \n",
+				__func__, req, sdev, cmd, sdev);
 			scsi_mpath_failover_req(req);
 			return 0;
 		}

@@ -1942,8 +1942,11 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 	 * up to the top level.
 	 */
 	if (!scsi_device_online(scmd->device)) {
-		if (scsi_is_mpath_request(req))
+		if (scsi_is_mpath_request(req)) {
+			pr_err("%s scmd=%pS req=%pS calling scsi_mpath_failover_disposition\n",
+				__func__, scmd, req);
 			return scsi_mpath_failover_disposition(scmd);
+		}
 
 		SCSI_LOG_ERROR_RECOVERY(5, scmd_printk(KERN_INFO, scmd,
 			"%s: device offline - report as SUCCESS\n", __func__));
@@ -2112,8 +2115,12 @@ maybe_retry:
 	 * For SCSI Multipath check if there are path errors to
 	 * trigger failover to available path
 	 */
-	if (scsi_is_mpath_request(req))
-		return scsi_mpath_failover_disposition(scmd);
+	if (scsi_is_mpath_request(req)) {
+	//	pr_err("%s maybe_retry: calling scsi_mpath_failover_disposition req=%pS scmd=%pS\n",
+	//		__func__, req, scmd);
+		WARN_ON_ONCE(1);
+	//	return scsi_mpath_failover_disposition(scmd);
+	}
 
 	/* we requeue for retry because the error was retryable, and
 	 * the request was not marked fast fail.  Note that above,
