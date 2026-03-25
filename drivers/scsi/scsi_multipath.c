@@ -259,7 +259,7 @@ static struct bio *scsi_mpath_clone_bio(struct bio *bio)
 	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
 	struct bio *clone;
 
-	clone = bio_alloc_clone(bio->bi_bdev, bio, GFP_NOWAIT,
+	clone = bio_alloc_clone(bio->bi_bdev, bio, GFP_NOIO,
 				&scsi_mpath_head->bio_pool);
 	if (!clone)
 		return NULL;
