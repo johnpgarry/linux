@@ -1943,9 +1943,9 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 	 */
 	if (!scsi_device_online(scmd->device)) {
 		if (scsi_is_mpath_request(req)) {
-			pr_err("%s scmd=%pS req=%pS calling scsi_mpath_failover_disposition\n",
-				__func__, scmd, req);
-			return scsi_mpath_failover_disposition(scmd);
+		//	pr_err("%s scmd=%pS req=%pS calling scsi_mpath_failover_disposition\n",
+		//		__func__, scmd, req);
+		//	return scsi_mpath_failover_disposition(scmd);
 		}
 
 		SCSI_LOG_ERROR_RECOVERY(5, scmd_printk(KERN_INFO, scmd,
@@ -2116,9 +2116,9 @@ maybe_retry:
 	 * trigger failover to available path
 	 */
 	if (scsi_is_mpath_request(req)) {
-	//	pr_err("%s maybe_retry: calling scsi_mpath_failover_disposition req=%pS scmd=%pS\n",
-	//		__func__, req, scmd);
-		WARN_ON_ONCE(1);
+		pr_err("%s maybe_retry: not calling scsi_mpath_failover_disposition req=%pS scmd=%pS\n",
+			__func__, req, scmd);
+	//	WARN_ON_ONCE(1);
 	//	return scsi_mpath_failover_disposition(scmd);
 	}
 
@@ -2127,6 +2127,12 @@ maybe_retry:
 	 * even if the request is marked fast fail, we still requeue
 	 * for queue congestion conditions (QUEUE_FULL or BUSY) */
 	if (scsi_cmd_retry_allowed(scmd) && !scsi_noretry_cmd(scmd)) {
+		if (scsi_is_mpath_request(req)) {
+			pr_err("%s2 maybe_retry: scsi_cmd_retry_allowed=%d scsi_noretry_cmd=%d req=%pS scmd=%pS\n",
+				__func__, scsi_cmd_retry_allowed(scmd), scsi_noretry_cmd(scmd), req, scmd);
+		//	WARN_ON_ONCE(1);
+		//	return scsi_mpath_failover_disposition(scmd);
+		}
 		return NEEDS_RETRY;
 	} else {
 		/*

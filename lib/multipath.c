@@ -842,11 +842,11 @@ void mpath_requeue_work(struct work_struct *work)
 	next = bio_list_get(&mpath_head->requeue_list);
 	spin_unlock_irq(&mpath_head->requeue_lock);
 
-	pr_err("%s next=%pS\n", __func__, next);
+	//pr_err("%s next=%pS\n", __func__, next);
 	while ((bio = next) != NULL) {
 		next = bio->bi_next;
 		bio->bi_next = NULL;
-		pr_err("%s2 bio=%pS calling submit_bio_noacct\n", __func__, bio);
+	//	pr_err("%s2 bio=%pS calling submit_bio_noacct\n", __func__, bio);
 		submit_bio_noacct(bio);
 	}
 }

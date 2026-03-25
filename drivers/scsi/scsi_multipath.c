@@ -244,11 +244,128 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	return 0;
 }
 
+static inline void bio_list_add_clone_master(struct bio_list *bl,
+				struct bio *clone)
+{
+	struct bio *master_bio;
+
+	pr_err("%s clone=%pS ->bi_private=%pS ->bi_next=%pS\n",
+		__func__, clone, clone->bi_private, clone->bi_next);
+	if (clone->bi_next)
+		bio_list_add_clone_master(bl, clone->bi_next);
+
+	master_bio = clone->bi_private;
+//	pr_err("%s2 clone=%pS master_bio=%pS bl->tail=%pS\n",
+//		__func__, clone, master_bio, bl->tail);
+
+	if (bl->tail)
+		bl->tail->bi_next = master_bio;
+	else
+		bl->head = master_bio;
+//	pr_err("%s3 clone=%pS master_bio=%pS bl->tail=%pS\n",
+//			__func__, clone, master_bio, bl->tail);
+	bl->tail = master_bio;
+//	pr_err("%s4 clone=%pS master_bio=%pS bl->tail=%pS\n",
+//			__func__, clone, master_bio, bl->tail);
+	bio_put(clone);
+//	pr_err("%s5 clone=%pS\n",
+//			__func__, clone);
+}
+
+
+
+static inline void bio_list_add_clone_master_new(struct bio_list *bl,
+				struct bio *clone)
+{
+	struct bio *master_bio;
+
+	pr_err("%s clone=%pS ->bi_private=%pS ->bi_next=%pS\n",
+		__func__, clone, clone->bi_private, clone->bi_next);
+
+	master_bio = clone->bi_private;
+//	pr_err("%s2 clone=%pS master_bio=%pS bl->tail=%pS\n",
+//		__func__, clone, master_bio, bl->tail);
+
+	if (bl->tail)
+		bl->tail->bi_next = master_bio;
+	else
+		bl->head = master_bio;
+//	pr_err("%s3 clone=%pS master_bio=%pS bl->tail=%pS\n",
+//			__func__, clone, master_bio, bl->tail);
+	bl->tail = master_bio;
+//	pr_err("%s4 clone=%pS master_bio=%pS bl->tail=%pS\n",
+//			__func__, clone, master_bio, bl->tail);
+	bio_put(clone);
+//	pr_err("%s5 clone=%pS\n",
+//			__func__, clone);
+}
+
+void scsi_mpath_failover_req(struct request *req)
+{
+	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
+	struct scsi_device *sdev = scmd->device;
+	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
+	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct mpath_head *mpath_head = drv->to_mpath_head(req);
+	unsigned long flags;
+
+	pr_err("%s req=%pS req->bio=%pS scmd=%pS scsi_mpath_dev=%pS\n", __func__, req, req->bio, scmd, scsi_mpath_dev);
+	scsi_mpath_dev_clear_path(scsi_mpath_dev);
+
+	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
+	bio_list_add_clone_master(&mpath_head->requeue_list, req->bio);
+	spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
+	req->bio = NULL;
+	req->biotail = NULL;
+	req->__data_len = 0;
+
+	/* End old request with clone detached */
+	scmd->result = 0;
+	blk_mq_end_request(req, 0);
+
+	mpath_schedule_requeue_work(mpath_head);
+}
+
 static void scsi_mpath_clone_end_io(struct bio *clone)
 {
 	struct bio *master_bio = clone->bi_private;
 
 	master_bio->bi_status = clone->bi_status;
+
+	if (clone->bi_status && blk_path_error(clone->bi_status)) {
+		struct block_device *bi_bdev = clone->bi_bdev;
+		struct request_queue *q = bi_bdev->bd_queue;
+		struct scsi_device *sdev = scsi_device_from_queue(q);
+		struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+		struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+		struct mpath_head *mpath_head = mpath_device->mpath_head;
+		unsigned long flags;
+
+		pr_err("%s clone=%pS master_bio=%pS bi_status=%d blk_path_error=%d sdev=%pS sdev_state=%d\n",
+			__func__, clone, master_bio, master_bio->bi_status, blk_path_error(master_bio->bi_status), sdev, sdev->sdev_state);
+
+	//	WARN_ON_ONCE(1);
+	//	#ifdef dsdsds
+		pr_err("%s2 scsi_mpath_dev=%pS mpath_head=%pS clone=%pS\n",
+			__func__, scsi_mpath_dev, mpath_head, clone);
+		scsi_mpath_dev_clear_path(scsi_mpath_dev);
+
+		spin_lock_irqsave(&mpath_head->requeue_lock, flags);
+		bio_list_add_clone_master_new(&mpath_head->requeue_list, clone);
+		spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
+		//req->bio = NULL;
+		//req->biotail = NULL;
+		//req->__data_len = 0;
+
+		/* End old request with clone detached */
+		//scmd->result = 0;
+		//blk_mq_end_request(req, 0);
+
+		mpath_schedule_requeue_work(mpath_head);
+		return;
+	//	#endif
+	}
+
 	bio_put(clone);
 	bio_endio(master_bio);
 }
@@ -697,52 +814,6 @@ bool scsi_is_mpath_request(struct request *req)
 }
 EXPORT_SYMBOL_GPL(scsi_is_mpath_request);
 
-static inline void bio_list_add_clone_master(struct bio_list *bl,
-				struct bio *clone)
-{
-	struct bio *master_bio;
-
-	if (clone->bi_next)
-		bio_list_add_clone_master(bl, clone->bi_next);
-
-	master_bio = clone->bi_private;
-
-	if (bl->tail)
-		bl->tail->bi_next = master_bio;
-	else
-		bl->head = master_bio;
-
-	bl->tail = master_bio;
-
-	bio_put(clone);
-}
-
-void scsi_mpath_failover_req(struct request *req)
-{
-	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
-	struct scsi_device *sdev = scmd->device;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	struct mpath_head *mpath_head = drv->to_mpath_head(req);
-	unsigned long flags;
-
-	pr_err("%s req=%pS req->bio=%pS scmd=%pS scsi_mpath_dev=%pS\n", __func__, req, req->bio, scmd, scsi_mpath_dev);
-	scsi_mpath_dev_clear_path(scsi_mpath_dev);
-
-	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
-	bio_list_add_clone_master(&mpath_head->requeue_list, req->bio);
-	spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
-	req->bio = NULL;
-	req->biotail = NULL;
-	req->__data_len = 0;
-
-	/* End old request with clone detached */
-	scmd->result = 0;
-	blk_mq_end_request(req, 0);
-
-	mpath_schedule_requeue_work(mpath_head);
-}
-
 static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
 {
 	struct scsi_device *sdev = scmd->device;
@@ -762,8 +833,10 @@ int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
 				blk_queue_dying(req->q));
 	if (is_mpath_request(req)) {
 		if (scsi_is_mpath_error(scmd) ||
-		    blk_queue_dying(req->q))
+		    blk_queue_dying(req->q)) {
+			BUG();
 			return FAILOVER;
+		}
 		return NEEDS_RETRY;
 	} else {
 		if (blk_queue_dying(req->q))

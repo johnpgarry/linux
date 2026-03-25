@@ -1954,10 +1954,10 @@ out_put_budget:
 			scsi_mq_uninit_cmd(cmd);
 		scsi_run_queue_async(sdev);
 		if (!scsi_device_online(sdev) && scsi_is_mpath_request(req)) {
-			pr_err("%s !online req=%pS sdev=%pS cmd=%pS calling scsi_mpath_failover_req sdev=%pS \n",
-				__func__, req, sdev, cmd, sdev);
-			scsi_mpath_failover_req(req);
-			return 0;
+			pr_err("%s !online req=%pS sdev=%pS cmd=%pS calling scsi_mpath_failover_req sdev=%pS ret=%d\n",
+				__func__, req, sdev, cmd, sdev, ret);
+			//scsi_mpath_failover_req(req);
+			//return 0;
 		}
 		break;
 	}
