@@ -307,9 +307,13 @@ static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 	struct scsi_mpath_device *scsi_mpath_dev =
 				to_scsi_mpath_device(mpath_device);
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	enum scsi_device_state sdev_state = sdev->sdev_state;
+	unsigned char access_state = READ_ONCE(sdev->access_state);
 
-	if (sdev_state == SDEV_RUNNING || sdev_state == SDEV_CANCEL)
+	if (sdev->sdev_state == SDEV_RUNNING)
+		return false;
+
+	if (access_state == SCSI_ACCESS_STATE_OPTIMAL ||
+	    access_state == SCSI_ACCESS_STATE_ACTIVE)
 		return false;
 
 	return true;
@@ -317,21 +321,48 @@ static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 
 static bool scsi_mpath_is_optimized(struct mpath_device *mpath_device)
 {
-	if (scsi_mpath_is_disabled(mpath_device))
-		return false;
-	return true;
-}
+	struct scsi_mpath_device *scsi_mpath_dev =
+				to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 
+	if (sdev->sdev_state != SDEV_RUNNING)
+		return false;
+
+	return READ_ONCE(sdev->access_state) == SCSI_ACCESS_STATE_OPTIMAL;
+}
+#ifdef dsdds
+	SDEV_CREATED = 1,	/* device created but not added to sysfs
+				 * Only internal commands allowed (for inq) */
+	SDEV_RUNNING,		/* device properly configured
+				 * All commands allowed */
+	SDEV_CANCEL,		/* beginning to delete device
+				 * Only error handler commands allowed */
+	SDEV_DEL,		/* device deleted 
+				 * no commands allowed */
+	SDEV_QUIESCE,		/* Device quiescent.  No block commands
+				 * will be accepted, only specials (which
+				 * originate in the mid-layer) */
+	SDEV_OFFLINE,		/* Device offlined (by error handling or
+				 * user request */
+	SDEV_TRANSPORT_OFFLINE,	/* Offlined by transport class error handler */
+	SDEV_BLOCK,		/* Device blocked by scsi lld.  No
+				 * scsi commands from user or midlayer
+				 * should be issued to the scsi
+				 * lld. */
+	SDEV_CREATED_BLOCK,	/* same as above but for created devices */
+#endif
 static bool scsi_mpath_available_path(struct mpath_device *mpath_device)
 {
 	struct scsi_mpath_device *scsi_mpath_dev =
 				to_scsi_mpath_device(mpath_device);
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	enum scsi_device_state sdev_state = sdev->sdev_state;
 
-	if (scsi_device_blocked(sdev))
-		return false;
+	if (sdev_state == SDEV_RUNNING || sdev_state == SDEV_QUIESCE ||
+		sdev_state == SDEV_BLOCK || sdev_state == SDEV_CREATED_BLOCK)
+		return true;
 
-	return scsi_device_online(sdev);
+	return false;
 }
 
 static int scsi_mpath_pr_register(struct mpath_device *mpath_device,
