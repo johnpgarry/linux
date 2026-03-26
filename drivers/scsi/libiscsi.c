@@ -43,7 +43,7 @@ MODULE_PARM_DESC(debug_libiscsi_session,
 		 "Turn on debugging for sessions in libiscsi module. "
 		 "Set to 1 to turn on, and zero to turn off. Default is off.");
 
-static int iscsi_dbg_lib_eh;
+static int iscsi_dbg_lib_eh = 1;
 module_param_named(debug_libiscsi_eh, iscsi_dbg_lib_eh, int,
 		   S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug_libiscsi_eh,
@@ -2335,6 +2335,7 @@ static void iscsi_prep_abort_task_pdu(struct iscsi_task *task,
 				      struct iscsi_tm *hdr)
 {
 	memset(hdr, 0, sizeof(*hdr));
+	pr_err("%s task=%pS ISCSI_TM_FUNC_ABORT_TASK\n", __func__, task);
 	hdr->opcode = ISCSI_OP_SCSI_TMFUNC | ISCSI_OP_IMMEDIATE;
 	hdr->flags = ISCSI_TM_FUNC_ABORT_TASK & ISCSI_FLAG_TM_FUNC_MASK;
 	hdr->flags |= ISCSI_FLAG_CMD_FINAL;
@@ -2352,6 +2353,7 @@ int iscsi_eh_abort(struct scsi_cmnd *sc)
 	struct iscsi_tm *hdr;
 	int age;
 
+	pr_err("%s sc=%pS\n", __func__, sc);
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
 
@@ -3441,7 +3443,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	 * flush queues.
 	 */
 	spin_lock_bh(&session->frwd_lock);
-	pr_err("%s called fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
+	pr_err("%s calling fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
 		__func__);
 	fail_scsi_tasks(conn, -1, DID_TRANSPORT_DISRUPTED);
 	fail_mgmt_tasks(session, conn);

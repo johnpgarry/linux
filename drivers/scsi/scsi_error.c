@@ -349,6 +349,9 @@ enum blk_eh_timer_return scsi_timeout(struct request *req)
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct Scsi_Host *host = scmd->device->host;
 
+	pr_err("%s req=%pS blk_rq_pos=%lld bytes=%d\n",
+		__func__, req, blk_rq_pos(req), blk_rq_bytes(req));
+
 	trace_scsi_dispatch_cmd_timeout(scmd);
 	scsi_log_completion(scmd, TIMEOUT_ERROR);
 
@@ -2004,8 +2007,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		goto maybe_retry;
 	case DID_IMM_RETRY:
-		pr_err("%s0.1 DID_IMM_RETRY req=%pS scmd=%pS\n",
-			__func__, req, scmd);
+		pr_err("%s0.1 DID_IMM_RETRY req=%pS blk_rq_pos=%lld scmd=%pS\n",
+			__func__, req, blk_rq_pos(req), scmd);
 		return NEEDS_RETRY;
 
 	case DID_REQUEUE:
