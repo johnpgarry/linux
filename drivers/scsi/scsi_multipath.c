@@ -624,6 +624,7 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 		goto out_bioset_exit;
 	scsi_mpath_head->mpath_head->mpdt = &smpdt_pr;
 	scsi_mpath_head->mpath_head->drvdata = scsi_mpath_head;
+	scsi_mpath_head->mpath_head->drv_module = THIS_MODULE;
 
 	scsi_mpath_head->index = ida_alloc(&scsi_multipath_dev_ida, GFP_KERNEL);
 	if (scsi_mpath_head->index < 0)

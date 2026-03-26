@@ -909,6 +909,7 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	}
 
 	mpath_head->drvdata = head;
+	mpath_head->drv_module = THIS_MODULE;
 	head->mpath_head = mpath_head;
 	mpath_head->parent = &subsys->dev;
 	mpath_head->mpdt = &mpdt;
