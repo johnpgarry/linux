@@ -244,6 +244,18 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	return 0;
 }
 
+blk_status_t scsi_mpath_setup_scsi_cmnd(struct scsi_cmnd *scmd)
+{
+	switch (scmd->cmnd[0]) {
+	/* Special handling required which is not yet supported */
+	case PERSISTENT_RESERVE_IN:
+	case PERSISTENT_RESERVE_OUT:
+		pr_err("%s scmd=%pS BLK_STS_NOTSUPP\n", __func__, scmd);
+		return BLK_STS_NOTSUPP;
+	}
+	return BLK_STS_OK;
+}
+
 static inline void bio_list_add_clone_master(struct bio_list *bl,
 				struct bio *clone)
 {

@@ -2099,8 +2099,8 @@ static int sd_pr_in_command(struct block_device *bdev, u8 sa,
 	};
 	int result;
 
-	if (is_mpath_head(bdev->bd_disk))
-		return -EOPNOTSUPP;
+	//if (sdev->scsi_mpath_dev)
+	//	return -EOPNOTSUPP;
 
 	put_unaligned_be16(data_len, &cmd[7]);
 
@@ -2216,8 +2216,8 @@ static int sd_pr_out_command(struct block_device *bdev, u8 sa, u64 key,
 	u8 cmd[16] = { 0, };
 	u8 data[24] = { 0, };
 
-	if (is_mpath_head(bdev->bd_disk))
-		return -EOPNOTSUPP;
+	//if (sdev->scsi_mpath_dev)
+	//	return -EOPNOTSUPP;
 
 	cmd[0] = PERSISTENT_RESERVE_OUT;
 	cmd[1] = sa;
