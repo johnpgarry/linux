@@ -476,105 +476,6 @@ static bool scsi_mpath_available_path(struct mpath_device *mpath_device)
 	return false;
 }
 
-static int scsi_mpath_pr_register(struct mpath_device *mpath_device,
-			u64 old_key, u64 new_key, u32 flags)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-
-	if (!drv->mpath_pr_ops)
-		return -EOPNOTSUPP;
-
-	return drv->mpath_pr_ops->pr_register(sdev, old_key, new_key, flags);
-}
-
-static int scsi_mpath_pr_reserve(struct mpath_device *mpath_device, u64 key,
-			enum pr_type type, u32 flags)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-
-	if (!drv->mpath_pr_ops)
-		return -EOPNOTSUPP;
-
-	return drv->mpath_pr_ops->pr_reserve(sdev, key, type, flags);
-}
-
-static int scsi_mpath_pr_release(struct mpath_device *mpath_device, u64 key,
-			enum pr_type type)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-
-	if (!drv->mpath_pr_ops)
-		return -EOPNOTSUPP;
-
-	return drv->mpath_pr_ops->pr_release(sdev, key, type);
-}
-
-static int scsi_mpath_pr_preempt(struct mpath_device *mpath_device,
-			u64 old_key, u64 new_key, enum pr_type type,
-			bool abort)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-
-	if (!drv->mpath_pr_ops)
-		return -EOPNOTSUPP;
-
-	return drv->mpath_pr_ops->pr_preempt(sdev, old_key, new_key,
-			type, abort);
-}
-
-static int scsi_mpath_pr_clear(struct mpath_device *mpath_device, u64 key)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-
-	if (!drv->mpath_pr_ops)
-		return -EOPNOTSUPP;
-
-	return drv->mpath_pr_ops->pr_clear(sdev, key);
-}
-
-static int scsi_mpath_pr_read_keys(struct mpath_device *mpath_device,
-				struct pr_keys *keys_info)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-
-	if (!drv->mpath_pr_ops)
-		return -EOPNOTSUPP;
-
-	return drv->mpath_pr_ops->pr_read_keys(sdev, keys_info);
-}
-
-static int scsi_mpath_pr_read_reservation(struct mpath_device *mpath_device,
-				  struct pr_held_reservation *rsv)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-
-	if (!drv->mpath_pr_ops)
-		return -EOPNOTSUPP;
-
-	return drv->mpath_pr_ops->pr_read_reservation(sdev, rsv);
-}
-
 static int scsi_mpath_get_nr_active(struct mpath_device *mpath_device)
 {
 	struct scsi_mpath_device *scsi_mpath_dev =
@@ -583,16 +484,6 @@ static int scsi_mpath_get_nr_active(struct mpath_device *mpath_device)
 	return atomic_read(&scsi_mpath_dev->nr_active);
 }
 
-static const struct mpath_pr_ops scsi_mpath_pr_ops = {
-	.pr_register	= scsi_mpath_pr_register,
-	.pr_reserve	= scsi_mpath_pr_reserve,
-	.pr_release	= scsi_mpath_pr_release,
-	.pr_preempt	= scsi_mpath_pr_preempt,
-	.pr_clear	= scsi_mpath_pr_clear,
-	.pr_read_keys	= scsi_mpath_pr_read_keys,
-	.pr_read_reservation = scsi_mpath_pr_read_reservation,
-};
-
 struct mpath_head_template smpdt_pr = {
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
@@ -600,7 +491,6 @@ struct mpath_head_template smpdt_pr = {
 	.available_path = scsi_mpath_available_path,
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.clone_bio = scsi_mpath_clone_bio,
-	.pr_ops = &scsi_mpath_pr_ops,
 	.device_groups = mpath_device_groups,
 	.get_nr_active = scsi_mpath_get_nr_active,
 };

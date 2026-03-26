@@ -2073,9 +2073,10 @@ static int sd_scsi_to_pr_err(struct scsi_sense_hdr *sshdr, int result)
 	}
 }
 
-static int sd_pr_in_command(struct scsi_disk *sdkp, u8 sa,
+static int sd_pr_in_command(struct block_device *bdev, u8 sa,
 			    unsigned char *data, int data_len)
 {
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
 	struct scsi_device *sdev = sdkp->device;
 	struct scsi_sense_hdr sshdr;
 	u8 cmd[10] = { PERSISTENT_RESERVE_IN, sa };
@@ -2098,6 +2099,9 @@ static int sd_pr_in_command(struct scsi_disk *sdkp, u8 sa,
 	};
 	int result;
 
+	if (is_mpath_head(bdev->bd_disk))
+		return -EOPNOTSUPP;
+
 	put_unaligned_be16(data_len, &cmd[7]);
 
 	result = scsi_execute_cmd(sdev, cmd, REQ_OP_DRV_IN, data, data_len,
@@ -2114,8 +2118,7 @@ static int sd_pr_in_command(struct scsi_disk *sdkp, u8 sa,
 	return sd_scsi_to_pr_err(&sshdr, result);
 }
 
-static int sd_pr_read_keys_disk(struct scsi_disk *sdkp,
-			struct pr_keys *keys_info)
+static int sd_pr_read_keys(struct block_device *bdev, struct pr_keys *keys_info)
 {
 	int result, i, data_offset, num_copy_keys;
 	u32 num_keys = keys_info->num_keys;
@@ -2136,7 +2139,7 @@ static int sd_pr_read_keys_disk(struct scsi_disk *sdkp,
 	if (!data)
 		return -ENOMEM;
 
-	result = sd_pr_in_command(sdkp, READ_KEYS, data, data_len);
+	result = sd_pr_in_command(bdev, READ_KEYS, data, data_len);
 	if (result)
 		goto free_data;
 
@@ -2156,22 +2159,15 @@ free_data:
 	return result;
 }
 
-static int sd_pr_read_keys(struct block_device *bdev,
-			struct pr_keys *keys_info)
-{
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
-
-	return sd_pr_read_keys_disk(sdkp, keys_info);
-}
-
-static int sd_pr_read_reservation_disk(struct scsi_disk *sdkp,
+static int sd_pr_read_reservation(struct block_device *bdev,
 				  struct pr_held_reservation *rsv)
 {
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
 	struct scsi_device *sdev = sdkp->device;
 	u8 data[24] = { };
 	int result, len;
 
-	result = sd_pr_in_command(sdkp, READ_RESERVATION, data, sizeof(data));
+	result = sd_pr_in_command(bdev, READ_RESERVATION, data, sizeof(data));
 	if (result)
 		return result;
 
@@ -2192,17 +2188,11 @@ static int sd_pr_read_reservation_disk(struct scsi_disk *sdkp,
 	rsv->type = scsi_pr_type_to_block(data[21] & 0x0f);
 	return 0;
 }
-static int sd_pr_read_reservation(struct block_device *bdev,
-				  struct pr_held_reservation *rsv)
-{
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
 
-	return sd_pr_read_reservation_disk(sdkp, rsv);
-}
-
-static int sd_pr_out_command(struct scsi_disk *sdkp, u8 sa, u64 key,
+static int sd_pr_out_command(struct block_device *bdev, u8 sa, u64 key,
 			     u64 sa_key, enum scsi_pr_type type, u8 flags)
 {
+	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
 	struct scsi_device *sdev = sdkp->device;
 	struct scsi_sense_hdr sshdr;
 	struct scsi_failure failure_defs[] = {
@@ -2225,6 +2215,9 @@ static int sd_pr_out_command(struct scsi_disk *sdkp, u8 sa, u64 key,
 	int result;
 	u8 cmd[16] = { 0, };
 	u8 data[24] = { 0, };
+
+	if (is_mpath_head(bdev->bd_disk))
+		return -EOPNOTSUPP;
 
 	cmd[0] = PERSISTENT_RESERVE_OUT;
 	cmd[1] = sa;
@@ -2251,82 +2244,41 @@ static int sd_pr_out_command(struct scsi_disk *sdkp, u8 sa, u64 key,
 	return sd_scsi_to_pr_err(&sshdr, result);
 }
 
-static int sd_pr_register_disk(struct scsi_disk *sdkp, u64 old_key, u64 new_key,
+static int sd_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
 		u32 flags)
 {
 	if (flags & ~PR_FL_IGNORE_KEY)
 		return -EOPNOTSUPP;
-
-	return sd_pr_out_command(sdkp,
-			(flags & PR_FL_IGNORE_KEY) ? 0x06 : 0x00,
+	return sd_pr_out_command(bdev, (flags & PR_FL_IGNORE_KEY) ? 0x06 : 0x00,
 			old_key, new_key, 0,
 			(1 << 0) /* APTPL */);
 }
 
-static int sd_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
+static int sd_pr_reserve(struct block_device *bdev, u64 key, enum pr_type type,
 		u32 flags)
-{
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
-
-	return sd_pr_register_disk(sdkp, old_key, new_key, flags);
-}
-
-static int sd_pr_reserve_disk(struct scsi_disk *sdkp, u64 key,
-		enum pr_type type, u32 flags)
 {
 	if (flags)
 		return -EOPNOTSUPP;
-	return sd_pr_out_command(sdkp, 0x01, key, 0,
-				 block_pr_type_to_scsi(type), 0);
-}
-
-static int sd_pr_reserve(struct block_device *bdev, u64 key,
-			enum pr_type type, u32 flags)
-{
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
-
-	return sd_pr_reserve_disk(sdkp, key, type, flags);
-}
-
-static int sd_pr_release_disk(struct scsi_disk *sdkp, u64 key,
-				enum pr_type type)
-{
-	return sd_pr_out_command(sdkp, 0x02, key, 0,
+	return sd_pr_out_command(bdev, 0x01, key, 0,
 				 block_pr_type_to_scsi(type), 0);
 }
 
 static int sd_pr_release(struct block_device *bdev, u64 key, enum pr_type type)
 {
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
-
-	return sd_pr_release_disk(sdkp, key, type);
-}
-
-static int sd_pr_preempt_disk(struct scsi_disk *sdkp, u64 old_key, u64 new_key,
-		enum pr_type type, bool abort)
-{
-	return sd_pr_out_command(sdkp, abort ? 0x05 : 0x04, old_key, new_key,
+	return sd_pr_out_command(bdev, 0x02, key, 0,
 				 block_pr_type_to_scsi(type), 0);
 }
 
 static int sd_pr_preempt(struct block_device *bdev, u64 old_key, u64 new_key,
 		enum pr_type type, bool abort)
 {
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
-
-	return sd_pr_preempt_disk(sdkp, old_key, new_key, type, abort);
-}
-
-static int sd_pr_clear_disk(struct scsi_disk *sdkp, u64 key)
-{
-	return sd_pr_out_command(sdkp, 0x03, key, 0, 0, 0);
+	return sd_pr_out_command(bdev, abort ? 0x05 : 0x04, old_key, new_key,
+				 block_pr_type_to_scsi(type), 0);
 }
 
 static int sd_pr_clear(struct block_device *bdev, u64 key)
 {
-	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
-
-	return sd_pr_clear_disk(sdkp, key);
+	return sd_pr_out_command(bdev, 0x03, key, 0, 0, 0);
 }
 
 static const struct pr_ops sd_pr_ops = {
@@ -4111,62 +4063,6 @@ static struct mpath_head *sd_mpath_to_head(struct request *req)
 	return sd_mpath_disk->scsi_mpath_head->mpath_head;
 }
 
-static int sd_mpath_pr_register(struct scsi_device *sdp, u64 old_key,
-			u64 new_key, u32 flags)
-{
-	return sd_pr_register_disk(dev_get_drvdata(&sdp->sdev_gendev), old_key,
-			new_key, flags);
-}
-
-static int sd_mpath_pr_reserve(struct scsi_device *sdp, u64 key,
-			enum pr_type type, u32 flags)
-{
-	return sd_pr_reserve_disk(dev_get_drvdata(&sdp->sdev_gendev), key, type,
-			flags);
-}
-
-static int sd_mpath_pr_release(struct scsi_device *sdp, u64 key,
-			enum pr_type type)
-{
-	return sd_pr_release_disk(dev_get_drvdata(&sdp->sdev_gendev), key, type);
-}
-
-static int sd_mpath_pr_preempt(struct scsi_device *sdp, u64 old,
-			u64 new, enum pr_type type, bool abort)
-{
-	return sd_pr_preempt_disk(dev_get_drvdata(&sdp->sdev_gendev), old, new,
-			type, abort);
-}
-
-static int sd_mpath_pr_clear(struct scsi_device *sdp, u64 key)
-{
-	return sd_pr_clear_disk(dev_get_drvdata(&sdp->sdev_gendev), key);
-}
-
-static int sd_mpath_pr_read_keys(struct scsi_device *sdp,
-			struct pr_keys *keys_info)
-{
-	return sd_pr_read_keys_disk(dev_get_drvdata(&sdp->sdev_gendev),
-			keys_info);
-}
-
-static int sd_mpath_pr_read_reservation(struct scsi_device *sdp,
-			struct pr_held_reservation *resv)
-{
-	return sd_pr_read_reservation_disk(dev_get_drvdata(&sdp->sdev_gendev),
-			resv);
-}
-
-static const struct scsi_mpath_pr_ops sd_mpath_pr_ops = {
-	.pr_register	= sd_mpath_pr_register,
-	.pr_reserve	= sd_mpath_pr_reserve,
-	.pr_release	= sd_mpath_pr_release,
-	.pr_preempt	= sd_mpath_pr_preempt,
-	.pr_clear	= sd_mpath_pr_clear,
-	.pr_read_keys	= sd_mpath_pr_read_keys,
-	.pr_read_reservation = sd_mpath_pr_read_reservation,
-};
-
 static int sd_mpath_revalidate_head(struct scsi_disk *sdkp)
 {
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
@@ -5018,7 +4914,6 @@ static struct scsi_driver sd_template = {
 	.mpath_start_cmd	= sd_mpath_start_command,
 	.mpath_end_cmd		= sd_mpath_end_command,
 	.mpath_ioctl		= sd_mpath_ioctl,
-	.mpath_pr_ops		= &sd_mpath_pr_ops,
 	.to_mpath_head		= sd_mpath_to_head,
 	#endif
 	.done			= sd_done,

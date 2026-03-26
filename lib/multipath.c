@@ -568,7 +568,8 @@ static int mpath_pr_register(struct block_device *bdev, u64 old_key,
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
 	if (mpath_device)
-		ret = mpath_head->mpdt->pr_ops->pr_register(mpath_device,
+		ret = mpath_device->disk->fops->pr_ops->pr_register(
+				mpath_device->disk->part0,
 				old_key, new_key, flags);
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
@@ -586,7 +587,8 @@ static int mpath_pr_reserve(struct block_device *bdev, u64 key,
 	mpath_device = mpath_find_path(mpath_head);
 
 	if (mpath_device)
-		ret = mpath_head->mpdt->pr_ops->pr_reserve(mpath_device, key,
+		ret = mpath_device->disk->fops->pr_ops->pr_reserve(
+				mpath_device->disk->part0, key,
 				type, flags);
 
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
@@ -604,8 +606,8 @@ static int mpath_pr_release(struct block_device *bdev, u64 key, enum pr_type typ
 	mpath_device = mpath_find_path(mpath_head);
 
 	if (mpath_device)
-		ret = mpath_head->mpdt->pr_ops->pr_release(mpath_device, key,
-				type);
+		ret = mpath_device->disk->fops->pr_ops->pr_release(
+				mpath_device->disk->part0, key, type);
 
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
@@ -623,7 +625,8 @@ static int mpath_pr_preempt(struct block_device *bdev, u64 old, u64 new,
 	mpath_device = mpath_find_path(mpath_head);
 
 	if (mpath_device)
-		ret = mpath_head->mpdt->pr_ops->pr_preempt(mpath_device, old,
+		ret = mpath_device->disk->fops->pr_ops->pr_preempt(
+				mpath_device->disk->part0, old,
 				new, type, abort);
 
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
@@ -641,7 +644,8 @@ static int mpath_pr_clear(struct block_device *bdev, u64 key)
 	mpath_device = mpath_find_path(mpath_head);
 
 	if (mpath_device)
-		ret = mpath_head->mpdt->pr_ops->pr_clear(mpath_device, key);
+		ret = mpath_device->disk->fops->pr_ops->pr_clear(
+				mpath_device->disk->part0, key);
 
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
@@ -659,8 +663,8 @@ static int mpath_pr_read_keys(struct block_device *bdev,
 	mpath_device = mpath_find_path(mpath_head);
 
 	if (mpath_device)
-		ret = mpath_head->mpdt->pr_ops->pr_read_keys(mpath_device,
-				keys_info);
+		ret = mpath_device->disk->fops->pr_ops->pr_read_keys(
+				mpath_device->disk->part0, keys_info);
 
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
@@ -678,8 +682,8 @@ static int mpath_pr_read_reservation(struct block_device *bdev,
 	mpath_device = mpath_find_path(mpath_head);
 
 	if (mpath_device)
-		ret = mpath_head->mpdt->pr_ops->pr_read_reservation(
-				mpath_device, resv);
+		ret = mpath_device->disk->fops->pr_ops->pr_read_reservation(
+				mpath_device->disk->part0, resv);
 
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 

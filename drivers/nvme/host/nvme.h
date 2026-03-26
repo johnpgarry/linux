@@ -22,7 +22,6 @@
 #include <trace/events/block.h>
 
 extern const struct pr_ops nvme_pr_ops;
-extern const struct mpath_pr_ops nvme_mpath_pr_ops;
 
 extern unsigned int nvme_io_timeout;
 #define NVME_IO_TIMEOUT	(nvme_io_timeout * HZ)
