@@ -117,6 +117,8 @@ static int scsi_host_eh_past_deadline(struct Scsi_Host *shost)
 
 static bool scsi_cmd_retry_allowed(struct scsi_cmnd *cmd)
 {
+	pr_err("%s cmd=%pS scmd->allowed=%d cmd->retries=%d\n",
+		__func__, cmd, cmd->allowed, cmd->retries);
 	if (cmd->allowed == SCSI_CMD_RETRIES_NO_LIMIT)
 		return true;
 
@@ -1408,7 +1410,7 @@ int scsi_eh_get_sense(struct list_head *work_q,
 		 * if the result was normal, then just pass it along to the
 		 * upper level.
 		 */
-		if (rtn == SUCCESS)
+		if (rtn == SUCCESS) {
 			/*
 			 * We don't want this command reissued, just finished
 			 * with the sense data, so set retries to the max
@@ -1417,12 +1419,19 @@ int scsi_eh_get_sense(struct list_head *work_q,
 			 * finish this command, so force completion by setting
 			 * retries and allowed to the same value.
 			 */
+			pr_err("%s SUCCESS from scsi_decide_disposition scmd=%pS scmd->allowed=%d\n", __func__, scmd, scmd->allowed);
 			if (scmd->allowed == SCSI_CMD_RETRIES_NO_LIMIT)
 				scmd->retries = scmd->allowed = 1;
 			else
 				scmd->retries = scmd->allowed;
-		else if (rtn != NEEDS_RETRY)
+		} else if (rtn != NEEDS_RETRY) {
+
+			pr_err("%s2 rtn=%d from scsi_decide_disposition scmd=%pS scmd->allowed=%d\n", __func__, rtn, scmd, scmd->allowed);
 			continue;
+		} else {
+
+			pr_err("%s3 rtn=%d NEEDS_RETRY=%d from scsi_decide_disposition scmd=%pS scmd->allowed=%d\n", __func__, rtn, NEEDS_RETRY, scmd, scmd->allowed);
+		}
 
 		scsi_eh_finish_cmd(scmd, done_q);
 	}
@@ -1986,6 +1995,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		return SUCCESS;
 	case DID_SOFT_ERROR:
+		pr_err("%s0.0 DID_SOFT_ERROR req=%pS scmd=%pS\n",
+			__func__, req, scmd);
 		/*
 		 * when the low level driver returns did_soft_error,
 		 * it is responsible for keeping an internal retry counter
@@ -1993,11 +2004,15 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		goto maybe_retry;
 	case DID_IMM_RETRY:
+		pr_err("%s0.1 DID_IMM_RETRY req=%pS scmd=%pS\n",
+			__func__, req, scmd);
 		return NEEDS_RETRY;
 
 	case DID_REQUEUE:
 		return ADD_TO_MLQUEUE;
 	case DID_TRANSPORT_DISRUPTED:
+		pr_err("%s0.2 DID_TRANSPORT_DISRUPTED req=%pS scmd=%pS\n",
+			__func__, req, scmd);
 		/*
 		 * LLD/transport was disrupted during processing of the IO.
 		 * The transport class is now blocked/blocking,
@@ -2011,6 +2026,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 * The transport decided to failfast the IO (most likely
 		 * the fast io fail tmo fired), so send IO directly upwards.
 		 */
+		pr_err("%s0.3 DID_TRANSPORT_FAILFAST req=%pS scmd=%pS\n",
+			__func__, req, scmd);
 		return SUCCESS;
 	case DID_TRANSPORT_MARGINAL:
 		/*
@@ -2019,6 +2036,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		return SUCCESS;
 	case DID_ERROR:
+		pr_err("%s0.4 DID_ERROR req=%pS scmd=%pS\n",
+			__func__, req, scmd);
 		if (get_status_byte(scmd) == SAM_STAT_RESERVATION_CONFLICT)
 			/*
 			 * execute reservation conflict processing code
@@ -2116,7 +2135,7 @@ maybe_retry:
 	 * trigger failover to available path
 	 */
 	if (scsi_is_mpath_request(req)) {
-		pr_err("%s maybe_retry: not calling scsi_mpath_failover_disposition req=%pS scmd=%pS\n",
+		pr_err("%s1 maybe_retry: not calling scsi_mpath_failover_disposition req=%pS scmd=%pS\n",
 			__func__, req, scmd);
 	//	WARN_ON_ONCE(1);
 	//	return scsi_mpath_failover_disposition(scmd);
@@ -2127,9 +2146,10 @@ maybe_retry:
 	 * even if the request is marked fast fail, we still requeue
 	 * for queue congestion conditions (QUEUE_FULL or BUSY) */
 	if (scsi_cmd_retry_allowed(scmd) && !scsi_noretry_cmd(scmd)) {
-		if (scsi_is_mpath_request(req)) {
-			pr_err("%s2 maybe_retry: scsi_cmd_retry_allowed=%d scsi_noretry_cmd=%d req=%pS scmd=%pS\n",
+		pr_err("%s2 maybe_retry: scsi_cmd_retry_allowed=%d scsi_noretry_cmd=%d req=%pS scmd=%pS\n",
 				__func__, scsi_cmd_retry_allowed(scmd), scsi_noretry_cmd(scmd), req, scmd);
+		if (scsi_is_mpath_request(req)) {
+			
 		//	WARN_ON_ONCE(1);
 		//	return scsi_mpath_failover_disposition(scmd);
 		}

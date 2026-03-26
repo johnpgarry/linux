@@ -3441,6 +3441,8 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	 * flush queues.
 	 */
 	spin_lock_bh(&session->frwd_lock);
+	pr_err("%s called fail_scsi_tasks DID_TRANSPORT_DISRUPTED\n",
+		__func__);
 	fail_scsi_tasks(conn, -1, DID_TRANSPORT_DISRUPTED);
 	fail_mgmt_tasks(session, conn);
 	memset(&session->tmhdr, 0, sizeof(session->tmhdr));

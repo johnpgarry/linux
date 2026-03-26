@@ -773,6 +773,7 @@ static bool scsi_cmd_runtime_exceeced(struct scsi_cmnd *cmd)
 	struct request *req = scsi_cmd_to_rq(cmd);
 	unsigned long wait_for;
 
+	pr_err("%s cmd=%pS scmd->allowed=%d\n", __func__, cmd, cmd->allowed);
 	if (cmd->allowed == SCSI_CMD_RETRIES_NO_LIMIT)
 		return false;
 
@@ -962,10 +963,14 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 		scsi_mq_requeue_cmd(cmd, ALUA_TRANSITION_REPREP_DELAY);
 		break;
 	case ACTION_RETRY:
+		pr_err("%s cmd=%pS ACTION_RETRY calling __scsi_queue_insert\n",
+			__func__, cmd);
 		/* Retry the same command immediately */
 		__scsi_queue_insert(cmd, SCSI_MLQUEUE_EH_RETRY, false);
 		break;
 	case ACTION_DELAYED_RETRY:
+		pr_err("%s2 cmd=%pS ACTION_DELAYED_RETRY calling __scsi_queue_insert\n",
+			__func__, cmd);
 		/* Retry the same command after a delay */
 		__scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY, false);
 		break;
@@ -1571,6 +1576,8 @@ static void scsi_complete(struct request *rq)
 		scsi_finish_command(cmd);
 		break;
 	case NEEDS_RETRY:
+		pr_err("%s NEEDS_RETRY rq=%pS cmd=%pS calling scsi_queue_insert\n",
+			__func__, rq, cmd);
 		scsi_queue_insert(cmd, SCSI_MLQUEUE_EH_RETRY);
 		break;
 	case ADD_TO_MLQUEUE:
@@ -1858,8 +1865,11 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 		 */
 		if (unlikely(sdev->sdev_state != SDEV_RUNNING)) {
 			ret = scsi_device_state_check(sdev, req);
-			if (ret != BLK_STS_OK)
+			if (ret != BLK_STS_OK) {
+				pr_err_ratelimited("%s called scsi_device_state_check ret=%d cmd=%pS\n",
+					__func__, ret, cmd);
 				goto out_put_budget;
+			}
 		}
 
 		ret = BLK_STS_RESOURCE;
@@ -1954,10 +1964,8 @@ out_put_budget:
 			scsi_mq_uninit_cmd(cmd);
 		scsi_run_queue_async(sdev);
 		if (!scsi_device_online(sdev) && scsi_is_mpath_request(req)) {
-			pr_err("%s !online req=%pS sdev=%pS cmd=%pS calling scsi_mpath_failover_req sdev=%pS ret=%d\n",
+			pr_err("%s !online req=%pS sdev=%pS cmd=%pS no calling scsi_mpath_failover_req sdev=%pS ret=%d\n",
 				__func__, req, sdev, cmd, sdev, ret);
-			//scsi_mpath_failover_req(req);
-			//return 0;
 		}
 		break;
 	}
@@ -2923,6 +2931,9 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
+
+	printk(KERN_ERR "%s\n", __func__);
+	//WARN_ON_ONCE(1);
 	if (sdev->scsi_mpath_dev)
 		scsi_mpath_dev_clear_path(sdev->scsi_mpath_dev);
 	if (scsi_device_set_state(sdev, SDEV_BLOCK))
