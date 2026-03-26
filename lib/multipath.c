@@ -1030,7 +1030,7 @@ static void mpath_iopolicy_update(struct mpath_iopolicy *mpath_iopolicy,
 
 	WRITE_ONCE(mpath_iopolicy->iopolicy, iopolicy);
 
-	pr_notice("iopolicy changed from %s to %s\n",
+	pr_info("iopolicy changed from %s to %s\n",
 		mpath_iopolicy_names[old_iopolicy],
 		mpath_iopolicy_names[iopolicy]);
 }
