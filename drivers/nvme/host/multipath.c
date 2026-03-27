@@ -627,7 +627,7 @@ static ssize_t nvme_subsys_iopolicy_store(struct device *dev,
 	struct nvme_ctrl *ctrl;
 
 	if (!mpath_iopolicy_store(&subsys->iopolicy, buf, count))
-		return  -EINVAL;
+		return -EINVAL;
 	mutex_lock(&nvme_subsystems_lock);
 	list_for_each_entry(ctrl, &subsys->ctrls, subsys_entry)
 		nvme_mpath_clear_ctrl_paths(ctrl);
