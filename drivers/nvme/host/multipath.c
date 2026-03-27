@@ -344,6 +344,13 @@ static void nvme_mpath_del_cdev(struct mpath_head *mpath_head)
 	nvme_cdev_del(&mpath_head->cdev, &mpath_head->cdev_device);
 }
 
+static void nvme_remove_head(struct nvme_ns_head *head)
+{
+	pr_err("%s calling mpath_remove_disk\n", __func__);
+	mpath_remove_disk(head->mpath_head);
+	pr_err("%s1 calling nvme_put_ns_head\n", __func__);
+	nvme_put_ns_head(head);
+}
 
 static void nvme_remove_head_work(struct work_struct *work)
 {
@@ -363,10 +370,9 @@ static void nvme_remove_head_work(struct work_struct *work)
 	}
 	mutex_unlock(&head->subsys->lock);
 
-	if (remove) {
-		mpath_unregister_disk(mpath_head);
-		nvme_put_ns_head(head);
-	}
+	if (remove)
+		nvme_remove_head(head);
+
 	module_put(THIS_MODULE);
 }
 
@@ -760,10 +766,8 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 	}
 out:
 	mutex_unlock(&head->subsys->lock);
-	if (remove) {
-		mpath_unregister_disk(head->mpath_head);
-		nvme_put_ns_head(head);
-	}
+	if (remove)
+		nvme_remove_head(head);
 }
 
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl)
