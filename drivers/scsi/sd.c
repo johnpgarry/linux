@@ -129,9 +129,11 @@ static void sd_mpath_disk_release(struct device *dev)
 		container_of(dev, struct sd_mpath_disk, dev);
 	struct scsi_mpath_head *scsi_mpath_head =
 		sd_mpath_disk->scsi_mpath_head;
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
 	pr_err("%s calling ida_free sd_mpath_disk=%pS disk_index=%d\n",
 		__func__, sd_mpath_disk, sd_mpath_disk->disk_index);
+	mpath_put_disk(mpath_head);
 
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
 	scsi_mpath_put_head(scsi_mpath_head);
@@ -4410,8 +4412,16 @@ static void sd_mpath_fail_probe(struct scsi_disk *sdkp)
 	mutex_unlock(&sd_mpath_disks_lock);
 	mpath_device->disk = NULL;
 
-	if (remove)
+	pr_err("%s1 sdkp=%pS sd_mpath_disk=%pS remove=%d\n",
+		__func__, sdkp, sd_mpath_disk, remove);
+	if (remove) {
+		pr_err("%s1.1 sdkp=%pS sd_mpath_disk=%pS remove=%d calling device_del\n",
+			__func__, sdkp, sd_mpath_disk, remove);
 		device_del(&sd_mpath_disk->dev);
+		pr_err("%s1.2 sdkp=%pS sd_mpath_disk=%pS remove=%d calling mpath_remove_disk\n",
+			__func__, sdkp, sd_mpath_disk, remove);
+		mpath_remove_disk(mpath_head);
+	}
 	sd_mpath_put_disk(sd_mpath_disk);
 }
 
@@ -4538,6 +4548,7 @@ static int sd_probe(struct scsi_device *sdp)
 	if (error) {
 		sd_mpath_fail_probe(sdkp);
 		put_device(&sdkp->disk_dev);
+		put_disk(gd);
 		goto out;
 	}
 
