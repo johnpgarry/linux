@@ -72,7 +72,7 @@ static inline void scsi_mpath_end_request(struct request *req)
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 
 	if (is_mpath_request(req))
-		scsi_cmd_to_driver(cmd)->mpath_start_cmd(cmd);
+		scsi_cmd_to_driver(cmd)->mpath_end_cmd(cmd);
 }
 
 #else /* CONFIG_SCSI_MULTIPATH */

@@ -653,6 +653,7 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 
 	WARN_ON_ONCE(!blk_rq_is_passthrough(req) &&
 		     !(cmd->flags & SCMD_INITIALIZED));
+	scsi_mpath_end_request(req);
 	cmd->flags = 0;
 
 	/*
@@ -663,7 +664,6 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	 */
 	destroy_rcu_head(&cmd->rcu);
 
-	scsi_mpath_end_request(req);
 
 	/*
 	 * In the MQ case the command gets freed by __blk_mq_end_request,
