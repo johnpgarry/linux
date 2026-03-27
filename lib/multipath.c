@@ -914,17 +914,6 @@ void mpath_remove_disk(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_disk);
 
-void mpath_unregister_disk(struct mpath_head *mpath_head)
-{
-	pr_err("%s calling mpath_remove_disk mpath_head=%pS\n",
-		__func__, mpath_head);
-	mpath_remove_disk(mpath_head);
-
-	pr_err("%s1 called mpath_remove_disk mpath_head=%pS\n",
-		__func__, mpath_head);
-}
-EXPORT_SYMBOL_GPL(mpath_unregister_disk);
-
 int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim, int numa_node)
 {
 	mpath_head->disk = blk_alloc_disk(lim, numa_node);
