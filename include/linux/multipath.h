@@ -148,6 +148,7 @@ void mpath_requeue_work(struct work_struct *work);
 struct mpath_head *mpath_alloc_head(void);
 bool mpath_can_remove_head(struct mpath_head *mpath_head);
 void mpath_remove_disk(struct mpath_head *mpath_head);
+void mpath_put_disk(struct mpath_head *mpath_head);
 int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim,
 			int numa_node);
 void mpath_device_set_live(struct mpath_device *mpath_device);

@@ -667,6 +667,7 @@ static void nvme_free_ns_head(struct kref *ref)
 	struct nvme_ns_head *head =
 		container_of(ref, struct nvme_ns_head, ref);
 	pr_err("%s head=%pS\n", __func__, head);
+	nvme_mpath_put_disk(head);
 	ida_free(&head->subsys->ns_ida, head->instance);
 	nvme_put_subsystem(head->subsys);
 	mpath_put_head(head->mpath_head);

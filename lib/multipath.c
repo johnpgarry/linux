@@ -914,6 +914,18 @@ void mpath_remove_disk(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_disk);
 
+void mpath_put_disk(struct mpath_head *mpath_head)
+{
+	if (!mpath_head)
+		return;
+	/* make sure all pending bios are cleaned up */
+	kblockd_schedule_work(&mpath_head->requeue_work);
+	flush_work(&mpath_head->requeue_work);
+	flush_work(&mpath_head->partition_scan_work);
+	put_disk(mpath_head->disk);
+}
+EXPORT_SYMBOL_GPL(mpath_put_disk);
+
 int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim, int numa_node)
 {
 	mpath_head->disk = blk_alloc_disk(lim, numa_node);
