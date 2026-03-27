@@ -120,7 +120,6 @@ struct sd_mpath_disk {
 	int				disk_index;
 	int				disk_count;
 	struct list_head		entry;
-	struct mutex			lock;
 	struct scsi_mpath_head		*scsi_mpath_head;
 };
 
@@ -4197,7 +4196,6 @@ static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_device *sdp)
 	struct sd_mpath_disk *sd_mpath_disk;
 	int ret;
 
-	mutex_lock(&sd_mpath_disks_lock);
 	list_for_each_entry(sd_mpath_disk, &sd_mpath_disks_list, entry) {
 		struct scsi_mpath_head *scsi_mpath_head;
 		struct mpath_head *mpath_head;
@@ -4212,7 +4210,6 @@ static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_device *sdp)
 			scsi_mpath_dev->device_id_str,
 			SCSI_MPATH_DEVICE_ID_LEN) == 0) {
 
-			mutex_unlock(&sd_mpath_disks_lock);
 			return sd_mpath_disk;
 		}
 		sd_mpath_put_disk(sd_mpath_disk);
@@ -4256,15 +4253,14 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	 */
 	pr_err("%s1 sdp->scsi_mpath_dev=%pS calling sd_mpath_find_disk\n",
 		__func__, sdp->scsi_mpath_dev);
+	mutex_lock(&sd_mpath_disks_lock);
 	sd_mpath_disk = sd_mpath_find_disk(sdp);
 	pr_err("%s1 sd_mpath_disk=%pS after sd_mpath_find_disk\n", __func__, sd_mpath_disk);
 	if (sd_mpath_disk) {
-
-		mutex_lock(&sd_mpath_disk->lock);
 		pr_err("%s1.1 sd_mpath_disk=%pS going to increment sd_mpath_disk->disk_count=%d\n", __func__,
 			sd_mpath_disk, sd_mpath_disk->disk_count);
 		sd_mpath_disk->disk_count++;
-		mutex_unlock(&sd_mpath_disk->lock);
+		mutex_unlock(&sd_mpath_disks_lock);
 		goto found;
 	}
 
@@ -4277,7 +4273,6 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 
 	sd_mpath_disk->scsi_mpath_head = scsi_mpath_head;
 	device_initialize(&sd_mpath_disk->dev);
-	mutex_init(&sd_mpath_disk->lock);
 	sd_mpath_disk->dev.class = &sd_mpath_disk_class;
 
 	blk_set_stacking_limits(&lim);
@@ -4370,23 +4365,19 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 
 	mpath_delete_device(mpath_device);
 
-	mutex_lock(&sd_mpath_disk->lock);
+	mutex_lock(&sd_mpath_disks_lock);
 	sd_mpath_disk->disk_count--;
 	/* delayed removal not yet supported */
 	if (!sd_mpath_disk->disk_count) {
-		mutex_lock(&sd_mpath_disks_lock);
 		list_del_init(&sd_mpath_disk->entry);
-		mutex_unlock(&sd_mpath_disks_lock);
-
 		remove = true;
 	}
-	mutex_unlock(&sd_mpath_disk->lock);
+	mutex_unlock(&sd_mpath_disks_lock);
 	mpath_remove_sysfs_link(mpath_device);
 	mpath_device->disk = NULL;
 
-	if (remove) {
+	if (remove)
 		device_del(&sd_mpath_disk->dev);
-	}
 	sd_mpath_put_disk(sd_mpath_disk);
 }
 
@@ -4408,21 +4399,17 @@ static void sd_mpath_fail_probe(struct scsi_disk *sdkp)
 	scsi_mpath_dev = sdp->scsi_mpath_dev;
 	mpath_device = &scsi_mpath_dev->mpath_device;
 
-	mutex_lock(&sd_mpath_disk->lock);
+	mutex_lock(&sd_mpath_disks_lock);
 	sd_mpath_disk->disk_count--;
 	if (!sd_mpath_disk->disk_count) {
-		mutex_lock(&sd_mpath_disks_lock);
 		list_del_init(&sd_mpath_disk->entry);
-		mutex_unlock(&sd_mpath_disks_lock);
-
 		remove = true;
 	}
-	mutex_unlock(&sd_mpath_disk->lock);
+	mutex_unlock(&sd_mpath_disks_lock);
 	mpath_device->disk = NULL;
 
-	if (remove) {
+	if (remove)
 		device_del(&sd_mpath_disk->dev);
-	}
 	sd_mpath_put_disk(sd_mpath_disk);
 }
 
