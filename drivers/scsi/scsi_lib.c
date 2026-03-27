@@ -645,6 +645,7 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	struct scsi_device *sdev = cmd->device;
 	struct request_queue *q = sdev->request_queue;
 
+	scsi_mpath_end_request(req);
 	if (blk_update_request(req, error, bytes))
 		return true;
 
@@ -653,7 +654,6 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 
 	WARN_ON_ONCE(!blk_rq_is_passthrough(req) &&
 		     !(cmd->flags & SCMD_INITIALIZED));
-	scsi_mpath_end_request(req);
 	cmd->flags = 0;
 
 	/*
