@@ -4376,8 +4376,10 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 	mpath_remove_sysfs_link(mpath_device);
 	mpath_device->disk = NULL;
 
-	if (remove)
+	if (remove) {
 		device_del(&sd_mpath_disk->dev);
+		mpath_remove_disk(mpath_head);
+	}
 	sd_mpath_put_disk(sd_mpath_disk);
 }
 
