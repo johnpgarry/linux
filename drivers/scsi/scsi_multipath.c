@@ -57,8 +57,8 @@ static const struct kernel_param_ops multipath_param_ops = {
 	.get = scsi_multipath_param_get,
 };
 
-module_param_cb(scsi_multipath, &multipath_param_ops, &scsi_multipath, 0444);
-MODULE_PARM_DESC(scsi_multipath, "turn on native multipath support, options: on, off, always");
+module_param_cb(multipath, &multipath_param_ops, &scsi_multipath, 0444);
+MODULE_PARM_DESC(multipath, "turn on native multipath support, options: on, off, always");
 
 static int iopolicy = MPATH_IOPOLICY_NUMA;
 
@@ -72,9 +72,9 @@ static int scsi_get_iopolicy(char *buf, const struct kernel_param *kp)
 	return mpath_get_iopolicy(buf, iopolicy);
 }
 
-module_param_call(iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
+module_param_call(multipath_iopolicy, scsi_set_iopolicy, scsi_get_iopolicy,
 	&iopolicy, 0644);
-MODULE_PARM_DESC(iopolicy,
+MODULE_PARM_DESC(multipath_iopolicy,
 	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
 
 static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
