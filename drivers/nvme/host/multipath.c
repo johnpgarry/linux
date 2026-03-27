@@ -834,9 +834,9 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 	ctrl->ana_log_size = 0;
 }
 
-static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(void *drvdata)
+static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_head)
 {
-	struct nvme_ns_head *head = drvdata;
+	struct nvme_ns_head *head = mpath_head->drvdata;
 
 	return mpath_read_iopolicy(&head->subsys->iopolicy);
 }
