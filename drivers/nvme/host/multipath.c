@@ -808,30 +808,8 @@ static int nvme_mpath_get_nr_active(struct mpath_device *mpath_device)
 #include <linux/nvme_ioctl.h>
 #include <linux/io_uring/cmd.h>
 #include "nvme.h"
-static bool is_ctrl_ioctl(unsigned int cmd)
-{
-	if (cmd == NVME_IOCTL_ADMIN_CMD || cmd == NVME_IOCTL_ADMIN64_CMD)
-		return true;
-	if (is_sed_ioctl(cmd))
-		return true;
-	return false;
-}
 
-static void *nvme_mpath_unlocked_ioctl_prep(struct mpath_device *mpath_device, unsigned int cmd)
-{
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
 
-	if (is_ctrl_ioctl(cmd)) {
-		nvme_get_ctrl(ns->ctrl);
-		return ns->ctrl;
-	}
-	return NULL;
-}
-
-static void nvme_mpath_unlocked_ioctl_finish(void *opaque)
-{
-	nvme_put_ctrl(opaque);
-}
 
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,

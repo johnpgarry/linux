@@ -1016,7 +1016,9 @@ void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
 long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, unsigned int cmd,
 						unsigned long arg, bool open_for_write);
-
+void *nvme_mpath_unlocked_ioctl_prep(struct mpath_device *mpath_device,
+						unsigned int cmd);
+void nvme_mpath_unlocked_ioctl_finish(void *opaque);
 static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
 	mpath_put_disk(head->mpath_head);
