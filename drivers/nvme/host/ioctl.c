@@ -734,10 +734,9 @@ int nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 			unsigned int cmd, unsigned long arg, int srcu_idx)
 {
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-	struct nvme_ns_head *head = ns->head;
 	bool open_for_write = mode & BLK_OPEN_WRITE;
 	void __user *argp = (void __user *)arg;
-	int ret = -EWOULDBLOCK;
+	int ret;
 
 	/*
 	 * Handle ioctls that apply to the controller instead of the namespace
@@ -746,14 +745,13 @@ int nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	 */
 	if (is_ctrl_ioctl(cmd))
 		return nvme_mpath_device_ctrl_ioctl(mpath_device, cmd, argp,
-				head, srcu_idx, open_for_write);
+				ns->head, srcu_idx, open_for_write);
 
 	ret = nvme_ns_ioctl(ns, cmd, argp, 0, open_for_write);
 	mpath_head_read_unlock(mpath_device->mpath_head, srcu_idx);
 
 	return ret;
 }
-
 #endif /* CONFIG_NVME_MULTIPATH */
 
 int nvme_dev_uring_cmd(struct io_uring_cmd *ioucmd, unsigned int issue_flags)
