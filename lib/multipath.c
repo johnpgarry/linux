@@ -450,6 +450,7 @@ static void mpath_free_head(struct kref *ref)
 
 int mpath_get_head(struct mpath_head *mpath_head)
 {
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
 	if (!mpath_head)
 		return 0;
 
@@ -464,6 +465,7 @@ void mpath_put_head(struct mpath_head *mpath_head)
 {
 	struct kref *ref;
 
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
 	if (!mpath_head)
 		return;
 
@@ -479,6 +481,7 @@ static int mpath_bdev_open(struct gendisk *disk, blk_mode_t mode)
 {
 	struct mpath_head *mpath_head = disk->private_data;
 
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
 	return mpath_get_head(mpath_head);
 }
 
@@ -486,6 +489,7 @@ static void mpath_bdev_release(struct gendisk *disk)
 {
 	struct mpath_head *mpath_head = disk->private_data;
 
+	pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
 	mpath_put_head(mpath_head);
 }
 

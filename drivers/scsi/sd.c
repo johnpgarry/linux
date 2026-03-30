@@ -134,7 +134,6 @@ static void sd_mpath_disk_release(struct device *dev)
 	pr_err("%s calling ida_free sd_mpath_disk=%pS disk_index=%d\n",
 		__func__, sd_mpath_disk, sd_mpath_disk->disk_index);
 	mpath_put_disk(mpath_head);
-
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
 	scsi_mpath_put_head(scsi_mpath_head);
 
@@ -809,6 +808,7 @@ static void scsi_disk_release(struct device *dev)
 {
 	struct scsi_disk *sdkp = to_scsi_disk(dev);
 
+	dev_err(dev, "%s dev=%pS sdkp=%pS\n", __func__, dev, sdkp);
 	if (sdkp->index >= 0)
 		ida_free(&sd_index_ida, sdkp->index);
 	put_device(&sdkp->device->sdev_gendev);
@@ -4181,6 +4181,11 @@ static const struct attribute_group *sd_mpath_dev_groups[] = {
 __maybe_unused
 static int sd_mpath_get_disk(struct sd_mpath_disk *sd_mpath_disk)
 {
+	struct device *dev = &sd_mpath_disk->dev;
+	struct kobject *kobj = &dev->kobj;
+	struct kref *kref = &kobj->kref;
+	dev_err(dev, "%s recount initial=%d\n",
+		__func__, refcount_read(&kref->refcount));
 	if (!get_device(&sd_mpath_disk->dev))
 		return -ENXIO;
 	return 0;
@@ -4189,6 +4194,11 @@ static int sd_mpath_get_disk(struct sd_mpath_disk *sd_mpath_disk)
 __maybe_unused
 static void sd_mpath_put_disk(struct sd_mpath_disk *sd_mpath_disk)
 {
+	struct device *dev = &sd_mpath_disk->dev;
+	struct kobject *kobj = &dev->kobj;
+	struct kref *kref = &kobj->kref;
+	dev_err(dev, "%s recount initial=%d\n",
+		__func__, refcount_read(&kref->refcount));
 	put_device(&sd_mpath_disk->dev);
 }
 
@@ -4368,6 +4378,8 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 	mpath_delete_device(mpath_device);
 
 	mutex_lock(&sd_mpath_disks_lock);
+	dev_err(&sd_mpath_disk->dev, "%s sdp=%pS scsi_mpath_dev=%pS disk_count=%d before dec\n",
+		__func__, sdp, sdp->scsi_mpath_dev, sd_mpath_disk->disk_count);
 	sd_mpath_disk->disk_count--;
 	/* delayed removal not yet supported */
 	if (!sd_mpath_disk->disk_count) {
@@ -4395,13 +4407,19 @@ static void sd_mpath_fail_probe(struct scsi_disk *sdkp)
 	struct scsi_mpath_device *scsi_mpath_dev;
 	struct mpath_device *mpath_device;
 	struct scsi_device *sdp = sdkp->device;
+	struct scsi_mpath_head *scsi_mpath_head;
+	struct mpath_head *mpath_head;
 	bool remove = false;
 
+	pr_err("%s sdkp=%pS sd_mpath_disk=%pS\n",
+		__func__, sdkp, sd_mpath_disk);
 	if (!sd_mpath_disk)
 		return;
 
 	scsi_mpath_dev = sdp->scsi_mpath_dev;
 	mpath_device = &scsi_mpath_dev->mpath_device;
+	scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
+	mpath_head = scsi_mpath_head->mpath_head;
 
 	mutex_lock(&sd_mpath_disks_lock);
 	sd_mpath_disk->disk_count--;
@@ -4422,6 +4440,8 @@ static void sd_mpath_fail_probe(struct scsi_disk *sdkp)
 			__func__, sdkp, sd_mpath_disk, remove);
 		mpath_remove_disk(mpath_head);
 	}
+	pr_err("%s2 sdkp=%pS sd_mpath_disk=%pS remove=%d calling sd_mpath_put_disk\n",
+			__func__, sdkp, sd_mpath_disk, remove);
 	sd_mpath_put_disk(sd_mpath_disk);
 }
 
@@ -4544,7 +4564,10 @@ static int sd_probe(struct scsi_device *sdp)
 	sdkp->disk_dev.class = &sd_disk_class;
 	dev_set_name(&sdkp->disk_dev, "%s", dev_name(dev));
 
-	error = device_add(&sdkp->disk_dev);
+	if (sdp->scsi_mpath_dev)
+		error = -1;
+	else
+		error = device_add(&sdkp->disk_dev);
 	if (error) {
 		sd_mpath_fail_probe(sdkp);
 		put_device(&sdkp->disk_dev);
@@ -4589,7 +4612,10 @@ static int sd_probe(struct scsi_device *sdp)
 			sdp->host->rpm_autosuspend_delay);
 	}
 
-	error = device_add_disk(dev, gd, sd_mpath_dev_groups);
+	if (sdp->scsi_mpath_dev)
+		error = device_add_disk(dev, gd, sd_mpath_dev_groups);
+	else
+		error = -1;
 	if (error) {
 		sd_mpath_fail_probe(sdkp);
 		device_unregister(&sdkp->disk_dev);
@@ -4742,6 +4768,8 @@ static void sd_remove(struct scsi_device *sdp)
 	struct device *dev = &sdp->sdev_gendev;
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 
+	dev_err(dev, "%s dev=%pS sdp=%pS scsi_mpath_dev=%pS\n",
+		__func__, dev, sdp, sdp->scsi_mpath_dev);
 	if (sdp->scsi_mpath_dev)
 		sd_mpath_remove(sdkp);
 

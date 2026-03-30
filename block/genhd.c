@@ -1277,6 +1277,7 @@ static void disk_release(struct device *dev)
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
 	might_sleep();
 	WARN_ON_ONCE(disk_live(disk));
 
@@ -1541,8 +1542,15 @@ EXPORT_SYMBOL(__blk_alloc_disk);
  */
 void put_disk(struct gendisk *disk)
 {
-	if (disk)
+	if (disk) {
+		struct device *dev = disk_to_dev(disk);
+		struct kobject *kobj = &dev->kobj;
+		struct kref *kref = &kobj->kref;
+		dev_err(dev, "%s recount initial=%d\n",
+			__func__, refcount_read(&kref->refcount));
+
 		put_device(disk_to_dev(disk));
+	}
 }
 EXPORT_SYMBOL(put_disk);
 
