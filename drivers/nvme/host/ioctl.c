@@ -725,7 +725,7 @@ int nvme_mpath_bdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 				ns->head, srcu_idx, mode & BLK_OPEN_WRITE);
 
 	ret = nvme_ns_ioctl(ns, cmd, argp, flags, mode & BLK_OPEN_WRITE);
-	mpath_head_read_unlock(ns->head->mpath_head, srcu_idx);
+	mpath_head_read_unlock(mpath_device->mpath_head, srcu_idx);
 
 	return ret;
 }
