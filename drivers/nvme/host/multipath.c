@@ -452,11 +452,6 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	}
 }
 
-void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
-{
-	mpath_remove_sysfs_link(&ns->mpath_device);
-}
-
 static int nvme_update_ana_state(struct nvme_ctrl *ctrl,
 		struct nvme_ana_group_desc *desc, void *data)
 {
