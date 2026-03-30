@@ -1000,7 +1000,6 @@ static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 }
 
 void nvme_mpath_add_ns(struct nvme_ns *ns);
-void nvme_mpath_delete_ns(struct nvme_ns *ns);
 void nvme_mpath_unfreeze(struct nvme_subsystem *subsys);
 void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys);
 void nvme_mpath_start_freeze(struct nvme_subsystem *subsys);
@@ -1030,6 +1029,11 @@ int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
 int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 		struct io_uring_cmd *ioucmd, unsigned int issue_flags);
+
+static inline void nvme_mpath_delete_ns(struct nvme_ns *ns)
+{
+	mpath_delete_device(&ns->mpath_device);
+}
 
 static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
 {

@@ -458,11 +458,6 @@ void nvme_mpath_add_ns(struct nvme_ns *ns)
 	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
 }
 
-void nvme_mpath_delete_ns(struct nvme_ns *ns)
-{
-	mpath_delete_device(&ns->mpath_device);
-}
-
 void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 {
 	mpath_remove_sysfs_link(&ns->mpath_device);
