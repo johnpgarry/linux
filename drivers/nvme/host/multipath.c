@@ -319,9 +319,7 @@ static void nvme_mpath_del_cdev(struct mpath_head *mpath_head)
 
 static void nvme_remove_head(struct nvme_ns_head *head)
 {
-	pr_err("%s calling mpath_remove_disk\n", __func__);
 	mpath_remove_disk(head->mpath_head);
-	pr_err("%s1 calling nvme_put_ns_head\n", __func__);
 	nvme_put_ns_head(head);
 }
 

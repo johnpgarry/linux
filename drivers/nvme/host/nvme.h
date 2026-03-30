@@ -1019,7 +1019,6 @@ int nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 
 static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
-	pr_err("%s head=%pS disk=%pS\n", __func__, head, head->mpath_head);
 	mpath_put_disk(head->mpath_head);
 }
 
