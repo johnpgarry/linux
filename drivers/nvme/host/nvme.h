@@ -1008,7 +1008,6 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl);
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl,struct nvme_ns_head *head);
 
 void nvme_mpath_add_disk(struct nvme_ns *ns, __le32 anagrpid);
-void nvme_mpath_put_disk(struct nvme_ns_head *head);
 int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id);
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl);
 void nvme_mpath_update(struct nvme_ctrl *ctrl);
@@ -1027,6 +1026,12 @@ int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
 int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 		struct io_uring_cmd *ioucmd, unsigned int issue_flags);
+
+static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
+{
+	pr_err("%s head=%pS disk=%pS\n", __func__, head, head->mpath_head);
+	mpath_put_disk(head->mpath_head);
+}
 
 static inline void nvme_mpath_delete_ns(struct nvme_ns *ns)
 {
