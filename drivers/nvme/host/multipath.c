@@ -189,11 +189,6 @@ void nvme_mpath_end_request(struct request *rq)
 			 nvme_req(rq)->start_time);
 }
 
-bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
-{
-	return mpath_head_queue_if_no_path(head->mpath_head);
-}
-
 void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 {
 	struct nvme_ns *ns;

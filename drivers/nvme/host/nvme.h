@@ -1023,7 +1023,6 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl);
 void nvme_mpath_remove_disk(struct nvme_ns_head *head);
 void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
-bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head);
 int nvme_mpath_bdev_ioctl(struct block_device *bdev,
 		struct mpath_device *mpath_device, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
@@ -1033,7 +1032,9 @@ int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
 int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 		struct io_uring_cmd *ioucmd, unsigned int issue_flags);
 
+static inline bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {
+	return mpath_head_queue_if_no_path(head->mpath_head);
 }
 
 static inline void nvme_trace_bio_complete(struct request *req)
