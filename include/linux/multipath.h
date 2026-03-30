@@ -58,6 +58,8 @@ struct mpath_head_template {
 	int (*get_nr_active)(struct mpath_device *);
 	long (*cdev_ioctl)(struct mpath_device *, unsigned int cmd, unsigned long arg,
 						bool open_for_write);
+	int (*chr_uring_cmd)(struct mpath_device *, struct io_uring_cmd *ioucmd,
+		unsigned int issue_flags);
 	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags);

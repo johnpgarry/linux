@@ -824,7 +824,7 @@ static int mpath_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 	struct mpath_head *mpath_head =
 			container_of(cdev, struct mpath_head, cdev);
 	struct mpath_device *mpath_device;
-	int srcu_idx, ret = -EWOULDBLOCK;
+	int srcu_idx, ret = -EINVAL; /* error code copied from nvme_ns_head_chr_uring_cmd */
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
@@ -832,13 +832,13 @@ static int mpath_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 	if (!mpath_device)
 		goto out_unlock;
 
-//	if (!mpath_device->cdev_fops || !mpath_device->cdev_ops->uring_cmd) {
-//		ret = -EOPNOTSUPP;
-//		goto out_unlock;
-//	}
+	if (!mpath_head->mpdt->chr_uring_cmd) {
+		ret = -EOPNOTSUPP;
+		goto out_unlock;
+	}
 
-//	ret = mpath_device->cdev->ops->uring_cmd(ioucmd,
-//			issue_flags);
+	ret = mpath_head->mpdt->chr_uring_cmd(mpath_device, ioucmd,
+			issue_flags);
 out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return ret;

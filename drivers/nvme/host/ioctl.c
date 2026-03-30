@@ -624,8 +624,8 @@ int nvme_ioctl(struct block_device *bdev, blk_mode_t mode,
 	return nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
 }
 
-static long _nvme_ns_chr_ioctl(struct nvme_ns *ns, unsigned int cmd, unsigned long arg,
-					bool open_for_write)
+static long _nvme_ns_chr_ioctl(struct nvme_ns *ns, unsigned int cmd,
+			unsigned long arg, bool open_for_write)
 {
 	void __user *argp = (void __user *)arg;
 
@@ -700,9 +700,15 @@ int nvme_ns_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, unsigned int cmd,
 					unsigned long arg, bool open_for_write)
 {
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-	
-	return _nvme_ns_chr_ioctl(ns, cmd, arg, open_for_write);
+	return _nvme_ns_chr_ioctl(nvme_mpath_to_ns(mpath_device), cmd,
+			arg, open_for_write);
+}
+
+int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
+		struct io_uring_cmd *ioucmd, unsigned int issue_flags)
+{
+	return nvme_ns_uring_cmd(nvme_mpath_to_ns(mpath_device),
+			ioucmd, issue_flags);
 }
 #endif /* CONFIG_NVME_MULTIPATH */
 
