@@ -999,7 +999,6 @@ static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 	return ctrl->ana_log_buf != NULL;
 }
 
-void nvme_mpath_synchronize(struct nvme_ns_head *head);
 void nvme_mpath_add_ns(struct nvme_ns *ns);
 void nvme_mpath_delete_ns(struct nvme_ns *ns);
 void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns);
@@ -1030,6 +1029,11 @@ int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
 int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 		struct io_uring_cmd *ioucmd, unsigned int issue_flags);
+
+static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
+{
+	mpath_synchronize(head->mpath_head);
+}
 
 static inline bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
 {
