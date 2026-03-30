@@ -730,7 +730,7 @@ int nvme_mpath_bdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	return ret;
 }
 
-long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
+long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, fmode_t mode,
 			unsigned int cmd, unsigned long arg, int srcu_idx)
 {
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
@@ -744,9 +744,9 @@ long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	 */
 	if (is_ctrl_ioctl(cmd))
 		return nvme_mpath_device_ctrl_ioctl(mpath_device, cmd, argp,
-				ns->head, srcu_idx, mode & BLK_OPEN_WRITE);
+				ns->head, srcu_idx, mode & FMODE_WRITE);
 
-	ret = nvme_ns_ioctl(ns, cmd, argp, 0, mode & BLK_OPEN_WRITE);
+	ret = nvme_ns_ioctl(ns, cmd, argp, 0, mode & FMODE_WRITE);
 	mpath_head_read_unlock(mpath_device->mpath_head, srcu_idx);
 
 	return ret;
