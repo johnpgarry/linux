@@ -712,9 +712,8 @@ int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 		struct io_uring_cmd *ioucmd,
 		unsigned int issue_flags)
 {
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-
-	return nvme_ns_uring_cmd(ns, ioucmd, issue_flags);
+	return nvme_ns_uring_cmd(nvme_mpath_to_ns(mpath_device),
+		ioucmd, issue_flags);
 }
 
 int nvme_mpath_bdev_ioctl(struct block_device *bdev,
