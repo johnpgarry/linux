@@ -398,7 +398,8 @@ static inline bool nvme_state_is_live(enum nvme_ana_state state)
 	return state == NVME_ANA_OPTIMIZED || state == NVME_ANA_NONOPTIMIZED;
 }
 
-static void nvme_mpath_update_ana_state(struct nvme_ns *ns, enum nvme_ana_state ana_state)
+static void nvme_mpath_update_ana_state(struct nvme_ns *ns,
+				enum nvme_ana_state ana_state)
 {
 	ns->ana_state = ana_state;
 	if (ana_state == NVME_ANA_OPTIMIZED)
