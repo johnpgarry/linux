@@ -1050,7 +1050,8 @@ static inline void nvme_trace_bio_complete(struct request *req)
 	struct nvme_ns *ns = req->q->queuedata;
 
 	if (is_mpath_request(req) && req->bio)
-		trace_block_bio_complete(ns->head->mpath_head->disk->queue, req->bio);
+		trace_block_bio_complete(ns->head->mpath_head->disk->queue,
+					req->bio);
 }
 
 extern bool multipath;
