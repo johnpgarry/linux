@@ -999,7 +999,6 @@ static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 	return ctrl->ana_log_buf != NULL;
 }
 
-void nvme_mpath_add_ns(struct nvme_ns *ns);
 void nvme_mpath_unfreeze(struct nvme_subsystem *subsys);
 void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys);
 void nvme_mpath_start_freeze(struct nvme_subsystem *subsys);
@@ -1033,6 +1032,12 @@ int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 static inline void nvme_mpath_delete_ns(struct nvme_ns *ns)
 {
 	mpath_delete_device(&ns->mpath_device);
+}
+
+static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
+{
+	ns->mpath_device.disk = ns->disk;
+	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
 }
 
 static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)

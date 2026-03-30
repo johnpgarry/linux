@@ -452,12 +452,6 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	}
 }
 
-void nvme_mpath_add_ns(struct nvme_ns *ns)
-{
-	ns->mpath_device.disk = ns->disk;
-	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
-}
-
 void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 {
 	mpath_remove_sysfs_link(&ns->mpath_device);
