@@ -1018,8 +1018,6 @@ int nvme_mpath_bdev_ioctl(struct block_device *bdev,
 int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
 		struct mpath_device *mpath_head, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
-int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
-		struct io_uring_cmd *ioucmd, unsigned int issue_flags);
 
 static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {

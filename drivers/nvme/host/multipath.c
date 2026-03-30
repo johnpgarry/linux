@@ -813,7 +813,6 @@ static const struct mpath_head_template mpdt = {
 	.is_optimized = nvme_mpath_is_optimized,
 	.bdev_ioctl = nvme_mpath_bdev_ioctl,
 	.cdev_ioctl = nvme_mpath_cdev_ioctl,
-	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 	.get_iopolicy = nvme_mpath_get_iopolicy,
 	.device_groups = nvme_ns_attr_groups,

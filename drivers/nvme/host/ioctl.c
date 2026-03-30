@@ -707,14 +707,6 @@ static int nvme_mpath_device_ctrl_ioctl(struct mpath_device *mpath_device,
 	return ret;
 }
 
-int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
-		struct io_uring_cmd *ioucmd,
-		unsigned int issue_flags)
-{
-	return nvme_ns_uring_cmd(nvme_mpath_to_ns(mpath_device),
-		ioucmd, issue_flags);
-}
-
 int nvme_mpath_bdev_ioctl(struct block_device *bdev,
 			struct mpath_device *mpath_device, blk_mode_t mode,
 			unsigned int cmd, unsigned long arg, int srcu_idx)

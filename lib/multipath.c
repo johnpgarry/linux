@@ -826,16 +826,18 @@ static int mpath_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
-	if (!mpath_head->mpdt->chr_uring_cmd)
-		return -EOPNOTSUPP;
-
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
 
 	if (!mpath_device)
 		goto out_unlock;
 
-	ret = mpath_head->mpdt->chr_uring_cmd(mpath_device, ioucmd,
+	if (!mpath_device->cdev || !mpath_device->cdev->ops->uring_cmd) {
+		ret = -EOPNOTSUPP;
+		goto out_unlock;
+	}
+
+	ret = mpath_device->cdev->ops->uring_cmd(ioucmd,
 			issue_flags);
 out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
