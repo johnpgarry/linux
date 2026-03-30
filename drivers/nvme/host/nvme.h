@@ -1014,8 +1014,7 @@ void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
 int nvme_mpath_bdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg, int srcu_idx, bool is_part);
-int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
-		struct mpath_device *mpath_head, blk_mode_t mode,
+int nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
 
 static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)

@@ -59,8 +59,8 @@ struct mpath_head_template {
 	int (*bdev_ioctl)(struct mpath_device *, blk_mode_t mode,
 			unsigned int cmd, unsigned long arg, int srcu_idx,
 			bool is_part);
-	int (*cdev_ioctl)(struct mpath_head *, struct mpath_device *,
-			blk_mode_t mode, unsigned int cmd, unsigned long arg, int srcu_idx);
+	int (*cdev_ioctl)(struct mpath_device *, blk_mode_t mode,
+				unsigned int cmd, unsigned long arg, int srcu_idx);
 	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags);

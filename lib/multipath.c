@@ -807,8 +807,8 @@ static long mpath_chr_ioctl(struct file *file, unsigned int cmd,
 	 * may try and take the device offline, in which case all further
 	 * access to the device is prohibited.
 	 */
-	err = mpath_head->mpdt->cdev_ioctl(mpath_head, mpath_device,
-			mode, cmd, arg, srcu_idx);
+	err = mpath_head->mpdt->cdev_ioctl(mpath_device, mode,
+					cmd, arg, srcu_idx);
 	lockdep_assert_not_held(&mpath_head->srcu);
 	return err;// ioctl must unlock
 
