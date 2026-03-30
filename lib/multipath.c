@@ -555,8 +555,13 @@ static int mpath_bdev_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
-	if (mpath_device)
-		ret = mpath_device->disk->fops->getgeo(mpath_device->disk, geo);
+	if (mpath_device) {
+		if (mpath_device->disk->fops->getgeo)
+			ret = mpath_device->disk->fops->getgeo(
+					mpath_device->disk, geo);
+		else
+			ret = -ENOTTY;
+	}
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
