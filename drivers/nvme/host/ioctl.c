@@ -710,8 +710,9 @@ int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 	return nvme_ns_uring_cmd(nvme_mpath_to_ns(mpath_device),
 			ioucmd, issue_flags);
 }
-void *nvme_mpath_unlocked_ioctl_prep(struct mpath_device *mpath_device,
-					unsigned int cmd)
+
+void *nvme_mpath_ioctl_prep(struct mpath_device *mpath_device,
+		unsigned int cmd)
 {
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
 
@@ -722,7 +723,7 @@ void *nvme_mpath_unlocked_ioctl_prep(struct mpath_device *mpath_device,
 	return NULL;
 }
 
-void nvme_mpath_unlocked_ioctl_finish(void *opaque)
+void nvme_mpath_ioctl_finish(void *opaque)
 {
 	nvme_put_ctrl(opaque);
 }

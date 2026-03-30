@@ -66,8 +66,8 @@ struct mpath_head_template {
 	enum mpath_iopolicy_e (*get_iopolicy)(struct mpath_head *mpath_head);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct attribute_group **device_groups;
-	void *(*unlocked_ioctl_prep)(struct mpath_device *, unsigned int cmd);
-	void (*unlocked_ioctl_finish)(void *opaque);
+	void *(*ioctl_prep)(struct mpath_device *, unsigned int cmd);
+	void (*ioctl_finish)(void *opaque);
 };
 
 #define MPATH_HEAD_DISK_LIVE 			0

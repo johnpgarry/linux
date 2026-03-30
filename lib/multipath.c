@@ -536,13 +536,13 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 		goto out_unlock;
 	}
 
-	unlocked_ioctl_data = mpath_head->mpdt->unlocked_ioctl_prep(mpath_device, cmd);
+	unlocked_ioctl_data = mpath_head->mpdt->ioctl_prep(mpath_device, cmd);
 	pr_err("%s2 unlocked_ioctl_data=%pS ioctl=%pS cmd=0x%x\n",
 		__func__, unlocked_ioctl_data, mpath_device->disk->fops->ioctl, cmd);
 	if (unlocked_ioctl_data) {
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 		err = mpath_device->disk->fops->ioctl(mpath_device->disk->part0, mode, cmd, arg);
-		mpath_head->mpdt->unlocked_ioctl_finish(unlocked_ioctl_data);
+		mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
 		return err;
 	} else {
 		err = mpath_device->disk->fops->ioctl(mpath_device->disk->part0, mode, cmd, arg);
@@ -802,15 +802,15 @@ static long mpath_chr_ioctl(struct file *file, unsigned int cmd,
 		goto out_unlock;
 	pr_err("%s1 mpath_device=%pS\n", __func__, mpath_device);
 	pr_err("%s1.1 mpath_head->mpdt->cdev_ioctl=%pS\n", __func__, mpath_head->mpdt->cdev_ioctl);
-	if (mpath_head->mpdt->unlocked_ioctl_prep)
-		unlocked_ioctl_data = mpath_head->mpdt->unlocked_ioctl_prep(mpath_device, cmd);
+	if (mpath_head->mpdt->ioctl_prep)
+		unlocked_ioctl_data = mpath_head->mpdt->ioctl_prep(mpath_device, cmd);
 	pr_err("%s2 unlocked_ioctl_data=%pS cmd=0x%x mode=0x%x\n",
 		__func__, unlocked_ioctl_data, cmd, mode);
 	if (unlocked_ioctl_data)
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	err = mpath_head->mpdt->cdev_ioctl(mpath_device, cmd, arg, file->f_mode & FMODE_WRITE);
 	if (unlocked_ioctl_data)
-		mpath_head->mpdt->unlocked_ioctl_finish(unlocked_ioctl_data);
+		mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
 
 out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);

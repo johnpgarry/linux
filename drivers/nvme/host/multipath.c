@@ -809,8 +809,6 @@ static int nvme_mpath_get_nr_active(struct mpath_device *mpath_device)
 #include <linux/io_uring/cmd.h>
 #include "nvme.h"
 
-
-
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
 	.add_cdev = nvme_mpath_add_cdev,
@@ -822,8 +820,8 @@ static const struct mpath_head_template mpdt = {
 	.get_iopolicy = nvme_mpath_get_iopolicy,
 	.device_groups = nvme_ns_attr_groups,
 	.get_nr_active = nvme_mpath_get_nr_active,
-	.unlocked_ioctl_prep = nvme_mpath_unlocked_ioctl_prep,
-	.unlocked_ioctl_finish = nvme_mpath_unlocked_ioctl_finish,
+	.ioctl_prep = nvme_mpath_ioctl_prep,
+	.ioctl_finish = nvme_mpath_ioctl_finish,
 };
 
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
