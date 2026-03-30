@@ -185,34 +185,26 @@ static DEVICE_ATTR_RO(metadata_bytes);
 
 static int ns_head_update_nuse_cb(struct mpath_device *mpath_device)
 {
-	struct nvme_ns *ns = container_of(mpath_device, struct nvme_ns, mpath_device);
-	struct nvme_ns_head *head = ns->head;
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
 	struct nvme_id_ns *id;
 	int ret;
 
-	ret = nvme_identify_ns(ns->ctrl, head->ns_id, &id);
+	ret = nvme_identify_ns(ns->ctrl, ns->head->ns_id, &id);
 	if (ret)
 		return ret;
 
-	head->nuse = le64_to_cpu(id->nuse);
+	ns->head->nuse = le64_to_cpu(id->nuse);
 	kfree(id);
 	return 0;
 }
 
 static int ns_head_update_nuse(struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head = head->mpath_head;
-	int ret;
-
 	/* Avoid issuing commands too often by rate limiting the update */
 	if (!__ratelimit(&head->rs_nuse))
 		return 0;
 
-	ret = mpath_call_for_device(mpath_head, ns_head_update_nuse_cb);
-	if (ret == -ENODEV)
-		return -EWOULDBLOCK;
-
-	return ret;
+	return mpath_call_for_device(head->mpath_head, ns_head_update_nuse_cb);
 }
 
 static int ns_update_nuse(struct nvme_ns *ns)
