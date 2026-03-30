@@ -3860,6 +3860,7 @@ int nvme_cdev_add(struct cdev *cdev, struct device *cdev_device,
 {
 	int minor, ret;
 
+	dev_err(cdev_device, "%s cdev=%pS fops=%pS\n", __func__, cdev, fops);
 	minor = ida_alloc(&nvme_ns_chr_minor_ida, GFP_KERNEL);
 	if (minor < 0)
 		return minor;
@@ -3993,6 +3994,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	struct nvme_ctrl *ctrl = ns->ctrl;
 	struct nvme_ns_head *head;
 	int ret;
+	pr_err("%s ns=%pS\n", __func__, ns);
 
 	ret = nvme_global_check_duplicate_ids(ctrl->subsys, &info->ids);
 	if (ret) {

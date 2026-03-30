@@ -56,17 +56,16 @@ struct mpath_head_template {
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*get_nr_active)(struct mpath_device *);
-	int (*bdev_ioctl)(struct mpath_device *, blk_mode_t mode,
-			unsigned int cmd, unsigned long arg, int srcu_idx,
-			bool is_part);
-	long (*cdev_ioctl)(struct mpath_device *, fmode_t mode,
-				unsigned int cmd, unsigned long arg, int srcu_idx);
+	long (*cdev_ioctl)(struct mpath_device *, unsigned int cmd, unsigned long arg,
+						bool open_for_write);
 	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags);
 	enum mpath_iopolicy_e (*get_iopolicy)(struct mpath_head *mpath_head);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct attribute_group **device_groups;
+	void *(*unlocked_ioctl_prep)(struct mpath_device *, unsigned int cmd);
+	void (*unlocked_ioctl_finish)(void *opaque);
 };
 
 #define MPATH_HEAD_DISK_LIVE 			0
@@ -136,7 +135,6 @@ void mpath_revalidate_paths(struct mpath_head *mpath_head,
 	void (*not_ready_cb)(struct mpath_device *mpath_device));
 void mpath_add_sysfs_link(struct mpath_head *mpath_head);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
-void mpath_head_read_unlock(struct mpath_head *mpath_head, int srcu_idx);
 int mpath_get_head(struct mpath_head *mpath_head);
 void mpath_put_head(struct mpath_head *mpath_head);
 void mpath_requeue_work(struct work_struct *work);

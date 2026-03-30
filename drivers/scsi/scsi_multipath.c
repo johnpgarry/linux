@@ -406,22 +406,6 @@ static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_he
 	return mpath_read_iopolicy(&scsi_mpath_head->iopolicy);
 }
 
-static int scsi_mpath_ioctl(struct mpath_device *mpath_device,
-			blk_mode_t mode, unsigned int cmd,
-			unsigned long arg, int srcu_idx, bool is_part)
-{
-	struct scsi_mpath_device *scsi_mpath_dev =
-				to_scsi_mpath_device(mpath_device);
-	struct scsi_device *sdev = scsi_mpath_dev->sdev;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-	int err;
-
-	err = drv->mpath_ioctl(sdev, mode, cmd, arg);
-
-	mpath_head_read_unlock(mpath_device->mpath_head, srcu_idx);
-	return err;
-}
-
 static bool scsi_mpath_is_disabled(struct mpath_device *mpath_device)
 {
 	struct scsi_mpath_device *scsi_mpath_dev =
@@ -496,7 +480,6 @@ static int scsi_mpath_get_nr_active(struct mpath_device *mpath_device)
 struct mpath_head_template smpdt_pr = {
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
-	.bdev_ioctl = scsi_mpath_ioctl,
 	.available_path = scsi_mpath_available_path,
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.clone_bio = scsi_mpath_clone_bio,

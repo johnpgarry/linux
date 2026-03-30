@@ -1012,10 +1012,8 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl);
 void nvme_mpath_remove_disk(struct nvme_ns_head *head);
 void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
-int nvme_mpath_bdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
-		unsigned int cmd, unsigned long arg, int srcu_idx, bool is_part);
-long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
-		unsigned int cmd, unsigned long arg, int srcu_idx);
+long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, unsigned int cmd,
+						unsigned long arg, bool open_for_write);
 
 static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
@@ -1031,6 +1029,9 @@ static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
 {
 	ns->mpath_device.disk = ns->disk;
 	ns->mpath_device.cdev = &ns->cdev;
+	pr_err("%s ns->mpath_device=%pS ns->mpath_device.cdev=%pS\n",
+		__func__,
+		&ns->mpath_device, ns->mpath_device.cdev);
 	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
 }
 
