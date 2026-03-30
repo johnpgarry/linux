@@ -536,8 +536,8 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 	}
 
 	/* ->ioctl must always unlock */
-	err = mpath_head->mpdt->bdev_ioctl(bdev, mpath_device, mode, cmd,
-				arg, srcu_idx);
+	err = mpath_head->mpdt->bdev_ioctl(mpath_device, mode,
+					cmd, arg, srcu_idx, bdev_is_partition(bdev));
 	lockdep_assert_not_held(&mpath_head->srcu);
 	return err;
 

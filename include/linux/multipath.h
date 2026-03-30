@@ -56,9 +56,9 @@ struct mpath_head_template {
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*get_nr_active)(struct mpath_device *);
-	int (*bdev_ioctl)(struct block_device *bdev, struct mpath_device *,
-			blk_mode_t mode, unsigned int cmd, unsigned long arg,
-			int srcu_idx);
+	int (*bdev_ioctl)(struct mpath_device *, blk_mode_t mode,
+			unsigned int cmd, unsigned long arg, int srcu_idx,
+			bool is_part);
 	int (*cdev_ioctl)(struct mpath_head *, struct mpath_device *,
 			blk_mode_t mode, unsigned int cmd, unsigned long arg, int srcu_idx);
 	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,

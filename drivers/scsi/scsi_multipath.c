@@ -406,22 +406,19 @@ static enum mpath_iopolicy_e scsi_mpath_get_iopolicy(struct mpath_head *mpath_he
 	return mpath_read_iopolicy(&scsi_mpath_head->iopolicy);
 }
 
-static int scsi_mpath_ioctl(struct block_device *bdev,
-			struct mpath_device *mpath_device,
+static int scsi_mpath_ioctl(struct mpath_device *mpath_device,
 			blk_mode_t mode, unsigned int cmd,
-			unsigned long arg, int srcu_idx)
+			unsigned long arg, int srcu_idx, bool is_part)
 {
-	struct gendisk *disk = bdev->bd_disk;
-	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 	struct scsi_mpath_device *scsi_mpath_dev =
 				to_scsi_mpath_device(mpath_device);
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
 	int err;
 
-	err = drv->mpath_ioctl(sdev, mode & BLK_OPEN_WRITE, cmd, arg);
+	err = drv->mpath_ioctl(sdev, mode, cmd, arg);
 
-	mpath_head_read_unlock(mpath_head, srcu_idx);
+	mpath_head_read_unlock(mpath_device->mpath_head, srcu_idx);
 	return err;
 }
 
