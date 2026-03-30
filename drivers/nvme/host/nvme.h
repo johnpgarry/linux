@@ -1035,6 +1035,7 @@ static inline void nvme_mpath_delete_ns(struct nvme_ns *ns)
 static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
 {
 	ns->mpath_device.disk = ns->disk;
+	ns->mpath_device.cdev = &ns->cdev;
 	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
 }
 
