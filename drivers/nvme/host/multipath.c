@@ -307,18 +307,6 @@ static bool nvme_mpath_available_path(struct mpath_device *mpath_device)
 	return false;
 }
 
-#ifdef CONFIG_BLK_DEV_ZONED
-static int nvme_mpath_report_zones(struct mpath_device *mpath_device,
-		sector_t sector, unsigned int nr_zones,
-		struct blk_report_zones_args *args)
-{
-	return nvme_ns_report_zones(nvme_mpath_to_ns(mpath_device), sector,
-				nr_zones, args);
-}
-#else
-#define nvme_mpath_report_zones		NULL
-#endif /* CONFIG_BLK_DEV_ZONED */
-
 static int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
 {
 	struct nvme_ns_head *head = mpath_head->drvdata;
@@ -861,7 +849,6 @@ static const struct mpath_head_template mpdt = {
 	.is_optimized = nvme_mpath_is_optimized,
 	.bdev_ioctl = nvme_mpath_bdev_ioctl,
 	.cdev_ioctl = nvme_mpath_cdev_ioctl,
-	.report_zones = nvme_mpath_report_zones,
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 	.get_iopolicy = nvme_mpath_get_iopolicy,

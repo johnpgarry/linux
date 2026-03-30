@@ -48,14 +48,15 @@ static int mpath_bdev_report_zones(struct gendisk *disk, sector_t sector,
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
-	if (!mpath_head->mpdt->report_zones)
-		return -EOPNOTSUPP;
-
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
-	if (mpath_device)
-		ret = mpath_head->mpdt->report_zones(mpath_device, sector,
-			nr_zones, args);
+	if (mpath_device) {
+		if (mpath_device->disk->fops->report_zones)
+			ret = mpath_device->disk->fops->report_zones
+				mpath_device->disk, sector, nr_zones, args);
+		else
+			ret = -EOPNOTSUPP;
+	}
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return ret;
 }
