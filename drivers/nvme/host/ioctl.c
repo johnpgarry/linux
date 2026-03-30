@@ -703,7 +703,6 @@ static int nvme_mpath_device_ctrl_ioctl(struct mpath_device *mpath_device,
 	nvme_get_ctrl(ns->ctrl);
 	mpath_head_read_unlock(mpath_head, srcu_idx);
 	ret = nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
-
 	nvme_put_ctrl(ctrl);
 	return ret;
 }
