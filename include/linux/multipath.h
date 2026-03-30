@@ -160,7 +160,11 @@ ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
 
 static inline bool is_mpath_disk(struct gendisk *disk)
 {
+	#if IS_ENABLED(CONFIG_LIBMULTIPATH)
 	return disk->fops == &mpath_ops;
+	#else
+	return false;
+	#endif
 }
 
 static inline bool mpath_qd_iopolicy(struct mpath_iopolicy *mpath_iopolicy)
