@@ -308,7 +308,7 @@ static int nvme_mpath_add_cdev(struct mpath_head *mpath_head)
 	if (ret)
 		return ret;
 	ret = nvme_cdev_add(&mpath_head->cdev, &mpath_head->cdev_device,
-			    &mpath_generic_chr_fops, THIS_MODULE);
+			    &mpath_chr_fops, THIS_MODULE);
 	return ret;
 }
 

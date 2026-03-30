@@ -767,7 +767,7 @@ const struct block_device_operations mpath_ops = {
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 
-static int mpath_generic_chr_open(struct inode *inode, struct file *file)
+static int mpath_chr_open(struct inode *inode, struct file *file)
 {
 	struct cdev *cdev = file_inode(file)->i_cdev;
 	struct mpath_head *mpath_head =
@@ -776,7 +776,7 @@ static int mpath_generic_chr_open(struct inode *inode, struct file *file)
 	return mpath_get_head(mpath_head);
 }
 
-static int mpath_generic_chr_release(struct inode *inode, struct file *file)
+static int mpath_chr_release(struct inode *inode, struct file *file)
 {
 	struct cdev *cdev = file_inode(file)->i_cdev;
 	struct mpath_head *mpath_head =
@@ -786,7 +786,7 @@ static int mpath_generic_chr_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static long mpath_generic_chr_ioctl(struct file *file, unsigned int cmd,
+static long mpath_chr_ioctl(struct file *file, unsigned int cmd,
 		unsigned long arg)
 {
 	struct cdev *cdev = file_inode(file)->i_cdev;
@@ -817,7 +817,7 @@ out_unlock:
 	return err;
 }
 
-static int mpath_generic_chr_uring_cmd(struct io_uring_cmd *ioucmd,
+static int mpath_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 		unsigned int issue_flags)
 {
 	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
@@ -842,7 +842,7 @@ out_unlock:
 	return ret;
 }
 
-static int mpath_generic_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
+static int mpath_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 				 struct io_comp_batch *iob,
 				 unsigned int poll_flags)
 {
@@ -856,16 +856,16 @@ static int mpath_generic_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 	return mpath_head->mpdt->chr_uring_cmd_iopoll(ioucmd, iob, poll_flags);
 }
 
-const struct file_operations mpath_generic_chr_fops = {
+const struct file_operations mpath_chr_fops = {
 	.owner		= THIS_MODULE,
-	.open		= mpath_generic_chr_open,
-	.release	= mpath_generic_chr_release,
-	.unlocked_ioctl	= mpath_generic_chr_ioctl,
+	.open		= mpath_chr_open,
+	.release	= mpath_chr_release,
+	.unlocked_ioctl	= mpath_chr_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
-	.uring_cmd	= mpath_generic_chr_uring_cmd,
-	.uring_cmd_iopoll = mpath_generic_chr_uring_cmd_iopoll,
+	.uring_cmd	= mpath_chr_uring_cmd,
+	.uring_cmd_iopoll = mpath_chr_uring_cmd_iopoll,
 };
-EXPORT_SYMBOL_GPL(mpath_generic_chr_fops);
+EXPORT_SYMBOL_GPL(mpath_chr_fops);
 
 static int mpath_head_add_cdev(struct mpath_head *mpath_head)
 {

@@ -9,7 +9,7 @@
 #include <linux/srcu.h>
 #include <linux/io_uring/cmd.h>
 
-extern const struct file_operations mpath_generic_chr_fops;
+extern const struct file_operations mpath_chr_fops;
 extern const struct block_device_operations mpath_ops;
 extern const struct attribute_group mpath_attr_group;
 extern const struct attribute_group *mpath_device_groups[];
