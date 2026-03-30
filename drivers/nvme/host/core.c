@@ -670,7 +670,7 @@ static void nvme_free_ns_head(struct kref *ref)
 	nvme_mpath_put_disk(head);
 	ida_free(&head->subsys->ns_ida, head->instance);
 	nvme_put_subsystem(head->subsys);
-	mpath_put_head(head->mpath_head);
+	//mpath_put_head(head->mpath_head); //needs to be relocated
 	kfree(head->plids);
 	pr_err("%s3 head=%pS calling kfree(head)\n", __func__, head);
 	kfree(head);
