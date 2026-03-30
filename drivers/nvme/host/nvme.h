@@ -1033,16 +1033,14 @@ int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
 int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 		struct io_uring_cmd *ioucmd, unsigned int issue_flags);
 
-static inline bool nvme_is_mpath_request(struct request *req)
 {
-	return is_mpath_request(req);
 }
 
 static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
 
-	if (nvme_is_mpath_request(req) && req->bio)
+	if (is_mpath_request(req) && req->bio)
 		trace_block_bio_complete(ns->head->mpath_head->disk->queue, req->bio);
 }
 
@@ -1141,10 +1139,6 @@ static inline void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 static inline void nvme_mpath_default_iopolicy(struct nvme_subsystem *subsys)
 {
 }
-static inline bool nvme_is_mpath_request(struct request *req)
-{
-	return false;
-}
 static inline void nvme_mpath_start_request(struct request *rq)
 {
 }
@@ -1217,7 +1211,7 @@ static inline void nvme_hwmon_exit(struct nvme_ctrl *ctrl)
 
 static inline void nvme_start_request(struct request *rq)
 {
-	if (nvme_is_mpath_request(rq))
+	if (is_mpath_request(rq))
 		nvme_mpath_start_request(rq);
 	blk_mq_start_request(rq);
 }
