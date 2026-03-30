@@ -502,8 +502,13 @@ static int mpath_bdev_get_unique_id(struct gendisk *disk, u8 id[16],
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
-	if (mpath_device)
-		ret = mpath_head->mpdt->get_unique_id(mpath_device, id, type);
+	if (mpath_device) {
+		if (mpath_device->disk->fops->get_unique_id)
+			ret = mpath_device->disk->fops->get_unique_id(
+					mpath_device->disk, id, type);
+		else
+			ret = 0; /* referencing __dm_get_unique_id() */
+	}
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
