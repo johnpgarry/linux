@@ -1017,7 +1017,6 @@ void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl);
 void nvme_mpath_update(struct nvme_ctrl *ctrl);
 void nvme_mpath_uninit(struct nvme_ctrl *ctrl);
 void nvme_mpath_stop(struct nvme_ctrl *ctrl);
-bool nvme_mpath_clear_current_path(struct nvme_ns *ns);
 void nvme_mpath_revalidate_paths(struct nvme_ns_head *head);
 void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl);
 void nvme_mpath_remove_disk(struct nvme_ns_head *head);
@@ -1031,6 +1030,11 @@ int nvme_mpath_cdev_ioctl(struct mpath_head *mpath_device,
 		unsigned int cmd, unsigned long arg, int srcu_idx);
 int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 		struct io_uring_cmd *ioucmd, unsigned int issue_flags);
+
+static inline bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
+{
+	return mpath_clear_current_path(&ns->mpath_device);
+}
 
 static inline bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {

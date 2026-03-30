@@ -215,11 +215,6 @@ static const char *nvme_ana_state_names[] = {
 	[NVME_ANA_CHANGE]		= "change",
 };
 
-bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
-{
-	return mpath_clear_current_path(&ns->mpath_device);
-}
-
 void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 {
 	struct nvme_ns *ns;
