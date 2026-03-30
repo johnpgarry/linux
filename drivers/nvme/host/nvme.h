@@ -1065,7 +1065,7 @@ extern struct device_attribute subsys_attr_iopolicy;
 
 static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
 {
-	return is_mpath_head(disk);
+	return is_mpath_disk(disk);
 }
 #else
 #define multipath false

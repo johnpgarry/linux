@@ -158,7 +158,7 @@ ssize_t mpath_delayed_removal_secs_show(struct mpath_head *mpath_head,
 ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
 			const char *buf, size_t count);
 
-static inline bool is_mpath_head(struct gendisk *disk)
+static inline bool is_mpath_disk(struct gendisk *disk)
 {
 	return disk->fops == &mpath_ops;
 }

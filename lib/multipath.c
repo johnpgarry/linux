@@ -1047,7 +1047,7 @@ static bool multipath_sysfs_group_visible(struct kobject *kobj)
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct gendisk *disk = dev_to_disk(dev);
 
-	return is_mpath_head(disk);
+	return is_mpath_disk(disk);
 }
 
 static bool multipath_sysfs_attr_visible(struct kobject *kobj,
