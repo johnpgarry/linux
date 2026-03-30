@@ -64,7 +64,7 @@ static inline struct nvme_ns_head *dev_to_ns_head(struct device *dev)
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
-	if (nvme_disk_is_ns_head(disk)) {
+	if (is_mpath_disk(disk)) {
 		struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
 
 		return mpath_head->drvdata;
@@ -243,7 +243,7 @@ static ssize_t nuse_show(struct device *dev, struct device_attribute *attr,
 	struct gendisk *disk = dev_to_disk(dev);
 	int ret;
 
-	if (nvme_disk_is_ns_head(disk))
+	if (is_mpath_disk(disk))
 		ret = ns_head_update_nuse(head);
 	else
 		ret = ns_update_nuse(disk->private_data);
@@ -296,19 +296,19 @@ static umode_t nvme_ns_attrs_are_visible(struct kobject *kobj,
 #ifdef CONFIG_NVME_MULTIPATH
 	if (a == &dev_attr_ana_grpid.attr || a == &dev_attr_ana_state.attr) {
 		/* per-path attr */
-		if (nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 		if (!nvme_ctrl_use_ana(nvme_get_ns_from_dev(dev)->ctrl))
 			return 0;
 	}
 	if (a == &dev_attr_queue_depth.attr || a == &dev_attr_numa_nodes.attr) {
-		if (nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 	}
 	if (a == &dev_attr_delayed_removal_secs.attr) {
 		struct gendisk *disk = dev_to_disk(dev);
 
-		if (!nvme_disk_is_ns_head(disk))
+		if (!is_mpath_disk(disk))
 			return 0;
 	}
 #endif

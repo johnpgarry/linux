@@ -85,7 +85,7 @@ static int __nvme_send_pr_command(struct block_device *bdev, u32 cdw10,
 	c.common.cdw10 = cpu_to_le32(cdw10);
 	c.common.cdw11 = cpu_to_le32(cdw11);
 
-	pr_err("%s nvme_disk_is_ns_head=%d\n", __func__, nvme_disk_is_ns_head(bdev->bd_disk));
+	pr_err("%s nvme_disk_is_ns_head=%d\n", __func__, is_mpath_disk(bdev->bd_disk));
 	return nvme_send_ns_pr_command(bdev->bd_disk->private_data, &c,
 				data, data_len);
 }

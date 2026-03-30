@@ -1063,10 +1063,6 @@ extern struct device_attribute dev_attr_numa_nodes;
 extern struct device_attribute dev_attr_delayed_removal_secs;
 extern struct device_attribute subsys_attr_iopolicy;
 
-static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
-{
-	return is_mpath_disk(disk);
-}
 #else
 #define multipath false
 static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
@@ -1157,10 +1153,6 @@ static inline void nvme_mpath_start_request(struct request *rq)
 static inline void nvme_mpath_end_request(struct request *rq)
 {
 }
-static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
-{
-	return false;
-}
 static inline bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {
 	return false;
@@ -1199,7 +1191,7 @@ static inline struct nvme_ns *nvme_get_ns_from_dev(struct device *dev)
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
-	WARN_ON(nvme_disk_is_ns_head(disk));
+	WARN_ON(is_mpath_disk(disk));
 	return disk->private_data;
 }
 
