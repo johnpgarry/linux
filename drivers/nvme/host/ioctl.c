@@ -730,7 +730,7 @@ int nvme_mpath_bdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 	return ret;
 }
 
-int nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
+long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, blk_mode_t mode,
 			unsigned int cmd, unsigned long arg, int srcu_idx)
 {
 	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
