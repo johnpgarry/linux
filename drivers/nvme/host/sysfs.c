@@ -64,11 +64,8 @@ static inline struct nvme_ns_head *dev_to_ns_head(struct device *dev)
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
-	if (is_mpath_disk(disk)) {
-		struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
-
-		return mpath_head->drvdata;
-	}
+	if (is_mpath_disk(disk))
+		return mpath_gendisk_to_disk(disk)->drvdata;
 	return nvme_get_ns_from_dev(dev)->head;
 }
 
