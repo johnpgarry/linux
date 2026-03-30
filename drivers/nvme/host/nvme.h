@@ -556,7 +556,7 @@ enum nvme_ns_features {
 
 struct nvme_ns {
 	struct mpath_device mpath_device;
-	struct list_head list;
+	struct list_head list; /* list in controller */
 
 	struct nvme_ctrl *ctrl;
 	struct request_queue *queue;
@@ -565,7 +565,6 @@ struct nvme_ns {
 	enum nvme_ana_state ana_state;
 	u32 ana_grpid;
 #endif
-	struct list_head siblings;
 	struct kref kref;
 	struct nvme_ns_head *head;
 
