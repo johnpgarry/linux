@@ -576,10 +576,17 @@ static int mpath_pr_register(struct block_device *bdev, u64 old_key,
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
-	if (mpath_device)
-		ret = mpath_device->disk->fops->pr_ops->pr_register(
-				mpath_device->disk->part0,
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
+
+		if (!ops || !ops->pr_register) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_register(mpath_device->disk->part0,
 				old_key, new_key, flags);
+	}
+unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
@@ -594,12 +601,17 @@ static int mpath_pr_reserve(struct block_device *bdev, u64 key,
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
 
-	if (mpath_device)
-		ret = mpath_device->disk->fops->pr_ops->pr_reserve(
-				mpath_device->disk->part0, key,
+		if (!ops || !ops->pr_reserve) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_reserve(mpath_device->disk->part0, key,
 				type, flags);
-
+	}
+unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
@@ -613,11 +625,16 @@ static int mpath_pr_release(struct block_device *bdev, u64 key, enum pr_type typ
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
 
-	if (mpath_device)
-		ret = mpath_device->disk->fops->pr_ops->pr_release(
-				mpath_device->disk->part0, key, type);
-
+		if (!ops || !ops->pr_release) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_release(mpath_device->disk->part0, key, type);
+	}
+unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
@@ -632,12 +649,17 @@ static int mpath_pr_preempt(struct block_device *bdev, u64 old, u64 new,
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
 
-	if (mpath_device)
-		ret = mpath_device->disk->fops->pr_ops->pr_preempt(
-				mpath_device->disk->part0, old,
+		if (!ops || !ops->pr_preempt) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_preempt(mpath_device->disk->part0, old,
 				new, type, abort);
-
+	}
+unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
@@ -651,11 +673,16 @@ static int mpath_pr_clear(struct block_device *bdev, u64 key)
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
 
-	if (mpath_device)
-		ret = mpath_device->disk->fops->pr_ops->pr_clear(
-				mpath_device->disk->part0, key);
-
+		if (!ops || !ops->pr_clear) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_clear(mpath_device->disk->part0, key);
+	}
+unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
@@ -670,11 +697,16 @@ static int mpath_pr_read_keys(struct block_device *bdev,
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
 
-	if (mpath_device)
-		ret = mpath_device->disk->fops->pr_ops->pr_read_keys(
-				mpath_device->disk->part0, keys_info);
-
+		if (!ops || !ops->pr_read_keys) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_read_keys(mpath_device->disk->part0, keys_info);
+	}
+unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
@@ -689,11 +721,17 @@ static int mpath_pr_read_reservation(struct block_device *bdev,
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device) {
+		const struct pr_ops *ops = mpath_device->disk->fops->pr_ops;
 
-	if (mpath_device)
-		ret = mpath_device->disk->fops->pr_ops->pr_read_reservation(
-				mpath_device->disk->part0, resv);
-
+		if (!ops || !ops->pr_read_reservation) {
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
+		ret = ops->pr_read_reservation(mpath_device->disk->part0,
+				resv);
+	}
+unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 
 	return ret;
