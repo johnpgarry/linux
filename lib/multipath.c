@@ -536,7 +536,8 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 		goto out_unlock;
 	}
 
-	unlocked_ioctl_data = mpath_head->mpdt->ioctl_prep(mpath_device, cmd);
+	if (mpath_head->mpdt->ioctl_prep)
+		unlocked_ioctl_data = mpath_head->mpdt->ioctl_prep(mpath_device, cmd);
 	pr_err("%s2 unlocked_ioctl_data=%pS ioctl=%pS cmd=0x%x\n",
 		__func__, unlocked_ioctl_data, mpath_device->disk->fops->ioctl, cmd);
 	if (unlocked_ioctl_data) {
