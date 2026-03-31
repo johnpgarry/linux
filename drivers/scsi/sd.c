@@ -4210,13 +4210,11 @@ static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_device *sdp)
 
 	list_for_each_entry(sd_mpath_disk, &sd_mpath_disks_list, entry) {
 		struct scsi_mpath_head *scsi_mpath_head;
-		struct mpath_head *mpath_head;
 
 		ret = sd_mpath_get_disk(sd_mpath_disk);
 		if (ret)
 			continue;
 		scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
-		mpath_head = scsi_mpath_head->mpath_head;
 
 		if (strncmp(scsi_mpath_head->vpd_id,
 			scsi_mpath_dev->device_id_str,
