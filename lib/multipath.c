@@ -971,6 +971,7 @@ EXPORT_SYMBOL_GPL(mpath_remove_disk);
 
 void mpath_put_disk(struct mpath_head *mpath_head)
 {
+	pr_err("%s mpqath=%pS\n", __func__, mpath_head);
 	if (!mpath_head)
 		return;
 	/* make sure all pending bios are cleaned up */
