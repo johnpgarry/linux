@@ -231,9 +231,7 @@ void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 
 static void nvme_mpath_revalidate_paths_cb(struct mpath_device *mpath_device)
 {
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-
-	clear_bit(NVME_NS_READY, &ns->flags);
+	clear_bit(NVME_NS_READY, &nvme_mpath_to_ns(mpath_device)->flags);
 }
 
 void nvme_mpath_revalidate_paths(struct nvme_ns_head *head)
@@ -260,9 +258,7 @@ static bool nvme_path_is_disabled(struct nvme_ns *ns)
 
 static bool nvme_mpath_is_disabled(struct mpath_device *mpath_device)
 {
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-
-	return nvme_path_is_disabled(ns);
+	return nvme_path_is_disabled(nvme_mpath_to_ns(mpath_device));
 }
 
 static inline bool nvme_path_is_optimized(struct nvme_ns *ns)
@@ -273,9 +269,7 @@ static inline bool nvme_path_is_optimized(struct nvme_ns *ns)
 
 static bool nvme_mpath_is_optimized(struct mpath_device *mpath_device)
 {
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-
-	return nvme_path_is_optimized(ns);
+	return nvme_path_is_optimized(nvme_mpath_to_ns(mpath_device));
 }
 
 static bool nvme_mpath_available_path(struct mpath_device *mpath_device)
@@ -798,16 +792,8 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(struct mpath_head *mpath_he
 
 static int nvme_mpath_get_nr_active(struct mpath_device *mpath_device)
 {
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
-
-	return atomic_read(&ns->ctrl->nr_active);
+	return atomic_read(&nvme_mpath_to_ns(mpath_device)->ctrl->nr_active);
 }
-
-#include <linux/blk-integrity.h>
-#include <linux/ptrace.h>	/* for force_successful_syscall_return */
-#include <linux/nvme_ioctl.h>
-#include <linux/io_uring/cmd.h>
-#include "nvme.h"
 
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
