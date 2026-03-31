@@ -4564,7 +4564,7 @@ static int sd_probe(struct scsi_device *sdp)
 	sdkp->disk_dev.class = &sd_disk_class;
 	dev_set_name(&sdkp->disk_dev, "%s", dev_name(dev));
 
-	if (sdp->scsi_mpath_dev)
+	if (sdp->scsi_mpath_dev && 0)
 		error = -1;
 	else
 		error = device_add(&sdkp->disk_dev);
