@@ -53,7 +53,7 @@ static int mpath_bdev_report_zones(struct gendisk *disk, sector_t sector,
 	if (mpath_device) {
 		if (mpath_device->disk->fops->report_zones)
 			ret = mpath_device->disk->fops->report_zones
-				mpath_device->disk, sector, nr_zones, args);
+				(mpath_device->disk, sector, nr_zones, args);
 		else
 			ret = -EOPNOTSUPP;
 	}
