@@ -714,11 +714,11 @@ int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 void *nvme_mpath_ioctl_prep(struct mpath_device *mpath_device,
 		unsigned int cmd)
 {
-	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+	struct nvme_ctrl *ctrl = nvme_mpath_to_ns(mpath_device)->ctrl;
 
 	if (is_ctrl_ioctl(cmd)) {
-		nvme_get_ctrl(ns->ctrl);
-		return ns->ctrl;
+		nvme_get_ctrl(ctrl);
+		return ctrl;
 	}
 	return NULL;
 }
