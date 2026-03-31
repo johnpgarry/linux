@@ -4349,7 +4349,7 @@ found:
 out_free_index:
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
 out_put_disk:
-	//mpath_put_disk(sd_mpath_disk->mpath_disk);
+	mpath_put_disk(mpath_head);
 out_free_disk:
 	kfree(sd_mpath_disk);
 out_unlock:
