@@ -66,11 +66,6 @@ static int mpath_bdev_report_zones(struct gendisk *disk, sector_t sector,
 
 void mpath_synchronize(struct mpath_head *mpath_head)
 {
-	if (!mpath_head) {
-		BUG();
-		return;
-	}
-
 	synchronize_srcu(&mpath_head->srcu);
 }
 EXPORT_SYMBOL_GPL(mpath_synchronize);
@@ -78,10 +73,6 @@ EXPORT_SYMBOL_GPL(mpath_synchronize);
 void mpath_add_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device)
 {
-	if (!mpath_head) {
-		BUG();
-		return;
-	}
 	mpath_device->mpath_head = mpath_head;
 	mutex_lock(&mpath_head->lock);
 	list_add_tail_rcu(&mpath_device->siblings, &mpath_head->dev_list);
@@ -94,10 +85,6 @@ bool mpath_delete_device(struct mpath_device *mpath_device)
 {
 	bool empty;
 
-	if (!mpath_device->mpath_head) {
-		BUG();
-		return false;
-	}
 	mutex_lock(&mpath_device->mpath_head->lock);
 	list_del_rcu(&mpath_device->siblings);
 	empty = list_empty(&mpath_device->mpath_head->dev_list);
@@ -140,11 +127,6 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device)
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	bool changed = false;
 	int node;
-
-	if (!mpath_head) {
-		BUG();
-		goto out;
-	}
 
 	for_each_node(node) {
 		if (mpath_device ==
@@ -190,10 +172,6 @@ EXPORT_SYMBOL_GPL(mpath_clear_paths);
 void mpath_revalidate_paths(struct mpath_head *mpath_head,
 	void (*not_ready_cb)(struct mpath_device *mpath_device))
 {
-	if (!mpath_head) {
-		BUG();
-		return;
-	}
 
 	mpath_revalidate_paths_iter(mpath_head, not_ready_cb);
 	mpath_clear_paths(mpath_head);
@@ -479,11 +457,6 @@ static void mpath_free_head(struct kref *ref)
 int mpath_get_head(struct mpath_head *mpath_head)
 {
 	//pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
-	if (!mpath_head) {
-		BUG();
-		return 0;
-	}
-
 	if (!kref_get_unless_zero(&mpath_head->ref)) {
 		return -ENXIO;
 	}
@@ -496,10 +469,7 @@ void mpath_put_head(struct mpath_head *mpath_head)
 	//struct kref *ref;
 
 	//pr_err("%s mpath_head=%pS\n", __func__, mpath_head);
-	if (!mpath_head) {
-		BUG();
-		return;
-	}
+
 
 	//ref = &mpath_head->ref;
 
@@ -1004,10 +974,7 @@ EXPORT_SYMBOL_GPL(mpath_remove_disk);
 void mpath_put_disk(struct mpath_head *mpath_head)
 {
 	pr_err("%s mpqath=%pS\n", __func__, mpath_head);
-	if (!mpath_head) {
-		BUG();
-		return;
-	}
+
 	if (!mpath_head->disk)
 		return;
 
@@ -1039,10 +1006,7 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	int ret;
 
-	if (!mpath_head) {
-		BUG();
-		return;
-	}
+
 
 	pr_err("%s mpath_head=%pS mpath_head->disk=%pS\n",
 		__func__, mpath_head, mpath_head->disk);
@@ -1280,11 +1244,6 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 	struct device *target;
 	struct kobject *mpath_gd_kobj;
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
-
-	if (!mpath_head) {
-		BUG();
-		return;
-	}
 
 	if (!test_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
 		return;
