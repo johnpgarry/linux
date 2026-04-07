@@ -4251,6 +4251,7 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 				scsi_mpath_dev->scsi_mpath_head;
 	struct sd_mpath_disk *sd_mpath_disk;
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	char disk_name[DISK_NAME_LEN - 2];
 	struct queue_limits lim;
 	struct gendisk *disk;
 	int error;
@@ -4334,17 +4335,27 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 
 	sd_mpath_disk->disk_count = 1;
 	mutex_unlock(&sd_mpath_disks_lock);
-
 found:
 	sdkp->sd_mpath_disk = sd_mpath_disk;
 	sdkp->disk->flags |= GENHD_FL_HIDDEN;
+
+	pr_err("%s9 mpath_head->disk->disk_name=%s\n", __func__,
+		 mpath_head->disk->disk_name);
+	error = sized_strscpy(disk_name, mpath_head->disk->disk_name,
+				sizeof(disk_name));
+	if (error < 0)
+		goto out_remove_disk;
+
 	snprintf(sdkp->disk->disk_name, DISK_NAME_LEN, "%s:%d",
-		mpath_head->disk->disk_name,
+		disk_name,
 		scsi_mpath_dev->index);
 	pr_err("%s10 found: %s sd_mpath_disk=%pS\n", __func__,
 		 dev_name(&sdp->sdev_gendev), sd_mpath_disk);
 	sdkp->index = -1;
 	return 0;
+out_remove_disk:
+	mutex_lock(&sd_mpath_disks_lock);
+	sd_mpath_disk->disk_count--;
 
 out_free_index:
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
