@@ -717,12 +717,10 @@ out:
 
 void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
-	pr_err("%s calling mpath_put_disk head->mpath_head=%pS\n", __func__, head->mpath_head);
-	if (!head->mpath_head->disk)
-		return;
+	pr_err("%s calling mpath_put_disk head->mpath_head=%pS disk=%pS\n",
+	__func__, head->mpath_head, head->mpath_head->disk);
+
 	mpath_put_disk(head->mpath_head);
-	pr_err("%s1 calling mpath_put_head head->mpath_head=%pS\n", __func__, head->mpath_head);
-	mpath_put_head(head->mpath_head); //needs to be relocated
 }
 
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl)
