@@ -4240,12 +4240,12 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		 * we do not release the reference to nshead twice if head->disk
 		 * is not present.
 		 */
-		if (ns->head->mpath_head)
+		if (ns->head->mpath_head->disk)
 			last_path = true;
 	}
 	mutex_unlock(&ctrl->subsys->lock);
 	if (last_path)
-		nvme_mpath_remove_disk(ns->head);
+		nvme_put_ns_head(ns->head);
 	nvme_put_ns_head(ns->head);
  out_cleanup_disk:
 	put_disk(disk);
