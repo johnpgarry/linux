@@ -2520,11 +2520,9 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 	if (!ret && nvme_ns_head_multipath(ns->head)) {
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
+		struct gendisk *disk = ns->head->mpath_head->disk;
 		struct queue_limits lim;
 		unsigned int memflags;
-		struct nvme_ns_head *head = ns->head;
-		struct mpath_head *mpath_head = head->mpath_head;
-		struct gendisk *disk = mpath_head->disk;
 
 		lim = queue_limits_start_update(disk->queue);
 		memflags = blk_mq_freeze_queue(disk->queue);
@@ -2559,7 +2557,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 		set_capacity_and_notify(disk, get_capacity(ns->disk));
 		set_disk_ro(disk, nvme_ns_is_readonly(ns, info));
-		nvme_mpath_revalidate_paths(head);
+		nvme_mpath_revalidate_paths(ns->head);
 
 		blk_mq_unfreeze_queue(disk->queue, memflags);
 	}
