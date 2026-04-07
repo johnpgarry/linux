@@ -707,29 +707,6 @@ static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
 	return false;
 }
 
-int scsi_mpath_failover_disposition(struct scsi_cmnd *scmd)
-{
-	struct request *req = scsi_cmd_to_rq(scmd);
-	struct scsi_device *sdev = scmd->device;
-
-	pr_err("%s scmd=%pS req=%pS scsi_is_mpath_error=%d sdev_state=%d queue_dying=%d\n",
-				__func__, scmd, req, scsi_is_mpath_error(scmd), sdev->sdev_state,
-				blk_queue_dying(req->q));
-	if (is_mpath_request(req)) {
-		if (scsi_is_mpath_error(scmd) ||
-		    blk_queue_dying(req->q)) {
-			BUG();
-			return FAILOVER;
-		}
-		return NEEDS_RETRY;
-	} else {
-		if (blk_queue_dying(req->q))
-			return SUCCESS;
-	}
-
-	return SUCCESS;
-}
-
 int __init scsi_multipath_init(void)
 {
 	return class_register(&scsi_mpath_device_class);
