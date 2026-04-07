@@ -985,8 +985,13 @@ EXPORT_SYMBOL_GPL(mpath_remove_disk);
 void mpath_put_disk(struct mpath_head *mpath_head)
 {
 	pr_err("%s mpqath=%pS\n", __func__, mpath_head);
-	if (!mpath_head)
+	if (!mpath_head) {
+		BUG();
 		return;
+	}
+	if (!mpath_head->disk)
+		return;
+
 	/* make sure all pending bios are cleaned up */
 	kblockd_schedule_work(&mpath_head->requeue_work);
 	flush_work(&mpath_head->requeue_work);
@@ -1015,8 +1020,14 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	int ret;
 
-	if (!mpath_head)
+	if (!mpath_head) {
+		BUG();
 		return;
+	}
+
+	if (!mpath_head->disk) {
+		return;
+	}
 
 	if (!test_and_set_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
 		dev_set_drvdata(disk_to_dev(mpath_head->disk), mpath_head);

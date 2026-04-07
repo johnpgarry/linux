@@ -3915,6 +3915,7 @@ static int nvme_add_ns_cdev(struct nvme_ns *ns)
 static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 		struct nvme_ns_info *info)
 {
+	struct nvme_subsystem *subsys = ctrl->subsys;
 	struct nvme_ns_head *head;
 	size_t size = sizeof(*head);
 	int ret = -ENOMEM;
@@ -3943,9 +3944,19 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	} else
 		head->effects = ctrl->effects;
 
+	head->mpath_head = mpath_alloc_head();
+	pr_err("%s head=%pS head->mpath_head=%pS\n",
+		__func__, head, head->mpath_head);
+	if (IS_ERR(head->mpath_head))
+		goto out_ida_free;
+
+	head->mpath_head->drvdata = head;
+	head->mpath_head->drv_module = THIS_MODULE;
+	head->mpath_head->parent = &subsys->dev;
+
 	ret = nvme_mpath_alloc_disk(ctrl, head);
 	if (ret)
-		goto out_ida_free;
+		goto out_mpath_head_free;
 
 	list_add_tail(&head->entry, &ctrl->subsys->nsheads);
 
@@ -3953,6 +3964,8 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 
 	return head;
 
+out_mpath_head_free:
+	mpath_put_head(head->mpath_head);
 out_ida_free:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
 out_free_head:

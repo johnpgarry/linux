@@ -544,7 +544,7 @@ struct nvme_ns_head {
 
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
 {
-	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->mpath_head;
+	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->mpath_head->disk;
 }
 
 enum nvme_ns_features {

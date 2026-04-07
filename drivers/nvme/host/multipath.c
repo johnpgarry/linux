@@ -820,10 +820,12 @@ static const struct mpath_head_template mpdt = {
 
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
-	struct mpath_head *mpath_head;
-	struct nvme_subsystem *subsys = ctrl->subsys;
 	struct queue_limits lim;
 	int ret;
+
+	INIT_DELAYED_WORK(&head->mpath_head->remove_work, nvme_remove_head_work);
+	head->mpath_head->delayed_removal_secs = 0;
+	head->mpath_head->mpdt = &mpdt;
 
 	/*
 	 * If "multipath_always_on" is enabled, a multipath node is added
@@ -850,24 +852,11 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	if (head->ids.csi == NVME_CSI_ZNS)
 		lim.features |= BLK_FEAT_ZONED;
 
-	mpath_head = mpath_alloc_head();
-	if (IS_ERR(mpath_head))
-		return PTR_ERR(mpath_head);
-
-	ret = mpath_alloc_head_disk(mpath_head, &lim, ctrl->numa_node);
-	if (ret) {
-		mpath_put_head(mpath_head);
+	ret = mpath_alloc_head_disk(head->mpath_head, &lim, ctrl->numa_node);
+	if (ret)
 		return ret;
-	}
 
-	mpath_head->drvdata = head;
-	mpath_head->drv_module = THIS_MODULE;
-	head->mpath_head = mpath_head;
-	mpath_head->parent = &subsys->dev;
-	mpath_head->mpdt = &mpdt;
-	INIT_DELAYED_WORK(&mpath_head->remove_work, nvme_remove_head_work);
-
-	sprintf(mpath_head->disk->disk_name, "nvme%dn%d",
+	sprintf(head->mpath_head->disk->disk_name, "nvme%dn%d",
 			ctrl->subsys->instance, head->instance);
 	nvme_tryget_ns_head(head);
 	return 0;
