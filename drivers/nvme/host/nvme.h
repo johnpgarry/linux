@@ -1017,7 +1017,11 @@ long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, unsigned int cmd,
 void *nvme_mpath_ioctl_prep(struct mpath_device *mpath_device,
 						unsigned int cmd);
 void nvme_mpath_ioctl_finish(void *opaque);
-void nvme_mpath_put_disk(struct nvme_ns_head *head);
+
+static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
+{
+	mpath_put_disk(head->mpath_head);
+}
 
 static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
 {

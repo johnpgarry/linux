@@ -715,14 +715,6 @@ out:
 		nvme_remove_head(head);
 }
 
-void nvme_mpath_put_disk(struct nvme_ns_head *head)
-{
-	pr_err("%s calling mpath_put_disk head->mpath_head=%pS disk=%pS\n",
-	__func__, head->mpath_head, head->mpath_head->disk);
-
-	mpath_put_disk(head->mpath_head);
-}
-
 void nvme_mpath_init_ctrl(struct nvme_ctrl *ctrl)
 {
 	mutex_init(&ctrl->ana_lock);
