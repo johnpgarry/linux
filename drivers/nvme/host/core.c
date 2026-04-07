@@ -4052,7 +4052,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	} else {
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
-		    head->ns_count) {
+		    !mpath_head_devices_empty(head->mpath_head)) {
 			dev_err(ctrl->device,
 				"Duplicate unshared namespace %d\n",
 				info->nsid);
@@ -4074,7 +4074,6 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	}
 
-	head->ns_count++;
 	ns->head = head;
 	nvme_mpath_add_ns(ns);
 	mutex_unlock(&ctrl->subsys->lock);
@@ -4216,9 +4215,9 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	synchronize_srcu(&ctrl->srcu);
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
-	nvme_mpath_delete_ns(ns);
-	ns->head->ns_count--;
-	if (!ns->head->ns_count) {
+
+	mpath_delete_device(&ns->mpath_device);
+	if (mpath_head_devices_empty(ns->head->mpath_head)) {
 		list_del_init(&ns->head->entry);
 		/*
 		 * If multipath is not configured, we still create a namespace
@@ -4264,10 +4263,9 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		nvme_mpath_synchronize(head);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
-	nvme_mpath_delete_ns(ns);
-	head->ns_count--;
-	if (!head->ns_count) {
-		if (!nvme_mpath_head_queue_if_no_path(head))
+	mpath_delete_device(&ns->mpath_device);
+	if (mpath_head_devices_empty(ns->head->mpath_head)) {
+		if (!nvme_mpath_head_queue_if_no_path(ns->head))
 			list_del_init(&ns->head->entry);
 		last_path = true;
 	}

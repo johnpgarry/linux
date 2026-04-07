@@ -528,7 +528,6 @@ struct nvme_ns_head {
 	struct nvme_effects_log *effects;
 	u64			nuse;
 	unsigned		ns_id;
-	int			ns_count;
 	int			instance;
 #ifdef CONFIG_BLK_DEV_ZONED
 	u64			zsze;
@@ -1020,11 +1019,6 @@ void *nvme_mpath_ioctl_prep(struct mpath_device *mpath_device,
 void nvme_mpath_ioctl_finish(void *opaque);
 void nvme_mpath_put_disk(struct nvme_ns_head *head);
 
-static inline void nvme_mpath_delete_ns(struct nvme_ns *ns)
-{
-	mpath_delete_device(&ns->mpath_device);
-}
-
 static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
 {
 	ns->mpath_device.disk = ns->disk;
@@ -1082,9 +1076,6 @@ static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
 {
 }
 static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
-{
-}
-static inline void nvme_mpath_delete_ns(struct nvme_ns *ns)
 {
 }
 static inline void nvme_failover_req(struct request *req)
