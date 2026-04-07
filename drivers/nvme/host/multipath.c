@@ -94,7 +94,7 @@ void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		if (h->mpath_head)
+		if (h->mpath_head->disk)
 			blk_mq_unfreeze_queue_nomemrestore(
 				h->mpath_head->disk->queue);
 	}
@@ -106,7 +106,7 @@ void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		if (h->mpath_head)
+		if (h->mpath_head->disk)
 			blk_mq_freeze_queue_wait(h->mpath_head->disk->queue);
 	}
 }
@@ -117,7 +117,7 @@ void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 
 	lockdep_assert_held(&subsys->lock);
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		if (h->mpath_head)
+		if (h->mpath_head->disk)
 			blk_freeze_queue_start(h->mpath_head->disk->queue);
 	}
 }
@@ -197,7 +197,7 @@ void nvme_kick_requeue_lists(struct nvme_ctrl *ctrl)
 	srcu_idx = srcu_read_lock(&ctrl->srcu);
 	list_for_each_entry_srcu(ns, &ctrl->namespaces, list,
 				 srcu_read_lock_held(&ctrl->srcu)) {
-		if (!ns->head->mpath_head)
+		if (!ns->head->mpath_head->disk)
 			continue;
 		mpath_schedule_requeue_work(ns->head->mpath_head);
 		if (nvme_ctrl_state(ns->ctrl) == NVME_CTRL_LIVE)
@@ -412,7 +412,7 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 	clear_bit(NVME_NS_ANA_PENDING, &ns->flags);
 
 	/*
-	 * nvme_mpath_set_live() will trigger I/O to the multipath path device
+	 * mpath_device_set_live() will trigger I/O to the multipath path device
 	 * and in turn to this path device.  However we cannot accept this I/O
 	 * if the controller is not live.  This may deadlock if called from
 	 * nvme_mpath_init_identify() and the ctrl will never complete
@@ -429,9 +429,9 @@ static void nvme_update_ns_ana_state(struct nvme_ana_group_desc *desc,
 		 * device gendisk node.
 		 * If path's ana state is live (i.e. state is either optimized
 		 * or non-optimized) while we alloc the ns then sysfs link would
-		 * be created from nvme_mpath_set_live(). In that case we would
+		 * be created from mpath_device_set_live(). In that case we would
 		 * not fallthrough this code path. However for the path's ana
-		 * state other than live, we call nvme_mpath_set_live() only
+		 * state other than live, we call mpath_device_set_live() only
 		 * after ana state transitioned to the live state. But we still
 		 * want to create the sysfs link from head node to a path device
 		 * irrespctive of the path's ana state.
@@ -689,7 +689,7 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head)
 {
 	bool remove = false;
 
-	if (!head->mpath_head)
+	if (!head->mpath_head->disk)
 		return;
 
 	mutex_lock(&head->subsys->lock);
@@ -718,6 +718,8 @@ out:
 void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
 	pr_err("%s calling mpath_put_disk head->mpath_head=%pS\n", __func__, head->mpath_head);
+	if (!head->mpath_head->disk)
+		return;
 	mpath_put_disk(head->mpath_head);
 	pr_err("%s1 calling mpath_put_head head->mpath_head=%pS\n", __func__, head->mpath_head);
 	mpath_put_head(head->mpath_head); //needs to be relocated

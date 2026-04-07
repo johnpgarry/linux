@@ -4229,8 +4229,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
 
-	mpath_delete_device(&ns->mpath_device);
-	if (mpath_head_devices_empty(ns->head->mpath_head)) {
+	if (mpath_delete_device(&ns->mpath_device)) {
 		list_del_init(&ns->head->entry);
 		/*
 		 * If multipath is not configured, we still create a namespace
@@ -4276,8 +4275,7 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		nvme_mpath_synchronize(head);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
-	mpath_delete_device(&ns->mpath_device);
-	if (mpath_head_devices_empty(ns->head->mpath_head)) {
+	if (mpath_delete_device(&ns->mpath_device)) {
 		if (!nvme_mpath_head_queue_if_no_path(ns->head))
 			list_del_init(&ns->head->entry);
 		last_path = true;

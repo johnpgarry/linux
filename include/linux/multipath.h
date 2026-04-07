@@ -129,7 +129,7 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device);
 void mpath_synchronize(struct mpath_head *mpath_head);
 void mpath_add_device(struct mpath_head *mpath_head,
 			struct mpath_device *mpath_device);
-void mpath_delete_device(struct mpath_device *mpath_device);
+bool mpath_delete_device(struct mpath_device *mpath_device);
 bool mpath_head_devices_empty(struct mpath_head *mpath_head);
 int mpath_call_for_device(struct mpath_head *mpath_head,
 			int (*cb)(struct mpath_device *mpath_device));
