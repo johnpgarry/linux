@@ -44,7 +44,7 @@ EXPORT_SYMBOL_GPL(mpath_get_iopolicy);
 static int mpath_bdev_report_zones(struct gendisk *disk, sector_t sector,
 		unsigned int nr_zones, struct blk_report_zones_args *args)
 {
-	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
+	struct mpath_head *mpath_head = mpath_gendisk_to_head(disk);
 	struct mpath_device *mpath_device;
 	int srcu_idx, ret = -EWOULDBLOCK;
 
@@ -136,7 +136,6 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device)
 			changed = true;
 		}
 	}
-out:
 	return changed;
 }
 EXPORT_SYMBOL_GPL(mpath_clear_current_path);
@@ -498,7 +497,7 @@ static void mpath_bdev_release(struct gendisk *disk)
 static int mpath_bdev_get_unique_id(struct gendisk *disk, u8 id[16],
     enum blk_unique_id type)
 {
-	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
+	struct mpath_head *mpath_head = mpath_gendisk_to_head(disk);
 	int srcu_idx, ret = -EWOULDBLOCK;
 	struct mpath_device *mpath_device;
 
@@ -520,7 +519,7 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 		    unsigned int cmd, unsigned long arg)
 {
 	struct gendisk *disk = bdev->bd_disk;
-	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
+	struct mpath_head *mpath_head = mpath_gendisk_to_head(disk);
 	struct mpath_device *mpath_device;
 	int srcu_idx, err;
 	void *unlocked_ioctl_data;
@@ -556,7 +555,7 @@ out_unlock:
 
 static int mpath_bdev_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 {
-	struct mpath_head *mpath_head = mpath_gendisk_to_disk(disk);
+	struct mpath_head *mpath_head = mpath_gendisk_to_head(disk);
 	int srcu_idx, ret = -EWOULDBLOCK;
 	struct mpath_device *mpath_device;
 

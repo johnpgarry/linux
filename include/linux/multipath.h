@@ -107,14 +107,14 @@ static inline bool is_mpath_request(struct request *req)
 	return req->cmd_flags & REQ_MPATH;
 }
 
-static inline struct mpath_head *mpath_bd_device_to_disk(struct device *dev)
+static inline struct mpath_head *mpath_bd_device_to_head(struct device *dev)
 {
 	return dev_get_drvdata(dev);
 }
 
-static inline struct mpath_head *mpath_gendisk_to_disk(struct gendisk *disk)
+static inline struct mpath_head *mpath_gendisk_to_head(struct gendisk *disk)
 {
-	return mpath_bd_device_to_disk(disk_to_dev(disk));
+	return mpath_bd_device_to_head(disk_to_dev(disk));
 }
 
 static inline enum mpath_iopolicy_e mpath_read_iopolicy(

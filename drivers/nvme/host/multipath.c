@@ -622,14 +622,14 @@ static ssize_t delayed_removal_secs_show(struct device *bd_device,
 		struct device_attribute *attr, char *buf)
 {
 	return mpath_delayed_removal_secs_show(
-		mpath_bd_device_to_disk(bd_device), buf);
+		mpath_bd_device_to_head(bd_device), buf);
 }
 
 static ssize_t delayed_removal_secs_store(struct device *bd_device,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	return mpath_delayed_removal_secs_store(
-		mpath_bd_device_to_disk(bd_device), buf, count);
+		mpath_bd_device_to_head(bd_device), buf, count);
 }
 
 DEVICE_ATTR_RW(delayed_removal_secs);
