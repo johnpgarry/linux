@@ -3970,6 +3970,8 @@ out_mpath_head_free:
 out_ida_free:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
 out_free_head:
+	pr_err("%s14 out_free_head: calling kfree(head) head=%pS\n",
+		__func__, head);
 	kfree(head);
 out:
 	if (ret > 0)
