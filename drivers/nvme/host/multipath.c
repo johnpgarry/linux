@@ -327,7 +327,6 @@ static void nvme_remove_head_work(struct work_struct *work)
 		remove = true;
 	}
 	mutex_unlock(&head->subsys->lock);
-
 	if (remove)
 		nvme_remove_head(head);
 
