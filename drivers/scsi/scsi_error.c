@@ -1431,9 +1431,6 @@ int scsi_eh_get_sense(struct list_head *work_q,
 
 			pr_err("%s2 rtn=%d from scsi_decide_disposition scmd=%pS scmd->allowed=%d\n", __func__, rtn, scmd, scmd->allowed);
 			continue;
-		} else {
-
-			pr_err("%s3 rtn=%d NEEDS_RETRY=%d from scsi_decide_disposition scmd=%pS scmd->allowed=%d\n", __func__, rtn, NEEDS_RETRY, scmd, scmd->allowed);
 		}
 
 		scsi_eh_finish_cmd(scmd, done_q);
@@ -2140,8 +2137,6 @@ maybe_retry:
 	if (scsi_is_mpath_request(req)) {
 		pr_err("%s1 maybe_retry: not calling scsi_mpath_failover_disposition req=%pS scmd=%pS\n",
 			__func__, req, scmd);
-	//	WARN_ON_ONCE(1);
-	//	return scsi_mpath_failover_disposition(scmd);
 	}
 
 	/* we requeue for retry because the error was retryable, and
@@ -2151,11 +2146,7 @@ maybe_retry:
 	if (scsi_cmd_retry_allowed(scmd) && !scsi_noretry_cmd(scmd)) {
 		pr_err("%s2 maybe_retry: scsi_cmd_retry_allowed=%d scsi_noretry_cmd=%d req=%pS scmd=%pS\n",
 				__func__, scsi_cmd_retry_allowed(scmd), scsi_noretry_cmd(scmd), req, scmd);
-		if (scsi_is_mpath_request(req)) {
-			
-		//	WARN_ON_ONCE(1);
-		//	return scsi_mpath_failover_disposition(scmd);
-		}
+
 		return NEEDS_RETRY;
 	} else {
 		/*
