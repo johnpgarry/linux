@@ -320,11 +320,7 @@ static void nvme_remove_head_work(struct work_struct *work)
 			struct mpath_head, remove_work);
 	struct nvme_ns_head *head = mpath_head->drvdata;
 	bool remove = false;
-	struct kref *ref_head;
-	struct kref *ref_mpath_head;
 
-	ref_head = &head->ref;
-	ref_mpath_head = &mpath_head->ref;
 	mutex_lock(&head->subsys->lock);
 	if (mpath_head_devices_empty(mpath_head)) {
 		list_del_init(&head->entry);
