@@ -4624,7 +4624,7 @@ static int sd_probe(struct scsi_device *sdp)
 	if (sdp->scsi_mpath_dev)
 		error = device_add_disk(dev, gd, sd_mpath_dev_groups);
 	else
-		error = -1;
+		error = device_add_disk(dev, gd, sd_mpath_dev_groups);
 	if (error) {
 		sd_mpath_fail_probe(sdkp);
 		device_unregister(&sdkp->disk_dev);
