@@ -993,6 +993,12 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *li
 	if (!mpath_head->mpdt->ioctl_begin ^ !mpath_head->mpdt->ioctl_finish)
 		return -EINVAL;
 
+	if (!mpath_head->mpdt->add_cdev ^ !mpath_head->mpdt->del_cdev)
+		return -EINVAL;
+
+	if (!mpath_head->mpdt->add_cdev ^ !mpath_head->mpdt->cdev_ioctl)
+		return -EINVAL;
+
 	mpath_head->disk = blk_alloc_disk(lim, numa_node);
 	if (IS_ERR(mpath_head->disk))
 		return PTR_ERR(mpath_head->disk);
