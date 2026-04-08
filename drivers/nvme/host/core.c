@@ -2485,6 +2485,10 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 	bool unsupported = false;
 	int ret;
 
+	pr_err("%s ns=%pS\n", __func__, ns);
+	pr_err("%s1 ns->head=%pS\n", __func__, ns->head);
+	pr_err("%s2 ns->head->mpath_head=%pS\n", __func__, ns->head->mpath_head);
+
 	switch (info->ids.csi) {
 	case NVME_CSI_ZNS:
 		if (!IS_ENABLED(CONFIG_BLK_DEV_ZONED)) {
@@ -3956,6 +3960,8 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	head->mpath_head->parent = &subsys->dev;
 
 	ret = nvme_mpath_alloc_disk(ctrl, head);
+	pr_err("%s2 head=%pS head->mpath_head=%pS ret=%d\n",
+		__func__, head, head->mpath_head, ret);
 	if (ret)
 		goto out_mpath_head_free;
 
@@ -4052,6 +4058,8 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 	mutex_lock(&ctrl->subsys->lock);
 	head = nvme_find_ns_head(ctrl, info->nsid);
+	pr_err("%s1 ns=%pS head=%pS\n", __func__, ns, head);
+	pr_err("%s1.1 ns=%pS head->mpath_head=%pS\n", __func__, ns, head ? head->mpath_head : NULL);
 	if (!head) {
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, &info->ids);
 		if (ret) {
@@ -4065,6 +4073,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 			ret = PTR_ERR(head);
 			goto out_unlock;
 		}
+		pr_err("%s1.3 ns=%pS head->mpath_head=%pS\n", __func__, ns, head->mpath_head);
 	} else {
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
@@ -4090,6 +4099,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	}
 
+	pr_err("%s2 head=%pS head->mpath_head=%pS\n", __func__, head, head->mpath_head);
 	ns->head = head;
 	nvme_mpath_add_ns(ns);
 	mutex_unlock(&ctrl->subsys->lock);
@@ -4278,7 +4288,11 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		nvme_mpath_synchronize(head);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
+	pr_err("%s ns=%pS calling mpath_delete_device\n",
+		__func__, ns);
 	if (mpath_delete_device(&ns->mpath_device)) {
+		pr_err("%s1 ns=%pS called mpath_delete_device, last path\n",
+			__func__, ns);
 		if (!nvme_mpath_head_queue_if_no_path(ns->head))
 			list_del_init(&ns->head->entry);
 		last_path = true;
