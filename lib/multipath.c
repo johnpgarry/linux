@@ -811,7 +811,10 @@ static long mpath_chr_ioctl(struct file *file, unsigned int cmd,
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	err = mpath_head->mpdt->cdev_ioctl(mpath_device, cmd, arg, file->f_mode & FMODE_WRITE);
 	if (unlocked_ioctl_data) {
-		mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
+		if (mpath_head->mpdt->ioctl_finish)
+			mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
+		else
+			WARN_ON(1);
 		return err;
 	}
 
