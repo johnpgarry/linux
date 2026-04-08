@@ -811,10 +811,7 @@ static long mpath_chr_ioctl(struct file *file, unsigned int cmd,
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	err = mpath_head->mpdt->cdev_ioctl(mpath_device, cmd, arg, file->f_mode & FMODE_WRITE);
 	if (unlocked_ioctl_data) {
-		if (mpath_head->mpdt->ioctl_finish)
-			mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
-		else
-			WARN_ON(1);
+		mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
 		return err;
 	}
 
@@ -992,6 +989,10 @@ EXPORT_SYMBOL_GPL(mpath_put_disk);
 
 int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim, int numa_node)
 {
+	/* Do limited sanity checks on template */
+	if (!mpath_head->mpdt->ioctl_begin ^ !mpath_head->mpdt->ioctl_finish)
+		return -EINVAL;
+
 	mpath_head->disk = blk_alloc_disk(lim, numa_node);
 	if (IS_ERR(mpath_head->disk))
 		return PTR_ERR(mpath_head->disk);
