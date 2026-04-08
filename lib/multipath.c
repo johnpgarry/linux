@@ -90,6 +90,7 @@ bool mpath_delete_device(struct mpath_device *mpath_device)
 	empty = list_empty(&mpath_device->mpath_head->dev_list);
 	mutex_unlock(&mpath_device->mpath_head->lock);
 
+	pr_err("%s mpath_device=%pS empty=%d\n", __func__, mpath_device, empty);
 	return empty;
 }
 EXPORT_SYMBOL_GPL(mpath_delete_device);
@@ -989,6 +990,11 @@ EXPORT_SYMBOL_GPL(mpath_put_disk);
 
 int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim, int numa_node)
 {
+	pr_err("%s mpath_head=%pS mpdt=%pS\n", __func__, mpath_head, mpath_head->mpdt);
+
+	pr_err("%s1 mpath_head->mpdt->ioctl_begin=%pS, ioctl_finish=%pS\n",
+		__func__, mpath_head->mpdt->ioctl_begin,
+		mpath_head->mpdt->ioctl_finish);
 	/* Do limited sanity checks on template */
 	if (!mpath_head->mpdt->ioctl_begin ^ !mpath_head->mpdt->ioctl_finish)
 		return -EINVAL;
