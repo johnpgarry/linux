@@ -93,11 +93,10 @@ void nvme_mpath_unfreeze(struct nvme_subsystem *subsys)
 	struct nvme_ns_head *h;
 
 	lockdep_assert_held(&subsys->lock);
-	list_for_each_entry(h, &subsys->nsheads, entry) {
+	list_for_each_entry(h, &subsys->nsheads, entry)
 		if (h->mpath_head->disk)
 			blk_mq_unfreeze_queue_nomemrestore(
 				h->mpath_head->disk->queue);
-	}
 }
 
 void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
@@ -105,10 +104,9 @@ void nvme_mpath_wait_freeze(struct nvme_subsystem *subsys)
 	struct nvme_ns_head *h;
 
 	lockdep_assert_held(&subsys->lock);
-	list_for_each_entry(h, &subsys->nsheads, entry) {
+	list_for_each_entry(h, &subsys->nsheads, entry)
 		if (h->mpath_head->disk)
 			blk_mq_freeze_queue_wait(h->mpath_head->disk->queue);
-	}
 }
 
 void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
@@ -116,10 +114,9 @@ void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
 	struct nvme_ns_head *h;
 
 	lockdep_assert_held(&subsys->lock);
-	list_for_each_entry(h, &subsys->nsheads, entry) {
+	list_for_each_entry(h, &subsys->nsheads, entry)
 		if (h->mpath_head->disk)
 			blk_freeze_queue_start(h->mpath_head->disk->queue);
-	}
 }
 
 void nvme_failover_req(struct request *req)
