@@ -798,7 +798,7 @@ static const struct mpath_head_template mpdt = {
 	.get_iopolicy = nvme_mpath_get_iopolicy,
 	.device_groups = nvme_ns_attr_groups,
 	.get_nr_active = nvme_mpath_get_nr_active,
-	.ioctl_prep = nvme_mpath_ioctl_prep,
+	.ioctl_begin = nvme_mpath_ioctl_begin,
 	.ioctl_finish = nvme_mpath_ioctl_finish,
 };
 

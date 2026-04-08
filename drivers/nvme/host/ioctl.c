@@ -711,16 +711,15 @@ int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 			ioucmd, issue_flags);
 }
 
-void *nvme_mpath_ioctl_prep(struct mpath_device *mpath_device,
-		unsigned int cmd)
+void nvme_mpath_ioctl_begin(struct mpath_device *mpath_device,
+		unsigned int cmd, void **data)
 {
 	struct nvme_ctrl *ctrl = nvme_mpath_to_ns(mpath_device)->ctrl;
 
 	if (is_ctrl_ioctl(cmd)) {
 		nvme_get_ctrl(ctrl);
-		return ctrl;
+		*data = ctrl;
 	}
-	return NULL;
 }
 
 void nvme_mpath_ioctl_finish(void *opaque)
