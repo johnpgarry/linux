@@ -4270,8 +4270,22 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	if (sd_mpath_disk) {
 		pr_err("%s1.1 sd_mpath_disk=%pS going to increment sd_mpath_disk->disk_count=%d\n", __func__,
 			sd_mpath_disk, sd_mpath_disk->disk_count);
+		error = sized_strscpy(disk_name, mpath_head->disk->disk_name,
+				sizeof(disk_name));
+		pr_err("%s1.2 sd_mpath_disk=%pS going to increment sd_mpath_disk->disk_count=%d\n", __func__,
+			sd_mpath_disk, sd_mpath_disk->disk_count);
+		if (error < 0) {
+			/*
+			 * Should not happen as would fail for the same when
+			 * allocating the sd_mpath_disk
+			 */
+			sd_mpath_put_disk(sd_mpath_disk);
+			mutex_unlock(&sd_mpath_disks_lock);
+			return error;
+		}
 		sd_mpath_disk->disk_count++;
 		mutex_unlock(&sd_mpath_disks_lock);
+
 		goto found;
 	}
 
@@ -4312,6 +4326,12 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 				disk->disk_name, DISK_NAME_LEN);
 	if (error)
 		goto out_free_index;
+		
+	error = sized_strscpy(disk_name, mpath_head->disk->disk_name,
+				sizeof(disk_name));
+	pr_err("%s5.1 error=%d from sized_strscpy\n", __func__, error);
+	if (error < 0)
+		goto out_free_index;
 
 	error = dev_set_name(&sd_mpath_disk->dev, "%s",
 				dev_name(&scsi_mpath_head->dev));
@@ -4341,10 +4361,6 @@ found:
 
 	pr_err("%s9 mpath_head->disk->disk_name=%s\n", __func__,
 		 mpath_head->disk->disk_name);
-	error = sized_strscpy(disk_name, mpath_head->disk->disk_name,
-				sizeof(disk_name));
-	if (error < 0)
-		goto out_remove_disk;
 
 	snprintf(sdkp->disk->disk_name, DISK_NAME_LEN, "%s:%d",
 		disk_name,
@@ -4353,10 +4369,6 @@ found:
 		 dev_name(&sdp->sdev_gendev), sd_mpath_disk);
 	sdkp->index = -1;
 	return 0;
-out_remove_disk:
-	mutex_lock(&sd_mpath_disks_lock);
-	sd_mpath_disk->disk_count--;
-
 out_free_index:
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
 out_put_disk:
