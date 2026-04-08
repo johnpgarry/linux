@@ -964,7 +964,7 @@ int nvme_cdev_add(struct cdev *cdev, struct device *cdev_device,
 void nvme_cdev_del(struct cdev *cdev, struct device *cdev_device);
 int nvme_ioctl(struct block_device *bdev, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg);
-long nvme_ns_chr_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+long nvme_chr_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 long nvme_dev_ioctl(struct file *file, unsigned int cmd,
 		unsigned long arg);
