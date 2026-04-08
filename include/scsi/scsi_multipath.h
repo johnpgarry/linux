@@ -45,7 +45,6 @@ struct scsi_mpath_device {
 	container_of(d, struct scsi_mpath_device, mpath_device)
 
 blk_status_t scsi_mpath_setup_scsi_cmnd(struct scsi_cmnd *);
-void scsi_mpath_failover_req(struct request *);
 bool scsi_is_mpath_request(struct request *req);
 int scsi_mpath_dev_alloc(struct scsi_device *sdev);
 void scsi_mpath_dev_release(struct scsi_device *sdev);
@@ -80,10 +79,6 @@ struct scsi_mpath_head {
 };
 struct scsi_mpath_device {
 };
-
-static inline void scsi_mpath_failover_req(struct request *)
-{
-}
 static inline blk_status_t scsi_mpath_setup_scsi_cmnd(struct scsi_cmnd *)
 {
 	return BLK_STS_OK;

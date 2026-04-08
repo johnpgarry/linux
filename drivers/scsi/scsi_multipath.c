@@ -312,32 +312,6 @@ static inline void bio_list_add_clone_master_new(struct bio_list *bl,
 //			__func__, clone);
 }
 
-void scsi_mpath_failover_req(struct request *req)
-{
-	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
-	struct scsi_device *sdev = scmd->device;
-	struct scsi_driver *drv = to_scsi_driver(sdev->sdev_gendev.driver);
-	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
-	struct mpath_head *mpath_head = drv->to_mpath_head(req);
-	unsigned long flags;
-
-	pr_err("%s req=%pS req->bio=%pS scmd=%pS scsi_mpath_dev=%pS\n", __func__, req, req->bio, scmd, scsi_mpath_dev);
-	scsi_mpath_dev_clear_path(scsi_mpath_dev);
-
-	spin_lock_irqsave(&mpath_head->requeue_lock, flags);
-	bio_list_add_clone_master(&mpath_head->requeue_list, req->bio);
-	spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
-	req->bio = NULL;
-	req->biotail = NULL;
-	req->__data_len = 0;
-
-	/* End old request with clone detached */
-	scmd->result = 0;
-	blk_mq_end_request(req, 0);
-
-	mpath_schedule_requeue_work(mpath_head);
-}
-
 static void scsi_mpath_clone_end_io(struct bio *clone)
 {
 	struct bio *master_bio = clone->bi_private;
