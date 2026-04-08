@@ -477,7 +477,7 @@ static int scsi_mpath_get_nr_active(struct mpath_device *mpath_device)
 	return atomic_read(&scsi_mpath_dev->nr_active);
 }
 
-struct mpath_head_template smpdt_pr = {
+struct mpath_head_template smpdt = {
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
 	.available_path = scsi_mpath_available_path,
@@ -504,7 +504,7 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 	scsi_mpath_head->mpath_head = mpath_alloc_head();
 	if (IS_ERR(scsi_mpath_head->mpath_head))
 		goto out_bioset_exit;
-	scsi_mpath_head->mpath_head->mpdt = &smpdt_pr;
+	scsi_mpath_head->mpath_head->mpdt = &smpdt;
 	scsi_mpath_head->mpath_head->drvdata = scsi_mpath_head;
 	scsi_mpath_head->mpath_head->drv_module = THIS_MODULE;
 	scsi_mpath_head->iopolicy.iopolicy = iopolicy;
