@@ -256,30 +256,19 @@ blk_status_t scsi_mpath_setup_scsi_cmnd(struct scsi_cmnd *scmd)
 	return BLK_STS_OK;
 }
 
-static inline void bio_list_add_clone_master_new(struct bio_list *bl,
+static inline void bio_list_add_clone(struct bio_list *bl,
 				struct bio *clone)
 {
-	struct bio *master_bio;
+	struct bio *master_bio = clone->bi_private;
 
 	pr_err("%s clone=%pS ->bi_private=%pS ->bi_next=%pS\n",
 		__func__, clone, clone->bi_private, clone->bi_next);
-
-	master_bio = clone->bi_private;
-//	pr_err("%s2 clone=%pS master_bio=%pS bl->tail=%pS\n",
-//		__func__, clone, master_bio, bl->tail);
-
 	if (bl->tail)
 		bl->tail->bi_next = master_bio;
 	else
 		bl->head = master_bio;
-//	pr_err("%s3 clone=%pS master_bio=%pS bl->tail=%pS\n",
-//			__func__, clone, master_bio, bl->tail);
 	bl->tail = master_bio;
-//	pr_err("%s4 clone=%pS master_bio=%pS bl->tail=%pS\n",
-//			__func__, clone, master_bio, bl->tail);
 	bio_put(clone);
-//	pr_err("%s5 clone=%pS\n",
-//			__func__, clone);
 }
 
 static void scsi_mpath_clone_end_io(struct bio *clone)
@@ -307,7 +296,7 @@ static void scsi_mpath_clone_end_io(struct bio *clone)
 		scsi_mpath_dev_clear_path(scsi_mpath_dev);
 
 		spin_lock_irqsave(&mpath_head->requeue_lock, flags);
-		bio_list_add_clone_master_new(&mpath_head->requeue_list, clone);
+		bio_list_add_clone(&mpath_head->requeue_list, clone);
 		spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
 		//req->bio = NULL;
 		//req->biotail = NULL;
