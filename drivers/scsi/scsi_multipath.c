@@ -631,15 +631,6 @@ bool scsi_is_mpath_request(struct request *req)
 }
 EXPORT_SYMBOL_GPL(scsi_is_mpath_request);
 
-static inline bool scsi_is_mpath_error(struct scsi_cmnd *scmd)
-{
-	struct scsi_device *sdev = scmd->device;
-
-	if (sdev->sdev_state == SDEV_TRANSPORT_OFFLINE)
-		return true;
-	return false;
-}
-
 int __init scsi_multipath_init(void)
 {
 	return class_register(&scsi_mpath_device_class);
