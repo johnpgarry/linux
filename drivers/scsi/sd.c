@@ -4220,6 +4220,7 @@ static void sd_mpath_add_disk(struct scsi_disk *sdkp)
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
 	mpath_device->disk = sdkp->disk;
+	mpath_device->numa_node = dev_to_node(sdp->host->dma_dev);
 	mpath_add_device(mpath_head, mpath_device);
 	mpath_device_set_live(mpath_device);
 }
