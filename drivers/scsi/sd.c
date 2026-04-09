@@ -4056,14 +4056,6 @@ static int sd_mpath_ioctl(struct scsi_device *sdp, blk_mode_t mode,
 	return sd_ioctl(bdev, mode, cmd, arg);
 }
 
-static struct mpath_head *sd_mpath_to_head(struct request *req)
-{
-	struct scsi_disk *sdkp = req->part->bd_disk->private_data;
-	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
-
-	return sd_mpath_disk->scsi_mpath_head->mpath_head;
-}
-
 static int sd_mpath_revalidate_head(struct scsi_disk *sdkp)
 {
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
@@ -4963,7 +4955,6 @@ static struct scsi_driver sd_template = {
 	.mpath_start_cmd	= sd_mpath_start_command,
 	.mpath_end_cmd		= sd_mpath_end_command,
 	.mpath_ioctl		= sd_mpath_ioctl,
-	.to_mpath_head		= sd_mpath_to_head,
 	#endif
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,
