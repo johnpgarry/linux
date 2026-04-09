@@ -256,36 +256,6 @@ blk_status_t scsi_mpath_setup_scsi_cmnd(struct scsi_cmnd *scmd)
 	return BLK_STS_OK;
 }
 
-static inline void bio_list_add_clone_master(struct bio_list *bl,
-				struct bio *clone)
-{
-	struct bio *master_bio;
-
-	pr_err("%s clone=%pS ->bi_private=%pS ->bi_next=%pS\n",
-		__func__, clone, clone->bi_private, clone->bi_next);
-	if (clone->bi_next)
-		bio_list_add_clone_master(bl, clone->bi_next);
-
-	master_bio = clone->bi_private;
-//	pr_err("%s2 clone=%pS master_bio=%pS bl->tail=%pS\n",
-//		__func__, clone, master_bio, bl->tail);
-
-	if (bl->tail)
-		bl->tail->bi_next = master_bio;
-	else
-		bl->head = master_bio;
-//	pr_err("%s3 clone=%pS master_bio=%pS bl->tail=%pS\n",
-//			__func__, clone, master_bio, bl->tail);
-	bl->tail = master_bio;
-//	pr_err("%s4 clone=%pS master_bio=%pS bl->tail=%pS\n",
-//			__func__, clone, master_bio, bl->tail);
-	bio_put(clone);
-//	pr_err("%s5 clone=%pS\n",
-//			__func__, clone);
-}
-
-
-
 static inline void bio_list_add_clone_master_new(struct bio_list *bl,
 				struct bio *clone)
 {
