@@ -187,7 +187,7 @@ static bool mpath_path_is_disabled(struct mpath_head *mpath_head,
 }
 
 static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
-	int node)
+				int node)
 {
 	int found_distance = INT_MAX, fallback_distance = INT_MAX, distance;
 	struct mpath_device *found = NULL, *fallback = NULL, *mpath_device;
@@ -198,8 +198,10 @@ static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 			continue;
 
 		if (mpath_device->numa_node != NUMA_NO_NODE &&
-		    (mpath_head->mpdt->get_iopolicy(mpath_head) == MPATH_IOPOLICY_NUMA))
-			distance = node_distance(node, mpath_device->numa_node);
+		    (mpath_head->mpdt->get_iopolicy(mpath_head) ==
+			MPATH_IOPOLICY_NUMA))
+			distance = node_distance(node,
+					mpath_device->numa_node);
 		else
 			distance = LOCAL_DISTANCE;
 
@@ -225,14 +227,13 @@ static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 		found = fallback;
 
 	if (found)
-		rcu_assign_pointer(mpath_head->current_path[node],
-			found);
+		rcu_assign_pointer(mpath_head->current_path[node], found);
 
 	return found;
 }
 
 static struct mpath_device *mpath_next_dev(struct mpath_head *mpath_head,
-			struct mpath_device *mpath_dev)
+				struct mpath_device *mpath_dev)
 {
 	mpath_dev = list_next_or_null_rcu(&mpath_head->dev_list,
 			&mpath_dev->siblings, struct mpath_device,
@@ -297,7 +298,8 @@ out:
 	return found;
 }
 
-static struct mpath_device *mpath_queue_depth_path(struct mpath_head *mpath_head)
+static struct mpath_device *mpath_queue_depth_path(
+				struct mpath_head *mpath_head)
 {
 	struct mpath_device *best_opt = NULL, *mpath_device;
 	struct mpath_device *best_nonopt = NULL;
@@ -335,7 +337,7 @@ static struct mpath_device *mpath_queue_depth_path(struct mpath_head *mpath_head
 }
 
 static inline bool mpath_path_is_optimized(struct mpath_head *mpath_head,
-					struct mpath_device *mpath_device)
+				struct mpath_device *mpath_device)
 {
 	return mpath_head->mpdt->is_optimized(mpath_device);
 }
@@ -517,7 +519,7 @@ static int mpath_bdev_get_unique_id(struct gendisk *disk, u8 id[16],
 }
 
 static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
-		    unsigned int cmd, unsigned long arg)
+				unsigned int cmd, unsigned long arg)
 {
 	struct gendisk *disk = bdev->bd_disk;
 	struct mpath_head *mpath_head = mpath_gendisk_to_head(disk);
@@ -538,16 +540,19 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 	}
 
 	if (mpath_head->mpdt->ioctl_begin)
-		mpath_head->mpdt->ioctl_begin(mpath_device, cmd, &unlocked_ioctl_data);
+		mpath_head->mpdt->ioctl_begin(mpath_device, cmd,
+					&unlocked_ioctl_data);
 	pr_err("%s2 unlocked_ioctl_data=%pS ioctl=%pS cmd=0x%x\n",
 		__func__, unlocked_ioctl_data, mpath_device->disk->fops->ioctl, cmd);
 	if (unlocked_ioctl_data) {
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
-		err = mpath_device->disk->fops->ioctl(mpath_device->disk->part0, mode, cmd, arg);
+		err = mpath_device->disk->fops->ioctl(
+				mpath_device->disk->part0, mode, cmd, arg);
 		mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
 		return err;
 	} else {
-		err = mpath_device->disk->fops->ioctl(mpath_device->disk->part0, mode, cmd, arg);
+		err = mpath_device->disk->fops->ioctl(
+				mpath_device->disk->part0, mode, cmd, arg);
 	}
 out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
@@ -624,7 +629,8 @@ unlock:
 	return ret;
 }
 
-static int mpath_pr_release(struct block_device *bdev, u64 key, enum pr_type type)
+static int mpath_pr_release(struct block_device *bdev, u64 key,
+				enum pr_type type)
 {
 	struct mpath_head *mpath_head = dev_get_drvdata(&bdev->bd_device);
 	struct mpath_device *mpath_device;
@@ -828,7 +834,8 @@ static int mpath_chr_uring_cmd(struct io_uring_cmd *ioucmd,
 	struct mpath_head *mpath_head =
 			container_of(cdev, struct mpath_head, cdev);
 	struct mpath_device *mpath_device;
-	int srcu_idx, ret = -EINVAL; /* error code copied from nvme_ns_head_chr_uring_cmd */
+	/* error code copied from nvme_ns_head_chr_uring_cmd */
+	int srcu_idx, ret = -EINVAL;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
 	mpath_device = mpath_find_path(mpath_head);
@@ -988,7 +995,8 @@ void mpath_put_disk(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_put_disk);
 
-int mpath_alloc_head_disk(struct mpath_head *mpath_head, struct queue_limits *lim, int numa_node)
+int mpath_alloc_head_disk(struct mpath_head *mpath_head,
+				struct queue_limits *lim, int numa_node)
 {
 	pr_err("%s mpath_head=%pS mpdt=%pS\n", __func__, mpath_head, mpath_head->mpdt);
 
@@ -1229,7 +1237,8 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 		if (!test_bit(GD_ADDED, &mpath_device->disk->state))
 			continue;
 
-		if (test_and_set_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags))
+		if (test_and_set_bit(MPATH_DEVICE_SYSFS_ATTR_LINK,
+					&mpath_device->flags))
 			continue;
 
 		target = disk_to_dev(mpath_device->disk);
@@ -1245,7 +1254,8 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head)
 			dev_err(disk_to_dev(mpath_head->disk),
 					"failed to create link to %s rc=%d\n",
 					dev_name(target), rc);
-			clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
+			clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK,
+					&mpath_device->flags);
 		} else {
 			dev_info(source, "Created multipath sysfs link to %s\n",
 					mpath_device->disk->disk_name);
