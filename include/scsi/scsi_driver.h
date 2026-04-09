@@ -25,8 +25,6 @@ struct scsi_driver {
 	#ifdef CONFIG_SCSI_MULTIPATH
 	void (*mpath_start_cmd)(struct scsi_cmnd *);
 	void (*mpath_end_cmd)(struct scsi_cmnd *);
-	int (*mpath_ioctl)(struct scsi_device *sdev, blk_mode_t mode,
-					unsigned int cmd, unsigned long arg);
 	#endif
 };
 #define to_scsi_driver(drv) \
