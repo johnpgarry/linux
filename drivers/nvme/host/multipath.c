@@ -389,7 +389,7 @@ static void nvme_mpath_update_ana_state(struct nvme_ns *ns,
 	if (ana_state == NVME_ANA_OPTIMIZED)
 		ns->mpath_device.access_state = MPATH_STATE_OPTIMIZED;
 	else if (ana_state == NVME_ANA_NONOPTIMIZED)
-		ns->mpath_device.access_state = MPATH_STATE_ACTIVE;
+		ns->mpath_device.access_state = MPATH_STATE_NONOPTIMIZED;
 	else
 		ns->mpath_device.access_state = MPATH_STATE_OTHER;
 }

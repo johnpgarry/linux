@@ -188,7 +188,7 @@ scsi_mpath_put_head
 
 scsi_mpath_is_disabled
 	mpath_device_is_live
-		mpath_device->state == MPATH_STATE_OPTIMIZED or MPATH_STATE_ACTIVE
+		mpath_device->state == MPATH_STATE_OPTIMIZED or MPATH_STATE_NONOPTIMIZED
 		sdev_state == SDEV_RUNNING or SDEV_CANCEL
 	
 	
@@ -200,7 +200,7 @@ mpath_add_device_scsi
 		mpath_add_sysfs_link
 			
 mpath_device_is_live
-	READ_ONCE(mpath_device->state) == MPATH_STATE_OPTIMIZED or MPATH_STATE_ACTIVE
+	READ_ONCE(mpath_device->state) == MPATH_STATE_OPTIMIZED or MPATH_STATE_NONOPTIMIZED
 
 -----
 static struct class_interface sg_interface = {

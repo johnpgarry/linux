@@ -212,7 +212,7 @@ static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 			    found = mpath_device;
 		    }
 		    break;
-		case MPATH_STATE_ACTIVE:
+		case MPATH_STATE_NONOPTIMIZED:
 		    if (distance < fallback_distance) {
 			    fallback_distance = distance;
 			    fallback = mpath_device;
@@ -274,7 +274,7 @@ static struct mpath_device *mpath_round_robin_path(
 			found = mpath_device;
 			goto out;
 		}
-		if (mpath_device->access_state == MPATH_STATE_ACTIVE)
+		if (mpath_device->access_state == MPATH_STATE_NONOPTIMIZED)
 			found = mpath_device;
 	}
 
@@ -287,7 +287,7 @@ static struct mpath_device *mpath_round_robin_path(
 	access_state_old = old->access_state;
 	if (!mpath_path_is_disabled(mpath_head, old) &&
 	    (access_state_old == MPATH_STATE_OPTIMIZED ||
-	    (!found && access_state_old == MPATH_STATE_ACTIVE)))
+	    (!found && access_state_old == MPATH_STATE_NONOPTIMIZED)))
 		return old;
 
 	if (!found)
@@ -319,7 +319,7 @@ static struct mpath_device *mpath_queue_depth_path(
 				best_opt = mpath_device;
 			}
 			break;
-		case MPATH_STATE_ACTIVE:
+		case MPATH_STATE_NONOPTIMIZED:
 			if (depth < min_depth_nonopt) {
 				min_depth_nonopt = depth;
 				best_nonopt = mpath_device;

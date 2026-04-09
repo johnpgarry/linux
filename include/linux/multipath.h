@@ -26,7 +26,7 @@ struct mpath_iopolicy {
 
 enum mpath_access_state {
 	MPATH_STATE_OPTIMIZED,
-	MPATH_STATE_ACTIVE,
+	MPATH_STATE_NONOPTIMIZED,
 	MPATH_STATE_OTHER
 };
 
