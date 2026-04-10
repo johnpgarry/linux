@@ -667,9 +667,7 @@ static void nvme_free_ns_head(struct kref *ref)
 	struct nvme_ns_head *head =
 		container_of(ref, struct nvme_ns_head, ref);
 
-	nvme_mpath_put_disk(head);
 	ida_free(&head->subsys->ns_ida, head->instance);
-	cleanup_srcu_struct(&head->srcu);
 	nvme_put_subsystem(head->subsys);
 	kfree(head->plids);
 	kfree(head);
@@ -2520,9 +2518,12 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
 		struct queue_limits lim;
 		unsigned int memflags;
+		struct nvme_ns_head *head = ns->head;
+		struct mpath_disk *mpath_disk = head->mpath_disk;
+		struct gendisk *disk = mpath_disk->disk;
 
-		lim = queue_limits_start_update(ns->head->disk->queue);
-		memflags = blk_mq_freeze_queue(ns->head->disk->queue);
+		lim = queue_limits_start_update(disk->queue);
+		memflags = blk_mq_freeze_queue(disk->queue);
 		/*
 		 * queue_limits mixes values that are the hardware limitations
 		 * for bio splitting with what is the device configuration.
@@ -2543,20 +2544,20 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 		lim.io_min = ns_lim->io_min;
 		lim.io_opt = ns_lim->io_opt;
 		queue_limits_stack_bdev(&lim, ns->disk->part0, 0,
-					ns->head->disk->disk_name);
+					disk->disk_name);
 		if (unsupported)
-			ns->head->disk->flags |= GENHD_FL_HIDDEN;
+			disk->flags |= GENHD_FL_HIDDEN;
 		else
 			nvme_init_integrity(ns->head, &lim, info);
 		lim.max_write_streams = ns_lim->max_write_streams;
 		lim.write_stream_granularity = ns_lim->write_stream_granularity;
-		ret = queue_limits_commit_update(ns->head->disk->queue, &lim);
+		ret = queue_limits_commit_update(disk->queue, &lim);
 
-		set_capacity_and_notify(ns->head->disk, get_capacity(ns->disk));
-		set_disk_ro(ns->head->disk, nvme_ns_is_readonly(ns, info));
-		nvme_mpath_revalidate_paths(ns->head);
+		set_capacity_and_notify(disk, get_capacity(ns->disk));
+		set_disk_ro(disk, nvme_ns_is_readonly(ns, info));
+		nvme_mpath_revalidate_paths(head);
 
-		blk_mq_unfreeze_queue(ns->head->disk->queue, memflags);
+		blk_mq_unfreeze_queue(disk->queue, memflags);
 	}
 
 	return ret;
@@ -3916,10 +3917,6 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	size_t size = sizeof(*head);
 	int ret = -ENOMEM;
 
-#ifdef CONFIG_NVME_MULTIPATH
-	size += num_possible_nodes() * sizeof(struct nvme_ns *);
-#endif
-
 	head = kzalloc(size, GFP_KERNEL);
 	if (!head)
 		goto out;
@@ -3927,10 +3924,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	if (ret < 0)
 		goto out_free_head;
 	head->instance = ret;
-	INIT_LIST_HEAD(&head->list);
-	ret = init_srcu_struct(&head->srcu);
-	if (ret)
-		goto out_ida_remove;
+
 	head->subsys = ctrl->subsys;
 	head->ns_id = info->nsid;
 	head->ids = info->ids;
@@ -3943,22 +3937,20 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	if (head->ids.csi) {
 		ret = nvme_get_effects_log(ctrl, head->ids.csi, &head->effects);
 		if (ret)
-			goto out_cleanup_srcu;
+			goto out_ida_free;
 	} else
 		head->effects = ctrl->effects;
 
 	ret = nvme_mpath_alloc_disk(ctrl, head);
 	if (ret)
-		goto out_cleanup_srcu;
+		goto out_ida_free;
 
 	list_add_tail(&head->entry, &ctrl->subsys->nsheads);
 
 	kref_get(&ctrl->subsys->ref);
 
 	return head;
-out_cleanup_srcu:
-	cleanup_srcu_struct(&head->srcu);
-out_ida_remove:
+out_ida_free:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
 out_free_head:
 	kfree(head);
@@ -3997,7 +3989,7 @@ static int nvme_global_check_duplicate_ids(struct nvme_subsystem *this,
 static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 {
 	struct nvme_ctrl *ctrl = ns->ctrl;
-	struct nvme_ns_head *head = NULL;
+	struct nvme_ns_head *head;
 	int ret;
 
 	ret = nvme_global_check_duplicate_ids(ctrl->subsys, &info->ids);
@@ -4078,14 +4070,11 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	}
 
-	list_add_tail_rcu(&ns->siblings, &head->list);
 	head->ns_count++;
 	ns->head = head;
+	nvme_mpath_add_ns(ns);
 	mutex_unlock(&ctrl->subsys->lock);
 
-#ifdef CONFIG_NVME_MULTIPATH
-	cancel_delayed_work(&head->remove_work);
-#endif
 	return 0;
 
 out_put_ns_head:
@@ -4224,24 +4213,24 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 	synchronize_srcu(&ctrl->srcu);
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
-	list_del_rcu(&ns->siblings);
+	nvme_mpath_delete_ns(ns);
 	ns->head->ns_count--;
 	if (!ns->head->ns_count) {
 		list_del_init(&ns->head->entry);
 		/*
 		 * If multipath is not configured, we still create a namespace
-		 * head (nshead), but head->disk is not initialized in that
+		 * head (nshead), but mpath_head->disk is not initialized in that
 		 * case.  As a result, only a single reference to nshead is held
 		 * (via kref_init()) when it is created. Therefore, ensure that
 		 * we do not release the reference to nshead twice if head->disk
 		 * is not present.
 		 */
-		if (ns->head->disk)
+		if (nvme_mpath_has_disk(ns->head))
 			last_path = true;
 	}
 	mutex_unlock(&ctrl->subsys->lock);
 	if (last_path)
-		nvme_put_ns_head(ns->head);
+		nvme_mpath_remove_disk(ns->head);
 	nvme_put_ns_head(ns->head);
  out_cleanup_disk:
 	put_disk(disk);
@@ -4265,24 +4254,24 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	 * Ensure that !NVME_NS_READY is seen by other threads to prevent
 	 * this ns going back into current_path.
 	 */
-	synchronize_srcu(&ns->head->srcu);
+	nvme_mpath_synchronize(head);
 
 	/* wait for concurrent submissions */
 	if (nvme_mpath_clear_current_path(ns))
-		synchronize_srcu(&ns->head->srcu);
+		nvme_mpath_synchronize(head);
 
 	mutex_lock(&ns->ctrl->subsys->lock);
-	list_del_rcu(&ns->siblings);
+	nvme_mpath_delete_ns(ns);
 	head->ns_count--;
 	if (!head->ns_count) {
-		if (!nvme_mpath_queue_if_no_path(ns->head))
+		if (!nvme_mpath_head_queue_if_no_path(head))
 			list_del_init(&ns->head->entry);
 		last_path = true;
 	}
 	mutex_unlock(&ns->ctrl->subsys->lock);
 
 	/* guarantee not available in head->list */
-	synchronize_srcu(&ns->head->srcu);
+	nvme_mpath_synchronize(head);
 
 	if (!nvme_ns_head_multipath(ns->head))
 		nvme_cdev_del(&ns->cdev, &ns->cdev_device);

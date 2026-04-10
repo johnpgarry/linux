@@ -64,8 +64,11 @@ static inline struct nvme_ns_head *dev_to_ns_head(struct device *dev)
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
-	if (nvme_disk_is_ns_head(disk))
-		return disk->private_data;
+	if (nvme_disk_is_ns_head(disk)) {
+		struct mpath_disk *mpath_disk = mpath_gendisk_to_disk(disk);
+
+		return mpath_disk->mpath_head->drvdata;
+	}
 	return nvme_get_ns_from_dev(dev)->head;
 }
 
@@ -183,30 +186,36 @@ static ssize_t metadata_bytes_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(metadata_bytes);
 
+static int ns_head_update_nuse_cb(struct mpath_device *mpath_device)
+{
+	struct nvme_ns *ns = container_of(mpath_device, struct nvme_ns, mpath_device);
+	struct nvme_ns_head *head = ns->head;
+	struct nvme_id_ns *id;
+	int ret;
+
+	ret = nvme_identify_ns(ns->ctrl, head->ns_id, &id);
+	if (ret)
+		return ret;
+
+	head->nuse = le64_to_cpu(id->nuse);
+	kfree(id);
+	return 0;
+}
+
 static int ns_head_update_nuse(struct nvme_ns_head *head)
 {
-	struct nvme_id_ns *id;
-	struct nvme_ns *ns;
-	int srcu_idx, ret = -EWOULDBLOCK;
+	struct mpath_disk *mpath_disk = head->mpath_disk;
+	struct mpath_head *mpath_head = mpath_disk->mpath_head;
+	int ret;
 
 	/* Avoid issuing commands too often by rate limiting the update */
 	if (!__ratelimit(&head->rs_nuse))
 		return 0;
 
-	srcu_idx = srcu_read_lock(&head->srcu);
-	ns = nvme_find_path(head);
-	if (!ns)
-		goto out_unlock;
+	ret = mpath_call_for_device(mpath_head, ns_head_update_nuse_cb);
+	if (ret == -ENODEV)
+		return -EWOULDBLOCK;
 
-	ret = nvme_identify_ns(ns->ctrl, head->ns_id, &id);
-	if (ret)
-		goto out_unlock;
-
-	head->nuse = le64_to_cpu(id->nuse);
-	kfree(id);
-
-out_unlock:
-	srcu_read_unlock(&head->srcu, srcu_idx);
 	return ret;
 }
 
@@ -312,49 +321,10 @@ static const struct attribute_group nvme_ns_attr_group = {
 	.is_visible	= nvme_ns_attrs_are_visible,
 };
 
-#ifdef CONFIG_NVME_MULTIPATH
-/*
- * NOTE: The dummy attribute does not appear in sysfs. It exists solely to allow
- * control over the visibility of the multipath sysfs node. Without at least one
- * attribute defined in nvme_ns_mpath_attrs[], the sysfs implementation does not
- * invoke the multipath_sysfs_group_visible() method. As a result, we would not
- * be able to control the visibility of the multipath sysfs node.
- */
-static struct attribute dummy_attr = {
-	.name = "dummy",
-};
-
-static struct attribute *nvme_ns_mpath_attrs[] = {
-	&dummy_attr,
-	NULL,
-};
-
-static bool multipath_sysfs_group_visible(struct kobject *kobj)
-{
-	struct device *dev = container_of(kobj, struct device, kobj);
-
-	return nvme_disk_is_ns_head(dev_to_disk(dev));
-}
-
-static bool multipath_sysfs_attr_visible(struct kobject *kobj,
-		struct attribute *attr, int n)
-{
-	return false;
-}
-
-DEFINE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
-
-const struct attribute_group nvme_ns_mpath_attr_group = {
-	.name           = "multipath",
-	.attrs		= nvme_ns_mpath_attrs,
-	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
-};
-#endif
-
 const struct attribute_group *nvme_ns_attr_groups[] = {
 	&nvme_ns_attr_group,
 #ifdef CONFIG_NVME_MULTIPATH
-	&nvme_ns_mpath_attr_group,
+	&mpath_attr_group,
 #endif
 	NULL,
 };
