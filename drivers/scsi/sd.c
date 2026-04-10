@@ -4295,7 +4295,6 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	if (error)
 		goto out_free_disk;
 	disk = mpath_head->disk;
-	mpath_get_head(mpath_head); /* undone in mpath_free_disk() */
 
 	mpath_head->parent = &sd_mpath_disk->dev;
 
