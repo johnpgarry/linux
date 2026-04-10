@@ -657,6 +657,7 @@ static void iscsi_sw_tcp_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	/* stop recv side and release socket */
 	iscsi_sw_tcp_release_conn(conn);
 
+	pr_err("%s calling iscsi_conn_stop\n", __func__);
 	iscsi_conn_stop(cls_conn, flag);
 }
 

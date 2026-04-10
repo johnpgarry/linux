@@ -395,6 +395,7 @@ static bool scsi_mpath_available_path(struct mpath_device *mpath_device)
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 	enum scsi_device_state sdev_state = sdev->sdev_state;
 
+	pr_err("%s sdev=%pS sdev_state=%d\n", __func__, sdev, sdev_state);
 	if (sdev_state == SDEV_RUNNING || sdev_state == SDEV_QUIESCE ||
 		sdev_state == SDEV_BLOCK || sdev_state == SDEV_CREATED_BLOCK)
 		return true;

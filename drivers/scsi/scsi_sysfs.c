@@ -812,6 +812,8 @@ store_state_field(struct device *dev, struct device_attribute *attr,
 		ret = 0;
 	} else {
 		ret = scsi_device_set_state(sdev, state);
+		pr_err("%s called scsi_device_set_state ret=%d\n",
+			__func__, ret);
 		if (ret == 0 && state == SDEV_RUNNING)
 			rescan_dev = true;
 	}

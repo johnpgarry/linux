@@ -1341,6 +1341,7 @@ scsi_device_state_check(struct scsi_device *sdev, struct request *req)
 		 */
 		if (!sdev->offline_already) {
 			sdev->offline_already = true;
+			WARN_ON_ONCE(1);
 			sdev_printk(KERN_ERR, sdev,
 				    "rejecting I/O to offline device\n");
 		}
@@ -2549,6 +2550,8 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 		break;
 
 	case SDEV_RUNNING:
+		pr_err("%s SDEV_RUNNING oldstate=%d SDEV_BLOCK=%d\n",
+			__func__, oldstate, SDEV_BLOCK);
 		switch (oldstate) {
 		case SDEV_CREATED:
 		case SDEV_OFFLINE:

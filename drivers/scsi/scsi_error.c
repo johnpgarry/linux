@@ -198,6 +198,8 @@ scmd_eh_abort_handler(struct work_struct *work)
 
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
+	pr_err("%s scmd=%pS scsi_noretry_cmd=%d scsi_cmd_retry_allowed=%d scsi_eh_should_retry_cmd=%d\n",
+		__func__, scmd, scsi_noretry_cmd(scmd),  scsi_cmd_retry_allowed(scmd), scsi_eh_should_retry_cmd(scmd));
 	if (!scsi_noretry_cmd(scmd) &&
 	    scsi_cmd_retry_allowed(scmd) &&
 	    scsi_eh_should_retry_cmd(scmd)) {

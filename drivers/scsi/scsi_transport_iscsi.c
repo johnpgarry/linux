@@ -1896,6 +1896,8 @@ static void session_recovery_timedout(struct work_struct *work)
 	scsi_target_unblock(&session->dev, SDEV_TRANSPORT_OFFLINE);
 	ISCSI_DBG_TRANS_SESSION(session, "Completed unblocking SCSI target\n");
 
+	pr_err("%s9 session->transport->session_recovery_timedout=%pS\n",
+		__func__, session->transport->session_recovery_timedout);
 	if (session->transport->session_recovery_timedout)
 		session->transport->session_recovery_timedout(session);
 }
@@ -2221,7 +2223,8 @@ static void iscsi_stop_conn(struct iscsi_cls_conn *conn, int flag)
 				      flag);
 		return;
 	}
-
+	pr_err("%s calling conn->transport->stop_conn=%pS\n",
+		__func__, conn->transport->stop_conn);
 	conn->transport->stop_conn(conn, flag);
 	ISCSI_DBG_TRANS_CONN(conn, "Stopping conn done.\n");
 }
@@ -2289,6 +2292,7 @@ static int iscsi_if_stop_conn(struct iscsi_cls_conn *conn, int flag)
 	 */
 	if (flag == STOP_CONN_TERM) {
 		cancel_work_sync(&conn->cleanup_work);
+		pr_err("%s calling iscsi_stop_conn\n", __func__);
 		iscsi_stop_conn(conn, flag);
 	} else {
 		/*
@@ -2297,6 +2301,7 @@ static int iscsi_if_stop_conn(struct iscsi_cls_conn *conn, int flag)
 		spin_lock_irq(&conn->lock);
 		if (!test_and_set_bit(ISCSI_CLS_CONN_BIT_CLEANUP, &conn->flags)) {
 			spin_unlock_irq(&conn->lock);
+			pr_err("%s1 calling iscsi_stop_conn\n", __func__);
 			iscsi_stop_conn(conn, flag);
 		} else {
 			spin_unlock_irq(&conn->lock);
@@ -2322,6 +2327,7 @@ static void iscsi_cleanup_conn_work_fn(struct work_struct *work)
 						   cleanup_work);
 	struct iscsi_cls_session *session = iscsi_conn_to_session(conn);
 
+	pr_err("%s\n", __func__);
 	mutex_lock(&conn->ep_mutex);
 	/*
 	 * Get a ref to the ep, so we don't release its ID until after
@@ -2341,6 +2347,7 @@ static void iscsi_cleanup_conn_work_fn(struct work_struct *work)
 			session->recovery_tmo = 0;
 	}
 
+	pr_err("%s2 calling iscsi_stop_conn\n", __func__);
 	iscsi_stop_conn(conn, STOP_CONN_RECOVER);
 	mutex_unlock(&conn->ep_mutex);
 	ISCSI_DBG_TRANS_CONN(conn, "cleanup done.\n");
@@ -2627,7 +2634,6 @@ void iscsi_conn_error_event(struct iscsi_cls_conn *conn, enum iscsi_err error)
 	int len = nlmsg_total_size(sizeof(*ev));
 	unsigned long flags;
 	int state;
-
 	spin_lock_irqsave(&conn->lock, flags);
 	/*
 	 * Userspace will only do a stop call if we are at least bound. And, we
@@ -2636,11 +2642,14 @@ void iscsi_conn_error_event(struct iscsi_cls_conn *conn, enum iscsi_err error)
 	 * userspace to avoid races that can leave the cleanup_work queued.
 	 */
 	state = READ_ONCE(conn->state);
+	pr_err("%s state=%d\n", __func__, state);
 	switch (state) {
 	case ISCSI_CONN_BOUND:
 	case ISCSI_CONN_UP:
 		if (!test_and_set_bit(ISCSI_CLS_CONN_BIT_CLEANUP,
 				      &conn->flags)) {
+			pr_err("%s2 calling queue_work for cleanup_work, calls iscsi_cleanup_conn_work_fn\n",
+				__func__);
 			queue_work(iscsi_conn_cleanup_workq,
 				   &conn->cleanup_work);
 		}

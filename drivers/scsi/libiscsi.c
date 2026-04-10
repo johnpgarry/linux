@@ -1473,7 +1473,10 @@ void iscsi_conn_failure(struct iscsi_conn *conn, enum iscsi_err err)
 	bool needs_evt;
 
 	spin_lock_bh(&session->frwd_lock);
+	pr_err("%s calling iscsi_set_conn_failed\n", __func__);
 	needs_evt = iscsi_set_conn_failed(conn);
+	pr_err("%s1 called iscsi_set_conn_failed needs_evt=%d\n",
+		__func__, needs_evt);
 	spin_unlock_bh(&session->frwd_lock);
 
 	if (needs_evt)
@@ -2085,7 +2088,7 @@ enum scsi_timeout_action iscsi_eh_cmd_timed_out(struct scsi_cmnd *sc)
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
 
-	ISCSI_DBG_EH(session, "scsi cmd %p timedout\n", sc);
+	ISCSI_DBG_EH(session, "scsi cmd %pS timedout\n", sc);
 
 	spin_lock_bh(&session->frwd_lock);
 	spin_lock(&session->back_lock);
@@ -2335,7 +2338,7 @@ static void iscsi_prep_abort_task_pdu(struct iscsi_task *task,
 				      struct iscsi_tm *hdr)
 {
 	memset(hdr, 0, sizeof(*hdr));
-	pr_err("%s task=%pS ISCSI_TM_FUNC_ABORT_TASK\n", __func__, task);
+	pr_err("%s task=%pS ISCSI_OP_SCSI_TMFUNC | ISCSI_OP_IMMEDIATE\n", __func__, task);
 	hdr->opcode = ISCSI_OP_SCSI_TMFUNC | ISCSI_OP_IMMEDIATE;
 	hdr->flags = ISCSI_TM_FUNC_ABORT_TASK & ISCSI_FLAG_TM_FUNC_MASK;
 	hdr->flags |= ISCSI_FLAG_CMD_FINAL;
@@ -2503,6 +2506,7 @@ EXPORT_SYMBOL_GPL(iscsi_eh_abort);
 static void iscsi_prep_lun_reset_pdu(struct scsi_cmnd *sc, struct iscsi_tm *hdr)
 {
 	memset(hdr, 0, sizeof(*hdr));
+	pr_err("%s sc=%pS ISCSI_OP_SCSI_TMFUNC | ISCSI_OP_IMMEDIATE\n", __func__, sc);
 	hdr->opcode = ISCSI_OP_SCSI_TMFUNC | ISCSI_OP_IMMEDIATE;
 	hdr->flags = ISCSI_TM_FUNC_LOGICAL_UNIT_RESET & ISCSI_FLAG_TM_FUNC_MASK;
 	hdr->flags |= ISCSI_FLAG_CMD_FINAL;
@@ -2660,6 +2664,7 @@ EXPORT_SYMBOL_GPL(iscsi_eh_session_reset);
 static void iscsi_prep_tgt_reset_pdu(struct scsi_cmnd *sc, struct iscsi_tm *hdr)
 {
 	memset(hdr, 0, sizeof(*hdr));
+	pr_err("%s sc=%pS ISCSI_OP_SCSI_TMFUNC | ISCSI_OP_IMMEDIATE\n", __func__, sc);
 	hdr->opcode = ISCSI_OP_SCSI_TMFUNC | ISCSI_OP_IMMEDIATE;
 	hdr->flags = ISCSI_TM_FUNC_TARGET_WARM_RESET & ISCSI_FLAG_TM_FUNC_MASK;
 	hdr->flags |= ISCSI_FLAG_CMD_FINAL;
@@ -3435,6 +3440,7 @@ void iscsi_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 		if (session->state == ISCSI_STATE_IN_RECOVERY &&
 		    old_stop_stage != STOP_CONN_RECOVER) {
 			ISCSI_DBG_SESSION(session, "blocking session\n");
+			pr_err("%s calling iscsi_block_session\n", __func__);
 			iscsi_block_session(session->cls_session);
 		}
 	}

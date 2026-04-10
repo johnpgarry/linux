@@ -1241,8 +1241,7 @@ get_target:
 	 */
 	conn->tpg = iscsit_get_tpg_from_np(tiqn, np, &tpg_np);
 	if (!conn->tpg) {
-		pr_err("Unable to locate Target Portal Group"
-				" on %s\n", tiqn->tiqn);
+		pr_err("Unable to locate Target Portal Group on %s\n", tiqn->tiqn);
 		iscsit_put_tiqn_for_login(tiqn);
 		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
