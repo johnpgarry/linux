@@ -1095,6 +1095,11 @@ static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
 	mpath_synchronize(&head->mpath_head);
 }
 
+static inline bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
+{
+	return mpath_head_queue_if_no_path(&head->mpath_head);
+}
+
 static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
@@ -1215,6 +1220,10 @@ static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
 	return false;
 }
 static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
+{
+	return false;
+}
+static inline bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {
 	return false;
 }
