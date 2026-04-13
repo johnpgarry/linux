@@ -623,16 +623,22 @@ int nvme_ioctl(struct block_device *bdev, blk_mode_t mode,
 	return nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
 }
 
-long nvme_ns_chr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long _nvme_ns_chr_ioctl(struct nvme_ns *ns, unsigned int cmd,
+				unsigned long arg, bool open_for_write)
 {
-	struct nvme_ns *ns =
-		container_of(file_inode(file)->i_cdev, struct nvme_ns, cdev);
-	bool open_for_write = file->f_mode & FMODE_WRITE;
 	void __user *argp = (void __user *)arg;
 
 	if (is_ctrl_ioctl(cmd))
 		return nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
 	return nvme_ns_ioctl(ns, cmd, argp, 0, open_for_write);
+}
+
+long nvme_ns_chr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct nvme_ns *ns =
+		container_of(file_inode(file)->i_cdev, struct nvme_ns, cdev);
+
+	return _nvme_ns_chr_ioctl(ns, cmd, arg, file->f_mode & FMODE_WRITE);
 }
 
 static int nvme_uring_cmd_checks(unsigned int issue_flags)
@@ -689,6 +695,29 @@ int nvme_ns_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
 	return 0;
 }
 #ifdef CONFIG_NVME_MULTIPATH
+long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, unsigned int cmd,
+					unsigned long arg, bool open_for_write)
+{
+	return _nvme_ns_chr_ioctl(nvme_mpath_to_ns(mpath_device), cmd,
+			arg, open_for_write);
+}
+
+void nvme_mpath_ioctl_begin(struct mpath_device *mpath_device,
+		unsigned int cmd, void **data)
+{
+	struct nvme_ctrl *ctrl = nvme_mpath_to_ns(mpath_device)->ctrl;
+
+	if (is_ctrl_ioctl(cmd)) {
+		nvme_get_ctrl(ctrl);
+		*data = ctrl;
+	}
+}
+
+void nvme_mpath_ioctl_finish(void *opaque)
+{
+	nvme_put_ctrl(opaque);
+}
+
 static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
 		void __user *argp, struct nvme_ns_head *head, int srcu_idx,
 		bool open_for_write)
