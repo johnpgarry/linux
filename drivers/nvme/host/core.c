@@ -4101,7 +4101,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 	pr_err("%s2 head=%pS head->mpath_head=%pS\n", __func__, head, head->mpath_head);
 	ns->head = head;
-	nvme_mpath_add_ns(ns);
+	nvme_add_ns(ns);
 	mutex_unlock(&ctrl->subsys->lock);
 	return 0;
 
@@ -4242,7 +4242,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
  out_unlink_ns:
 	mutex_lock(&ctrl->subsys->lock);
 
-	if (mpath_delete_device(&ns->mpath_device)) {
+	if (nvme_delete_ns(ns)) {
 		list_del_init(&ns->head->entry);
 		/*
 		 * If multipath is not configured, we still create a namespace

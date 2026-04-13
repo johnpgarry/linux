@@ -987,6 +987,25 @@ extern const struct attribute_group *nvme_dev_attr_groups[];
 extern const struct block_device_operations nvme_bdev_ops;
 
 void nvme_delete_ctrl_sync(struct nvme_ctrl *ctrl);
+
+static inline void nvme_add_ns(struct nvme_ns *ns)
+{
+	ns->mpath_device.disk = ns->disk;
+	ns->mpath_device.numa_node = ns->ctrl->numa_node;
+	pr_err("%s ns->mpath_device=%pS\n",
+		__func__,
+		&ns->mpath_device);
+	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
+}
+
+static inline bool nvme_delete_ns(struct nvme_ns *ns)
+{
+	pr_err("%s ns->mpath_device=%pS\n",
+		__func__,
+		&ns->mpath_device);
+	return mpath_delete_device(&ns->mpath_device);
+}
+
 #ifdef CONFIG_NVME_MULTIPATH
 static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 {
@@ -1021,16 +1040,6 @@ void nvme_mpath_ioctl_finish(void *opaque);
 static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
 	mpath_put_disk(head->mpath_head);
-}
-
-static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
-{
-	ns->mpath_device.disk = ns->disk;
-	ns->mpath_device.numa_node = ns->ctrl->numa_node;
-	pr_err("%s ns->mpath_device=%pS\n",
-		__func__,
-		&ns->mpath_device);
-	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
 }
 
 static inline void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
@@ -1077,9 +1086,6 @@ static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 	return false;
 }
 static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
-{
-}
-static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
 {
 }
 static inline void nvme_failover_req(struct request *req)
