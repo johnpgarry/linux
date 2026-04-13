@@ -1041,6 +1041,18 @@ extern const struct block_device_operations nvme_bdev_ops;
 
 void nvme_delete_ctrl_sync(struct nvme_ctrl *ctrl);
 struct nvme_ns *nvme_find_path(struct nvme_ns_head *head);
+
+static inline void nvme_add_ns(struct nvme_ns *ns)
+{
+	mpath_add_device(&ns->mpath_device, &ns->head->mpath_head,
+		ns->disk, ns->ctrl->numa_node, &ns->ctrl->nr_active);
+}
+
+static inline bool nvme_delete_ns(struct nvme_ns *ns)
+{
+	return mpath_delete_device(&ns->mpath_device);
+}
+
 #ifdef CONFIG_NVME_MULTIPATH
 static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 {
