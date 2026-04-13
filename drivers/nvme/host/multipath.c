@@ -1554,4 +1554,6 @@ static const struct mpath_head_template mpdt = {
 	.cdev_ioctl = nvme_mpath_cdev_ioctl,
 	.ioctl_begin = nvme_mpath_ioctl_begin,
 	.ioctl_finish = nvme_mpath_ioctl_finish,
+	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
+	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 };
