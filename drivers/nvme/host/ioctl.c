@@ -550,6 +550,7 @@ static bool is_ctrl_ioctl(unsigned int cmd)
 static int nvme_ctrl_ioctl(struct nvme_ctrl *ctrl, unsigned int cmd,
 		void __user *argp, bool open_for_write)
 {
+	pr_err("%s\n", __func__);
 	switch (cmd) {
 	case NVME_IOCTL_ADMIN_CMD:
 		return nvme_user_cmd(ctrl, NULL, argp, 0, open_for_write);
@@ -581,6 +582,7 @@ struct nvme_user_io32 {
 static int nvme_ns_ioctl(struct nvme_ns *ns, unsigned int cmd,
 		void __user *argp, unsigned int flags, bool open_for_write)
 {
+	pr_err("%s\n", __func__);
 	switch (cmd) {
 	case NVME_IOCTL_ID:
 		force_successful_syscall_return();
@@ -615,12 +617,24 @@ int nvme_ioctl(struct block_device *bdev, blk_mode_t mode,
 	bool open_for_write = mode & BLK_OPEN_WRITE;
 	void __user *argp = (void __user *)arg;
 	unsigned int flags = 0;
+	struct nvme_ns_head *head = ns->head;
+	struct mpath_head *mpath_head = head->mpath_head;
+
+	pr_err("%s\n", __func__);
 
 	if (bdev_is_partition(bdev))
 		flags |= NVME_IOCTL_PARTITION;
 
-	if (is_ctrl_ioctl(cmd))
+	if (is_ctrl_ioctl(cmd)) {
+
+		pr_err("%s calling nvme_ctrl_ioctl srcu_read_lock_held=%d\n",
+			__func__, srcu_read_lock_held(&mpath_head->srcu));
+		lockdep_assert(!srcu_read_lock_held(&mpath_head->srcu));
 		return nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
+	}
+	pr_err("%s1 calling nvme_ns_ioctl srcu_read_lock_held=%d\n",
+		__func__, srcu_read_lock_held(&mpath_head->srcu));
+	lockdep_assert(srcu_read_lock_held(&mpath_head->srcu));
 	return nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
 }
 

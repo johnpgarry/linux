@@ -534,26 +534,21 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 		goto out_unlock;
 	}
 
-	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO)) {
-		err = -ENOIOCTLCMD;
-		goto out_unlock;
-	}
-
 	if (mpath_head->mpdt->ioctl_begin)
 		mpath_head->mpdt->ioctl_begin(mpath_device, cmd,
 					&unlocked_ioctl_data);
-	pr_err("%s2 unlocked_ioctl_data=%pS ioctl=%pS cmd=0x%x\n",
-		__func__, unlocked_ioctl_data, mpath_device->disk->fops->ioctl, cmd);
-	if (unlocked_ioctl_data) {
+	pr_err("%s2 unlocked_ioctl_data=%pS ioctl=%pS cmd=0x%x fops->ioctl=%pS\n",
+		__func__, unlocked_ioctl_data, mpath_device->disk->fops->ioctl, cmd, 
+		mpath_device->disk->fops->ioctl);
+	if (unlocked_ioctl_data)
 		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
-		err = mpath_device->disk->fops->ioctl(
-				mpath_device->disk->part0, mode, cmd, arg);
+	err = mpath_device->disk->fops->ioctl(
+			mpath_device->disk->part0, mode, cmd, arg);
+	if (unlocked_ioctl_data) {
 		mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
 		return err;
-	} else {
-		err = mpath_device->disk->fops->ioctl(
-				mpath_device->disk->part0, mode, cmd, arg);
 	}
+
 out_unlock:
 	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
 	return err;
