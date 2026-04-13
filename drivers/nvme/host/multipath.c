@@ -1551,4 +1551,7 @@ static const struct mpath_head_template mpdt = {
 	.del_cdev = nvme_mpath_del_cdev,
 	.is_disabled = nvme_mpath_is_disabled,
 	.is_optimized = nvme_mpath_is_optimized,
+	.cdev_ioctl = nvme_mpath_cdev_ioctl,
+	.ioctl_begin = nvme_mpath_ioctl_begin,
+	.ioctl_finish = nvme_mpath_ioctl_finish,
 };

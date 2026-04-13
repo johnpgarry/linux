@@ -1070,6 +1070,12 @@ void nvme_mpath_remove_disk(struct nvme_ns_head *head);
 void nvme_mpath_start_request(struct request *rq);
 void nvme_mpath_end_request(struct request *rq);
 
+long nvme_mpath_cdev_ioctl(struct mpath_device *mpath_device, unsigned int cmd,
+			unsigned long arg, bool open_for_write);
+void nvme_mpath_ioctl_begin(struct mpath_device *mpath_device,
+			unsigned int cmd, void **opaque);
+void nvme_mpath_ioctl_finish(void *opaque);
+
 static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
