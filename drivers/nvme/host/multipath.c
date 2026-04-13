@@ -1438,6 +1438,14 @@ void nvme_mpath_uninit(struct nvme_ctrl *ctrl)
 	ctrl->ana_log_size = 0;
 }
 
+static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(
+				struct mpath_head *mpath_head)
+{
+	struct nvme_ns_head *head = mpath_head->drvdata;
+
+	return mpath_read_iopolicy(&head->subsys->mpath_iopolicy);
+}
+
 __maybe_unused
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
@@ -1450,4 +1458,5 @@ static const struct mpath_head_template mpdt = {
 	.ioctl_finish = nvme_mpath_ioctl_finish,
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
+	.get_iopolicy = nvme_mpath_get_iopolicy,
 };
