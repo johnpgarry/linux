@@ -508,6 +508,7 @@ struct nvme_subsystem {
 	struct ida		ns_ida;
 #ifdef CONFIG_NVME_MULTIPATH
 	enum nvme_iopolicy	iopolicy;
+	struct mpath_iopolicy	mpath_iopolicy;
 #endif
 };
 
