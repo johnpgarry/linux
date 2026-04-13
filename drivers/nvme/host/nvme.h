@@ -1026,11 +1026,10 @@ static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
 static inline void nvme_mpath_add_ns(struct nvme_ns *ns)
 {
 	ns->mpath_device.disk = ns->disk;
-	ns->mpath_device.cdev = &ns->cdev;
 	ns->mpath_device.numa_node = ns->ctrl->numa_node;
-	pr_err("%s ns->mpath_device=%pS ns->mpath_device.cdev=%pS\n",
+	pr_err("%s ns->mpath_device=%pS\n",
 		__func__,
-		&ns->mpath_device, ns->mpath_device.cdev);
+		&ns->mpath_device);
 	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
 }
 

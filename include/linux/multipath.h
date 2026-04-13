@@ -43,7 +43,6 @@ struct mpath_device {
 	struct mpath_head *mpath_head;
 	struct list_head	siblings;
 	struct gendisk		*disk;
-	struct cdev		*cdev;
 	unsigned long		flags;
 	int			numa_node;
 	enum mpath_access_state access_state;
