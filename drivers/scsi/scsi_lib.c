@@ -669,6 +669,9 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	struct scsi_device *sdev = cmd->device;
 	struct request_queue *q = sdev->request_queue;
 
+	if (is_mpath_request(req))
+		scsi_mpath_end_request(req);
+
 	if (blk_update_request(req, error, bytes))
 		return true;
 
@@ -1916,6 +1919,9 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	scsi_set_resid(cmd, 0);
 	memset(cmd->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
 	cmd->submitter = SUBMITTED_BY_BLOCK_LAYER;
+
+	if (is_mpath_request(req))
+		scsi_mpath_start_request(req);
 
 	blk_mq_start_request(req);
 	if (blk_mq_is_reserved_rq(req)) {
