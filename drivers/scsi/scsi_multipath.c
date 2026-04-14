@@ -368,6 +368,7 @@ struct mpath_head_template smpdt = {
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.clone_bio = scsi_mpath_clone_bio,
 	.get_nr_active = scsi_mpath_get_nr_active,
+	.device_groups = mpath_device_groups,
 };
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
