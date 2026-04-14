@@ -351,12 +351,23 @@ static bool scsi_mpath_available_path(struct mpath_device *mpath_device)
 	return false;
 }
 
+static int scsi_mpath_get_nr_active(struct mpath_device *mpath_device)
+{
+	struct scsi_mpath_device *scsi_mpath_dev =
+				to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	struct Scsi_Host *shost = sdev->host;
+
+	return atomic_read(&shost->mpath_nr_active);
+}
+
 static struct mpath_head_template smpdt = {
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
 	.available_path = scsi_mpath_available_path,
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.clone_bio = scsi_mpath_clone_bio,
+	.get_nr_active = scsi_mpath_get_nr_active,
 };
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
