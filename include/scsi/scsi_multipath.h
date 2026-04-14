@@ -43,6 +43,7 @@ struct scsi_mpath_device {
 #define to_scsi_mpath_device(d) \
 	container_of(d, struct scsi_mpath_device, mpath_device)
 
+blk_status_t scsi_mpath_setup_scsi_cmnd(struct scsi_cmnd *);
 int scsi_mpath_dev_alloc(struct scsi_device *sdev);
 void scsi_mpath_dev_release(struct scsi_device *sdev);
 int scsi_multipath_init(void);
@@ -77,6 +78,10 @@ struct scsi_mpath_head {
 struct scsi_mpath_device {
 };
 
+static inline blk_status_t scsi_mpath_setup_scsi_cmnd(struct scsi_cmnd *)
+{
+	return BLK_STS_OK;
+}
 static inline int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	return 0;
