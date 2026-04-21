@@ -455,6 +455,7 @@ static void scsi_device_dev_release(struct device *dev)
 
 	might_sleep();
 
+	dev_err(dev, "%s sdev=%pS\n", __func__, sdev);
 	scsi_dh_release_device(sdev);
 	scsi_mpath_dev_release(sdev);
 
@@ -1449,6 +1450,8 @@ void __scsi_remove_device(struct scsi_device *sdev)
 {
 	struct device *dev = &sdev->sdev_gendev;
 	int res;
+
+	dev_err(dev, "%s sdev=%pS\n", __func__, sdev);
 
 	/*
 	 * This cleanup path is not reentrant and while it is impossible

@@ -131,10 +131,14 @@ static void sd_mpath_disk_release(struct device *dev)
 		sd_mpath_disk->scsi_mpath_head;
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
+	dev_err(dev, "%s sd_mpath_disk=%pS scsi_mpath_head=%pS\n",
+		__func__, sd_mpath_disk, scsi_mpath_head);
 	mpath_put_disk(mpath_head);
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
 	scsi_mpath_put_head(scsi_mpath_head);
 
+	dev_err(dev, "%s1 sd_mpath_disk=%pS scsi_mpath_head=%pS calling kfree(sd_mpath_disk)\n",
+		__func__, sd_mpath_disk, scsi_mpath_head);
 	kfree(sd_mpath_disk);
 }
 
@@ -805,6 +809,7 @@ static void scsi_disk_release(struct device *dev)
 {
 	struct scsi_disk *sdkp = to_scsi_disk(dev);
 
+	dev_err(dev, "%s sdkp=%pS\n", __func__, sdkp);
 	if (sdkp->index >= 0)
 		ida_free(&sd_index_ida, sdkp->index);
 	put_device(&sdkp->device->sdev_gendev);
@@ -4330,12 +4335,15 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 {
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
 	struct scsi_device *sdp = sdkp->device;
+	struct device *dev = &sdp->sdev_gendev;
 	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 	bool remove = false;
 
+	dev_err(dev, "%s sdp=%pS sdkp=%pS scsi_mpath_dev=%pS\n",
+		__func__, sdp, sdkp, scsi_mpath_dev);
 	mpath_synchronize(mpath_head);
 
 	if (mpath_clear_current_path(mpath_device))
@@ -4714,6 +4722,10 @@ static void sd_remove(struct scsi_device *sdp)
 {
 	struct device *dev = &sdp->sdev_gendev;
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+
+	WARN_ON_ONCE(1);
+
+	dev_err(dev, "%s sdp=%pS sdkp=%pS\n", __func__, sdp, sdkp);
 
 	if (sdp->scsi_mpath_dev)
 		sd_mpath_remove(sdkp);

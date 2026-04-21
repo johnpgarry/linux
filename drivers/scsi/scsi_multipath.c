@@ -96,6 +96,7 @@ static void scsi_mpath_head_release(struct device *dev)
 		container_of(dev, struct scsi_mpath_head, dev);
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
 
+	dev_err(dev, "%s mpath_head=%pS scsi_mpath_head=%pS\n", __func__, mpath_head, scsi_mpath_head);
 	bioset_exit(&scsi_mpath_head->bio_pool);
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
 	mpath_put_head(mpath_head);
@@ -150,6 +151,29 @@ static ssize_t scsi_mpath_device_iopolicy_show(struct device *dev,
 
 static DEVICE_ATTR(iopolicy, S_IRUGO | S_IWUSR,
 		scsi_mpath_device_iopolicy_show, scsi_mpath_device_iopolicy_store);
+
+static ssize_t scsi_mpath_device_delayed_removal_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+
+	return mpath_delayed_removal_secs_store(mpath_head, buf, count);
+}
+
+static ssize_t scsi_mpath_device_delayed_removal_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+
+	return mpath_delayed_removal_secs_show(mpath_head, buf);
+}
+
+static DEVICE_ATTR(delayed_removal_secs, S_IRUGO | S_IWUSR,
+		scsi_mpath_device_delayed_removal_show, scsi_mpath_device_delayed_removal_store);
 
 static struct attribute *scsi_mpath_device_attrs[] = {
 	&dev_attr_vpd_id.attr,
@@ -372,6 +396,21 @@ static int scsi_mpath_get_nr_active(struct mpath_device *mpath_device)
 	return atomic_read(&shost->mpath_nr_active);
 }
 
+static struct attribute *scsi_mpath_disk_attrs[] = {
+	&dev_attr_delayed_removal_secs.attr,
+	NULL,
+};
+
+static const struct attribute_group scsi_mpath_disk_attr_group = {
+	.attrs		= scsi_mpath_disk_attrs,
+};
+
+const struct attribute_group *scsi_mpath_disk_attr_groups[] = {
+	&scsi_mpath_disk_attr_group,
+	&mpath_attr_group,
+	NULL
+};
+
 struct mpath_head_template smpdt = {
 	.is_disabled = scsi_mpath_is_disabled,
 	.is_optimized = scsi_mpath_is_optimized,
@@ -379,7 +418,8 @@ struct mpath_head_template smpdt = {
 	.get_iopolicy = scsi_mpath_get_iopolicy,
 	.clone_bio = scsi_mpath_clone_bio,
 	.get_nr_active = scsi_mpath_get_nr_active,
-	.device_groups = mpath_device_groups,
+	//.device_groups = mpath_device_groups,
+	.device_groups = scsi_mpath_disk_attr_groups,
 };
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
@@ -562,7 +602,9 @@ void scsi_mpath_remove_device(struct scsi_mpath_device *scsi_mpath_dev)
 void scsi_mpath_dev_release(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct device *dev = &sdev->sdev_gendev;
 
+	dev_err(dev, "%s sdev=%pS scsi_mpath_dev=%pS\n", __func__, sdev, scsi_mpath_dev);
 	if (!scsi_mpath_dev)
 		return;
 
