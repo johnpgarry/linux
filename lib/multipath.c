@@ -932,9 +932,10 @@ static void mpath_remove_head_work(struct work_struct *work)
 {
 	struct mpath_head *mpath_head = container_of(to_delayed_work(work),
 			struct mpath_head, remove_work);
+	struct module *drv_module = mpath_head->drv_module;
 
 	mpath_head->mpdt->remove_head(mpath_head);
-	module_put(mpath_head->drv_module);
+	module_put(drv_module);
 }
 
 void mpath_remove_disk(struct mpath_head *mpath_head)
