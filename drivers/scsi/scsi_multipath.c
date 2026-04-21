@@ -432,8 +432,12 @@ static void scsi_mpath_remove_head_work(struct mpath_head *mpath_head)
 	device_del(&scsi_mpath_head->dev);
 	pr_err("%s2 mpath_head=%pS scsi_mpath_head=%pS calling mutex_unlock\n",
 		__func__, mpath_head, scsi_mpath_head);
-	mutex_unlock(&scsi_mpath_heads_lock);	
-	pr_err("%s3 mpath_head=%pS scsi_mpath_head=%pS called mutex_unlock\n",
+	mutex_unlock(&scsi_mpath_heads_lock);
+	pr_err("%s3 mpath_head=%pS scsi_mpath_head=%pS calling scsi_mpath_put_head\n",
+		__func__, mpath_head, scsi_mpath_head);
+
+	scsi_mpath_put_head(scsi_mpath_head);
+	pr_err("%s4 mpath_head=%pS scsi_mpath_head=%pS called scsi_mpath_put_head\n",
 		__func__, mpath_head, scsi_mpath_head);
 }
 
@@ -636,6 +640,8 @@ static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 	struct device *dev = &sdev->sdev_gendev;
 	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct kobject *kobj;
+	struct device *scsi_mpath_head_dev;
 
 	dev_err(dev, "%s scsi_mpath_head=%pS scsi_mpath_dev=%pS\n",
 		__func__, scsi_mpath_head, scsi_mpath_dev);
@@ -649,6 +655,7 @@ static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 				__func__, scsi_mpath_head);
 			last_path = true;
 		} else {
+			scsi_mpath_get_head(scsi_mpath_head);
 			dev_err(dev, "%s1.2 scsi_mpath_head=%pS mpath_can_remove_head failed\n",
 				__func__, scsi_mpath_head);
 		}
@@ -661,6 +668,8 @@ static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 		device_del(&scsi_mpath_head->dev);
 
 	scsi_mpath_dev->scsi_mpath_head = NULL;
+	scsi_mpath_head_dev = &scsi_mpath_head->dev;
+	kobj = &scsi_mpath_head_dev->kobj;
 	scsi_mpath_put_head(scsi_mpath_head);
 }
 
