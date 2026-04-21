@@ -43,6 +43,7 @@ struct mpath_device {
 
 struct mpath_head_template {
 	bool (*available_path)(struct mpath_device *);
+	void (*remove_head)(struct mpath_head *);
 	int (*add_cdev)(struct mpath_head *);
 	void (*del_cdev)(struct mpath_head *);
 	bool (*is_disabled)(struct mpath_device *);

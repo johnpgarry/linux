@@ -928,6 +928,15 @@ bool mpath_can_remove_head(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_can_remove_head);
 
+static void mpath_remove_head_work(struct work_struct *work)
+{
+	struct mpath_head *mpath_head = container_of(to_delayed_work(work),
+			struct mpath_head, remove_work);
+
+	mpath_head->mpdt->remove_head(mpath_head);
+	module_put(mpath_head->drv_module);
+}
+
 void mpath_remove_disk(struct mpath_head *mpath_head)
 {
 	if (test_and_clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
@@ -978,6 +987,9 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head,
 
 	mpath_head->disk->private_data = mpath_head;
 	mpath_head->disk->fops = &mpath_ops;
+
+	INIT_DELAYED_WORK(&mpath_head->remove_work, mpath_remove_head_work);
+	mpath_head->delayed_removal_secs = 0;
 
 	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->disk->state);
 

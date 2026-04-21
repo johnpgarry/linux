@@ -314,10 +314,8 @@ static void nvme_remove_head(struct nvme_ns_head *head)
 	nvme_put_ns_head(head);
 }
 
-static void nvme_remove_head_work(struct work_struct *work)
+static void nvme_mpath_remove_head(struct mpath_head *mpath_head)
 {
-	struct mpath_head *mpath_head = container_of(to_delayed_work(work),
-			struct mpath_head, remove_work);
 	struct nvme_ns_head *head = mpath_head->drvdata;
 	bool remove = false;
 
@@ -329,8 +327,6 @@ static void nvme_remove_head_work(struct work_struct *work)
 	mutex_unlock(&head->subsys->lock);
 	if (remove)
 		nvme_remove_head(head);
-
-	module_put(THIS_MODULE);
 }
 
 static int nvme_parse_ana_log(struct nvme_ctrl *ctrl, void *data,
@@ -790,6 +786,7 @@ static int nvme_mpath_get_nr_active(struct mpath_device *mpath_device)
 
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
+	.remove_head = nvme_mpath_remove_head,
 	.add_cdev = nvme_mpath_add_cdev,
 	.del_cdev = nvme_mpath_del_cdev,
 	.is_disabled = nvme_mpath_is_disabled,
@@ -809,8 +806,6 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	struct queue_limits lim;
 	int ret;
 
-	INIT_DELAYED_WORK(&head->mpath_head->remove_work, nvme_remove_head_work);
-	head->mpath_head->delayed_removal_secs = 0;
 	head->mpath_head->mpdt = &mpdt;
 
 	/*
