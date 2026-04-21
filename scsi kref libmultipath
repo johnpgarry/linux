@@ -32,6 +32,8 @@ scsi_sequential_lun_scan
 			transport_configure_device
 			scsi_attach_vpd
 	*		scsi_mpath_dev_alloc
+				scsi_multipath_sdev_init
+				scsi_mpath_unique_lun_id
 				scsi_mpath_find_head ref + 1 when found
 				scsi_mpath_alloc_head  = scsi_mpath_head 1 initially
 					mpath_alloc_head = mpath_head 1 initially
@@ -48,10 +50,6 @@ sd_revalidate_disk
 	sd_read_capacity(sdkp, lim
 	sd_config_write_same
 	queue_limits_commit_update_frozen	
-		
-scsi_mpath_dev_alloc
-	scsi_multipath_sdev_init
-	scsi_mpath_unique_lun_id
 	
 sd_probe
 	blk_mq_alloc_disk_for_queue
@@ -100,22 +98,25 @@ __iscsi_unbind_session
 					scsi_mpath_remove_sysfs_link
 					device_unregister(&sdev->sdev_dev)
 						sd_remove
-							mpath_delete_device
-								list_del_rcu(&mpath_device->siblings);
-							mpath_remove_sysfs_link
-							list_del(&sdkp->mpath_entry)
-							mpath_remove_disk // if last path
-							device_del(&scsi_mpath_disk->dev) // if last path
-							put_device(&scsi_mpath_disk->dev)
-								sd_mpath_disk_release
-									mpath_put_disk(mpath_disk)
-									ida_free(&sd_index_ida, scsi_mpath_disk->disk_index)
-									scsi_mpath_put_head(scsi_mpath_head) // see sd_probe for taking ref
-									kfree(scsi_mpath_disk)
+							sd_mpath_remove
+								mpath_delete_device
+									list_del_rcu(&mpath_device->siblings);
+								mpath_remove_sysfs_link
+								list_del(&sdkp->mpath_entry) // if last path
+								mpath_remove_disk // if last path
+								device_del(&scsi_mpath_disk->dev) // if last path
+								put_device(&scsi_mpath_disk->dev)
+									sd_mpath_disk_release
+										mpath_put_disk(mpath_disk)
+										ida_free(&sd_index_ida, scsi_mpath_disk->disk_index)
+										scsi_mpath_put_head(scsi_mpath_head) // see sd_probe for taking ref
+										kfree(scsi_mpath_disk)
 							device_del(&sdkp->disk_dev)
 								scsi_disk_release sd
 									ida_free(&sd_index_ida, sdkp->index);
 									kfree(sdkp)
+							del_gendisk(sdkp->disk)
+							put_disk(sdkp->disk)
 					scsi_mpath_remove_device
 						mpath_clear_current_path
 						ida_free(&scsi_mpath_head->ida, scsi_mpath_dev->index);
