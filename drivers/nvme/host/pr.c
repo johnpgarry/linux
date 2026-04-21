@@ -49,22 +49,6 @@ static enum pr_type block_pr_type_from_nvme(enum nvme_pr_type type)
 	return 0;
 }
 
-static int nvme_send_ns_head_pr_command(struct block_device *bdev,
-		struct nvme_command *c, void *data, unsigned int data_len)
-{
-	struct nvme_ns_head *head = bdev->bd_disk->private_data;
-	int srcu_idx = srcu_read_lock(&head->srcu);
-	struct nvme_ns *ns = nvme_find_path(head);
-	int ret = -EWOULDBLOCK;
-
-	if (ns) {
-		c->common.nsid = cpu_to_le32(ns->head->ns_id);
-		ret = nvme_submit_sync_cmd(ns->queue, c, data, data_len);
-	}
-	srcu_read_unlock(&head->srcu, srcu_idx);
-	return ret;
-}
-
 static int nvme_send_ns_pr_command(struct nvme_ns *ns, struct nvme_command *c,
 		void *data, unsigned int data_len)
 {
@@ -101,8 +85,6 @@ static int __nvme_send_pr_command(struct block_device *bdev, u32 cdw10,
 	c.common.cdw10 = cpu_to_le32(cdw10);
 	c.common.cdw11 = cpu_to_le32(cdw11);
 
-	if (nvme_disk_is_ns_head(bdev->bd_disk))
-		return nvme_send_ns_head_pr_command(bdev, &c, data, data_len);
 	return nvme_send_ns_pr_command(bdev->bd_disk->private_data, &c,
 				data, data_len);
 }
