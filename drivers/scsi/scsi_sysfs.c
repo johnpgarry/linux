@@ -1493,8 +1493,10 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	} else
 		put_device(&sdev->sdev_dev);
 
-	if (sdev->scsi_mpath_dev)
+	if (sdev->scsi_mpath_dev) {
+		dev_err(dev, "%s2 sdev=%pS calling scsi_mpath_remove_device\n", __func__, sdev);
 		scsi_mpath_remove_device(sdev->scsi_mpath_dev);
+	}
 
 	/*
 	 * Stop accepting new requests and wait until all queuecommand() and

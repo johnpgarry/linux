@@ -4362,6 +4362,8 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 	mpath_remove_sysfs_link(mpath_device);
 	mpath_device->disk = NULL;
 
+	dev_err(dev, "%s2 sdp=%pS sdkp=%pS scsi_mpath_dev=%pS remove=%d\n",
+		__func__, sdp, sdkp, scsi_mpath_dev, remove);
 	if (remove) {
 		device_del(&sd_mpath_disk->dev);
 		mpath_remove_disk(mpath_head);
@@ -4722,8 +4724,6 @@ static void sd_remove(struct scsi_device *sdp)
 {
 	struct device *dev = &sdp->sdev_gendev;
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
-
-	WARN_ON_ONCE(1);
 
 	dev_err(dev, "%s sdp=%pS sdkp=%pS\n", __func__, sdp, sdkp);
 

@@ -178,6 +178,7 @@ static DEVICE_ATTR(delayed_removal_secs, S_IRUGO | S_IWUSR,
 static struct attribute *scsi_mpath_device_attrs[] = {
 	&dev_attr_vpd_id.attr,
 	&dev_attr_iopolicy.attr,
+	&dev_attr_delayed_removal_secs.attr,
 	NULL
 };
 
@@ -569,11 +570,48 @@ out_uninit:
 	return ret;
 }
 
+#ifdef dsddsd
+void nvme_mpath_remove_disk(struct nvme_ns_head *head)
+{
+	bool remove = false;
+
+	if (!head->mpath_head->disk)
+		return;
+
+	mutex_lock(&head->subsys->lock);
+	/*
+	 * We are called when all paths have been removed, and at that point
+	 * head->list is expected to be empty. However, nvme_ns_remove() and
+	 * nvme_init_ns_head() can run concurrently and so if head->delayed_
+	 * removal_secs is configured, it is possible that by the time we reach
+	 * this point, head->list may no longer be empty. Therefore, we recheck
+	 * head->list here. If it is no longer empty then we skip enqueuing the
+	 * delayed head removal work.
+	 */
+	if (!mpath_head_devices_empty(head->mpath_head))
+		goto out;
+
+	if (mpath_can_remove_head(head->mpath_head)) {
+		list_del_init(&head->entry);
+		remove = true;
+	}
+out:
+	mutex_unlock(&head->subsys->lock);
+	if (remove)
+		nvme_remove_head(head);
+}
+#endif
+
 static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 			scsi_mpath_dev->scsi_mpath_head;
 	bool last_path = false;
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	struct device *dev = &sdev->sdev_gendev;
+
+	dev_err(dev, "%s scsi_mpath_head=%pS scsi_mpath_dev=%pS\n",
+		__func__, scsi_mpath_head, scsi_mpath_dev);
 
 	mutex_lock(&scsi_mpath_heads_lock);
 	scsi_mpath_head->dev_count--;
@@ -583,6 +621,8 @@ static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 	}
 	mutex_unlock(&scsi_mpath_heads_lock);
 
+	dev_err(dev, "%s2 scsi_mpath_head=%pS scsi_mpath_dev=%pS last_path=%d\n",
+		__func__, scsi_mpath_head, scsi_mpath_dev, last_path);
 	if (last_path)
 		device_del(&scsi_mpath_head->dev);
 
@@ -593,9 +633,13 @@ static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 void scsi_mpath_remove_device(struct scsi_mpath_device *scsi_mpath_dev)
 {
 	struct scsi_mpath_head *scsi_mpath_head = scsi_mpath_dev->scsi_mpath_head;
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	struct device *dev = &sdev->sdev_gendev;
 
 	ida_free(&scsi_mpath_head->ida, scsi_mpath_dev->index);
 
+	dev_err(dev, "%s scsi_mpath_head=%pS scsi_mpath_dev=%pS calling scsi_mpath_remove_head\n",
+		__func__, scsi_mpath_head, scsi_mpath_dev);
 	scsi_mpath_remove_head(scsi_mpath_dev);
 }
 
