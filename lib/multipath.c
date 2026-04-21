@@ -459,6 +459,7 @@ static void mpath_free_head(struct kref *ref)
 		container_of(ref, struct mpath_head, ref);
 
 	cleanup_srcu_struct(&mpath_head->srcu);
+	pr_err("%s calling kfree(mpath_head)\n", __func__);
 	kfree(mpath_head);
 }
 
