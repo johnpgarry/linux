@@ -4087,8 +4087,8 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 		}
 	}
 
-	nvme_add_ns(ns);
 	ns->head = head;
+	nvme_add_ns(ns);
 	mutex_unlock(&ctrl->subsys->lock);
 
 	return 0;
