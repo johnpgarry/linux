@@ -4190,28 +4190,6 @@ static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_mpath_head *scsi_mpa
 	return NULL;
 }
 
-static void sd_mpath_remove_head(struct scsi_mpath_head *scsi_mpath_head)
-{
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
-	struct sd_mpath_disk *sd_mpath_disk;
-	struct device *dev = &scsi_mpath_head->dev;
-
-	dev_err(dev, "%s scsi_mpath_head=%pS mpath_head=%pS\n", __func__, scsi_mpath_head, mpath_head);
-
-	mutex_lock(&sd_mpath_disks_lock);
-	sd_mpath_disk = sd_mpath_find_disk(scsi_mpath_head);
-
-	if (!sd_mpath_disk) {
-		dev_warn(dev, "could not find mpath disk\n");
-		mutex_unlock(&sd_mpath_disks_lock);
-		return;
-	}
-	
-	dev_err(dev, "%s2 scsi_mpath_head=%pS mpath_head=%pS sd_mpath_disk=%pS\n",
-		__func__, scsi_mpath_head, mpath_head, sd_mpath_disk);
-	mutex_unlock(&sd_mpath_disks_lock);
-}
-
 static void sd_mpath_add_disk(struct scsi_disk *sdkp)
 {
 	struct scsi_device *sdp = sdkp->device;
@@ -4392,6 +4370,39 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 		device_del(&sd_mpath_disk->dev);
 		mpath_remove_disk(mpath_head);
 	}
+	sd_mpath_put_disk(sd_mpath_disk);
+}
+
+static void sd_mpath_remove_head(struct scsi_mpath_head *scsi_mpath_head)
+{
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct sd_mpath_disk *sd_mpath_disk;
+	struct device *dev = &scsi_mpath_head->dev;
+
+	dev_err(dev, "%s scsi_mpath_head=%pS mpath_head=%pS\n", __func__, scsi_mpath_head, mpath_head);
+
+	mutex_lock(&sd_mpath_disks_lock);
+	sd_mpath_disk = sd_mpath_find_disk(scsi_mpath_head);
+
+	if (!sd_mpath_disk) {
+		dev_warn(dev, "could not find mpath disk\n");
+		mutex_unlock(&sd_mpath_disks_lock);
+		return;
+	}
+
+	dev_err(dev, "%s2 scsi_mpath_head=%pS mpath_head=%pS sd_mpath_disk=%pS calling list_del_init\n",
+		__func__, scsi_mpath_head, mpath_head, sd_mpath_disk);
+	list_del_init(&sd_mpath_disk->entry);
+	mutex_unlock(&sd_mpath_disks_lock);
+
+	dev_err(dev, "%s3 scsi_mpath_head=%pS mpath_head=%pS sd_mpath_disk=%pS calling device_del\n",
+		__func__, scsi_mpath_head, mpath_head, sd_mpath_disk);
+	device_del(&sd_mpath_disk->dev);
+	dev_err(dev, "%s4 scsi_mpath_head=%pS mpath_head=%pS sd_mpath_disk=%pS calling mpath_remove_disk\n",
+		__func__, scsi_mpath_head, mpath_head, sd_mpath_disk);
+	mpath_remove_disk(mpath_head);
+	dev_err(dev, "%s5 scsi_mpath_head=%pS mpath_head=%pS sd_mpath_disk=%pS calling sd_mpath_put_disk\n",
+		__func__, scsi_mpath_head, mpath_head, sd_mpath_disk);
 	sd_mpath_put_disk(sd_mpath_disk);
 }
 
