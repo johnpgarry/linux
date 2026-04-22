@@ -697,15 +697,15 @@ static void scsi_mpath_free_head(struct kref *ref)
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(ref, struct scsi_mpath_head, ref);
 
-	pr_err("%s x0 scsi_mpath_head=%pS calling msleep\n",
-		__func__, scsi_mpath_head);
-	msleep(30000);
-	pr_err("%s x1 scsi_mpath_head=%pS called msleep\n",
-		__func__, scsi_mpath_head);
+//	pr_err("%s x0 scsi_mpath_head=%pS calling msleep\n",
+//		__func__, scsi_mpath_head);
+//	msleep(30000);
+//	pr_err("%s x1 scsi_mpath_head=%pS called msleep\n",
+//		__func__, scsi_mpath_head);
 
 	/* If we race with scsi_mpath_find_head(), then that function may
 	find this scsi_mpath_head in the head list; however we would fail to
-	take a reference to this scsi_mpath_head, so move on */
+	take a reference to this scsi_mpath_head and continue the search */
 
 	pr_err("%s0 scsi_mpath_head=%pS calling mutex_lock\n",
 		__func__, scsi_mpath_head);
