@@ -4289,6 +4289,7 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 
 	/* undone in sd_mpath_disk_release() */
 	scsi_mpath_get_head(scsi_mpath_head);
+	scsi_mpath_head->mpath_head->drv_module = THIS_MODULE;
 
 	error = device_add(&sd_mpath_disk->dev);
 	if (error) {
