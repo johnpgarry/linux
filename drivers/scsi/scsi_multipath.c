@@ -10,7 +10,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_multipath.h>
-
+#include <linux/delay.h>
 #include "scsi_priv.h"
 
 enum {
@@ -420,15 +420,15 @@ static void scsi_mpath_remove_head_work(struct mpath_head *mpath_head)
 {
 	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
 
-	pr_err("%s mpath_head=%pS scsi_mpath_head=%pS dev_count=%d\n",
-		__func__, mpath_head, scsi_mpath_head, scsi_mpath_head->dev_count);
+	pr_err("%s mpath_head=%pS scsi_mpath_head=%pS\n",
+		__func__, mpath_head, scsi_mpath_head);
 
 	mutex_lock(&scsi_mpath_heads_lock);
-	pr_err("%s0 mpath_head=%pS scsi_mpath_head=%pS dev_count=%d calling list_del_init\n",
-		__func__, mpath_head, scsi_mpath_head, scsi_mpath_head->dev_count);
+	pr_err("%s0 mpath_head=%pS scsi_mpath_head=%pS calling list_del_init\n",
+		__func__, mpath_head, scsi_mpath_head);
 	list_del_init(&scsi_mpath_head->entry);
-	pr_err("%s1 mpath_head=%pS scsi_mpath_head=%pS dev_count=%d calling device_del\n",
-		__func__, mpath_head, scsi_mpath_head, scsi_mpath_head->dev_count);
+	pr_err("%s1 mpath_head=%pS scsi_mpath_head=%pS calling device_del\n",
+		__func__, mpath_head, scsi_mpath_head);
 	device_del(&scsi_mpath_head->dev);
 	pr_err("%s2 mpath_head=%pS scsi_mpath_head=%pS calling mutex_unlock\n",
 		__func__, mpath_head, scsi_mpath_head);
@@ -478,6 +478,7 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 	scsi_mpath_head->index = ida_alloc(&scsi_multipath_dev_ida, GFP_KERNEL);
 	if (scsi_mpath_head->index < 0)
 		goto out_put_head;
+	kref_init(&scsi_mpath_head->ref);
 
 	device_initialize(&scsi_mpath_head->dev);
 	scsi_mpath_head->dev.class = &scsi_mpath_device_class;
@@ -508,7 +509,10 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 	int ret;
 
 	list_for_each_entry(scsi_mpath_head, &scsi_mpath_heads_list, entry) {
+		pr_err("%s scsi_mpath_head=%pS calling scsi_mpath_get_head\n", __func__, scsi_mpath_head);
 		ret = scsi_mpath_get_head(scsi_mpath_head);
+		pr_err("%s1 scsi_mpath_head=%pS called scsi_mpath_get_head ret=%d\n",
+			__func__, scsi_mpath_head, ret);
 		if (ret)
 			continue;
 		if (strncmp(scsi_mpath_head->vpd_id,
@@ -532,7 +536,6 @@ static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
-	bool last_path = false;
 	int ret;
 
 	if (scsi_multipath == SCSI_MULTIPATH_OFF)
@@ -574,25 +577,14 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 
 	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
 found:
-	scsi_mpath_head->dev_count++;
 	mutex_unlock(&scsi_mpath_heads_lock);
 	ret = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
 	if (ret < 0)
-		goto out_dec_count;
+		goto out_put_head;
 	sdev->scsi_mpath_dev->index = ret;
 
 	sdev->scsi_mpath_dev->scsi_mpath_head = scsi_mpath_head;
-	return 0;
-out_dec_count:
-	mutex_lock(&scsi_mpath_heads_lock);
-	scsi_mpath_head->dev_count--;
-	if (scsi_mpath_head->dev_count == 0) {
-		last_path = true;
-		list_del_init(&scsi_mpath_head->entry);
-	}
-	mutex_unlock(&scsi_mpath_heads_lock);
-	if (last_path)
-		device_del(&scsi_mpath_head->dev);
+	return 0;	
 out_put_head:
 	scsi_mpath_put_head(scsi_mpath_head);
 out_uninit:
@@ -636,40 +628,21 @@ static void scsi_mpath_remove_head(struct scsi_mpath_device *scsi_mpath_dev)
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 			scsi_mpath_dev->scsi_mpath_head;
-	bool last_path = false;
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 	struct device *dev = &sdev->sdev_gendev;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
-	struct kobject *kobj;
-	struct device *scsi_mpath_head_dev;
+	__maybe_unused struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	__maybe_unused struct kobject *kobj;
+	__maybe_unused struct device *scsi_mpath_head_dev;
 
 	dev_err(dev, "%s scsi_mpath_head=%pS scsi_mpath_dev=%pS\n",
 		__func__, scsi_mpath_head, scsi_mpath_dev);
 
-	mutex_lock(&scsi_mpath_heads_lock);
-	scsi_mpath_head->dev_count--;
-	if (scsi_mpath_head->dev_count == 0) {
-		if (mpath_can_remove_head(mpath_head)) {
-			list_del_init(&scsi_mpath_head->entry);
-			dev_err(dev, "%s1.1 scsi_mpath_head=%pS mpath_can_remove_head passed\n",
-				__func__, scsi_mpath_head);
-			last_path = true;
-		} else {
-			scsi_mpath_get_head(scsi_mpath_head);
-			dev_err(dev, "%s1.2 scsi_mpath_head=%pS mpath_can_remove_head failed\n",
-				__func__, scsi_mpath_head);
-		}
-	}
-	mutex_unlock(&scsi_mpath_heads_lock);
-
-	dev_err(dev, "%s2 scsi_mpath_head=%pS scsi_mpath_dev=%pS last_path=%d\n",
-		__func__, scsi_mpath_head, scsi_mpath_dev, last_path);
-	if (last_path)
-		device_del(&scsi_mpath_head->dev);
 
 	scsi_mpath_dev->scsi_mpath_head = NULL;
 	scsi_mpath_head_dev = &scsi_mpath_head->dev;
 	kobj = &scsi_mpath_head_dev->kobj;
+	dev_err(dev, "%s3 scsi_mpath_head=%pS scsi_mpath_dev=%pS calling scsi_mpath_put_head\n",
+		__func__, scsi_mpath_head, scsi_mpath_dev);
 	scsi_mpath_put_head(scsi_mpath_head);
 }
 
@@ -700,15 +673,56 @@ void scsi_mpath_dev_release(struct scsi_device *sdev)
 
 int scsi_mpath_get_head(struct scsi_mpath_head *scsi_mpath_head)
 {
+	#ifdef olldd
 	if (!get_device(&scsi_mpath_head->dev))
 		return -ENXIO;
+	#else
+	if (!kref_get_unless_zero(&scsi_mpath_head->ref))
+		return -ENXIO;
+	return 0;
+	#endif
 	return 0;
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_get_head);
 
+static void scsi_mpath_free_head(struct kref *ref)
+{
+	struct scsi_mpath_head *scsi_mpath_head =
+		container_of(ref, struct scsi_mpath_head, ref);
+
+	pr_err("%s x0 scsi_mpath_head=%pS calling msleep\n",
+		__func__, scsi_mpath_head);
+	msleep(30000);
+	pr_err("%s x1 scsi_mpath_head=%pS called msleep\n",
+		__func__, scsi_mpath_head);
+
+	/* If we race with scsi_mpath_find_head(), then that function may
+	find this scsi_mpath_head in the head list; however we would fail to
+	take a reference to this scsi_mpath_head, so move on */
+
+	pr_err("%s0 scsi_mpath_head=%pS calling mutex_lock\n",
+		__func__, scsi_mpath_head);
+	mutex_lock(&scsi_mpath_heads_lock);
+	pr_err("%s1 scsi_mpath_head=%pS calling list_del_init\n",
+		__func__, scsi_mpath_head);
+	list_del_init(&scsi_mpath_head->entry);
+	pr_err("%s2 scsi_mpath_head=%pS calling mutex_unlock\n",
+		__func__, scsi_mpath_head);
+	mutex_unlock(&scsi_mpath_heads_lock);
+
+	pr_err("%s3 scsi_mpath_head=%pS calling device_unregister\n", __func__, scsi_mpath_head);
+	device_unregister(&scsi_mpath_head->dev);
+	pr_err("%s3.1 scsi_mpath_head=%pS called device_unregister\n", __func__, scsi_mpath_head);
+}
+
 void scsi_mpath_put_head(struct scsi_mpath_head *scsi_mpath_head)
 {
+	#ifdef olldd
 	put_device(&scsi_mpath_head->dev);
+
+	#else
+	kref_put(&scsi_mpath_head->ref, scsi_mpath_free_head);
+	#endif
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_put_head);
 

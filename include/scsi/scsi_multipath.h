@@ -22,8 +22,8 @@
 struct scsi_mpath_head {
 	char			vpd_id[SCSI_MPATH_DEVICE_ID_LEN];
 	struct list_head	entry;
-	int			dev_count;
 	struct ida		ida;
+	struct kref		ref;
 	struct mpath_iopolicy	iopolicy;
 	struct bio_set		bio_pool;
 	struct mpath_head	*mpath_head;
