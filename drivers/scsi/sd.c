@@ -4493,8 +4493,6 @@ static int sd_probe(struct scsi_device *sdp)
 	int index;
 	int error;
 
-	WARN_ON_ONCE(1);
-
 	dev_err(dev, "%s dev=%pS dev->bus=%pS ->type=%pS ->driver=%pS ->platform_data=%pS\n",
 		__func__, dev, dev->bus, dev->type, dev->driver, dev->platform_data);
 
