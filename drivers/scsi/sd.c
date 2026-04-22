@@ -1630,11 +1630,6 @@ static void sd_mpath_end_command(struct scsi_cmnd *scmd)
 			 blk_rq_bytes(req) >> SECTOR_SHIFT,
 			 scmd->start_time);
 }
-
-static void sd_mpath_remove_head(struct scsi_mpath_head *scsi_mpath_head)
-{
-	pr_err("%s scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
-}
 #endif
 
 static bool sd_need_revalidate(struct gendisk *disk, struct scsi_disk *sdkp)
@@ -4176,30 +4171,45 @@ static void sd_mpath_put_disk(struct sd_mpath_disk *sd_mpath_disk)
 	put_device(&sd_mpath_disk->dev);
 }
 
-static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_device *sdp)
+static struct sd_mpath_disk *sd_mpath_find_disk(struct scsi_mpath_head *scsi_mpath_head)
 {
-	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 	struct sd_mpath_disk *sd_mpath_disk;
 	int ret;
 
 	list_for_each_entry(sd_mpath_disk, &sd_mpath_disks_list, entry) {
-		struct scsi_mpath_head *scsi_mpath_head;
-
 		ret = sd_mpath_get_disk(sd_mpath_disk);
 		if (ret)
 			continue;
-		scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
 
-		if (strncmp(scsi_mpath_head->vpd_id,
-			scsi_mpath_dev->device_id_str,
-			SCSI_MPATH_DEVICE_ID_LEN) == 0) {
-
+		if (sd_mpath_disk->scsi_mpath_head == scsi_mpath_head)
 			return sd_mpath_disk;
-		}
+
 		sd_mpath_put_disk(sd_mpath_disk);
 	}
 
 	return NULL;
+}
+
+static void sd_mpath_remove_head(struct scsi_mpath_head *scsi_mpath_head)
+{
+	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct sd_mpath_disk *sd_mpath_disk;
+	struct device *dev = &scsi_mpath_head->dev;
+
+	dev_err(dev, "%s scsi_mpath_head=%pS mpath_head=%pS\n", __func__, scsi_mpath_head, mpath_head);
+
+	mutex_lock(&sd_mpath_disks_lock);
+	sd_mpath_disk = sd_mpath_find_disk(scsi_mpath_head);
+
+	if (!sd_mpath_disk) {
+		dev_warn(dev, "could not find mpath disk\n");
+		mutex_unlock(&sd_mpath_disks_lock);
+		return;
+	}
+	
+	dev_err(dev, "%s2 scsi_mpath_head=%pS mpath_head=%pS sd_mpath_disk=%pS\n",
+		__func__, scsi_mpath_head, mpath_head, sd_mpath_disk);
+	mutex_unlock(&sd_mpath_disks_lock);
 }
 
 static void sd_mpath_add_disk(struct scsi_disk *sdkp)
@@ -4236,7 +4246,7 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	 * Otherwise an extra reference is taken.
 	 */
 	mutex_lock(&sd_mpath_disks_lock);
-	sd_mpath_disk = sd_mpath_find_disk(sdp);
+	sd_mpath_disk = sd_mpath_find_disk(scsi_mpath_head);
 	if (sd_mpath_disk) {
 		error = sized_strscpy(disk_name, mpath_head->disk->disk_name,
 				sizeof(disk_name));
