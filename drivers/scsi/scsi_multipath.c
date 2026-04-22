@@ -159,9 +159,15 @@ static DEVICE_ATTR(iopolicy, S_IRUGO | S_IWUSR,
 static ssize_t scsi_mpath_device_delayed_removal_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct scsi_mpath_head *scsi_mpath_head =
-		container_of(dev, struct scsi_mpath_head, dev);
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct scsi_mpath_head *scsi_mpath_head;// = container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head;// = scsi_mpath_head->mpath_head;
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
+	dev_err(dev, "%s1 dev_get_drvdata(dev)=%pS\n", __func__, dev_get_drvdata(dev));
+
+	mpath_head = mpath_bd_device_to_head(dev);
+	dev_err(dev, "%s2 mpath_head=%pS\n", __func__, mpath_head);
+	scsi_mpath_head = mpath_head->drvdata;
+	dev_err(dev, "%s3 scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 
 	return mpath_delayed_removal_secs_store(mpath_head, buf, count);
 }
@@ -169,9 +175,16 @@ static ssize_t scsi_mpath_device_delayed_removal_store(struct device *dev,
 static ssize_t scsi_mpath_device_delayed_removal_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	struct scsi_mpath_head *scsi_mpath_head =
-		container_of(dev, struct scsi_mpath_head, dev);
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct scsi_mpath_head *scsi_mpath_head;// = container_of(dev, struct scsi_mpath_head, dev);
+	struct mpath_head *mpath_head;// = scsi_mpath_head->mpath_head;
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
+	dev_err(dev, "%s1 dev_get_drvdata(dev)=%pS\n", __func__, dev_get_drvdata(dev));
+
+	mpath_head = mpath_bd_device_to_head(dev);
+	dev_err(dev, "%s2 mpath_head=%pS\n", __func__, mpath_head);
+	scsi_mpath_head = mpath_head->drvdata;
+	dev_err(dev, "%s3 scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
+
 
 	return mpath_delayed_removal_secs_show(mpath_head, buf);
 }
@@ -182,7 +195,7 @@ static DEVICE_ATTR(delayed_removal_secs, S_IRUGO | S_IWUSR,
 static struct attribute *scsi_mpath_device_attrs[] = {
 	&dev_attr_vpd_id.attr,
 	&dev_attr_iopolicy.attr,
-	&dev_attr_delayed_removal_secs.attr,
+	//&dev_attr_delayed_removal_secs.attr,
 	NULL
 };
 
@@ -508,8 +521,9 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 	struct scsi_mpath_head *scsi_mpath_head;
 	int ret;
 
+	pr_err("%s0 scsi_mpath_dev=%pS\n", __func__, scsi_mpath_dev);
 	list_for_each_entry(scsi_mpath_head, &scsi_mpath_heads_list, entry) {
-		pr_err("%s scsi_mpath_head=%pS calling scsi_mpath_get_head\n", __func__, scsi_mpath_head);
+		pr_err("%s1 scsi_mpath_head=%pS calling scsi_mpath_get_head\n", __func__, scsi_mpath_head);
 		ret = scsi_mpath_get_head(scsi_mpath_head);
 		pr_err("%s1 scsi_mpath_head=%pS called scsi_mpath_get_head ret=%d\n",
 			__func__, scsi_mpath_head, ret);
@@ -524,6 +538,7 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 		scsi_mpath_put_head(scsi_mpath_head);
 	}
 
+	pr_err("%s10 scsi_mpath_dev=%pS returning NULL\n", __func__, scsi_mpath_dev);
 	return NULL;
 }
 

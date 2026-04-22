@@ -1008,6 +1008,8 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 		return;
 
 	if (!test_and_set_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags)) {
+		pr_err("%s disk_to_dev(mpath_head->disk)=%pS mpath_head=%pS\n",
+			__func__, disk_to_dev(mpath_head->disk), mpath_head);
 		dev_set_drvdata(disk_to_dev(mpath_head->disk), mpath_head);
 		ret = device_add_disk(mpath_head->parent, mpath_head->disk,
 				mpath_head->mpdt->device_groups);
