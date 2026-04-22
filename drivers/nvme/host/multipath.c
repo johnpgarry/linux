@@ -1552,6 +1552,11 @@ static enum mpath_iopolicy_e nvme_mpath_get_iopolicy(
 	return mpath_read_iopolicy(&head->subsys->mpath_iopolicy);
 }
 
+static int nvme_mpath_get_nr_active(struct mpath_device *mpath_device)
+{
+	return atomic_read(&nvme_mpath_to_ns(mpath_device)->ctrl->nr_active);
+}
+
 __maybe_unused
 static const struct mpath_head_template mpdt = {
 	.available_path = nvme_mpath_available_path,
@@ -1565,4 +1570,5 @@ static const struct mpath_head_template mpdt = {
 	.chr_uring_cmd = nvme_mpath_chr_uring_cmd,
 	.chr_uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 	.get_iopolicy = nvme_mpath_get_iopolicy,
+	.get_nr_active = nvme_mpath_get_nr_active,
 };
