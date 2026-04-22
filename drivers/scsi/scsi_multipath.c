@@ -429,29 +429,21 @@ const struct attribute_group *scsi_mpath_disk_attr_groups[] = {
 	NULL
 };
 
+static int scsi_mpath_remove_head_drv(struct device_driver *drv, void *data)
+{
+	struct scsi_mpath_head *scsi_mpath_head = data;
+	struct scsi_driver *scsi_driver = to_scsi_driver(drv);
+
+	if (scsi_driver->mpath_remove_head)
+		scsi_driver->mpath_remove_head(scsi_mpath_head);
+
+	return 0;
+}
+
 static void scsi_mpath_remove_head_work(struct mpath_head *mpath_head)
 {
-	struct scsi_mpath_head *scsi_mpath_head = mpath_head->drvdata;
-
-	pr_err("%s mpath_head=%pS scsi_mpath_head=%pS\n",
-		__func__, mpath_head, scsi_mpath_head);
-
-	mutex_lock(&scsi_mpath_heads_lock);
-	pr_err("%s0 mpath_head=%pS scsi_mpath_head=%pS calling list_del_init\n",
-		__func__, mpath_head, scsi_mpath_head);
-	list_del_init(&scsi_mpath_head->entry);
-	pr_err("%s1 mpath_head=%pS scsi_mpath_head=%pS calling device_del\n",
-		__func__, mpath_head, scsi_mpath_head);
-	device_del(&scsi_mpath_head->dev);
-	pr_err("%s2 mpath_head=%pS scsi_mpath_head=%pS calling mutex_unlock\n",
-		__func__, mpath_head, scsi_mpath_head);
-	mutex_unlock(&scsi_mpath_heads_lock);
-	pr_err("%s3 mpath_head=%pS scsi_mpath_head=%pS calling scsi_mpath_put_head\n",
-		__func__, mpath_head, scsi_mpath_head);
-
-	scsi_mpath_put_head(scsi_mpath_head);
-	pr_err("%s4 mpath_head=%pS scsi_mpath_head=%pS called scsi_mpath_put_head\n",
-		__func__, mpath_head, scsi_mpath_head);
+	bus_for_each_drv(&scsi_bus_type, NULL, mpath_head->drvdata,
+		scsi_mpath_remove_head_drv);
 }
 
 struct mpath_head_template smpdt = {

@@ -8,6 +8,7 @@
 
 struct module;
 struct request;
+struct scsi_mpath_head;
 
 struct scsi_driver {
 	struct device_driver	gendrv;
@@ -25,6 +26,7 @@ struct scsi_driver {
 	#ifdef CONFIG_SCSI_MULTIPATH
 	void (*mpath_start_cmd)(struct scsi_cmnd *);
 	void (*mpath_end_cmd)(struct scsi_cmnd *);
+	void (*mpath_remove_head)(struct scsi_mpath_head *);
 	#endif
 };
 #define to_scsi_driver(drv) \

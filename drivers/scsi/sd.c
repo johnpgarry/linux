@@ -1630,6 +1630,11 @@ static void sd_mpath_end_command(struct scsi_cmnd *scmd)
 			 blk_rq_bytes(req) >> SECTOR_SHIFT,
 			 scmd->start_time);
 }
+
+static void sd_mpath_remove_head(struct scsi_mpath_head *scsi_mpath_head)
+{
+	pr_err("%s scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
+}
 #endif
 
 static bool sd_need_revalidate(struct gendisk *disk, struct scsi_disk *sdkp)
@@ -4354,15 +4359,24 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 	mutex_lock(&sd_mpath_disks_lock);
 	sd_mpath_disk->disk_count--;
 	/* delayed removal not yet supported */
+	dev_err(dev, "%s2 sdp=%pS sdkp=%pS scsi_mpath_dev=%pS disk_count=%d after dec\n",
+		__func__, sdp, sdkp, scsi_mpath_dev, sd_mpath_disk->disk_count);
 	if (!sd_mpath_disk->disk_count) {
-		list_del_init(&sd_mpath_disk->entry);
-		remove = true;
+		if (mpath_can_remove_head(mpath_head)) {
+			dev_err(dev, "%s3 sdp=%pS sdkp=%pS scsi_mpath_dev=%pS mpath_can_remove_head true\n",
+				__func__, sdp, sdkp, scsi_mpath_dev);
+			list_del_init(&sd_mpath_disk->entry);
+			remove = true;
+		} else {
+			dev_err(dev, "%s4 sdp=%pS sdkp=%pS scsi_mpath_dev=%pS mpath_can_remove_head false\n",
+				__func__, sdp, sdkp, scsi_mpath_dev);
+		}
 	}
 	mutex_unlock(&sd_mpath_disks_lock);
 	mpath_remove_sysfs_link(mpath_device);
 	mpath_device->disk = NULL;
 
-	dev_err(dev, "%s2 sdp=%pS sdkp=%pS scsi_mpath_dev=%pS remove=%d\n",
+	dev_err(dev, "%s5 sdp=%pS sdkp=%pS scsi_mpath_dev=%pS remove=%d\n",
 		__func__, sdp, sdkp, scsi_mpath_dev, remove);
 	if (remove) {
 		device_del(&sd_mpath_disk->dev);
@@ -4457,6 +4471,11 @@ static int sd_probe(struct scsi_device *sdp)
 	struct gendisk *gd;
 	int index;
 	int error;
+
+	WARN_ON_ONCE(1);
+
+	dev_err(dev, "%s dev=%pS dev->bus=%pS ->type=%pS ->driver=%pS ->platform_data=%pS\n",
+		__func__, dev, dev->bus, dev->type, dev->driver, dev->platform_data);
 
 	scsi_autopm_get_device(sdp);
 	error = -ENODEV;
@@ -4898,6 +4917,7 @@ static struct scsi_driver sd_template = {
 	#ifdef CONFIG_SCSI_MULTIPATH
 	.mpath_start_cmd	= sd_mpath_start_command,
 	.mpath_end_cmd		= sd_mpath_end_command,
+	.mpath_remove_head	= sd_mpath_remove_head,
 	#endif
 	.done			= sd_done,
 	.eh_action		= sd_eh_action,

@@ -623,6 +623,8 @@ static int sr_probe(struct scsi_device *sdev)
 	struct scsi_cd *cd;
 	int minor, error;
 
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
+
 	scsi_autopm_get_device(sdev);
 	error = -ENODEV;
 	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)

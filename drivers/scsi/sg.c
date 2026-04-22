@@ -1496,6 +1496,10 @@ sg_add_device(struct device *cl_dev)
 	int error;
 	unsigned long iflags;
 
+	dev_err(cl_dev, "%s cl_dev=%pS ->bus=%pS ->type=%pS ->driver=%pS ->platform_data=%pS\n",
+		__func__, cl_dev, cl_dev->bus, cl_dev->type, cl_dev->driver, cl_dev->platform_data);
+
+
 	if (!blk_get_queue(scsidp->request_queue)) {
 		pr_warn("%s: get scsi_device queue failed\n", __func__);
 		return -ENODEV;
