@@ -1239,7 +1239,10 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	struct alua_dh_data *h;
 	int err;
 
-	h = kzalloc_obj(*h);
+	if (sdev->scsi_mpath_dev)
+		return SCSI_DH_DEV_UNSUPP;
+
+	h = kzalloc(sizeof(*h) , GFP_KERNEL);
 	if (!h)
 		return SCSI_DH_NOMEM;
 	spin_lock_init(&h->pg_lock);
