@@ -58,6 +58,7 @@
 #include <linux/unaligned.h>
 
 #include <scsi/scsi.h>
+#include <scsi/scsi_alua.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_device.h>
@@ -1108,14 +1109,19 @@ static int __init init_scsi(void)
 	error = scsi_sysfs_register();
 	if (error)
 		goto cleanup_sysctl;
-	error =  scsi_multipath_init();
+	error = scsi_alua_init();
 	if (error)
 		goto cleanup_sysfs;
+	error =  scsi_multipath_init();
+	if (error)
+		goto cleanup_alua;
 
 	scsi_netlink_init();
 
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
+cleanup_alua:
+	scsi_exit_alua();
 cleanup_sysfs:
 	scsi_sysfs_unregister();
 cleanup_sysctl:
@@ -1137,6 +1143,7 @@ static void __exit exit_scsi(void)
 {
 	scsi_netlink_exit();
 	scsi_multipath_exit();
+	scsi_exit_alua();
 	scsi_sysfs_unregister();
 	scsi_exit_sysctl();
 	scsi_exit_hosts();
