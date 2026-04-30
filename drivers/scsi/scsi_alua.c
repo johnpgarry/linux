@@ -22,6 +22,9 @@ static void scsi_alua_handle_state_transition(struct scsi_device *sdev)
 	struct alua_data *alua = sdev->alua;
 	unsigned long flags;
 
+	sdev_printk(KERN_INFO, sdev,
+			    "%s: %s\n",
+			    DRV_NAME, __func__);
 	spin_lock_irqsave(&alua->lock, flags);
 	alua->state = SCSI_ACCESS_STATE_TRANSITIONING;
 	spin_unlock_irqrestore(&alua->lock, flags);
@@ -50,6 +53,9 @@ static int scsi_alua_rtpg(struct scsi_device *sdev)
 	bool transitioning_sense = false;
 	int rel_port, group_id = scsi_vpd_tpg_id(sdev, &rel_port);
 
+	sdev_printk(KERN_INFO, sdev,
+			    "%s: %s\n",
+			    DRV_NAME, __func__);
 	if (group_id < 0) {
 		/*
 		 * Internal error; TPGS supported but required
@@ -264,12 +270,16 @@ static int scsi_alua_rtpg(struct scsi_device *sdev)
 	kfree(buff);
 	return err;
 }
+
 static int scsi_alua_rtpg_run(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 	unsigned long flags;
 	int state, err;
 
+	sdev_printk(KERN_INFO, sdev,
+			    "%s: %s\n",
+			    DRV_NAME, __func__);
 	spin_lock_irqsave(&alua->lock, flags);
 	state = alua->state;
 	spin_unlock_irqrestore(&alua->lock, flags);
@@ -298,6 +308,9 @@ static int scsi_alua_rtpg_run(struct scsi_device *sdev)
 enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr)
 {
+	sdev_printk(KERN_INFO, sdev,
+			    "%s: %s\n",
+			    DRV_NAME, __func__);
 	switch (sense_hdr->sense_key) {
 	case NOT_READY:
 		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
@@ -373,6 +386,9 @@ static void alua_rtpg_work(struct work_struct *work)
 		container_of(work, struct alua_data, work.work);
 	int ret;
 
+	sdev_printk(KERN_INFO, alua->sdev,
+			    "%s: %s\n",
+			    DRV_NAME, __func__);
 	ret = scsi_alua_rtpg_run(alua->sdev);
 
 	if (ret == -EAGAIN)
