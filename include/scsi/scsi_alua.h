@@ -28,8 +28,6 @@ struct alua_data {
 	spinlock_t		lock;
 };
 
-blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req);
-
 int scsi_alua_sdev_init(struct scsi_device *sdev);
 void scsi_alua_sdev_exit(struct scsi_device *sdev);
 
@@ -37,6 +35,8 @@ void scsi_alua_handle_state_transition(struct scsi_device *sdev);
 
 enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
 				struct scsi_sense_hdr *sense_hdr);
+
+blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req);
 
 void scsi_device_alua_rescan(struct scsi_device *sdev);
 int scsi_alua_init(void);

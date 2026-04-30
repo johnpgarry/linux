@@ -386,7 +386,7 @@ int scsi_alua_sdev_init(struct scsi_device *sdev)
 	int rel_port, ret, tpgs;
 
 	tpgs = scsi_device_tpgs(sdev);
-	if (!tpgs)
+	if (!(tpgs & TPGS_MODE_IMPLICIT))
 		return 0;
 
 	sdev->alua = kzalloc(sizeof(*sdev->alua), GFP_KERNEL);
