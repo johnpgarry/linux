@@ -1018,6 +1018,71 @@ struct scsi_device *scsi_device_lookup(struct Scsi_Host *shost,
 }
 EXPORT_SYMBOL(scsi_device_lookup);
 
+/*
+ * submit_rtpg - Issue a REPORT TARGET GROUP STATES command
+ * @sdev: sdev the command should be sent to
+ */
+int scsi_submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
+		       int bufflen, struct scsi_sense_hdr *sshdr, bool rtpg_ext_hdr_unsupp)
+{
+	u8 cdb[MAX_COMMAND_SIZE];
+	blk_opf_t opf = REQ_OP_DRV_IN | REQ_FAILFAST_DEV |
+				REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER;
+	const struct scsi_exec_args exec_args = {
+		.sshdr = sshdr,
+	};
+
+	/* Prepare the command. */
+	memset(cdb, 0x0, MAX_COMMAND_SIZE);
+	cdb[0] = MAINTENANCE_IN;
+	if (rtpg_ext_hdr_unsupp)
+		cdb[1] = MI_REPORT_TARGET_PGS;
+	else
+		cdb[1] = MI_REPORT_TARGET_PGS | MI_EXT_HDR_PARAM_FMT;
+	put_unaligned_be32(bufflen, &cdb[6]);
+
+	return scsi_execute_cmd(sdev, cdb, opf, buff, bufflen,
+				ALUA_FAILOVER_TIMEOUT * HZ,
+				ALUA_FAILOVER_RETRIES, &exec_args);
+}
+EXPORT_SYMBOL(scsi_submit_rtpg);
+
+/*
+ * submit_stpg - Issue a SET TARGET PORT GROUP command
+ *
+ * Currently we're only setting the current target port group state
+ * to 'active/optimized' and let the array firmware figure out
+ * the states of the remaining groups.
+ */
+int scsi_submit_stpg(struct scsi_device *sdev, int group_id,
+		       struct scsi_sense_hdr *sshdr)
+{
+	u8 cdb[MAX_COMMAND_SIZE];
+	unsigned char stpg_data[8];
+	int stpg_len = 8;
+	blk_opf_t opf = REQ_OP_DRV_OUT | REQ_FAILFAST_DEV |
+				REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER;
+	const struct scsi_exec_args exec_args = {
+		.sshdr = sshdr,
+	};
+
+	/* Prepare the data buffer */
+	memset(stpg_data, 0, stpg_len);
+	stpg_data[4] = SCSI_ACCESS_STATE_OPTIMAL;
+	put_unaligned_be16(group_id, &stpg_data[6]);
+
+	/* Prepare the command. */
+	memset(cdb, 0x0, MAX_COMMAND_SIZE);
+	cdb[0] = MAINTENANCE_OUT;
+	cdb[1] = MO_SET_TARGET_PGS;
+	put_unaligned_be32(stpg_len, &cdb[6]);
+
+	return scsi_execute_cmd(sdev, cdb, opf, stpg_data,
+				stpg_len, ALUA_FAILOVER_TIMEOUT * HZ,
+				ALUA_FAILOVER_RETRIES, &exec_args);
+}
+EXPORT_SYMBOL(scsi_submit_stpg);
+
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
 

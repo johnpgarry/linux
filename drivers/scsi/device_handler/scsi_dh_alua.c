@@ -37,8 +37,6 @@
 #define TPGS_MODE_EXPLICIT		0x2
 
 #define ALUA_RTPG_SIZE			128
-#define ALUA_FAILOVER_TIMEOUT		60
-#define ALUA_FAILOVER_RETRIES		5
 #define ALUA_RTPG_DELAY_MSECS		5
 #define ALUA_RTPG_RETRY_DELAY		2
 
@@ -117,69 +115,6 @@ static void release_port_group(struct kref *kref)
 	list_del(&pg->node);
 	spin_unlock(&port_group_lock);
 	kfree_rcu(pg, rcu);
-}
-
-/*
- * submit_rtpg - Issue a REPORT TARGET GROUP STATES command
- * @sdev: sdev the command should be sent to
- */
-static int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
-		       int bufflen, struct scsi_sense_hdr *sshdr, int flags)
-{
-	u8 cdb[MAX_COMMAND_SIZE];
-	blk_opf_t opf = REQ_OP_DRV_IN | REQ_FAILFAST_DEV |
-				REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER;
-	const struct scsi_exec_args exec_args = {
-		.sshdr = sshdr,
-	};
-
-	/* Prepare the command. */
-	memset(cdb, 0x0, MAX_COMMAND_SIZE);
-	cdb[0] = MAINTENANCE_IN;
-	if (!(flags & ALUA_RTPG_EXT_HDR_UNSUPP))
-		cdb[1] = MI_REPORT_TARGET_PGS | MI_EXT_HDR_PARAM_FMT;
-	else
-		cdb[1] = MI_REPORT_TARGET_PGS;
-	put_unaligned_be32(bufflen, &cdb[6]);
-
-	return scsi_execute_cmd(sdev, cdb, opf, buff, bufflen,
-				ALUA_FAILOVER_TIMEOUT * HZ,
-				ALUA_FAILOVER_RETRIES, &exec_args);
-}
-
-/*
- * submit_stpg - Issue a SET TARGET PORT GROUP command
- *
- * Currently we're only setting the current target port group state
- * to 'active/optimized' and let the array firmware figure out
- * the states of the remaining groups.
- */
-static int submit_stpg(struct scsi_device *sdev, int group_id,
-		       struct scsi_sense_hdr *sshdr)
-{
-	u8 cdb[MAX_COMMAND_SIZE];
-	unsigned char stpg_data[8];
-	int stpg_len = 8;
-	blk_opf_t opf = REQ_OP_DRV_OUT | REQ_FAILFAST_DEV |
-				REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER;
-	const struct scsi_exec_args exec_args = {
-		.sshdr = sshdr,
-	};
-
-	/* Prepare the data buffer */
-	memset(stpg_data, 0, stpg_len);
-	stpg_data[4] = SCSI_ACCESS_STATE_OPTIMAL;
-	put_unaligned_be16(group_id, &stpg_data[6]);
-
-	/* Prepare the command. */
-	memset(cdb, 0x0, MAX_COMMAND_SIZE);
-	cdb[0] = MAINTENANCE_OUT;
-	cdb[1] = MO_SET_TARGET_PGS;
-	put_unaligned_be32(stpg_len, &cdb[6]);
-
-	return scsi_execute_cmd(sdev, cdb, opf, stpg_data,
-				stpg_len, ALUA_FAILOVER_TIMEOUT * HZ,
-				ALUA_FAILOVER_RETRIES, &exec_args);
 }
 
 static struct alua_port_group *alua_find_get_pg(char *id_str, size_t id_size,
@@ -566,7 +501,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  retry:
 	err = 0;
-	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr, pg->flags);
+	retval = scsi_submit_rtpg(sdev, buff, bufflen, &sense_hdr,
+				pg->flags & ALUA_RTPG_EXT_HDR_UNSUPP);
 
 	if (retval) {
 		/*
@@ -813,7 +749,7 @@ static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			    ALUA_DH_NAME, pg->state);
 		return SCSI_DH_NOSYS;
 	}
-	retval = submit_stpg(sdev, pg->group_id, &sense_hdr);
+	retval = scsi_submit_stpg(sdev, pg->group_id, &sense_hdr);
 
 	if (retval) {
 		if (retval < 0 || !scsi_sense_valid(&sense_hdr)) {

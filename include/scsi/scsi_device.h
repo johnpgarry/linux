@@ -502,6 +502,13 @@ extern const char *scsi_device_state_name(enum scsi_device_state);
 extern int scsi_is_sdev_device(const struct device *);
 extern int scsi_is_target_device(const struct device *);
 extern void scsi_sanitize_inquiry_string(unsigned char *s, int len);
+int scsi_submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
+		       int bufflen, struct scsi_sense_hdr *sshdr,
+		       bool rtpg_ext_hdr_unsupp);
+int scsi_submit_stpg(struct scsi_device *sdev, int group_id,
+		       struct scsi_sense_hdr *sshdr);
+#define ALUA_FAILOVER_TIMEOUT		60
+#define ALUA_FAILOVER_RETRIES		5
 
 /*
  * scsi_execute_cmd users can set scsi_failure.result to have
