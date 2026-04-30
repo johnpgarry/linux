@@ -17,8 +17,7 @@
 
 static struct workqueue_struct *kalua_wq;
 
-
-void scsi_alua_handle_state_transition(struct scsi_device *sdev)
+static void scsi_alua_handle_state_transition(struct scsi_device *sdev)
 {
 	struct alua_data *alua = sdev->alua;
 	unsigned long flags;
@@ -27,7 +26,6 @@ void scsi_alua_handle_state_transition(struct scsi_device *sdev)
 	alua->state = SCSI_ACCESS_STATE_TRANSITIONING;
 	spin_unlock_irqrestore(&alua->lock, flags);
 }
-EXPORT_SYMBOL_GPL(scsi_alua_handle_state_transition);
 
 /*
  * scsi_alua_rtpg - Evaluate REPORT TARGET GROUP STATES

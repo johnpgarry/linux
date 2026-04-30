@@ -31,8 +31,6 @@ struct alua_data {
 int scsi_alua_sdev_init(struct scsi_device *sdev);
 void scsi_alua_sdev_exit(struct scsi_device *sdev);
 
-void scsi_alua_handle_state_transition(struct scsi_device *sdev);
-
 enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
 				struct scsi_sense_hdr *sense_hdr);
 
@@ -42,10 +40,6 @@ void scsi_device_alua_rescan(struct scsi_device *sdev);
 int scsi_alua_init(void);
 void scsi_exit_alua(void);
 #else //CONFIG_SCSI_ALUA
-
-static inline void scsi_alua_handle_state_transition(struct scsi_device *sdev)
-{
-}
 
 static inline
 enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
