@@ -1084,6 +1084,31 @@ int scsi_submit_stpg(struct scsi_device *sdev, int group_id,
 }
 EXPORT_SYMBOL(scsi_submit_stpg);
 
+/*
+ * scsi_alua_tur - Send a TEST UNIT READY
+ * @sdev: device to which the TEST UNIT READY command should be send
+ *
+ * Send a TEST UNIT READY to @sdev to figure out the device state
+ * Returns -EAGAIN if the sense code is NOT READY/ALUA TRANSITIONING,
+ * 0 if no error occurred, and -EIO otherwise.
+ */
+int scsi_alua_tur(struct scsi_device *sdev)
+{
+	struct scsi_sense_hdr sense_hdr;
+	int retval;
+
+	retval = scsi_test_unit_ready(sdev, ALUA_FAILOVER_TIMEOUT * HZ,
+				      ALUA_FAILOVER_RETRIES, &sense_hdr);
+	if ((sense_hdr.sense_key == NOT_READY ||
+	     sense_hdr.sense_key == UNIT_ATTENTION) &&
+	    sense_hdr.asc == 0x04 && sense_hdr.ascq == 0x0a)
+		return -EAGAIN;
+	else if (retval)
+		return -EIO;
+	return 0;
+}
+EXPORT_SYMBOL(scsi_alua_tur);
+
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
 

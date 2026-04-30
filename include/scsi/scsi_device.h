@@ -508,6 +508,8 @@ int scsi_submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 		       bool rtpg_ext_hdr_unsupp);
 int scsi_submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
+int scsi_alua_tur(struct scsi_device *sdev);
+
 #define ALUA_FAILOVER_TIMEOUT		60
 #define ALUA_FAILOVER_RETRIES		5
 
