@@ -1109,6 +1109,29 @@ int scsi_alua_tur(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL(scsi_alua_tur);
 
+char scsi_print_alua_state(unsigned char state)
+{
+	switch (state) {
+	case SCSI_ACCESS_STATE_OPTIMAL:
+		return 'A';
+	case SCSI_ACCESS_STATE_ACTIVE:
+		return 'N';
+	case SCSI_ACCESS_STATE_STANDBY:
+		return 'S';
+	case SCSI_ACCESS_STATE_UNAVAILABLE:
+		return 'U';
+	case SCSI_ACCESS_STATE_LBA:
+		return 'L';
+	case SCSI_ACCESS_STATE_OFFLINE:
+		return 'O';
+	case SCSI_ACCESS_STATE_TRANSITIONING:
+		return 'T';
+	default:
+		return 'X';
+	}
+}
+EXPORT_SYMBOL(scsi_print_alua_state);
+
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
 

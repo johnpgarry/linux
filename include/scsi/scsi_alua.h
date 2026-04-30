@@ -16,16 +16,50 @@
 struct alua_data {
 	int			group_id;
 	int			tpgs;
+	int			state;
+	int			pref;
+	int			valid_states;
+	bool			rtpg_ext_hdr_unsupp;
+	unsigned char		transition_tmo;
+	unsigned long		expiry;
+	unsigned long		interval;
+	struct delayed_work	work;
 	struct scsi_device	*sdev;
+	spinlock_t		lock;
 };
+
+blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req);
 
 int scsi_alua_sdev_init(struct scsi_device *sdev);
 void scsi_alua_sdev_exit(struct scsi_device *sdev);
 
+void scsi_alua_handle_state_transition(struct scsi_device *sdev);
+
+enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
+				struct scsi_sense_hdr *sense_hdr);
+
+void scsi_device_alua_rescan(struct scsi_device *sdev);
 int scsi_alua_init(void);
 void scsi_exit_alua(void);
 #else //CONFIG_SCSI_ALUA
 
+static inline void scsi_alua_handle_state_transition(struct scsi_device *sdev)
+{
+}
+
+static inline
+enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
+				struct scsi_sense_hdr *sense_hdr)
+{
+	return SCSI_RETURN_NOT_HANDLED;
+}
+static inline blk_status_t scsi_alua_prep_fn(struct scsi_device *sdev, struct request *req)
+{
+	return BLK_STS_OK;
+}
+static inline void scsi_device_alua_rescan(struct scsi_device *sdev)
+{
+}
 static inline int scsi_alua_sdev_init(struct scsi_device *sdev)
 {
 	return 0;

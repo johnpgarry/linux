@@ -327,28 +327,6 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 	return SCSI_DH_OK;
 }
 
-static char print_alua_state(unsigned char state)
-{
-	switch (state) {
-	case SCSI_ACCESS_STATE_OPTIMAL:
-		return 'A';
-	case SCSI_ACCESS_STATE_ACTIVE:
-		return 'N';
-	case SCSI_ACCESS_STATE_STANDBY:
-		return 'S';
-	case SCSI_ACCESS_STATE_UNAVAILABLE:
-		return 'U';
-	case SCSI_ACCESS_STATE_LBA:
-		return 'L';
-	case SCSI_ACCESS_STATE_OFFLINE:
-		return 'O';
-	case SCSI_ACCESS_STATE_TRANSITIONING:
-		return 'T';
-	default:
-		return 'X';
-	}
-}
-
 static void alua_handle_state_transition(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h = sdev->handler_data;
@@ -633,7 +611,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		pref_old != pg->pref || valid_states_old != pg->valid_states)
 		sdev_printk(KERN_INFO, sdev,
 			"%s: port group %02x state %c %s supports %c%c%c%c%c%c%c\n",
-			ALUA_DH_NAME, pg->group_id, print_alua_state(pg->state),
+			ALUA_DH_NAME, pg->group_id, scsi_print_alua_state(pg->state),
 			pg->pref ? "preferred" : "non-preferred",
 			pg->valid_states&TPGS_SUPPORT_TRANSITION?'T':'t',
 			pg->valid_states&TPGS_SUPPORT_OFFLINE?'O':'o',
@@ -820,7 +798,7 @@ static void alua_rtpg_work(struct work_struct *work)
 		pg->flags &= ~ALUA_PG_RUN_RTPG;
 		spin_unlock_irqrestore(&pg->lock, flags);
 		if (state == SCSI_ACCESS_STATE_TRANSITIONING) {
-			if (alua_tur(sdev) == SCSI_DH_RETRY) {
+			if (scsi_alua_tur(sdev) == -EAGAIN) {
 				spin_lock_irqsave(&pg->lock, flags);
 				pg->flags &= ~ALUA_PG_RUNNING;
 				pg->flags |= ALUA_PG_RUN_RTPG;
