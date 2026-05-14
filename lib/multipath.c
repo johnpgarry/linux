@@ -11,6 +11,26 @@ static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head);
 
 static struct workqueue_struct *mpath_wq;
 
+bool rq_mode = false;
+
+static int multipath_rq_mode_set(const char *val, const struct kernel_param *kp)
+{
+	pr_err("%s val=%s\n", __func__, val);
+	if (!val)
+		return -EINVAL;
+	if (!strncmp(val, "on", 2))
+		rq_mode = true;
+
+	return 0;
+}
+
+static const struct kernel_param_ops rq_mode_param_ops = {
+	.set = multipath_rq_mode_set,
+};
+
+module_param_cb(rq_mode, &rq_mode_param_ops, &rq_mode, 0444);
+MODULE_PARM_DESC(rq_mode, "turn on native multipath support, options: on, off, always");
+
 static const char *mpath_iopolicy_names[] = {
 	[MPATH_IOPOLICY_NUMA]	= "numa",
 	[MPATH_IOPOLICY_RR]	= "round-robin",
@@ -743,7 +763,20 @@ static const struct pr_ops mpath_pr_ops = {
 	.pr_read_reservation = mpath_pr_read_reservation,
 };
 
-const struct block_device_operations mpath_ops = {
+const struct block_device_operations mpath_ops_rq = {
+	.owner          = THIS_MODULE,
+	.open		= mpath_bdev_open,
+	.release	= mpath_bdev_release,
+	.ioctl		= mpath_bdev_ioctl,
+	.compat_ioctl	= blkdev_compat_ptr_ioctl,
+	.get_unique_id	= mpath_bdev_get_unique_id,
+	.report_zones	= mpath_bdev_report_zones,
+	.getgeo		= mpath_bdev_getgeo,
+	.pr_ops		= &mpath_pr_ops,
+};
+EXPORT_SYMBOL_GPL(mpath_ops_rq);
+
+const struct block_device_operations mpath_ops_bio = {
 	.owner          = THIS_MODULE,
 	.open		= mpath_bdev_open,
 	.release	= mpath_bdev_release,
@@ -755,7 +788,7 @@ const struct block_device_operations mpath_ops = {
 	.getgeo		= mpath_bdev_getgeo,
 	.pr_ops		= &mpath_pr_ops,
 };
-EXPORT_SYMBOL_GPL(mpath_ops);
+EXPORT_SYMBOL_GPL(mpath_ops_bio);
 
 static int mpath_chr_open(struct inode *inode, struct file *file)
 {
@@ -981,12 +1014,18 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head,
 	if (!mpath_head->mpdt->add_cdev ^ !mpath_head->mpdt->cdev_ioctl)
 		return -EINVAL;
 
-	mpath_head->disk = blk_alloc_disk(lim, numa_node);
+	if (rq_mode)
+		mpath_head->disk = blk_mq_alloc_disk(&mpath_head->tag_set, lim, mpath_head);
+	else
+		mpath_head->disk = blk_alloc_disk(lim, numa_node);
 	if (IS_ERR(mpath_head->disk))
 		return PTR_ERR(mpath_head->disk);
 
 	mpath_head->disk->private_data = mpath_head;
-	mpath_head->disk->fops = &mpath_ops;
+	if (rq_mode)
+		mpath_head->disk->fops = &mpath_ops_rq;
+	else
+		mpath_head->disk->fops = &mpath_ops_bio;
 
 	INIT_DELAYED_WORK(&mpath_head->remove_work, mpath_remove_head_work);
 	mpath_head->delayed_removal_secs = 0;
@@ -1244,9 +1283,126 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
 
+struct mpath_rq_clone_bio_info {
+	struct bio *orig;
+	struct bio clone;
+};
+
+static enum rq_end_io_ret end_clone_request(struct request *clone,
+					    blk_status_t error,
+					    const struct io_comp_batch *iob)
+{
+	struct request *orig = clone->end_io_data;
+	//if (error)
+	//WARN_ON_ONCE(1);
+		pr_err_once("%s clone=%pS tag=%d error=%d iob=%pS end_io_data=%pS orig=%pS tag=%d\n",
+			__func__, clone, clone->tag, error, iob, clone->end_io_data, orig, orig->tag);
+	blk_mq_end_request(orig, error);
+	return RQ_END_IO_FREE;
+}
+
+static blk_status_t mpath_mq_rq(struct blk_mq_hw_ctx *hctx,
+			 const struct blk_mq_queue_data *bd)
+{
+	struct request *rq = bd->rq;
+	blk_status_t blk_sts;
+	struct request_queue *q = rq->q;
+	struct gendisk *disk = q->disk;
+	struct mpath_head *mpath_head = disk->private_data;
+	struct device *dev;
+	struct mpath_device *mpath_device;
+	int srcu_idx;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+
+	//pr_err("%s mpath_head=%pS mpath_device=%pS rq=%pS\n", __func__, mpath_head, mpath_device, rq);
+
+	if (likely(mpath_device)) {
+		struct request *clone;
+		struct block_device *mpath_device_bdev = mpath_device->disk->part0;
+		struct request_queue *mpath_device_q = bdev_get_queue(mpath_device_bdev);
+		int ret;
+
+	//	pr_err("%s2 mpath_head=%pS rq=%pS end_io=%pS\n",
+	//		__func__, mpath_head, rq, rq->end_io);
+
+
+		clone = blk_mq_alloc_request(mpath_device_q, rq->cmd_flags | REQ_NOMERGE,
+			BLK_MQ_REQ_NOWAIT);
+		
+		if (IS_ERR(clone)) {
+			pr_err("%s3 clone=%pS mpath_device=%pS mpath_device_bdev=%pS q=%pS rq=%pS\n",
+				__func__, clone, mpath_device, mpath_device_bdev, mpath_device_q, rq);
+			if (clone == ERR_PTR(-EAGAIN))
+				blk_sts = BLK_STS_RESOURCE;
+			else
+				blk_sts = BLK_STS_IOERR;
+			goto out_unlock;
+		}
+
+		ret = blk_rq_prep_clone(clone, rq, NULL, GFP_KERNEL,
+				      NULL, NULL);
+	
+		if (ret) {
+			pr_err("%s4 clone=%pS ret=%d mpath_device_bdev=%pS q=%pS rq=%pS\n",
+				__func__, clone, ret, mpath_device_bdev, mpath_device_q, rq);
+			blk_sts = BLK_STS_IOERR;
+			goto out_unlock;
+		}
+
+
+
+		clone->end_io = end_clone_request;
+		clone->end_io_data = rq;
+
+
+		ret = blk_insert_cloned_request(clone);
+		pr_err_once("%s clone=%pS tag=%d rq=%pS tag=%d\n", __func__, clone, clone->tag, rq, rq->tag);
+		switch (ret) {
+		case BLK_STS_OK:
+			break;
+		case BLK_STS_RESOURCE:
+		case BLK_STS_DEV_RESOURCE:
+			pr_err_once("%s calling blk_rq_unprep_clone clone=%pS\n", __func__, clone);
+			blk_rq_unprep_clone(clone);
+			pr_err_once("%s calling blk_mq_cleanup_rq clone=%pS\n", __func__, clone);
+			blk_mq_cleanup_rq(clone);
+			pr_err_once("%s calling blk_mq_free_request clone=%pS\n", __func__, clone);
+			blk_mq_free_request(clone);
+			pr_err_once("%s called blk_mq_free_request clone=%pS\n", __func__, clone);
+			blk_sts = BLK_STS_RESOURCE;
+			goto out_unlock;
+		default:
+			pr_err("%s5 clone=%pS ret=%d mpath_device_bdev=%pS q=%pS from blk_insert_cloned_request rq=%pS\n",
+				__func__, clone, ret, mpath_device_bdev, mpath_device_q, rq);
+			/* must complete clone in terms of original request */
+			BUG();
+		}
+
+	} else if (mpath_available_path(mpath_head)) {
+		dev_warn_ratelimited(dev, "no usable path - requeuing I/O\n");
+
+		blk_sts = BLK_STS_TRANSPORT;
+	} else {
+		dev_warn_ratelimited(dev, "no available path - failing I/O\n");
+
+		blk_sts = BLK_STS_IOERR;
+	}
+
+out_unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	return blk_sts;
+}
+
+static const struct blk_mq_ops mpath_mq_ops = {
+	.queue_rq	= mpath_mq_rq,
+};
+
 struct mpath_head *mpath_alloc_head(void)
 {
 	struct mpath_head *mpath_head;
+	struct blk_mq_tag_set *tag_set;
 	int ret;
 
 	mpath_head = kzalloc(struct_size(mpath_head, current_path,
@@ -1268,6 +1424,19 @@ struct mpath_head *mpath_alloc_head(void)
 		kfree(mpath_head);
 		return ERR_PTR(ret);
 	}
+
+	tag_set = &mpath_head->tag_set;
+	memset(tag_set, 0, sizeof(*tag_set));
+
+	tag_set->ops = &mpath_mq_ops;
+	tag_set->nr_hw_queues = 1;
+	tag_set->nr_maps = 1;
+	tag_set->queue_depth = 32;
+
+	tag_set->driver_data = mpath_head;
+
+	ret = blk_mq_alloc_tag_set(tag_set);
+	pr_err("%s ret=%d from blk_mq_alloc_tag_set\n", __func__, ret);
 
 	return mpath_head;
 }

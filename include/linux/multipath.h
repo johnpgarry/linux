@@ -10,7 +10,8 @@
 #include <linux/io_uring/cmd.h>
 
 extern const struct file_operations mpath_chr_fops;
-extern const struct block_device_operations mpath_ops;
+extern const struct block_device_operations mpath_ops_bio;
+extern const struct block_device_operations mpath_ops_rq;
 extern const struct attribute_group mpath_attr_group;
 extern const struct attribute_group *mpath_device_groups[];
 
@@ -85,6 +86,7 @@ struct mpath_head {
 	unsigned int		delayed_removal_secs;
 	struct module		*drv_module;
 
+	struct blk_mq_tag_set tag_set;
 	void			*drvdata;
 	unsigned long		flags;
 	struct gendisk		*disk;
@@ -156,7 +158,7 @@ ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
 static inline bool is_mpath_disk(struct gendisk *disk)
 {
 	#if IS_ENABLED(CONFIG_LIBMULTIPATH)
-	return disk->fops == &mpath_ops;
+	return disk->fops == &mpath_ops_bio || disk->fops == &mpath_ops_rq;
 	#else
 	return false;
 	#endif
