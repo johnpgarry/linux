@@ -1244,15 +1244,8 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
 
-struct mpath_head *mpath_alloc_head(void)
+int mpath_head_init(struct mpath_head *mpath_head)
 {
-	struct mpath_head *mpath_head;
-	int ret;
-
-	mpath_head = kzalloc(struct_size(mpath_head, current_path,
-				num_possible_nodes()), GFP_KERNEL);
-	if (!mpath_head)
-		return ERR_PTR(-ENOMEM);
 	INIT_LIST_HEAD(&mpath_head->dev_list);
 	mutex_init(&mpath_head->lock);
 	kref_init(&mpath_head->ref);
@@ -1263,15 +1256,9 @@ struct mpath_head *mpath_alloc_head(void)
 	spin_lock_init(&mpath_head->requeue_lock);
 	bio_list_init(&mpath_head->requeue_list);
 
-	ret = init_srcu_struct(&mpath_head->srcu);
-	if (ret) {
-		kfree(mpath_head);
-		return ERR_PTR(ret);
-	}
-
-	return mpath_head;
+	return init_srcu_struct(&mpath_head->srcu);
 }
-EXPORT_SYMBOL_GPL(mpath_alloc_head);
+EXPORT_SYMBOL_GPL(mpath_head_init);
 
 static int __init mpath_init(void)
 {

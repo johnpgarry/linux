@@ -513,6 +513,7 @@ struct nvme_ns_ids {
  * only ever has a single entry for private namespaces.
  */
 struct nvme_ns_head {
+	struct mpath_head	mpath_head;
 	struct nvme_subsystem	*subsys;
 	struct nvme_ns_ids	ids;
 	u8			lba_shift;
@@ -538,13 +539,11 @@ struct nvme_ns_head {
 
 	u16			nr_plids;
 	u16			*plids;
-
-	struct mpath_head	*mpath_head;
 };
 
 static inline bool nvme_ns_head_multipath(struct nvme_ns_head *head)
 {
-	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->mpath_head->disk;
+	return IS_ENABLED(CONFIG_NVME_MULTIPATH) && head->mpath_head.disk;
 }
 
 enum nvme_ns_features {
@@ -992,7 +991,7 @@ static inline void nvme_add_ns(struct nvme_ns *ns)
 {
 	ns->mpath_device.disk = ns->disk;
 	ns->mpath_device.numa_node = ns->ctrl->numa_node;
-	mpath_add_device(ns->head->mpath_head, &ns->mpath_device);
+	mpath_add_device(&ns->head->mpath_head, &ns->mpath_device);
 }
 
 static inline bool nvme_delete_ns(struct nvme_ns *ns)
@@ -1032,7 +1031,7 @@ void nvme_mpath_ioctl_finish(void *opaque);
 
 static inline void nvme_mpath_put_disk(struct nvme_ns_head *head)
 {
-	mpath_put_disk(head->mpath_head);
+	mpath_put_disk(&head->mpath_head);
 }
 
 static inline void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
@@ -1042,7 +1041,7 @@ static inline void nvme_mpath_remove_sysfs_link(struct nvme_ns *ns)
 
 static inline void nvme_mpath_synchronize(struct nvme_ns_head *head)
 {
-	mpath_synchronize(head->mpath_head);
+	mpath_synchronize(&head->mpath_head);
 }
 
 static inline bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
@@ -1052,7 +1051,7 @@ static inline bool nvme_mpath_clear_current_path(struct nvme_ns *ns)
 
 static inline bool nvme_mpath_head_queue_if_no_path(struct nvme_ns_head *head)
 {
-	return mpath_head_queue_if_no_path(head->mpath_head);
+	return mpath_head_queue_if_no_path(&head->mpath_head);
 }
 
 static inline void nvme_trace_bio_complete(struct request *req)
@@ -1060,7 +1059,7 @@ static inline void nvme_trace_bio_complete(struct request *req)
 	struct nvme_ns *ns = req->q->queuedata;
 
 	if (is_mpath_request(req) && req->bio)
-		trace_block_bio_complete(ns->head->mpath_head->disk->queue,
+		trace_block_bio_complete(ns->head->mpath_head.disk->queue,
 					req->bio);
 }
 

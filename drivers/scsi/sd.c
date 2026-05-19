@@ -129,7 +129,7 @@ static void sd_mpath_disk_release(struct device *dev)
 		container_of(dev, struct sd_mpath_disk, dev);
 	struct scsi_mpath_head *scsi_mpath_head =
 		sd_mpath_disk->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;;
 
 	mpath_put_disk(mpath_head);
 	ida_free(&sd_index_ida, sd_mpath_disk->disk_index);
@@ -3988,7 +3988,7 @@ static int sd_mpath_revalidate_head(struct scsi_disk *sdkp)
 {
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
 	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;;
 	struct gendisk *disk = mpath_head->disk;
 	struct queue_limits *sdkp_lim = &sdkp->disk->queue->limits;
 	struct queue_limits lim;
@@ -4025,7 +4025,7 @@ static ssize_t sd_mpath_dev_show(struct device *dev,
 	struct scsi_disk *sdkp = gd->private_data;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
 	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;;
 	struct gendisk *disk = mpath_head->disk;
 	struct device *disk_dev = disk_to_dev(disk);
 
@@ -4137,7 +4137,7 @@ static void sd_mpath_add_disk(struct scsi_disk *sdkp)
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct sd_mpath_disk *sd_mpath_disk = sdkp->sd_mpath_disk;
 	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;;
 
 	mpath_device->disk = sdkp->disk;
 	mpath_device->numa_node = dev_to_node(sdp->host->dma_dev);
@@ -4188,7 +4188,7 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	struct scsi_mpath_head *scsi_mpath_head =
 				scsi_mpath_dev->scsi_mpath_head;
 	struct sd_mpath_disk *sd_mpath_disk;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 	char disk_name[DISK_NAME_LEN - 2];
 	struct queue_limits lim;
 	struct gendisk *disk;
@@ -4264,8 +4264,8 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 
 	/* undone in sd_mpath_disk_release() */
 	scsi_mpath_get_head(scsi_mpath_head);
-	scsi_mpath_head->mpath_head->drv_module = THIS_MODULE;
-	scsi_mpath_head->mpath_head->disk_groups = sd_mpath_disk_attr_groups;
+	scsi_mpath_head->mpath_head.drv_module = THIS_MODULE;
+	scsi_mpath_head->mpath_head.disk_groups = sd_mpath_disk_attr_groups;
 
 	error = device_add(&sd_mpath_disk->dev);
 	if (error) {
@@ -4308,7 +4308,7 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct scsi_mpath_head *scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;;
 	bool remove = false;
 
 	mpath_synchronize(mpath_head);
@@ -4337,7 +4337,7 @@ static void sd_mpath_remove(struct scsi_disk *sdkp)
 
 static void sd_mpath_remove_head(struct scsi_mpath_head *scsi_mpath_head)
 {
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;;
 	struct sd_mpath_disk *sd_mpath_disk;
 	struct device *dev = &scsi_mpath_head->dev;
 
@@ -4377,7 +4377,7 @@ static void sd_mpath_fail_probe(struct scsi_disk *sdkp)
 	scsi_mpath_dev = sdp->scsi_mpath_dev;
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	scsi_mpath_head = sd_mpath_disk->scsi_mpath_head;
-	mpath_head = scsi_mpath_head->mpath_head;
+	mpath_head = &scsi_mpath_head->mpath_head;
 
 	mutex_lock(&sd_mpath_disks_lock);
 	sd_mpath_disk->disk_count--;

@@ -674,7 +674,7 @@ static void nvme_free_ns_head(struct kref *ref)
 
 	nvme_mpath_put_disk(head);
 	ida_free(&head->subsys->ns_ida, head->instance);
-	mpath_put_head(head->mpath_head);
+	mpath_put_head(&head->mpath_head);
 	nvme_put_subsystem(head->subsys);
 	kfree(head->plids);
 	kfree(head);
@@ -2523,7 +2523,7 @@ static int nvme_update_ns_info(struct nvme_ns *ns, struct nvme_ns_info *info)
 
 	if (!ret && nvme_ns_head_multipath(ns->head)) {
 		struct queue_limits *ns_lim = &ns->disk->queue->limits;
-		struct gendisk *disk = ns->head->mpath_head->disk;
+		struct gendisk *disk = ns->head->mpath_head.disk;
 		struct queue_limits lim;
 		unsigned int memflags;
 
@@ -3947,14 +3947,14 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	} else
 		head->effects = ctrl->effects;
 
-	head->mpath_head = mpath_alloc_head();
-	if (IS_ERR(head->mpath_head))
+	ret = mpath_head_init(&head->mpath_head);
+	if (ret)
 		goto out_ida_free;
 
-	head->mpath_head->drvdata = head;
-	head->mpath_head->drv_module = THIS_MODULE;
-	head->mpath_head->disk_groups = nvme_ns_attr_groups;
-	head->mpath_head->parent = &subsys->dev;
+	head->mpath_head.drvdata = head;
+	head->mpath_head.drv_module = THIS_MODULE;
+	head->mpath_head.disk_groups = nvme_ns_attr_groups;
+	head->mpath_head.parent = &subsys->dev;
 
 	ret = nvme_mpath_alloc_disk(ctrl, head);
 	if (ret)
@@ -3967,7 +3967,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	return head;
 
 out_mpath_head_free:
-	mpath_put_head(head->mpath_head);
+	mpath_put_head(&head->mpath_head);
 out_ida_free:
 	ida_free(&ctrl->subsys->ns_ida, head->instance);
 out_free_head:
@@ -4066,7 +4066,7 @@ static int nvme_init_ns_head(struct nvme_ns *ns, struct nvme_ns_info *info)
 	} else {
 		ret = -EINVAL;
 		if ((!info->is_shared || !head->shared) &&
-		    !mpath_head_devices_empty(head->mpath_head)) {
+		    !mpath_head_devices_empty(&head->mpath_head)) {
 			dev_err(ctrl->device,
 				"Duplicate unshared namespace %d\n",
 				info->nsid);
@@ -4241,7 +4241,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, struct nvme_ns_info *info)
 		 * we do not release the reference to nshead twice if head->disk
 		 * is not present.
 		 */
-		if (ns->head->mpath_head->disk)
+		if (ns->head->mpath_head.disk)
 			last_path = true;
 	}
 	mutex_unlock(&ctrl->subsys->lock);

@@ -20,13 +20,13 @@
 #define SCSI_MPATH_DEVICE_ID_LEN 256
 
 struct scsi_mpath_head {
+	struct mpath_head	mpath_head;
 	char			vpd_id[SCSI_MPATH_DEVICE_ID_LEN];
 	struct list_head	entry;
 	struct ida		ida;
 	struct kref		ref;
 	struct mpath_iopolicy	iopolicy;
 	struct bio_set		bio_pool;
-	struct mpath_head	*mpath_head;
 	struct device		dev;
 	int			index;
 };

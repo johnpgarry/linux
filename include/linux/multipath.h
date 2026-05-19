@@ -92,7 +92,7 @@ struct mpath_head {
 	struct device		*parent;
 	const struct attribute_group 		**disk_groups;
 	const struct mpath_head_template	*mpdt;
-	struct mpath_device __rcu		*current_path[];
+	struct mpath_device __rcu 		*current_path[MAX_NUMNODES];
 };
 
 #define REQ_MPATH		REQ_DRV
@@ -135,7 +135,7 @@ void mpath_add_sysfs_link(struct mpath_head *mpath_head);
 void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 int mpath_get_head(struct mpath_head *mpath_head);
 void mpath_put_head(struct mpath_head *mpath_head);
-struct mpath_head *mpath_alloc_head(void);
+int mpath_head_init(struct mpath_head *mpath_head);
 
 void mpath_put_disk(struct mpath_head *mpath_head);
 void mpath_remove_disk(struct mpath_head *mpath_head);

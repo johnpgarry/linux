@@ -204,7 +204,7 @@ static int ns_head_update_nuse(struct nvme_ns_head *head)
 	if (!__ratelimit(&head->rs_nuse))
 		return 0;
 
-	return mpath_call_for_device(head->mpath_head, ns_head_update_nuse_cb);
+	return mpath_call_for_device(&head->mpath_head, ns_head_update_nuse_cb);
 }
 
 static int ns_update_nuse(struct nvme_ns *ns)

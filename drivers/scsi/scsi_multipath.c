@@ -94,7 +94,7 @@ static void scsi_mpath_head_release(struct device *dev)
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 
 	bioset_exit(&scsi_mpath_head->bio_pool);
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
@@ -117,7 +117,7 @@ void scsi_mpath_dev_clear_path(struct scsi_mpath_device *scsi_mpath_dev)
 {
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 	struct scsi_mpath_head *scsi_mpath_head = scsi_mpath_dev->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 
 	if (mpath_clear_current_path(mpath_device))
 		mpath_synchronize(mpath_head);
@@ -129,7 +129,7 @@ static ssize_t scsi_mpath_device_iopolicy_store(struct device *dev,
 {
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(dev, struct scsi_mpath_head, dev);
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 
 	if (!mpath_iopolicy_store(&scsi_mpath_head->iopolicy, buf, count))
 		return -EINVAL;
@@ -413,11 +413,10 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 	if (bioset_init(&scsi_mpath_head->bio_pool, BIO_POOL_SIZE,
 			0, BIOSET_PERCPU_CACHE))
 		goto out_free;
-	scsi_mpath_head->mpath_head = mpath_alloc_head();
-	if (IS_ERR(scsi_mpath_head->mpath_head))
+	if (mpath_head_init(&scsi_mpath_head->mpath_head))
 		goto out_bioset_exit;
-	scsi_mpath_head->mpath_head->mpdt = &smpdt;
-	scsi_mpath_head->mpath_head->drvdata = scsi_mpath_head;
+	scsi_mpath_head->mpath_head.mpdt = &smpdt;
+	scsi_mpath_head->mpath_head.drvdata = scsi_mpath_head;
 	scsi_mpath_head->iopolicy.iopolicy = iopolicy;
 
 	scsi_mpath_head->index = ida_alloc(&scsi_multipath_dev_ida, GFP_KERNEL);
@@ -439,7 +438,7 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 out_free_ida:
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
 out_put_head:
-	mpath_put_head(scsi_mpath_head->mpath_head);
+	mpath_put_head(&scsi_mpath_head->mpath_head);
 out_bioset_exit:
 	bioset_exit(&scsi_mpath_head->bio_pool);
 out_free:
@@ -600,7 +599,7 @@ void scsi_mpath_start_request(struct request *req)
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	struct scsi_mpath_head *scsi_mpath_head =
 				scsi_mpath_dev->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 	struct gendisk *disk = mpath_head->disk;
 
 	if (mpath_qd_iopolicy(&scsi_mpath_head->iopolicy) &&
@@ -628,7 +627,7 @@ void scsi_mpath_end_request(struct request *req)
 			sdev->scsi_mpath_dev;
 	struct scsi_mpath_head *scsi_mpath_head =
 			scsi_mpath_dev->scsi_mpath_head;
-	struct mpath_head *mpath_head = scsi_mpath_head->mpath_head;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 	struct gendisk *disk = mpath_head->disk;
 
 	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE) {
