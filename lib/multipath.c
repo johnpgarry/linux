@@ -455,11 +455,11 @@ out:
 
 static void mpath_free_head(struct kref *ref)
 {
-	struct mpath_head *mpath_head =
-		container_of(ref, struct mpath_head, ref);
-
-	cleanup_srcu_struct(&mpath_head->srcu);
-	kfree(mpath_head);
+//	struct mpath_head *mpath_head =
+//		container_of(ref, struct mpath_head, ref);
+	BUG();
+//	cleanup_srcu_struct(&mpath_head->srcu);
+//	kfree(mpath_head);
 }
 
 int mpath_get_head(struct mpath_head *mpath_head)
