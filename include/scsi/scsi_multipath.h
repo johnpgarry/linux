@@ -26,6 +26,7 @@ struct scsi_mpath_head {
 	struct ida		ida;
 	struct kref		ref;
 	struct mpath_iopolicy	iopolicy;
+	struct bio_set		bio_pool;
 	struct device		dev;
 	int			index;
 };
