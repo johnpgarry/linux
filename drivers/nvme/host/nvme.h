@@ -251,11 +251,6 @@ struct nvme_request {
 	struct nvme_ctrl	*ctrl;
 };
 
-/*
- * Mark a bio as coming in through the mpath node.
- */
-#define REQ_NVME_MPATH		REQ_DRV
-
 enum {
 	NVME_REQ_CANCELLED		= (1 << 0),
 	NVME_REQ_USERCMD		= (1 << 1),
@@ -1021,6 +1016,13 @@ extern const struct block_device_operations nvme_bdev_ops;
 void nvme_delete_ctrl_sync(struct nvme_ctrl *ctrl);
 struct nvme_ns *nvme_find_path(struct nvme_ns_head *head);
 #ifdef CONFIG_NVME_MULTIPATH
+/*
+ * Mark a bio as coming in through the mpath node.
+ */
+#define REQ_NVME_MPATH		REQ_DRV
+
+#define nvme_is_mpath_request(req) ((req)->cmd_flags & REQ_NVME_MPATH)
+
 static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 {
 	return ctrl->ana_log_buf != NULL;
@@ -1053,7 +1055,7 @@ static inline void nvme_trace_bio_complete(struct request *req)
 {
 	struct nvme_ns *ns = req->q->queuedata;
 
-	if ((req->cmd_flags & REQ_NVME_MPATH) && req->bio)
+	if (nvme_is_mpath_request(req) && req->bio)
 		trace_block_bio_complete(ns->head->disk->queue, req->bio);
 }
 
@@ -1077,6 +1079,10 @@ static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
 }
 #else
 #define multipath false
+static inline bool nvme_is_mpath_request(struct request *req)
+{
+	return false;
+}
 static inline bool nvme_ctrl_use_ana(struct nvme_ctrl *ctrl)
 {
 	return false;
@@ -1220,7 +1226,7 @@ static inline void nvme_hwmon_exit(struct nvme_ctrl *ctrl)
 
 static inline void nvme_start_request(struct request *rq)
 {
-	if (rq->cmd_flags & REQ_NVME_MPATH)
+	if (nvme_is_mpath_request(rq))
 		nvme_mpath_start_request(rq);
 	blk_mq_start_request(rq);
 }
