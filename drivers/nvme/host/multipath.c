@@ -71,7 +71,7 @@ static const char *nvme_iopolicy_names[] = {
 	[NVME_IOPOLICY_QD]      = "queue-depth",
 };
 
-static int iopolicy = NVME_IOPOLICY_NUMA;
+static enum nvme_iopolicy iopolicy = NVME_IOPOLICY_NUMA;
 
 static int nvme_iopolicy_parse(const char *str)
 {
