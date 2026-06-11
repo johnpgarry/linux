@@ -4,8 +4,11 @@
 
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
+#include <linux/cdev.h>
 #include <linux/srcu.h>
+#include <linux/io_uring/cmd.h>
 
+extern const struct file_operations mpath_chr_fops;
 extern const struct block_device_operations mpath_ops;
 
 enum mpath_iopolicy_e {
@@ -38,9 +41,21 @@ struct mpath_device {
 struct mpath_head_template {
 	bool (*available_path)(struct mpath_device *);
 	void (*remove_head)(struct mpath_head *);
+	int (*add_cdev)(struct mpath_head *);
+	void (*del_cdev)(struct mpath_head *);
 	bool (*is_disabled)(struct mpath_device *);
 	bool (*is_optimized)(struct mpath_device *);
 	int (*get_nr_active)(struct mpath_device *);
+	void (*ioctl_begin)(struct mpath_device *, unsigned int cmd, void **);
+	void (*ioctl_finish)(void *opaque);
+	long (*cdev_ioctl)(struct mpath_device *, unsigned int cmd,
+				unsigned long arg, bool open_for_write);
+	int (*chr_uring_cmd)(struct mpath_device *,
+				struct io_uring_cmd *ioucmd,
+				unsigned int issue_flags);
+	int (*chr_uring_cmd_iopoll)(struct io_uring_cmd *ioucmd,
+				 struct io_comp_batch *iob,
+				 unsigned int poll_flags);
 	enum mpath_iopolicy_e (*get_iopolicy)(struct mpath_head *);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct attribute_group **device_groups;
@@ -48,6 +63,7 @@ struct mpath_head_template {
 
 #define MPATH_HEAD_DISK_LIVE 			0
 #define MPATH_HEAD_QUEUE_IF_NO_PATH		1
+#define MPATH_HEAD_CDEV_LIVE			2
 
 struct mpath_head {
 	struct srcu_struct	srcu;
@@ -63,6 +79,9 @@ struct mpath_head {
 	struct delayed_work	remove_work;
 	unsigned int		delayed_removal_secs;
 	struct module		*drv_module;
+
+	struct cdev		cdev;
+	struct device		cdev_device;
 
 	unsigned long		flags;
 	struct gendisk		*disk;
