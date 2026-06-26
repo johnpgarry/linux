@@ -727,6 +727,9 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 	int ret, tsize;
 	u16 control;
 
+	pr_err("%s affd=%d %d\n", __func__,
+					affd ? affd->pre_vectors : -1,
+					affd ? affd->post_vectors : -1);
 	/*
 	 * Some devices require MSI-X to be enabled before the MSI-X
 	 * registers can be accessed.  Mask all the vectors to prevent
@@ -810,6 +813,10 @@ int __pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int
 	if (maxvec < minvec)
 		return -ERANGE;
 
+	pr_err("%s minvec=%d maxvec=%d affd=%d %d\n", __func__, minvec, maxvec,
+		affd ? affd->pre_vectors : -1,
+		affd ? affd->post_vectors : -1);
+
 	if (dev->msi_enabled) {
 		pci_info(dev, "can't enable MSI-X (MSI already enabled)\n");
 		return -EINVAL;
@@ -851,8 +858,17 @@ int __pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int
 		return -ENODEV;
 
 	for (;;) {
+
+		pr_err("%s2 looping minvec=%d maxvec=%d affd=%d %d\n", __func__, minvec, maxvec,
+			affd ? affd->pre_vectors : -1,
+			affd ? affd->post_vectors : -1);
+
 		if (affd) {
 			nvec = irq_calc_affinity_vectors(minvec, nvec, affd);
+			pr_err("%s3 minvec=%d maxvec=%d affd=%d %d nvec=%d\n", __func__, minvec, maxvec,
+				affd ? affd->pre_vectors : -1,
+				affd ? affd->post_vectors : -1,
+				nvec);
 			if (nvec < minvec)
 				return -ENOSPC;
 		}

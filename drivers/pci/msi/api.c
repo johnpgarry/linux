@@ -256,6 +256,8 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 	struct irq_affinity msi_default_affd = {0};
 	int nvecs = -ENOSPC;
 
+	pr_err("%s min_vecs=%d max_vecs=%d\n", __func__, min_vecs, max_vecs);
+
 	if (flags & PCI_IRQ_AFFINITY) {
 		if (!affd)
 			affd = &msi_default_affd;
@@ -342,6 +344,7 @@ const struct cpumask *pci_irq_get_affinity(struct pci_dev *dev, int nr)
 	int idx, irq = pci_irq_vector(dev, nr);
 	struct msi_desc *desc;
 
+	pr_err("%s nr=%d\n", __func__, nr);
 	if (WARN_ON_ONCE(irq <= 0))
 		return NULL;
 

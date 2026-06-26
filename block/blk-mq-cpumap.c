@@ -61,6 +61,7 @@ void blk_mq_map_queues(struct blk_mq_queue_map *qmap)
 	const struct cpumask *masks;
 	unsigned int queue, cpu, nr_masks;
 
+	pr_err("%s qmap->nr_queues=%d\n", __func__, qmap->nr_queues);
 	masks = group_cpus_evenly(qmap->nr_queues, &nr_masks);
 	if (!masks) {
 		for_each_possible_cpu(cpu)
@@ -112,11 +113,15 @@ void blk_mq_map_hw_queues(struct blk_mq_queue_map *qmap,
 	const struct cpumask *mask;
 	unsigned int queue, cpu;
 
+	pr_err("%s dev->bus->irq_get_affinity=%pS offset=%d qmap->queue_offset=%d\n",
+		__func__, dev->bus->irq_get_affinity, offset, qmap->queue_offset);
 	if (!dev->bus->irq_get_affinity)
 		goto fallback;
 
 	for (queue = 0; queue < qmap->nr_queues; queue++) {
 		mask = dev->bus->irq_get_affinity(dev, queue + offset);
+
+		pr_err("%s2 queue=%d mask=%*pb\n", __func__, queue, cpumask_pr_args(mask));
 		if (!mask)
 			goto fallback;
 

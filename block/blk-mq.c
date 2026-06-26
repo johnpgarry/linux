@@ -4909,6 +4909,8 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	if (set->nr_maps == 1 && set->nr_hw_queues > nr_cpu_ids)
 		set->nr_hw_queues = nr_cpu_ids;
 
+
+	pr_err("%s set=%pS ->nr_hw_queues=%d\n", __func__, set, set->nr_hw_queues);
 	if (set->flags & BLK_MQ_F_BLOCKING) {
 		set->srcu = kmalloc_obj(*set->srcu);
 		if (!set->srcu)
@@ -5147,6 +5149,7 @@ static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
 	struct blk_mq_tags **new_tags;
 	bool queues_frozen = false;
 
+	pr_err("%s nr_hw_queues=%d\n", __func__, nr_hw_queues);
 	lockdep_assert_held(&set->tag_list_lock);
 
 	if (set->nr_maps == 1 && nr_hw_queues > nr_cpu_ids)

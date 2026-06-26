@@ -493,6 +493,8 @@ struct cpumask *group_cpus_evenly(unsigned int numgrps, unsigned int *nummasks)
 	int ret = -ENOMEM;
 	struct cpumask *masks = NULL;
 
+	pr_err("%s numgrps=%d *nummasks=%d\n", __func__, numgrps, *nummasks);
+
 	if (numgrps == 0)
 		return NULL;
 
@@ -527,6 +529,7 @@ struct cpumask *group_cpus_evenly(unsigned int numgrps, unsigned int *nummasks)
 	cpumask_copy(npresmsk, data_race(cpu_present_mask));
 
 	/* grouping present CPUs first */
+	pr_err("%s2 calling __group_cpus_evenly curgrp=%d numgrps=%d\n", __func__, curgrp, numgrps);
 	ret = __group_cpus_evenly(curgrp, numgrps, node_to_cpumask,
 				  npresmsk, nmsk, masks);
 	if (ret < 0)

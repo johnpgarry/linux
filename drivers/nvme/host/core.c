@@ -1724,10 +1724,13 @@ EXPORT_SYMBOL_GPL(nvme_get_features);
 
 int nvme_set_queue_count(struct nvme_ctrl *ctrl, int *count)
 {
-	u32 q_count = (*count - 1) | ((*count - 1) << 16);
+	u32 q_count;
 	u32 result;
 	int status, nr_io_queues;
 
+	q_count = (*count - 1) | ((*count - 1) << 16);
+
+	pr_err("%s q_count=%d *count=%d\n", __func__, q_count, *count);
 	status = nvme_set_features(ctrl, NVME_FEAT_NUM_QUEUES, q_count, NULL, 0,
 			&result);
 
@@ -1749,6 +1752,7 @@ int nvme_set_queue_count(struct nvme_ctrl *ctrl, int *count)
 		*count = 0;
 	} else {
 		nr_io_queues = min(result & 0xffff, result >> 16) + 1;
+		pr_err("%s9 nr_io_queues=%d *count=%d\n", __func__, nr_io_queues, *count);
 		*count = min(*count, nr_io_queues);
 	}
 
@@ -4969,6 +4973,7 @@ int nvme_alloc_io_tag_set(struct nvme_ctrl *ctrl, struct blk_mq_tag_set *set,
 	set->cmd_size = cmd_size;
 	set->driver_data = ctrl;
 	set->nr_hw_queues = ctrl->queue_count - 1;
+	pr_err("%s set=%pS ->nr_hw_queues=%d\n", __func__, set, set->nr_hw_queues);
 	set->timeout = NVME_IO_TIMEOUT;
 	set->nr_maps = nr_maps;
 	ret = blk_mq_alloc_tag_set(set);

@@ -28,6 +28,11 @@ irq_create_affinity_masks(unsigned int nvecs, struct irq_affinity *affd)
 	unsigned int affvecs, curvec, usedvecs, i;
 	struct irq_affinity_desc *masks = NULL;
 
+
+	pr_err("%s affd=%d %d nvecs=%d\n", __func__,
+					affd ? affd->pre_vectors : -1,
+					affd ? affd->post_vectors : -1,
+					nvecs);
 	/*
 	 * Determine the number of vectors which need interrupt affinities
 	 * assigned. If the pre/post request exhausts the available vectors
@@ -39,6 +44,7 @@ irq_create_affinity_masks(unsigned int nvecs, struct irq_affinity *affd)
 	else
 		affvecs = 0;
 
+
 	/*
 	 * Simple invocations do not provide a calc_sets() callback. Install
 	 * the generic one.
@@ -46,9 +52,19 @@ irq_create_affinity_masks(unsigned int nvecs, struct irq_affinity *affd)
 	if (!affd->calc_sets)
 		affd->calc_sets = default_calc_sets;
 
+	pr_err("%s2 affd=%d %d nvecs=%d affvecs=%d affd->calc_sets=%pS affd->nr_sets=%d\n", __func__,
+					affd ? affd->pre_vectors : -1,
+					affd ? affd->post_vectors : -1,
+					nvecs, affvecs, affd->calc_sets,
+					affd->nr_sets);
 	/* Recalculate the sets */
 	affd->calc_sets(affd, affvecs);
 
+	pr_err("%s3 affd=%d %d nvecs=%d affvecs=%d affd->calc_sets=%pS affd->nr_sets=%d\n", __func__,
+					affd ? affd->pre_vectors : -1,
+					affd ? affd->post_vectors : -1,
+					nvecs, affvecs, affd->calc_sets,
+					affd->nr_sets);
 	if (WARN_ON_ONCE(affd->nr_sets > IRQ_AFFINITY_MAX_SETS))
 		return NULL;
 
@@ -72,13 +88,18 @@ irq_create_affinity_masks(unsigned int nvecs, struct irq_affinity *affd)
 		unsigned int nr_masks, this_vecs = affd->set_size[i];
 		struct cpumask *result = group_cpus_evenly(this_vecs, &nr_masks);
 
+		pr_err("%s4 i=%d result=%*pb nr_masks=%d this_vecs=%d\n",
+			__func__, i, cpumask_pr_args(result), nr_masks, this_vecs);
 		if (!result) {
 			kfree(masks);
 			return NULL;
 		}
 
-		for (int j = 0; j < nr_masks; j++)
+		for (int j = 0; j < nr_masks; j++) {
 			cpumask_copy(&masks[curvec + j].mask, &result[j]);
+			pr_err("%s4.1 i=%d masks[curvec + j].mask=%*pb nr_masks=%d this_vecs=%d\n",
+				__func__, i, cpumask_pr_args(&masks[curvec + j].mask), nr_masks, this_vecs);
+		}
 		kfree(result);
 
 		curvec += nr_masks;
