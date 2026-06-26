@@ -79,6 +79,9 @@ struct quirk_entry {
 	u32 disabled_quirks;
 };
 
+static int max_io_queue;
+module_param(max_io_queue, int, 0444);
+
 static int use_threaded_interrupts;
 module_param(use_threaded_interrupts, int, 0444);
 
@@ -2939,8 +2942,10 @@ static unsigned int nvme_max_io_queues(struct nvme_dev *dev)
 	 */
 	if (dev->ctrl.quirks & NVME_QUIRK_SHARED_TAGS)
 		return 1;
-	pr_err("%s blk_mq_num_possible_queues(0)=%d dev->nr_write_queues=%d dev->nr_poll_queues=%d\n",
-		__func__, blk_mq_num_possible_queues(0), dev->nr_write_queues, dev->nr_poll_queues);
+	pr_err("%s blk_mq_num_possible_queues(0)=%d dev->nr_write_queues=%d dev->nr_poll_queues=%d max_io_queue=%d\n",
+		__func__, blk_mq_num_possible_queues(0), dev->nr_write_queues, dev->nr_poll_queues, max_io_queue);
+	if (max_io_queue)
+		return max_io_queue;
 	return blk_mq_num_possible_queues(0) + dev->nr_write_queues +
 		dev->nr_poll_queues;
 }
