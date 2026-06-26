@@ -78,8 +78,9 @@ static void build_node_to_cpumask(cpumask_var_t *masks)
 {
 	int cpu;
 
-	for_each_possible_cpu(cpu)
+	for_each_possible_cpu(cpu) {
 		cpumask_set_cpu(cpu, masks[cpu_to_node(cpu)]);
+	}
 }
 
 static int get_nodes_in_cpumask(cpumask_var_t *node_to_cpumask,
@@ -412,11 +413,16 @@ static int __group_cpus_evenly(unsigned int startgrp, unsigned int numgrps,
 	nodemask_t nodemsk = NODE_MASK_NONE;
 	struct node_groups *node_groups;
 
+	pr_err("%s startgrp=%d numgrps=%d cpu_mask=%*pb nmsk=%*pb\n",
+		__func__, startgrp, numgrps, 
+		cpumask_pr_args(cpu_mask),
+		cpumask_pr_args(nmsk));
 	if (cpumask_empty(cpu_mask))
 		return 0;
 
 	nodes = get_nodes_in_cpumask(node_to_cpumask, cpu_mask, &nodemsk);
 
+	pr_err("%s2 startgrp=%d numgrps=%d nodes=%d\n", __func__, startgrp, numgrps, nodes);
 	/*
 	 * If the number of nodes in the mask is greater than or equal the
 	 * number of groups we just spread the groups across the nodes.
@@ -492,6 +498,7 @@ struct cpumask *group_cpus_evenly(unsigned int numgrps, unsigned int *nummasks)
 	cpumask_var_t nmsk, npresmsk;
 	int ret = -ENOMEM;
 	struct cpumask *masks = NULL;
+	int node;
 
 	pr_err("%s numgrps=%d *nummasks=%d\n", __func__, numgrps, *nummasks);
 
@@ -514,6 +521,12 @@ struct cpumask *group_cpus_evenly(unsigned int numgrps, unsigned int *nummasks)
 
 	build_node_to_cpumask(node_to_cpumask);
 
+	for (node = 0; node < nr_node_ids; node++) {
+		struct cpumask *jmsk = node_to_cpumask[node];
+		pr_err("%s1 node=%d node_to_cpumask=%*pb nr_node_ids=%d\n",
+			__func__, node, cpumask_pr_args(jmsk), nr_node_ids);
+	}
+
 	/*
 	 * Make a local cache of 'cpu_present_mask', so the two stages
 	 * spread can observe consistent 'cpu_present_mask' without holding
@@ -529,11 +542,13 @@ struct cpumask *group_cpus_evenly(unsigned int numgrps, unsigned int *nummasks)
 	cpumask_copy(npresmsk, data_race(cpu_present_mask));
 
 	/* grouping present CPUs first */
-	pr_err("%s2 calling __group_cpus_evenly curgrp=%d numgrps=%d\n", __func__, curgrp, numgrps);
+	pr_err("%s2 calling __group_cpus_evenly curgrp=%d numgrps=%d cpu_present_mask=%*pb\n",
+		__func__, curgrp, numgrps, cpumask_pr_args(cpu_present_mask));
 	ret = __group_cpus_evenly(curgrp, numgrps, node_to_cpumask,
 				  npresmsk, nmsk, masks);
 	if (ret < 0)
 		goto fail_node_to_cpumask;
+	pr_err("%s2.1 called __group_cpus_evenly curgrp=%d numgrps=%d nr_present=%d\n", __func__, curgrp, numgrps, nr_present);
 	nr_present = ret;
 
 	/*
