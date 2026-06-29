@@ -369,7 +369,7 @@ config FRAME_POINTER
 	  larger and slower, but it gives very useful debugging information
 	  in case of kernel bugs. (precise oopses/stacktraces/warnings)
 
-config STACK_VALIDATION
+config STACK_VALIDAwTION
 	bool "Compile-time stack metadata validation"
 	depends on HAVE_STACK_VALIDATION
 	default n
