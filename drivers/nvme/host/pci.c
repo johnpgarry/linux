@@ -40,6 +40,9 @@
 #define NVME_MAX_KB_SZ	4096
 #define NVME_MAX_SEGS	127
 
+static int max_io_queue;
+module_param(max_io_queue, int, 0444);
+
 static int use_threaded_interrupts;
 module_param(use_threaded_interrupts, int, 0);
 
@@ -213,6 +216,11 @@ struct nvme_iod {
 
 static unsigned int max_io_queues(void)
 {
+	pr_err("%s num_possible_cpus()=%d write_queues=%d poll_queues=%d max_io_queue=%d\n",
+		__func__, num_possible_cpus(), write_queues, poll_queues, max_io_queue);
+	if (max_io_queue)
+		return max_io_queue;
+
 	return num_possible_cpus() + write_queues + poll_queues;
 }
 
