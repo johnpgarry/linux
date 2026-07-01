@@ -34,6 +34,7 @@
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport.h> /* scsi_init_limits() */
+#include <scsi/scsi_multipath.h>
 #include <scsi/scsi_dh.h>
 
 #include <trace/events/scsi.h>
@@ -2931,6 +2932,8 @@ EXPORT_SYMBOL(scsi_target_resume);
 
 static int __scsi_internal_device_block_nowait(struct scsi_device *sdev)
 {
+	if (sdev->scsi_mpath_dev)
+		scsi_mpath_dev_clear_path(sdev->scsi_mpath_dev);
 	if (scsi_device_set_state(sdev, SDEV_BLOCK))
 		return scsi_device_set_state(sdev, SDEV_CREATED_BLOCK);
 
