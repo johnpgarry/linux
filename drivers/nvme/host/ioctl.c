@@ -111,7 +111,7 @@ static struct request *nvme_alloc_user_request(struct request_queue *q,
 	 * failover as passthrough requests also append REQ_FAILFAST_DRIVER.
 	 */
 	if (ns && nvme_ns_head_multipath(ns->head))
-		rq_flags |= REQ_NVME_MPATH;
+		rq_flags |= REQ_MPATH;
 
 	req = blk_mq_alloc_request(q, nvme_req_op(cmd) | rq_flags, blk_flags);
 	if (IS_ERR(req))
@@ -726,95 +726,6 @@ int nvme_mpath_chr_uring_cmd(struct mpath_device *mpath_device,
 					issue_flags);
 }
 
-static int nvme_ns_head_ctrl_ioctl(struct nvme_ns *ns, unsigned int cmd,
-		void __user *argp, struct nvme_ns_head *head, int srcu_idx,
-		bool open_for_write)
-	__releases(&head->srcu)
-{
-	struct nvme_ctrl *ctrl = ns->ctrl;
-	int ret;
-
-	nvme_get_ctrl(ns->ctrl);
-	srcu_read_unlock(&head->srcu, srcu_idx);
-	ret = nvme_ctrl_ioctl(ns->ctrl, cmd, argp, open_for_write);
-
-	nvme_put_ctrl(ctrl);
-	return ret;
-}
-
-int nvme_ns_head_ioctl(struct block_device *bdev, blk_mode_t mode,
-		unsigned int cmd, unsigned long arg)
-{
-	struct nvme_ns_head *head = bdev->bd_disk->private_data;
-	bool open_for_write = mode & BLK_OPEN_WRITE;
-	void __user *argp = (void __user *)arg;
-	struct nvme_ns *ns;
-	int srcu_idx, ret = -EWOULDBLOCK;
-	unsigned int flags = 0;
-
-	if (bdev_is_partition(bdev))
-		flags |= NVME_IOCTL_PARTITION;
-
-	srcu_idx = srcu_read_lock(&head->srcu);
-	ns = nvme_find_path(head);
-	if (!ns)
-		goto out_unlock;
-
-	/*
-	 * Handle ioctls that apply to the controller instead of the namespace
-	 * separately and drop the ns SRCU reference early.  This avoids a
-	 * deadlock when deleting namespaces using the passthrough interface.
-	 */
-	if (is_ctrl_ioctl(cmd))
-		return nvme_ns_head_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
-					       open_for_write);
-
-	ret = nvme_ns_ioctl(ns, cmd, argp, flags, open_for_write);
-out_unlock:
-	srcu_read_unlock(&head->srcu, srcu_idx);
-	return ret;
-}
-
-long nvme_ns_head_chr_ioctl(struct file *file, unsigned int cmd,
-		unsigned long arg)
-{
-	bool open_for_write = file->f_mode & FMODE_WRITE;
-	struct cdev *cdev = file_inode(file)->i_cdev;
-	struct nvme_ns_head *head =
-		container_of(cdev, struct nvme_ns_head, cdev);
-	void __user *argp = (void __user *)arg;
-	struct nvme_ns *ns;
-	int srcu_idx, ret = -EWOULDBLOCK;
-
-	srcu_idx = srcu_read_lock(&head->srcu);
-	ns = nvme_find_path(head);
-	if (!ns)
-		goto out_unlock;
-
-	if (is_ctrl_ioctl(cmd))
-		return nvme_ns_head_ctrl_ioctl(ns, cmd, argp, head, srcu_idx,
-				open_for_write);
-
-	ret = nvme_ns_ioctl(ns, cmd, argp, 0, open_for_write);
-out_unlock:
-	srcu_read_unlock(&head->srcu, srcu_idx);
-	return ret;
-}
-
-int nvme_ns_head_chr_uring_cmd(struct io_uring_cmd *ioucmd,
-		unsigned int issue_flags)
-{
-	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
-	struct nvme_ns_head *head = container_of(cdev, struct nvme_ns_head, cdev);
-	int srcu_idx = srcu_read_lock(&head->srcu);
-	struct nvme_ns *ns = nvme_find_path(head);
-	int ret = -EINVAL;
-
-	if (ns)
-		ret = nvme_ns_uring_cmd(ns, ioucmd, issue_flags);
-	srcu_read_unlock(&head->srcu, srcu_idx);
-	return ret;
-}
 #endif /* CONFIG_NVME_MULTIPATH */
 
 int nvme_dev_uring_cmd(struct io_uring_cmd *ioucmd, unsigned int issue_flags)
