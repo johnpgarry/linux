@@ -65,8 +65,8 @@ static inline struct nvme_ns_head *dev_to_ns_head(struct device *dev)
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
-	if (nvme_disk_is_ns_head(disk))
-		return disk->private_data;
+	if (is_mpath_disk(disk))
+		return nvme_mpath_to_ns_head(mpath_bd_device_to_head(dev));
 	return nvme_get_ns_from_dev(dev)->head;
 }
 
@@ -184,31 +184,28 @@ static ssize_t metadata_bytes_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(metadata_bytes);
 
+static int ns_head_update_nuse_cb(struct mpath_device *mpath_device)
+{
+	struct nvme_ns *ns = nvme_mpath_to_ns(mpath_device);
+	struct nvme_id_ns *id;
+	int ret;
+
+	ret = nvme_identify_ns(ns->ctrl, ns->head->ns_id, &id);
+	if (ret)
+		return ret;
+
+	ns->head->nuse = le64_to_cpu(id->nuse);
+	kfree(id);
+	return 0;
+}
+
 static int ns_head_update_nuse(struct nvme_ns_head *head)
 {
-	struct nvme_id_ns *id;
-	struct nvme_ns *ns;
-	int srcu_idx, ret = -EWOULDBLOCK;
-
 	/* Avoid issuing commands too often by rate limiting the update */
 	if (!__ratelimit(&head->rs_nuse))
 		return 0;
 
-	srcu_idx = srcu_read_lock(&head->srcu);
-	ns = nvme_find_path(head);
-	if (!ns)
-		goto out_unlock;
-
-	ret = nvme_identify_ns(ns->ctrl, head->ns_id, &id);
-	if (ret)
-		goto out_unlock;
-
-	head->nuse = le64_to_cpu(id->nuse);
-	kfree(id);
-
-out_unlock:
-	srcu_read_unlock(&head->srcu, srcu_idx);
-	return ret;
+	return mpath_call_for_device(&head->mpath_head, ns_head_update_nuse_cb);
 }
 
 static int ns_update_nuse(struct nvme_ns *ns)
@@ -236,7 +233,7 @@ static ssize_t nuse_show(struct device *dev, struct device_attribute *attr,
 	struct gendisk *disk = dev_to_disk(dev);
 	int ret;
 
-	if (nvme_disk_is_ns_head(disk))
+	if (is_mpath_disk(disk))
 		ret = ns_head_update_nuse(head);
 	else
 		ret = ns_update_nuse(disk->private_data);
@@ -289,19 +286,19 @@ static umode_t nvme_ns_attrs_are_visible(struct kobject *kobj,
 #ifdef CONFIG_NVME_MULTIPATH
 	if (a == &dev_attr_ana_grpid.attr || a == &dev_attr_ana_state.attr) {
 		/* per-path attr */
-		if (nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 		if (!nvme_ctrl_use_ana(nvme_get_ns_from_dev(dev)->ctrl))
 			return 0;
 	}
 	if (a == &dev_attr_queue_depth.attr || a == &dev_attr_numa_nodes.attr) {
-		if (nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 	}
 	if (a == &dev_attr_delayed_removal_secs.attr) {
 		struct gendisk *disk = dev_to_disk(dev);
 
-		if (!nvme_disk_is_ns_head(disk))
+		if (!is_mpath_disk(disk))
 			return 0;
 	}
 #endif
@@ -312,38 +309,6 @@ static const struct attribute_group nvme_ns_attr_group = {
 	.attrs		= nvme_ns_attrs,
 	.is_visible	= nvme_ns_attrs_are_visible,
 };
-
-#ifdef CONFIG_NVME_MULTIPATH
-/*
- * NOTE: The dummy attribute does not appear in sysfs. It exists solely to allow
- * control over the visibility of the multipath sysfs node. Without at least one
- * attribute defined in nvme_ns_mpath_attrs[], the sysfs implementation does not
- * invoke the multipath_sysfs_group_visible() method. As a result, we would not
- * be able to control the visibility of the multipath sysfs node.
- */
-static struct attribute dummy_attr = {
-	.name = "dummy",
-};
-
-static struct attribute *nvme_ns_mpath_attrs[] = {
-	&dummy_attr,
-	NULL,
-};
-
-static bool multipath_sysfs_group_visible(struct kobject *kobj)
-{
-	struct device *dev = container_of(kobj, struct device, kobj);
-
-	return nvme_disk_is_ns_head(dev_to_disk(dev));
-}
-DEFINE_SIMPLE_SYSFS_GROUP_VISIBLE(multipath_sysfs)
-
-const struct attribute_group nvme_ns_mpath_attr_group = {
-	.name           = "multipath",
-	.attrs		= nvme_ns_mpath_attrs,
-	.is_visible     = SYSFS_GROUP_VISIBLE(multipath_sysfs),
-};
-#endif
 
 static ssize_t command_retries_count_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -415,26 +380,26 @@ static umode_t nvme_ns_diag_attrs_are_visible(struct kobject *kobj,
 	struct device *dev = container_of(kobj, struct device, kobj);
 
 	if (a == &dev_attr_command_retries_count.attr) {
-		if (nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 	}
 	if (a == &dev_attr_io_errors.attr) {
 		struct gendisk *disk = dev_to_disk(dev);
 
-		if (nvme_disk_is_ns_head(disk))
+		if (is_mpath_disk(disk))
 			return 0;
 	}
 #ifdef CONFIG_NVME_MULTIPATH
 	if (a == &dev_attr_multipath_failover_count.attr) {
-		if (nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 	}
 	if (a == &dev_attr_io_requeue_no_usable_path_count.attr) {
-		if (!nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (!is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 	}
 	if (a == &dev_attr_io_fail_no_available_path_count.attr) {
-		if (!nvme_disk_is_ns_head(dev_to_disk(dev)))
+		if (!is_mpath_disk(dev_to_disk(dev)))
 			return 0;
 	}
 #endif
@@ -450,7 +415,7 @@ static const struct attribute_group nvme_ns_diag_attr_group = {
 const struct attribute_group *nvme_ns_attr_groups[] = {
 	&nvme_ns_attr_group,
 #ifdef CONFIG_NVME_MULTIPATH
-	&nvme_ns_mpath_attr_group,
+	&mpath_attr_group,
 #endif
 	&nvme_ns_diag_attr_group,
 	NULL,
