@@ -499,6 +499,131 @@ const struct block_device_operations mpath_ops = {
 };
 EXPORT_SYMBOL_GPL(mpath_ops);
 
+static int mpath_chr_open(struct inode *inode, struct file *file)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct mpath_head *mpath_head =
+			container_of(cdev, struct mpath_head, cdev);
+
+	return mpath_get_head(mpath_head);
+}
+
+static int mpath_chr_release(struct inode *inode, struct file *file)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct mpath_head *mpath_head =
+			container_of(cdev, struct mpath_head, cdev);
+
+	mpath_put_head(mpath_head);
+	return 0;
+}
+
+static long mpath_chr_ioctl(struct file *file, unsigned int cmd,
+		unsigned long arg)
+{
+	struct cdev *cdev = file_inode(file)->i_cdev;
+	struct mpath_head *mpath_head =
+			container_of(cdev, struct mpath_head, cdev);
+	struct mpath_device *mpath_device;
+	int srcu_idx, err = -EWOULDBLOCK;
+	void *unlocked_ioctl_data = NULL;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (!mpath_device)
+		goto out_unlock;
+	if (mpath_head->mpdt->ioctl_begin)
+		mpath_head->mpdt->ioctl_begin(mpath_device, cmd,
+					&unlocked_ioctl_data);
+	if (unlocked_ioctl_data)
+		srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	err = mpath_head->mpdt->cdev_ioctl(mpath_device, cmd, arg,
+					file->f_mode & FMODE_WRITE);
+	if (unlocked_ioctl_data) {
+		mpath_head->mpdt->ioctl_finish(unlocked_ioctl_data);
+		return err;
+	}
+
+out_unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	return err;
+}
+
+static int mpath_chr_uring_cmd(struct io_uring_cmd *ioucmd,
+		unsigned int issue_flags)
+{
+	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
+	struct mpath_head *mpath_head =
+			container_of(cdev, struct mpath_head, cdev);
+	struct mpath_device *mpath_device;
+	/* error code copied from nvme_ns_head_chr_uring_cmd */
+	int srcu_idx, ret = -EINVAL;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+
+	if (!mpath_device)
+		goto out_unlock;
+
+	if (!mpath_head->mpdt->chr_uring_cmd) {
+		ret = -EOPNOTSUPP;
+		goto out_unlock;
+	}
+
+	ret = mpath_head->mpdt->chr_uring_cmd(mpath_device, ioucmd,
+			issue_flags);
+out_unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	return ret;
+}
+
+static int mpath_chr_uring_cmd_iopoll(struct io_uring_cmd *ioucmd,
+				 struct io_comp_batch *iob,
+				 unsigned int poll_flags)
+{
+	struct cdev *cdev = file_inode(ioucmd->file)->i_cdev;
+	struct mpath_head *mpath_head =
+			container_of(cdev, struct mpath_head, cdev);
+
+	if (!mpath_head->mpdt->chr_uring_cmd_iopoll)
+		return -EOPNOTSUPP;
+
+	return mpath_head->mpdt->chr_uring_cmd_iopoll(ioucmd, iob, poll_flags);
+}
+
+const struct file_operations mpath_chr_fops = {
+	.owner		= THIS_MODULE,
+	.open		= mpath_chr_open,
+	.release	= mpath_chr_release,
+	.unlocked_ioctl	= mpath_chr_ioctl,
+	.compat_ioctl	= compat_ptr_ioctl,
+	.uring_cmd	= mpath_chr_uring_cmd,
+	.uring_cmd_iopoll = mpath_chr_uring_cmd_iopoll,
+};
+EXPORT_SYMBOL_GPL(mpath_chr_fops);
+
+static void mpath_head_add_cdev(struct mpath_head *mpath_head)
+{
+	if (!mpath_head->mpdt->add_cdev)
+		return;
+
+	if (mpath_head->mpdt->add_cdev(mpath_head)) {
+		dev_err(disk_to_dev(mpath_head->disk),
+			"Unable to create the cdev\n");
+		return;
+	}
+	set_bit(MPATH_HEAD_CDEV_LIVE, &mpath_head->flags);
+}
+
+static void mpath_head_del_cdev(struct mpath_head *mpath_head)
+{
+	if (!mpath_head->mpdt->del_cdev)
+		return;
+
+	if (test_and_clear_bit(MPATH_HEAD_CDEV_LIVE, &mpath_head->flags))
+		mpath_head->mpdt->del_cdev(mpath_head);
+}
+
 static void multipath_partition_scan_work(struct work_struct *work)
 {
 	struct mpath_head *mpath_head =
@@ -574,6 +699,7 @@ void mpath_remove_disk(struct mpath_head *mpath_head)
 		 */
 		mpath_schedule_requeue_work(mpath_head);
 
+		mpath_head_del_cdev(mpath_head);
 		mpath_synchronize(mpath_head);
 		del_gendisk(disk);
 	}
@@ -598,6 +724,16 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head,
 {
 	if (!mpath_head->disk_groups || !mpath_head->parent ||
 	    !mpath_head->iopolicy)
+		return -EINVAL;
+
+	/* limited sanity checks on the template */
+	if (!mpath_head->mpdt->ioctl_begin ^ !mpath_head->mpdt->ioctl_finish)
+		return -EINVAL;
+
+	if (!mpath_head->mpdt->add_cdev ^ !mpath_head->mpdt->del_cdev)
+		return -EINVAL;
+
+	if (!mpath_head->mpdt->add_cdev ^ !mpath_head->mpdt->cdev_ioctl)
 		return -EINVAL;
 
 	mpath_head->disk = blk_alloc_disk(lim, numa_node);
@@ -632,6 +768,8 @@ void mpath_device_set_live(struct mpath_device *mpath_device)
 			clear_bit(MPATH_HEAD_DISK_LIVE, &mpath_head->flags);
 			return;
 		}
+
+		mpath_head_add_cdev(mpath_head);
 		queue_work(mpath_wq, &mpath_head->partition_scan_work);
 	}
 
