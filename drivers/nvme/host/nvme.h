@@ -999,8 +999,10 @@ bool nvme_tryget_ns_head(struct nvme_ns_head *head);
 void nvme_put_ns_head(struct nvme_ns_head *head);
 int nvme_cdev_add(const char *name, struct cdev *cdev,
 		struct device *cdev_device,
-		const struct file_operations *fops, struct module *owner);
+		const struct file_operations *fops, struct module *owner,
+		void (*release)(struct device *cdev_device));
 void nvme_cdev_del(struct cdev *cdev, struct device *cdev_device);
+void nvme_cdev_rel(struct device *dev);
 int nvme_ioctl(struct block_device *bdev, blk_mode_t mode,
 		unsigned int cmd, unsigned long arg);
 long nvme_ns_chr_ioctl(struct file *file, unsigned int cmd, unsigned long arg);

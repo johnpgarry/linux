@@ -3887,7 +3887,7 @@ static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
 	return 0;
 }
 
-static void nvme_cdev_rel(struct device *dev)
+void nvme_cdev_rel(struct device *dev)
 {
 	ida_free(&nvme_ns_chr_minor_ida, MINOR(dev->devt));
 }
@@ -3900,7 +3900,8 @@ void nvme_cdev_del(struct cdev *cdev, struct device *cdev_device)
 
 int nvme_cdev_add(const char *name, struct cdev *cdev,
 		struct device *cdev_device,
-		const struct file_operations *fops, struct module *owner)
+		const struct file_operations *fops, struct module *owner,
+		void (*release)(struct device *cdev_dev))
 {
 	int minor, ret;
 
@@ -3915,7 +3916,7 @@ int nvme_cdev_add(const char *name, struct cdev *cdev,
 	}
 	cdev_device->devt = MKDEV(MAJOR(nvme_ns_chr_devt), minor);
 	cdev_device->class = &nvme_ns_chr_class;
-	cdev_device->release = nvme_cdev_rel;
+	cdev_device->release = release;
 	device_initialize(cdev_device);
 	cdev_init(cdev, fops);
 	cdev->owner = owner;
@@ -3956,7 +3957,8 @@ static void nvme_add_ns_cdev(struct nvme_ns *ns)
 		 ns->head->instance);
 
 	if (nvme_cdev_add(name, &ns->cdev, &ns->cdev_device,
-			&nvme_ns_chr_fops, ns->ctrl->ops->module)) {
+			&nvme_ns_chr_fops, ns->ctrl->ops->module,
+			nvme_cdev_rel)) {
 		dev_err(ns->ctrl->device, "Unable to create the %s device\n",
 			name);
 		return;

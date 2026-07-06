@@ -616,28 +616,22 @@ static inline struct nvme_ns_head *cdev_to_ns_head(struct cdev *cdev)
 	return container_of(cdev, struct nvme_ns_head, cdev);
 }
 
-static int nvme_ns_head_chr_open(struct inode *inode, struct file *file)
-{
-	if (!nvme_tryget_ns_head(cdev_to_ns_head(inode->i_cdev)))
-		return -ENXIO;
-	return 0;
-}
-
-static int nvme_ns_head_chr_release(struct inode *inode, struct file *file)
-{
-	nvme_put_ns_head(cdev_to_ns_head(inode->i_cdev));
-	return 0;
-}
-
 static const struct file_operations nvme_ns_head_chr_fops = {
 	.owner		= THIS_MODULE,
-	.open		= nvme_ns_head_chr_open,
-	.release	= nvme_ns_head_chr_release,
 	.unlocked_ioctl	= nvme_ns_head_chr_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
 	.uring_cmd	= nvme_ns_head_chr_uring_cmd,
 	.uring_cmd_iopoll = nvme_ns_chr_uring_cmd_iopoll,
 };
+
+static void nvme_cdev_ns_head_rel(struct device *dev)
+{
+	struct nvme_ns_head *head = container_of(dev, struct nvme_ns_head,
+						cdev_device);
+
+	nvme_cdev_rel(dev);
+	nvme_put_ns_head(head);
+}
 
 static void nvme_add_ns_head_cdev(struct nvme_ns_head *head)
 {
@@ -647,11 +641,15 @@ static void nvme_add_ns_head_cdev(struct nvme_ns_head *head)
 	snprintf(name, sizeof(name), "ng%dn%d", head->subsys->instance,
 		 head->instance);
 
-	if (nvme_cdev_add(name, &head->cdev, &head->cdev_device,
-			&nvme_ns_head_chr_fops, THIS_MODULE)) {
-		dev_err(disk_to_dev(head->disk),
-			"Unable to create the %s device\n", name);
-		return;
+	if (nvme_tryget_ns_head(head)) {
+		if (nvme_cdev_add(name, &head->cdev, &head->cdev_device,
+			&nvme_ns_head_chr_fops, THIS_MODULE,
+			nvme_cdev_ns_head_rel)) {
+			dev_err(disk_to_dev(head->disk),
+				"Unable to create the %s device\n", name);
+			nvme_put_ns_head(head);
+			return;
+		}
 	}
 	set_bit(NVME_NSHEAD_CDEV_LIVE, &head->flags);
 }
