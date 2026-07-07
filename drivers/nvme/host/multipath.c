@@ -6,6 +6,7 @@
 #include <linux/backing-dev.h>
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 #include <trace/events/block.h>
 #include "nvme.h"
 
@@ -511,6 +512,10 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 	struct device *dev = disk_to_dev(head->disk);
 	struct nvme_ns *ns;
 	int srcu_idx;
+	static atomic_t bio_count;
+	unsigned int _bio_count;
+
+	_bio_count = atomic_inc_return(&bio_count);
 
 	/*
 	 * The namespace might be going away and the bio might be moved to a
@@ -522,7 +527,14 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 		return;
 
 	srcu_idx = srcu_read_lock(&head->srcu);
+	if (_bio_count == 30000) {
+	//	pr_err("%s special bio going to sleep for 10 seconds bio=%pS\n", __func__, bio);
+	//	msleep(10000);
+	//	pr_err("%s2 special bio finished sleep bio=%pS\n", __func__, bio);
+	}
 	ns = nvme_find_path(head);
+	if (!ns)
+		pr_err("%s ns=%pS nvme_available_path=%d bio=%pS\n", __func__, ns, nvme_available_path(head), bio);
 	if (likely(ns)) {
 		bio_set_dev(bio, ns->disk->part0);
 		/*
@@ -536,14 +548,28 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 				      bio->bi_iter.bi_sector);
 		submit_bio_noacct(bio);
 	} else if (nvme_available_path(head)) {
-		dev_warn_ratelimited(dev, "no usable path - requeuing I/O\n");
+		static atomic_t special_bio_count;
+		unsigned int _special_bio_count;
 
+		_special_bio_count = atomic_inc_return(&special_bio_count);
+		dev_warn(dev, "no usable path - requeuing I/O bio=%pS getting requeue lock _special_bio_count=%d\n",
+			bio, _special_bio_count);
+
+		if (_special_bio_count == 1) {
+			dev_warn(dev, "no usable path - requeuing I/O bio=%pS going to sleep for 30 seconds _special_bio_count=%d\n",
+				bio, _special_bio_count);
+			msleep(30000);
+			dev_warn(dev, "no usable path - requeuing I/O bio=%pS finished sleep _special_bio_count=%d\n",
+				bio, _special_bio_count);
+		}
 		spin_lock_irq(&head->requeue_lock);
+		dev_warn(dev, "no usable path - requeuing I/O bio=%pS got requeue lock\n", bio);
 		bio_list_add(&head->requeue_list, bio);
 		spin_unlock_irq(&head->requeue_lock);
+		dev_warn(dev, "no usable path - requeuing I/O bio=%pS dropped requeue lock\n", bio);
 		atomic_long_inc(&head->io_requeue_no_usable_path_count);
 	} else {
-		dev_warn_ratelimited(dev, "no available path - failing I/O\n");
+		dev_warn(dev, "no available path - failing I/O bio=%pS\n", bio);
 
 		bio_io_error(bio);
 		atomic_long_inc(&head->io_fail_no_available_path_count);
@@ -678,26 +704,32 @@ static void nvme_requeue_work(struct work_struct *work)
 	next = bio_list_get(&head->requeue_list);
 	spin_unlock_irq(&head->requeue_lock);
 
+	pr_err("%s head=%pS next=%pS\n", __func__, head, next);
 	while ((bio = next) != NULL) {
 		next = bio->bi_next;
 		bio->bi_next = NULL;
 
+		pr_err("%s2 head=%pS calling submit_bio_noacct bio=%pS\n", __func__, head, bio);
 		submit_bio_noacct(bio);
 	}
 }
 
 static void nvme_remove_head(struct nvme_ns_head *head)
 {
+	pr_err("%s head=%pS calling test_and_clear_bit NVME_NSHEAD_DISK_LIVE\n", __func__, head);
 	if (test_and_clear_bit(NVME_NSHEAD_DISK_LIVE, &head->flags)) {
 		/*
 		 * requeue I/O after NVME_NSHEAD_DISK_LIVE has been cleared
 		 * to allow multipath to fail all I/O.
 		 */
+		pr_err("%s1 head=%pS calling kblockd_schedule_work\n", __func__, head);
 		kblockd_schedule_work(&head->requeue_work);
 
 		if (test_and_clear_bit(NVME_NSHEAD_CDEV_LIVE, &head->flags))
 			nvme_cdev_del(&head->cdev, &head->cdev_device);
+		pr_err("%s2 head=%pS calling synchronize_srcu\n", __func__, head);
 		synchronize_srcu(&head->srcu);
+		pr_err("%s3 head=%pS calling del_gendisk\n", __func__, head);
 		del_gendisk(head->disk);
 	}
 	nvme_put_ns_head(head);
