@@ -153,7 +153,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_RANDOM false
 #define DEF_REMOVABLE false
 #define DEF_SCSI_LEVEL   7    /* INQUIRY, byte2 [6->SPC-4; 7->SPC-5] */
-#define DEF_SECTOR_SIZE 512
+#define DEF_SECTOR_SIZE 8192
 #define DEF_UNMAP_ALIGNMENT 0
 #define DEF_UNMAP_GRANULARITY 1
 #define DEF_UNMAP_MAX_BLOCKS 0xFFFFFFFF
@@ -8488,6 +8488,7 @@ static int __init scsi_debug_init(void)
 	case 1024:
 	case 2048:
 	case 4096:
+	case 8192:
 		break;
 	default:
 		pr_err("invalid sector_size %d\n", sdebug_sector_size);
