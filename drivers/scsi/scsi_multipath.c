@@ -80,8 +80,11 @@ static void scsi_mpath_head_release(struct device *dev)
 		container_of(dev, struct scsi_mpath_head, dev);
 	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
 
+	pr_err("%s calling ida_free scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
+	pr_err("%s1 calling mpath_head_uninit scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	mpath_head_uninit(mpath_head);
+	pr_err("%s2 calling kfree(scsi_mpath_head)\n", __func__);
 	kfree(scsi_mpath_head);
 }
 
@@ -170,11 +173,19 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(void)
 				scsi_mpath_head->index);
 	if (ret) {
 		put_device(&scsi_mpath_head->dev);
-		return NULL;
+		goto out_free_ida;
+	}
+
+	ret = device_add(&scsi_mpath_head->dev);
+	if (ret) {
+		put_device(&scsi_mpath_head->dev);
+		goto out_free_ida;
 	}
 
 	return scsi_mpath_head;
 
+out_free_ida:
+	ida_free(&scsi_multipath_dev_ida, scsi_mpath_head->index);
 out_uninit_head:
 	mpath_head_uninit(&scsi_mpath_head->mpath_head);
 out_free:
@@ -244,13 +255,10 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 	strscpy(scsi_mpath_head->vpd_id, sdev->scsi_mpath_dev->device_id_str,
 			SCSI_MPATH_DEVICE_ID_LEN);
 
-	ret = device_add(&scsi_mpath_head->dev);
-	if (ret) {
-		mutex_unlock(&scsi_mpath_heads_lock);
-		goto out_put_head;
-	}
-
+	
+	pr_err("%s4 calling list_add_tail scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
+
 found:
 	mutex_unlock(&scsi_mpath_heads_lock);
 	ret = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
@@ -261,8 +269,10 @@ found:
 	sdev->scsi_mpath_dev->scsi_mpath_head = scsi_mpath_head;
 	return 0;
 out_put_head:
+	pr_err("%s11 out_put_head calling scsi_mpath_put_head scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	scsi_mpath_put_head(scsi_mpath_head);
 out_uninit:
+	pr_err("%s12 out_put_head calling scsi_multipath_sdev_uninit scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	scsi_multipath_sdev_uninit(sdev);
 	return ret;
 }
@@ -305,6 +315,7 @@ static void scsi_mpath_free_head(struct kref *ref)
 	struct scsi_mpath_head *scsi_mpath_head =
 		container_of(ref, struct scsi_mpath_head, ref);
 
+	pr_err("%s calling mutex_lock scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	/*
 	 * If we race with scsi_mpath_find_head(), then that function may
 	 * find this scsi_mpath_head in the heads list; however we would fail
@@ -313,9 +324,11 @@ static void scsi_mpath_free_head(struct kref *ref)
 	 * scsi_mpath_head) after we delete this head from the list.
 	 */
 	mutex_lock(&scsi_mpath_heads_lock);
+	pr_err("%s1 calling list_del_init scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	list_del_init(&scsi_mpath_head->entry);
 	mutex_unlock(&scsi_mpath_heads_lock);
 
+	pr_err("%s2 calling device_unregister scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
 	device_unregister(&scsi_mpath_head->dev);
 }
 
