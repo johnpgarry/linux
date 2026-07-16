@@ -35,6 +35,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport.h> /* scsi_init_limits() */
 #include <scsi/scsi_dh.h>
+#include <scsi/scsi_multipath.h>
 
 #include <trace/events/scsi.h>
 
@@ -3007,13 +3008,16 @@ static void scsi_device_block(struct scsi_device *sdev, void *data)
 	mutex_lock(&sdev->state_mutex);
 	err = __scsi_internal_device_block_nowait(sdev);
 	state = sdev->sdev_state;
-	if (err == 0)
+	if (err == 0) {
 		/*
 		 * scsi_stop_queue() must be called with the state_mutex
 		 * held. Otherwise a simultaneous scsi_start_queue() call
 		 * might unquiesce the queue before we quiesce it.
 		 */
 		scsi_stop_queue(sdev);
+		if (sdev->scsi_mpath_dev)
+			scsi_mpath_dev_clear_path(sdev->scsi_mpath_dev);
+	}
 
 	mutex_unlock(&sdev->state_mutex);
 
