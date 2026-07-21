@@ -194,8 +194,12 @@ void nvme_mpath_start_request(struct request *rq)
 		return;
 
 	nvme_req(rq)->flags |= NVME_MPATH_IO_STATS;
-	nvme_req(rq)->start_time = bdev_start_io_acct(disk->part0, req_op(rq),
-						      jiffies);
+	if (bdev_is_partition(rq->bio->bi_orig))
+		nvme_req(rq)->start_time = bdev_start_io_acct(rq->bio->bi_orig, req_op(rq),
+							      jiffies);
+	else
+		nvme_req(rq)->start_time = bdev_start_io_acct(disk->part0, req_op(rq),
+							      jiffies);
 }
 EXPORT_SYMBOL_GPL(nvme_mpath_start_request);
 
@@ -208,7 +212,12 @@ void nvme_mpath_end_request(struct request *rq)
 
 	if (!(nvme_req(rq)->flags & NVME_MPATH_IO_STATS))
 		return;
-	bdev_end_io_acct(ns->head->disk->part0, req_op(rq),
+	if (bdev_is_partition(rq->bio->bi_orig))
+		bdev_end_io_acct(rq->bio->bi_orig, req_op(rq),
+				 blk_rq_bytes(rq) >> SECTOR_SHIFT,
+				 nvme_req(rq)->start_time);
+	else
+		bdev_end_io_acct(ns->head->disk->part0, req_op(rq),
 			 blk_rq_bytes(rq) >> SECTOR_SHIFT,
 			 nvme_req(rq)->start_time);
 }
@@ -543,6 +552,7 @@ static void nvme_ns_head_submit_bio(struct bio *bio)
 	srcu_idx = srcu_read_lock(&head->srcu);
 	ns = nvme_find_path(head);
 	if (likely(ns)) {
+		bio->bi_orig = bio->bi_bdev;
 		bio_set_dev(bio, ns->disk->part0);
 		/*
 		 * Use BIO_REMAPPED to skip bio_check_eod() when this bio
