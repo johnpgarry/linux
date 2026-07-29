@@ -789,6 +789,12 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 	if (!head->disk)
 		return;
 
+	mutex_lock(&head->lock);
+	if (test_bit(NVME_NSHEAD_DISK_BROKEN, &head->flags)) {
+		mutex_unlock(&head->lock);
+		return;
+	}
+
 	/*
 	 * test_and_set_bit() is used because it is protecting against two nvme
 	 * paths simultaneously calling device_add_disk() on the same namespace
@@ -798,12 +804,17 @@ static void nvme_mpath_set_live(struct nvme_ns *ns)
 		rc = device_add_disk(&head->subsys->dev, head->disk,
 				     nvme_ns_attr_groups);
 		if (rc) {
+			dev_err(disk_to_dev(ns->disk),
+				"Unable to add multipath disk\n");
+			set_bit(NVME_NSHEAD_DISK_BROKEN, &head->flags);
 			clear_bit(NVME_NSHEAD_DISK_LIVE, &head->flags);
+			mutex_unlock(&head->lock);
 			return;
 		}
 		nvme_add_ns_head_cdev(head);
 		queue_work(nvme_wq, &head->partition_scan_work);
 	}
+	mutex_unlock(&head->lock);
 
 	nvme_mpath_add_sysfs_link(ns->head);
 
