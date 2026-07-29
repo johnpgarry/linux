@@ -434,7 +434,10 @@ static int __add_disk(struct device *parent, struct gendisk *disk,
 
 {
 	struct device *ddev = disk_to_dev(disk);
+	static int count;
 	int ret;
+
+	count++;
 
 	if (WARN_ON_ONCE(bdev_nr_sectors(disk->part0) > BLK_DEV_MAX_SECTORS))
 		return -EINVAL;
@@ -496,6 +499,8 @@ static int __add_disk(struct device *parent, struct gendisk *disk,
 	ret = device_add(ddev);
 	if (ret)
 		goto out_free_ext_minor;
+
+	dev_err(ddev, "%s count=%d groups=%pS\n", __func__, count, groups);
 
 	ret = disk_alloc_events(disk);
 	if (ret)
