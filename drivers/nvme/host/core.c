@@ -1808,10 +1808,6 @@ static void nvme_enable_aen(struct nvme_ctrl *ctrl)
 
 static int nvme_ns_open(struct nvme_ns *ns)
 {
-
-	/* should never be called due to GENHD_FL_HIDDEN */
-	if (WARN_ON_ONCE(nvme_ns_head_multipath(ns->head)))
-		goto fail;
 	if (!nvme_get_ns(ns))
 		goto fail;
 	if (!try_module_get(ns->ctrl->ops->module))

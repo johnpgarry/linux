@@ -152,7 +152,8 @@ static struct parsed_partitions *check_partition(struct gendisk *hd)
 
 	}
 	if (res > 0) {
-		printk(KERN_INFO "%s", seq_buf_str(&state->pp_buf));
+		if (!(hd->flags & GENHD_FL_HIDDEN))
+			printk(KERN_INFO "%s", seq_buf_str(&state->pp_buf));
 
 		kfree(state->pp_buf.buffer);
 		return state;
@@ -164,7 +165,7 @@ static struct parsed_partitions *check_partition(struct gendisk *hd)
 	 */
 	if (err)
 		res = err;
-	if (res) {
+	if (res && !(hd->flags & GENHD_FL_HIDDEN)) {
 		seq_buf_puts(&state->pp_buf,
 			     " unable to read partition table\n");
 		printk(KERN_INFO "%s", seq_buf_str(&state->pp_buf));

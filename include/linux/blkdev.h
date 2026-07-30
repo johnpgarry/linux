@@ -260,7 +260,7 @@ static inline unsigned int disk_openers(struct gendisk *disk)
  */
 static inline bool disk_has_partscan(struct gendisk *disk)
 {
-	return !(disk->flags & (GENHD_FL_NO_PART | GENHD_FL_HIDDEN)) &&
+	return !(disk->flags & GENHD_FL_NO_PART) &&
 		!test_bit(GD_SUPPRESS_PART_SCAN, &disk->state);
 }
 

@@ -406,15 +406,15 @@ static void add_disk_final(struct gendisk *disk)
 {
 	struct device *ddev = disk_to_dev(disk);
 
+	/* Make sure the first partition scan will be proceed */
+	if (get_capacity(disk) && disk_has_partscan(disk))
+		set_bit(GD_NEED_PART_SCAN, &disk->state);
+
+	bdev_add(disk->part0, ddev->devt);
+	if (get_capacity(disk))
+		disk_scan_partitions(disk, BLK_OPEN_READ);
+
 	if (!(disk->flags & GENHD_FL_HIDDEN)) {
-		/* Make sure the first partition scan will be proceed */
-		if (get_capacity(disk) && disk_has_partscan(disk))
-			set_bit(GD_NEED_PART_SCAN, &disk->state);
-
-		bdev_add(disk->part0, ddev->devt);
-		if (get_capacity(disk))
-			disk_scan_partitions(disk, BLK_OPEN_READ);
-
 		/*
 		 * Announce the disk and partitions after all partitions are
 		 * created. (for hidden disks uevents remain suppressed forever)
@@ -491,8 +491,7 @@ static int __add_disk(struct device *parent, struct gendisk *disk,
 	dev_set_name(ddev, "%s", disk->disk_name);
 	if (fwnode)
 		device_set_node(ddev, fwnode);
-	if (!(disk->flags & GENHD_FL_HIDDEN))
-		ddev->devt = MKDEV(disk->major, disk->first_minor);
+	ddev->devt = MKDEV(disk->major, disk->first_minor);
 	ret = device_add(ddev);
 	if (ret)
 		goto out_free_ext_minor;
@@ -1368,7 +1367,8 @@ static int diskstats_show(struct seq_file *seqf, void *v)
 
 	rcu_read_lock();
 	xa_for_each(&gp->part_tbl, idx, hd) {
-		if (bdev_is_partition(hd) && !bdev_nr_sectors(hd))
+		if (bdev_is_partition(hd) &&
+		    (!bdev_nr_sectors(hd) ||(gp->flags & GENHD_FL_HIDDEN)))
 			continue;
 
 		inflight = bdev_count_inflight(hd);
