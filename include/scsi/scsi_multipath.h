@@ -29,6 +29,7 @@ struct scsi_mpath_head {
 	struct bio_set		bio_pool;
 	struct device		dev;
 	int			index;
+	struct task_struct	*kua;
 };
 
 struct scsi_mpath_device {
