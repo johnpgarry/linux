@@ -38,8 +38,14 @@ struct scsi_mpath_device {
 	int			index;
 	struct scsi_mpath_head	*scsi_mpath_head;
 	struct delayed_work	alua_work;
-	unsigned long		alua_interval;
+	int			alua_group_id;
 	int			alua_state;
+	int			alua_pref;
+	int			alua_valid_states;
+	int			rtpg_ext_hdr_unsupp;
+	unsigned char		alua_transition_tmo;
+	unsigned long		alua_expiry;
+	unsigned long		alua_interval;
 
 	char			device_id_str[SCSI_MPATH_DEVICE_ID_LEN];
 };
