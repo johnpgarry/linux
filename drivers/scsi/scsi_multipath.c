@@ -375,7 +375,7 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 		if (group_id == scsi_mpath_dev->alua_group_id) {
 			scsi_mpath_dev->alua_state = desc[0] & 0x0f;
 			scsi_mpath_dev->alua_pref = desc[0] >> 7;
-			sdev->access_state = desc[0];
+			WRITE_ONCE(sdev->access_state, desc[0]);
 			scsi_mpath_dev->alua_valid_states = desc[1];
 		}
 		off = 8 + (desc[7] * 4);
