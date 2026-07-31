@@ -478,15 +478,148 @@ static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 	sdev->scsi_mpath_dev = NULL;
 }
 
+static int scsi_mpath_alua_init(struct scsi_device *sdev)
+{
+	__maybe_unused struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct scsi_sense_hdr sense_hdr;
+	int len, k, off, bufflen = ALUA_RTPG_SIZE;
+	unsigned char *desc, *buff;
+	unsigned int tpg_desc_tbl_off;
+	int group_id, rel_port = -1;
+	bool ext_hdr_unsupp = false;
+	int ret;
+
+	group_id = scsi_vpd_tpg_id(sdev, &rel_port);
+	if (group_id < 0) {
+		/*
+		 * Internal error; TPGS supported but required
+		 * VPD identification descriptors not present.
+		 * Disable ALUA support.
+		 */
+		sdev_printk(KERN_INFO, sdev,
+			    "%s: No target port descriptors found\n",
+			    __func__);
+		return -EIO;
+	}
+
+	buff = kzalloc(bufflen, GFP_KERNEL);
+	if (!buff)
+		return -ENOMEM;
+ retry:
+	ret = submit_rtpg(sdev, buff, bufflen, &sense_hdr,
+				ext_hdr_unsupp);
+
+	if (ret) {
+		if (ret < 0 || !scsi_sense_valid(&sense_hdr)) {
+			sdev_printk(KERN_INFO, sdev,
+				    "%s: rtpg failed, result %d\n",
+				    __func__, ret);
+			kfree(buff);
+			if (ret < 0)
+				return -EBUSY;
+			if (host_byte(ret) == DID_NO_CONNECT)
+				return -ENODEV;
+			return -EIO;
+		}
+
+		/*
+		 * submit_rtpg() has failed on existing arrays
+		 * when requesting extended header info, and
+		 * the array doesn't support extended headers,
+		 * even though it shouldn't according to T10.
+		 * The retry without rtpg_ext_hdr_req set
+		 * handles this.
+		 * Note:  some arrays return a sense key of ILLEGAL_REQUEST
+		 * with ASC 00h if they don't support the extended header.
+		 */
+		if (ext_hdr_unsupp &&
+		    sense_hdr.sense_key == ILLEGAL_REQUEST) {
+			ext_hdr_unsupp = true;
+			goto retry;
+		}
+		/*
+		 * If the array returns with 'ALUA state transition'
+		 * sense code here it cannot return RTPG data during
+		 * transition. So set the state to 'transitioning' directly.
+		 */
+		if (sense_hdr.sense_key == NOT_READY &&
+		    sense_hdr.asc == 0x04 && sense_hdr.ascq == 0x0a)
+			goto out;
+
+		/*
+		 * Retry on any other UNIT ATTENTION occurred.
+		 */
+		if (sense_hdr.sense_key == UNIT_ATTENTION) {
+			scsi_print_sense_hdr(sdev, __func__, &sense_hdr);
+			kfree(buff);
+			return -EAGAIN;
+		}
+		sdev_printk(KERN_ERR, sdev, "%s: rtpg failed\n",
+			    __func__);
+		scsi_print_sense_hdr(sdev, __func__, &sense_hdr);
+		kfree(buff);
+		return -EIO;
+	}
+
+	len = get_unaligned_be32(&buff[0]) + 4;
+
+	if (len > bufflen) {
+		/* Resubmit with the correct length */
+		kfree(buff);
+		bufflen = len;
+		buff = kmalloc(bufflen, GFP_KERNEL);
+		if (!buff) {
+			/* Temporary failure, bypass */
+			return -EBUSY;
+		}
+		goto retry;
+	}
+
+	if ((buff[4] & RTPG_FMT_MASK) == RTPG_FMT_EXT_HDR)
+		tpg_desc_tbl_off = 8;
+	else
+		tpg_desc_tbl_off = 4;
+
+	for (k = tpg_desc_tbl_off, desc = buff + tpg_desc_tbl_off;
+	     k < len;
+	     k += off, desc += off) {
+		u16 group_id_found = get_unaligned_be16(&desc[2]);
+
+		if (group_id_found == group_id) {
+			int valid_states, state, pref;
+
+			state = desc[0] & 0x0f;
+			pref = desc[0] >> 7;
+			valid_states = desc[1];
+
+			alua_print_info(sdev, group_id, state, pref, valid_states);
+
+			//scsi_mpath_dev->alua_state = state;
+			//scsi_mpath_dev->alua_pref = pref;
+			//scsi_mpath_dev->alua_valid_states = valid_states;
+			dev_err(&sdev->sdev_gendev, "%s state=%d pref=%d valid_states=%d\n",
+				__func__, state, pref, valid_states);
+			goto out;
+		}
+
+		off = 8 + (desc[7] * 4);
+	}
+
+out:
+	kfree(buff);
+	return 0;
+}
+
 int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
-	int ret;
+	int ret, tpgs;
 
 	if (scsi_multipath == SCSI_MULTIPATH_OFF)
 		return 0;
 
-	if (!(scsi_device_tpgs(sdev) & TPGS_MODE_IMPLICIT) &&
+	tpgs = alua_check_tpgs(sdev);
+	if (!(tpgs & TPGS_MODE_IMPLICIT) &&
 	    (scsi_multipath != SCSI_MULTIPATH_ALWAYS)) {
 		sdev_printk(KERN_DEBUG, sdev, "IMPLICIT TPGS are required for multipath support\n");
 		return 0;
@@ -515,6 +648,15 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 	list_add_tail(&scsi_mpath_head->entry, &scsi_mpath_heads_list);
 found:
 	mutex_unlock(&scsi_mpath_heads_lock);
+
+	if (tpgs & TPGS_MODE_IMPLICIT) {
+		ret = scsi_mpath_alua_init(sdev);
+		if (ret)
+			goto out_put_head;
+	} else {
+		//sdev->scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
+	}
+
 	ret = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
 	if (ret < 0)
 		goto out_put_head;
