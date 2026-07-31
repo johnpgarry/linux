@@ -33,8 +33,8 @@ int alua_check_tpgs(struct scsi_device *sdev)
 	 */
 	if (sdev->type != TYPE_DISK) {
 		sdev_printk(KERN_INFO, sdev,
-			    "%s: disable for non-disk devices\n",
-			    DRV_NAME);
+			    "%s: disable for non-disk devices sdev->type=%d\n",
+			    DRV_NAME, sdev->type);
 		return tpgs;
 	}
 
