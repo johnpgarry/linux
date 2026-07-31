@@ -15,6 +15,8 @@
 
 #include "scsi_priv.h"
 
+static struct workqueue_struct *alua_wq;
+
 enum {
 	SCSI_MULTIPATH_OFF,
 	SCSI_MULTIPATH_ON,
@@ -220,6 +222,15 @@ static const struct class scsi_mpath_device_class = {
 	.dev_release = scsi_mpath_head_release,
 };
 
+static void scsi_mpath_alua_work(struct work_struct *work)
+{
+	struct scsi_mpath_device *scsi_mpath_dev =
+		container_of(work, struct scsi_mpath_device, alua_work.work);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+
+	dev_err(&sdev->sdev_gendev, "%s\n", __func__);
+}
+
 static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
@@ -235,6 +246,8 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_device->numa_node = dev_to_node(shost->dma_dev);
 	mpath_device->access_state = MPATH_STATE_OPTIMIZED;
+
+	INIT_DELAYED_WORK(&scsi_mpath_dev->alua_work, scsi_mpath_alua_work);
 
 	return 0;
 }
@@ -394,6 +407,88 @@ static void scsi_mpath_remove_head_work(struct mpath_head *mpath_head)
 	scsi_mpath_put_head(scsi_mpath_head);
 }
 
+
+static void scsi_multipath_alua_rtpg_queue(struct scsi_device *sdev)
+{
+	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
+		sdev->scsi_mpath_dev->alua_interval * HZ);
+}
+
+enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr)
+{
+	switch (sense_hdr->sense_key) {
+	case NOT_READY:
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
+			/*
+			 * LUN Not Accessible - ALUA state transition
+			 */
+			//alua_handle_state_transition(sdev); fixme
+			return NEEDS_RETRY;
+		}
+		break;
+	case UNIT_ATTENTION:
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
+			/*
+			 * LUN Not Accessible - ALUA state transition
+			 */
+			//alua_handle_state_transition(sdev); fixme
+			return NEEDS_RETRY;
+		}
+		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x00) {
+			/*
+			 * Power On, Reset, or Bus Device Reset.
+			 * Might have obscured a state transition,
+			 * so schedule a recheck.
+			 */
+			dev_err(&sdev->sdev_gendev, "%s1 calling alua_check Power On, Reset, or Bus Device Reset\n", __func__);
+			scsi_multipath_alua_rtpg_queue(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x04)
+			/*
+			 * Device internal reset
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x01)
+			/*
+			 * Mode Parameters Changed
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x06) {
+			/*
+			 * ALUA state changed
+			 */
+			dev_err(&sdev->sdev_gendev, "%s2 calling alua_check ALUA state changed\n", __func__);
+			scsi_multipath_alua_rtpg_queue(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07) {
+			/*
+			 * Implicit ALUA state transition failed
+			 */
+			dev_err(&sdev->sdev_gendev, "%s3 Implicit ALUA state transition failed\n", __func__);
+			scsi_multipath_alua_rtpg_queue(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x03)
+			/*
+			 * Inquiry data has changed
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x0e)
+			/*
+			 * REPORTED_LUNS_DATA_HAS_CHANGED is reported
+			 * when switching controllers on targets like
+			 * Intel Multi-Flex. We can just retry.
+			 */
+			return ADD_TO_MLQUEUE;
+		break;
+	}
+
+	return SCSI_RETURN_NOT_HANDLED;
+}
+
 static struct mpath_head_template smpdt = {
 	.remove_head = scsi_mpath_remove_head_work,
 	.is_disabled = scsi_mpath_is_disabled,
@@ -404,13 +499,15 @@ static struct mpath_head_template smpdt = {
 
 static void scsi_mpath_cb_ua_thread(struct mpath_device *mpath_device)
 {
-	struct scsi_mpath_device *scsi_mpath_dev =
-			to_scsi_mpath_device(mpath_device);
+//	struct scsi_mpath_device *scsi_mpath_dev =
+//			to_scsi_mpath_device(mpath_device);
+	//struct scsi_device *sdev = scsi_mpath_dev->sdev;
 
-	if (alua_tur(scsi_mpath_dev->sdev))
-		sdev_printk(KERN_NOTICE, scsi_mpath_dev->sdev,
-			    "%s: No target port descriptors found\n",
-			    __func__);
+	//dev_err(&sdev->sdev_gendev, "%s calling alua_tur\n", __func__);
+//	if (alua_tur(scsi_mpath_dev->sdev))
+//		sdev_printk(KERN_NOTICE, scsi_mpath_dev->sdev,
+//			    "%s: No target port descriptors found\n",
+//			    __func__);
 }
 
 static int scsi_mpath_ua_thread(void *data)
@@ -540,8 +637,8 @@ static int scsi_mpath_alua_init(struct scsi_device *sdev)
 		 * Disable ALUA support.
 		 */
 		sdev_printk(KERN_INFO, sdev,
-			    "%s: No target port descriptors found\n",
-			    __func__);
+			    "%s: No target port descriptors found group_id=%d\n",
+			    __func__, group_id);
 		return -EIO;
 	}
 
@@ -844,11 +941,23 @@ bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 
 int __init scsi_multipath_init(void)
 {
-	return class_register(&scsi_mpath_device_class);
+	int ret;
+
+	alua_wq = alloc_workqueue("alua_wq", WQ_MEM_RECLAIM | WQ_PERCPU, 0);
+	if (!alua_wq)
+		return -ENOMEM;
+	ret = class_register(&scsi_mpath_device_class);
+	if (ret) {
+		ida_destroy(&scsi_multipath_dev_ida);
+		destroy_workqueue(alua_wq);
+		return ret;
+	}
+	return 0;
 }
 
 void __exit scsi_multipath_exit(void)
 {
+	destroy_workqueue(alua_wq);
 	ida_destroy(&scsi_multipath_dev_ida);
 	class_unregister(&scsi_mpath_device_class);
 }

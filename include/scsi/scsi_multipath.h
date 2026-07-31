@@ -37,6 +37,9 @@ struct scsi_mpath_device {
 	struct scsi_device 	*sdev;
 	int			index;
 	struct scsi_mpath_head	*scsi_mpath_head;
+	struct delayed_work	alua_work;
+	unsigned long		alua_interval;
+	int			alua_state;
 
 	char			device_id_str[SCSI_MPATH_DEVICE_ID_LEN];
 };
@@ -61,6 +64,8 @@ void scsi_mpath_start_request(struct request *req);
 bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 			       unsigned int nr_bytes);
 void scsi_multipath_dev_rescan(struct scsi_device *sdev);
+enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr);
 #else /* CONFIG_SCSI_MULTIPATH */
 
 struct scsi_mpath_head {
@@ -119,6 +124,11 @@ static inline void scsi_mpath_remove_sysfs_link(struct scsi_device *sdev)
 }
 static inline void scsi_multipath_dev_rescan(struct scsi_device *sdev)
 {
+}
+static inline enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr)
+{
+	return SCSI_RETURN_NOT_HANDLED;
 }
 #endif /* CONFIG_SCSI_MULTIPATH */
 #endif /* _SCSI_SCSI_MULTIPATH_H */
