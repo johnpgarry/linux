@@ -640,8 +640,8 @@ static int scsi_mpath_alua_init(struct scsi_device *sdev)
 			//scsi_mpath_dev->alua_state = state;
 			//scsi_mpath_dev->alua_pref = pref;
 			//scsi_mpath_dev->alua_valid_states = valid_states;
-			dev_err(&sdev->sdev_gendev, "%s state=%d pref=%d valid_states=%d\n",
-				__func__, state, pref, valid_states);
+			dev_err(&sdev->sdev_gendev, "%s state=%d pref=%d valid_states=%d group_id=%d\n",
+				__func__, state, pref, valid_states, group_id);
 			goto out;
 		}
 
