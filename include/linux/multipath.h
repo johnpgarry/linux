@@ -105,6 +105,8 @@ int mpath_add_device(struct mpath_device *mpath_device, struct gendisk *disk,
 		int numa_node, atomic_t *nr_active);
 bool mpath_delete_device(struct mpath_device *mpath_device);
 bool mpath_head_devices_empty(struct mpath_head *mpath_head);
+void mpath_call_for_all_devices(struct mpath_head *mpath_head,
+			void (*cb)(struct mpath_device *mpath_device));
 void mpath_clear_paths(struct mpath_head *mpath_head);
 void mpath_revalidate_paths(struct mpath_head *mpath_head);
 void mpath_add_sysfs_link(struct mpath_head *mpath_head);
