@@ -629,7 +629,11 @@ static void scsi_multipath_alua_rtpg_queue(struct scsi_device *sdev)
 
 static void scsi_mpath_alua_handle_state_transition(struct scsi_device *sdev)
 {
+	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	dev_err(&sdev->sdev_gendev, "%s\n", __func__);
+	scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_TRANSITIONING;
+	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
+		msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
 }
 
 enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
@@ -721,13 +725,15 @@ static void scsi_mpath_cb_ua_thread(struct mpath_device *mpath_device)
 {
 	struct scsi_mpath_device *scsi_mpath_dev =
 			to_scsi_mpath_device(mpath_device);
+	int ret;
 //	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 
 	//dev_err(&sdev->sdev_gendev, "%s calling alua_tur\n", __func__);
-	if (alua_tur(scsi_mpath_dev->sdev))
+	ret = alua_tur(scsi_mpath_dev->sdev);
+	if (ret)
 		sdev_printk(KERN_NOTICE, scsi_mpath_dev->sdev,
-			    "%s: No target port descriptors found\n",
-			    __func__);
+			    "%s: issed tur ret=%d\n",
+			    __func__, ret);
 }
 
 static int scsi_mpath_ua_thread(void *data)
