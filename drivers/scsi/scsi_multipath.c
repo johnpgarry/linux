@@ -15,7 +15,7 @@
 
 #include "scsi_priv.h"
 
-#define SCSI_MPATH_ALUA_RTPG_DELAY_MSECS		5
+#define SCSI_MPATH_ALUA_RTPG_DELAY_MS		5
 #define SCSI_MPATH_ALUA_RTPG_RETRY_DELAY		2
 
 /* get rid of this fixme */
@@ -256,6 +256,7 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 	err = 0;
 	ret = submit_rtpg(sdev, buff, bufflen, &sense_hdr,
 			scsi_mpath_dev->rtpg_ext_hdr_unsupp);
+	dev_err(&sdev->sdev_gendev, "%s1.1 called submit_rtpg ret=%d\n", __func__, ret);
 
 	if (ret) {
 		/*
@@ -384,6 +385,15 @@ skip_rtpg:
 	if (transitioning_sense)
 		scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_TRANSITIONING;
 
+
+	dev_err(&sdev->sdev_gendev, "%s5 group_id_old=%d scsi_mpath_dev->alua_group_id=%d\n",
+		__func__, group_id_old, scsi_mpath_dev->alua_group_id);
+	dev_err(&sdev->sdev_gendev, "%s5.1 state_old=%d scsi_mpath_dev->alua_state=%d\n",
+		__func__, state_old, scsi_mpath_dev->alua_state);
+	dev_err(&sdev->sdev_gendev, "%s5.2 pref_old=%d scsi_mpath_dev->alua_pref=%d\n",
+		__func__, pref_old, scsi_mpath_dev->alua_pref);
+	dev_err(&sdev->sdev_gendev, "%s5.3 valid_states_old=%d scsi_mpath_dev->alua_valid_states=%d\n",
+		__func__, valid_states_old, scsi_mpath_dev->alua_valid_states);
 	if (group_id_old != scsi_mpath_dev->alua_group_id || state_old != scsi_mpath_dev->alua_state ||
 		pref_old != scsi_mpath_dev->alua_pref || valid_states_old != scsi_mpath_dev->alua_valid_states)
 		alua_print_info(sdev, scsi_mpath_dev->alua_group_id, scsi_mpath_dev->alua_state, scsi_mpath_dev->alua_pref,
@@ -651,7 +661,7 @@ enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 			 * Might have obscured a state transition,
 			 * so schedule a recheck.
 			 */
-			dev_err(&sdev->sdev_gendev, "%s1 calling alua_check Power On, Reset, or Bus Device Reset\n", __func__);
+			dev_err(&sdev->sdev_gendev, "%s1 calling scsi_multipath_alua_rtpg_queue Power On, Reset, or Bus Device Reset\n", __func__);
 			scsi_multipath_alua_rtpg_queue(sdev);
 			return ADD_TO_MLQUEUE;
 		}
@@ -669,7 +679,7 @@ enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 			/*
 			 * ALUA state changed
 			 */
-			dev_err(&sdev->sdev_gendev, "%s2 calling alua_check ALUA state changed\n", __func__);
+			dev_err(&sdev->sdev_gendev, "%s2 calling scsi_multipath_alua_rtpg_queue ALUA state changed\n", __func__);
 			scsi_multipath_alua_rtpg_queue(sdev);
 			return ADD_TO_MLQUEUE;
 		}
@@ -677,7 +687,7 @@ enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 			/*
 			 * Implicit ALUA state transition failed
 			 */
-			dev_err(&sdev->sdev_gendev, "%s3 Implicit ALUA state transition failed\n", __func__);
+			dev_err(&sdev->sdev_gendev, "%s3 calling scsi_multipath_alua_rtpg_queue Implicit ALUA state transition failed\n", __func__);
 			scsi_multipath_alua_rtpg_queue(sdev);
 			return ADD_TO_MLQUEUE;
 		}
@@ -709,15 +719,15 @@ static struct mpath_head_template smpdt = {
 
 static void scsi_mpath_cb_ua_thread(struct mpath_device *mpath_device)
 {
-//	struct scsi_mpath_device *scsi_mpath_dev =
-//			to_scsi_mpath_device(mpath_device);
-	//struct scsi_device *sdev = scsi_mpath_dev->sdev;
+	struct scsi_mpath_device *scsi_mpath_dev =
+			to_scsi_mpath_device(mpath_device);
+//	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 
 	//dev_err(&sdev->sdev_gendev, "%s calling alua_tur\n", __func__);
-//	if (alua_tur(scsi_mpath_dev->sdev))
-//		sdev_printk(KERN_NOTICE, scsi_mpath_dev->sdev,
-//			    "%s: No target port descriptors found\n",
-//			    __func__);
+	if (alua_tur(scsi_mpath_dev->sdev))
+		sdev_printk(KERN_NOTICE, scsi_mpath_dev->sdev,
+			    "%s: No target port descriptors found\n",
+			    __func__);
 }
 
 static int scsi_mpath_ua_thread(void *data)
@@ -846,9 +856,8 @@ static int scsi_mpath_alua_init(struct scsi_device *sdev)
 		return -EIO;
 	}
 
-	scsi_mpath_dev->alua_interval = SCSI_MPATH_ALUA_RTPG_DELAY_MSECS;
-
-	scsi_multipath_alua_rtpg_queue(sdev);
+	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
+		msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
 
 	return 0;
 }
