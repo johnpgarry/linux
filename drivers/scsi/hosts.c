@@ -167,14 +167,14 @@ void scsi_remove_host(struct Scsi_Host *shost)
 	unsigned long flags;
 
 	mutex_lock(&shost->scan_mutex);
-	spin_lock_irqsave(shost->host_lock, flags);
+	spin_lock_irqsave(&shost->host_lock, flags);
 	if (scsi_host_set_state(shost, SHOST_CANCEL))
 		if (scsi_host_set_state(shost, SHOST_CANCEL_RECOVERY)) {
-			spin_unlock_irqrestore(shost->host_lock, flags);
+			spin_unlock_irqrestore(&shost->host_lock, flags);
 			mutex_unlock(&shost->scan_mutex);
 			return;
 		}
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	spin_unlock_irqrestore(&shost->host_lock, flags);
 
 	scsi_autopm_get_host(shost);
 	flush_workqueue(shost->tmf_work_q);
@@ -192,10 +192,10 @@ void scsi_remove_host(struct Scsi_Host *shost)
 	kref_put(&shost->tagset_refcnt, scsi_mq_free_tags);
 	wait_for_completion(&shost->tagset_freed);
 
-	spin_lock_irqsave(shost->host_lock, flags);
+	spin_lock_irqsave(&shost->host_lock, flags);
 	if (scsi_host_set_state(shost, SHOST_DEL))
 		BUG_ON(scsi_host_set_state(shost, SHOST_DEL_RECOVERY));
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	spin_unlock_irqrestore(&shost->host_lock, flags);
 
 	transport_unregister_device(&shost->shost_gendev);
 	device_unregister(&shost->shost_dev);
@@ -410,8 +410,7 @@ struct Scsi_Host *scsi_host_alloc(const struct scsi_host_template *sht, int priv
 	if (!shost)
 		return NULL;
 
-	shost->host_lock = &shost->default_lock;
-	spin_lock_init(shost->host_lock);
+	spin_lock_init(&shost->host_lock);
 	shost->shost_state = SHOST_CREATED;
 	INIT_LIST_HEAD(&shost->__devices);
 	INIT_LIST_HEAD(&shost->__targets);
