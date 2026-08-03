@@ -751,7 +751,10 @@ static int scsi_mpath_ua_thread(void *data)
 void scsi_multipath_dev_rescan(struct scsi_device *sdev)
 {
 	/* Handle ALUA reconfig */
-	dev_warn_once(&sdev->sdev_gendev, "mulitpath rescan not handled\n");
+	dev_warn_once(&sdev->sdev_gendev, "calling queue_delayed_work SCSI_MPATH_ALUA_RTPG_DELAY_MS\n");
+
+	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
+		msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
 }
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(char *vpd_id)
