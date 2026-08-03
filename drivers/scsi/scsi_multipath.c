@@ -713,6 +713,23 @@ enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 	return SCSI_RETURN_NOT_HANDLED;
 }
 
+blk_status_t scsi_multipath_prep_cmd(struct scsi_cmnd *cmnd)
+{
+	struct scsi_device *sdev = cmnd->device;
+	struct request *rq = scsi_cmd_to_rq(cmnd);
+
+	switch (READ_ONCE(sdev->scsi_mpath_dev->alua_state)) {
+	case SCSI_ACCESS_STATE_OPTIMAL:
+	case SCSI_ACCESS_STATE_ACTIVE:
+	case SCSI_ACCESS_STATE_LBA:
+	case SCSI_ACCESS_STATE_TRANSITIONING:
+		return BLK_STS_OK;
+	default:
+		rq->rq_flags |= RQF_QUIET;
+		return BLK_STS_IOERR;
+	}
+}
+
 static struct mpath_head_template smpdt = {
 	.remove_head = scsi_mpath_remove_head_work,
 	.is_disabled = scsi_mpath_is_disabled,

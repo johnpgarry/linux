@@ -1749,6 +1749,11 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 
 		if (ret != BLK_STS_OK)
 			return ret;
+	} else if (sdev->scsi_mpath_dev) {
+		blk_status_t ret = scsi_multipath_prep_cmd(cmd);
+
+		if (ret != BLK_STS_OK)
+			return ret;
 	}
 
 	/* Usually overridden by the ULP */
