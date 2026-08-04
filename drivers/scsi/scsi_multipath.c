@@ -711,9 +711,7 @@ enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 
 blk_status_t scsi_multipath_prep_cmd(struct scsi_cmnd *cmnd)
 {
-	struct scsi_device *sdev = cmnd->device;
-
-	return scsi_alua_prep_cmd(cmnd, READ_ONCE(sdev->scsi_mpath_dev->alua_state));
+	return scsi_alua_prep_cmd(cmnd, READ_ONCE(cmnd->device->scsi_mpath_dev->alua_state));
 }
 
 static struct mpath_head_template smpdt = {
