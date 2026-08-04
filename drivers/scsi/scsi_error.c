@@ -579,7 +579,7 @@ enum scsi_disposition scsi_check_sense(struct scsi_cmnd *scmd)
 		if (rc != SCSI_RETURN_NOT_HANDLED)
 			return rc;
 		/* handler does not care. Drop down to default handling */
-	} else if (sdev->scsi_mpath_dev) {
+	} else if (scsi_mpath_dev_alua(sdev)) {
 		enum scsi_disposition rc;
 
 		rc = scsi_multipath_alua_check_sense(sdev, &sshdr);
