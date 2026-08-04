@@ -164,6 +164,23 @@ void alua_print_info(struct scsi_device *sdev, int group_id, int state,
 }
 EXPORT_SYMBOL_GPL(alua_print_info);
 
+blk_status_t scsi_alua_prep_cmd(struct scsi_cmnd *cmnd, unsigned char state)
+{
+	struct request *rq = scsi_cmd_to_rq(cmnd);
+
+	switch (state) {
+	case SCSI_ACCESS_STATE_OPTIMAL:
+	case SCSI_ACCESS_STATE_ACTIVE:
+	case SCSI_ACCESS_STATE_LBA:
+	case SCSI_ACCESS_STATE_TRANSITIONING:
+		return BLK_STS_OK;
+	default:
+		rq->rq_flags |= RQF_QUIET;
+		return BLK_STS_IOERR;
+	}
+}
+EXPORT_SYMBOL_GPL(scsi_alua_prep_cmd);
+
 /*
  * submit_stpg - Issue a SET TARGET PORT GROUP command
  *

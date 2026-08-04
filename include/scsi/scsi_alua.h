@@ -45,6 +45,7 @@ int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
 int alua_tur(struct scsi_device *sdev);
 void alua_print_info(struct scsi_device *sdev, int group_id, int state,
 		int pref, int valid_states);
+blk_status_t scsi_alua_prep_cmd(struct scsi_cmnd *cmnd, unsigned char state);
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
 #endif // _SCSI_ALUA_H

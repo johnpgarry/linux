@@ -1040,16 +1040,7 @@ static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 		state = pg->state;
 	rcu_read_unlock();
 
-	switch (state) {
-	case SCSI_ACCESS_STATE_OPTIMAL:
-	case SCSI_ACCESS_STATE_ACTIVE:
-	case SCSI_ACCESS_STATE_LBA:
-	case SCSI_ACCESS_STATE_TRANSITIONING:
-		return BLK_STS_OK;
-	default:
-		req->rq_flags |= RQF_QUIET;
-		return BLK_STS_IOERR;
-	}
+	return scsi_alua_prep_cmd(blk_mq_rq_to_pdu(req), state);
 }
 
 __maybe_unused
