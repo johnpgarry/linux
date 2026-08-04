@@ -225,6 +225,23 @@ static const struct class scsi_mpath_device_class = {
 	.dev_release = scsi_mpath_head_release,
 };
 
+static void scsi_mpath_update_access_state(struct scsi_device *sdev, unsigned char access_state)
+{
+	WRITE_ONCE(sdev->access_state, access_state);
+
+	switch (access_state & SCSI_ACCESS_STATE_MASK) {
+	case SCSI_ACCESS_STATE_OPTIMAL:
+		sdev->scsi_mpath_dev->mpath_device.access_state = MPATH_STATE_OPTIMIZED;
+		break;
+	case SCSI_ACCESS_STATE_ACTIVE:
+		sdev->scsi_mpath_dev->mpath_device.access_state = MPATH_STATE_NONOPTIMIZED;
+		break;
+	default:
+		sdev->scsi_mpath_dev->mpath_device.access_state = MPATH_STATE_OTHER;
+		break;
+	}
+}
+
 static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 {
 	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
@@ -238,8 +255,8 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 	int ret, err;
 
 	group_id_old = scsi_mpath_dev->alua_group_id;
-	state_old = scsi_mpath_dev->alua_state;
-	pref_old = scsi_mpath_dev->alua_pref;
+	state_old = READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_MASK;
+	pref_old = READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_PREFERRED;
 	valid_states_old = scsi_mpath_dev->alua_valid_states;
 
 	dev_err(&sdev->sdev_gendev, "%s\n", __func__);
@@ -365,47 +382,52 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 		u16 group_id = get_unaligned_be16(&desc[2]);
 
 		if (group_id == scsi_mpath_dev->alua_group_id) {
-			scsi_mpath_dev->alua_state = desc[0] & 0x0f;
-			scsi_mpath_dev->alua_pref = desc[0] >> 7;
-			WRITE_ONCE(sdev->access_state, desc[0]);
+			//scsi_mpath_dev->alua_state = desc[0] & 0x0f;
+			//scsi_mpath_dev->alua_pref = desc[0] >> 7;
+			scsi_mpath_update_access_state(sdev, desc[0]);
 			scsi_mpath_dev->alua_valid_states = desc[1];
 		}
 		off = 8 + (desc[7] * 4);
 	}
 skip_rtpg:
 	if (transitioning_sense)
-		scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_TRANSITIONING;
+		scsi_mpath_update_access_state(sdev, SCSI_ACCESS_STATE_TRANSITIONING);
 
 	dev_err(&sdev->sdev_gendev, "%s5 group_id_old=%d scsi_mpath_dev->alua_group_id=%d\n",
 		__func__, group_id_old, scsi_mpath_dev->alua_group_id);
-	dev_err(&sdev->sdev_gendev, "%s5.1 state_old=%d scsi_mpath_dev->alua_state=%d\n",
-		__func__, state_old, scsi_mpath_dev->alua_state);
-	dev_err(&sdev->sdev_gendev, "%s5.2 pref_old=%d scsi_mpath_dev->alua_pref=%d\n",
-		__func__, pref_old, scsi_mpath_dev->alua_pref);
+	dev_err(&sdev->sdev_gendev, "%s5.1 state_old=%d sdev->access_state & mask=%d\n",
+		__func__, state_old, READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_MASK);
+	dev_err(&sdev->sdev_gendev, "%s5.2 pref_old=%d sdev->access_state & mask=%d\n",
+		__func__, pref_old, READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_PREFERRED);
 	dev_err(&sdev->sdev_gendev, "%s5.3 valid_states_old=%d scsi_mpath_dev->alua_valid_states=%d\n",
 		__func__, valid_states_old, scsi_mpath_dev->alua_valid_states);
-	if (group_id_old != scsi_mpath_dev->alua_group_id || state_old != scsi_mpath_dev->alua_state ||
-		pref_old != scsi_mpath_dev->alua_pref || valid_states_old != scsi_mpath_dev->alua_valid_states)
-		alua_print_info(sdev, scsi_mpath_dev->alua_group_id, scsi_mpath_dev->alua_state, scsi_mpath_dev->alua_pref,
-						scsi_mpath_dev->alua_valid_states);
+	if (group_id_old != scsi_mpath_dev->alua_group_id ||
+		state_old != (READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_MASK) ||
+		pref_old != (READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_PREFERRED) ||
+		valid_states_old != scsi_mpath_dev->alua_valid_states)
+		alua_print_info(sdev, scsi_mpath_dev->alua_group_id,
+			READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_MASK,
+			READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_PREFERRED,
+			scsi_mpath_dev->alua_valid_states);
 
-	switch (scsi_mpath_dev->alua_state) {
+	switch (READ_ONCE(sdev->access_state) & SCSI_ACCESS_STATE_MASK) {
 	case SCSI_ACCESS_STATE_TRANSITIONING:
 		if (time_before(jiffies, scsi_mpath_dev->alua_expiry)) {
 			/* State transition, retry */
 			scsi_mpath_dev->alua_interval = SCSI_MPATH_ALUA_RTPG_RETRY_DELAY;
 			err = -EAGAIN;
 		} else {
-			unsigned char access_state;
+		//	unsigned char access_state;
 
 			/* Transitioning time exceeded, set port to standby */
 			err = -EIO;
-			scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_STANDBY;
+			scsi_mpath_update_access_state(sdev, SCSI_ACCESS_STATE_STANDBY);
+
 			scsi_mpath_dev->alua_expiry = 0;
-			access_state = scsi_mpath_dev->alua_state & SCSI_ACCESS_STATE_MASK;
-			if (scsi_mpath_dev->alua_pref)
-				access_state |= SCSI_ACCESS_STATE_PREFERRED;
-			WRITE_ONCE(sdev->access_state, access_state);
+		//	access_state = scsi_mpath_dev->alua_state & SCSI_ACCESS_STATE_MASK;
+		//	if (scsi_mpath_dev->alua_pref)
+		//		access_state |= SCSI_ACCESS_STATE_PREFERRED;
+		//	WRITE_ONCE(sdev->access_state, access_state);
 		}
 		break;
 	case SCSI_ACCESS_STATE_OFFLINE:
@@ -467,8 +489,6 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_device->numa_node = dev_to_node(shost->dma_dev);
 	mpath_device->access_state = MPATH_STATE_OPTIMIZED;
-
-	scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
 
 	INIT_DELAYED_WORK(&scsi_mpath_dev->alua_work, scsi_mpath_alua_work);
 
@@ -630,11 +650,13 @@ static void scsi_mpath_remove_head_work(struct mpath_head *mpath_head)
 	scsi_mpath_put_head(scsi_mpath_head);
 }
 
+
+
 static void scsi_mpath_alua_handle_state_transition(struct scsi_device *sdev)
 {
-	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	__maybe_unused struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
 	dev_err(&sdev->sdev_gendev, "%s\n", __func__);
-	scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_TRANSITIONING;
+	scsi_mpath_update_access_state(sdev, SCSI_ACCESS_STATE_TRANSITIONING);
 	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
 		msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
 }
@@ -718,7 +740,8 @@ enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 
 blk_status_t scsi_multipath_prep_cmd(struct scsi_cmnd *cmnd)
 {
-	return scsi_alua_prep_cmd(cmnd, READ_ONCE(cmnd->device->scsi_mpath_dev->alua_state));
+	return scsi_alua_prep_cmd(cmnd,
+		READ_ONCE(cmnd->device->access_state) & SCSI_ACCESS_STATE_MASK);
 }
 
 static struct mpath_head_template smpdt = {

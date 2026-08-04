@@ -39,8 +39,8 @@ struct scsi_mpath_device {
 	struct scsi_mpath_head	*scsi_mpath_head;
 	struct delayed_work	alua_work;
 	int			alua_group_id;
-	int			alua_state;
-	int			alua_pref;
+	//int			alua_state;
+	//int			alua_pref;
 	int			alua_valid_states;
 	int			rtpg_ext_hdr_unsupp;
 	unsigned char		alua_transition_tmo;
