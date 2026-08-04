@@ -396,14 +396,16 @@ skip_rtpg:
 			scsi_mpath_dev->alua_interval = SCSI_MPATH_ALUA_RTPG_RETRY_DELAY;
 			err = -EAGAIN;
 		} else {
+			unsigned char access_state;
 
 			/* Transitioning time exceeded, set port to standby */
 			err = -EIO;
 			scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_STANDBY;
 			scsi_mpath_dev->alua_expiry = 0;
-			sdev->access_state = scsi_mpath_dev->alua_state & SCSI_ACCESS_STATE_MASK;
+			access_state = scsi_mpath_dev->alua_state & SCSI_ACCESS_STATE_MASK;
 			if (scsi_mpath_dev->alua_pref)
-				sdev->access_state |= SCSI_ACCESS_STATE_PREFERRED;
+				access_state |= SCSI_ACCESS_STATE_PREFERRED;
+			WRITE_ONCE(sdev->access_state, access_state);
 		}
 		break;
 	case SCSI_ACCESS_STATE_OFFLINE:
@@ -465,6 +467,8 @@ static int scsi_multipath_sdev_init(struct scsi_device *sdev)
 	mpath_device = &scsi_mpath_dev->mpath_device;
 	mpath_device->numa_node = dev_to_node(shost->dma_dev);
 	mpath_device->access_state = MPATH_STATE_OPTIMIZED;
+
+	scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
 
 	INIT_DELAYED_WORK(&scsi_mpath_dev->alua_work, scsi_mpath_alua_work);
 
@@ -934,7 +938,6 @@ found:
 			goto out_put_head;
 		sdev->scsi_mpath_dev->alua = 1;
 	} else {
-		sdev->scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
 	}
 
 	ret = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
