@@ -248,6 +248,7 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 
 	spin_unlock(&h->pg_lock);
 
+	dev_err(&sdev->sdev_gendev, "%s calling alua_rtpg_queue\n", __func__);
 	alua_rtpg_queue(pg, sdev, NULL, true);
 	kref_put(&pg->kref, release_port_group);
 
@@ -268,9 +269,11 @@ static void alua_handle_state_transition(struct scsi_device *sdev)
 	if (pg)
 		pg->state = SCSI_ACCESS_STATE_TRANSITIONING;
 	rcu_read_unlock();
+	dev_err(&sdev->sdev_gendev, "%s calling alua_check\n", __func__);
 	alua_check(sdev, false);
 }
 
+__maybe_unused
 static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr)
 {
@@ -298,6 +301,7 @@ static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 			 * Might have obscured a state transition,
 			 * so schedule a recheck.
 			 */
+			dev_err(&sdev->sdev_gendev, "%s1 calling alua_check Power On, Reset, or Bus Device Reset\n", __func__);
 			alua_check(sdev, true);
 			return ADD_TO_MLQUEUE;
 		}
@@ -315,6 +319,7 @@ static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 			/*
 			 * ALUA state changed
 			 */
+			dev_err(&sdev->sdev_gendev, "%s2 calling alua_check ALUA state changed\n", __func__);
 			alua_check(sdev, true);
 			return ADD_TO_MLQUEUE;
 		}
@@ -322,6 +327,7 @@ static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 			/*
 			 * Implicit ALUA state transition failed
 			 */
+			dev_err(&sdev->sdev_gendev, "%s3 Implicit ALUA state transition failed\n", __func__);
 			alua_check(sdev, true);
 			return ADD_TO_MLQUEUE;
 		}
@@ -365,6 +371,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	unsigned char orig_transition_tmo;
 	unsigned long flags;
 	bool transitioning_sense = false;
+
+	dev_err(&sdev->sdev_gendev, "%s\n", __func__);
 
 	group_id_old = pg->group_id;
 	state_old = pg->state;
@@ -728,6 +736,7 @@ static void alua_rtpg_work(struct work_struct *work)
 				if (!pg->interval)
 					pg->interval = ALUA_RTPG_RETRY_DELAY;
 				spin_unlock_irqrestore(&pg->lock, flags);
+				dev_err(&sdev->sdev_gendev, "%s calling queue_delayed_work\n", __func__);
 				queue_delayed_work(kaluad_wq, &pg->rtpg_work,
 						   pg->interval * HZ);
 				return;
@@ -799,6 +808,8 @@ static void alua_rtpg_work(struct work_struct *work)
 queue_rtpg:
 	if (prev_sdev)
 		scsi_device_put(prev_sdev);
+
+	dev_err(&sdev->sdev_gendev, "%s9 calling queue_delayed_work\n", __func__);
 	queue_delayed_work(kaluad_wq, &pg->rtpg_work, pg->interval * HZ);
 }
 
@@ -856,6 +867,7 @@ static bool alua_rtpg_queue(struct alua_port_group *pg,
 	spin_unlock_irqrestore(&pg->lock, flags);
 
 	if (start_queue) {
+		dev_err(&sdev->sdev_gendev, "%s calling queue_delayed_work\n", __func__);
 		if (queue_delayed_work(kaluad_wq, &pg->rtpg_work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS)))
 			sdev = NULL;
@@ -897,6 +909,7 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
  * from multipath.conf
  *     hardware_handler        "2 alua 1"
  */
+__maybe_unused
 static int alua_set_params(struct scsi_device *sdev, const char *params)
 {
 	struct alua_dh_data *h = sdev->handler_data;
@@ -941,6 +954,7 @@ static int alua_set_params(struct scsi_device *sdev, const char *params)
  * based on a certain policy. But until we actually encounter them it
  * should be okay.
  */
+__maybe_unused
 static int alua_activate(struct scsi_device *sdev,
 			activate_complete fn, void *data)
 {
@@ -970,6 +984,7 @@ static int alua_activate(struct scsi_device *sdev,
 	rcu_read_unlock();
 	mutex_unlock(&h->init_mutex);
 
+	dev_err(&sdev->sdev_gendev, "%s calling alua_rtpg_queue\n", __func__);
 	if (alua_rtpg_queue(pg, sdev, qdata, true)) {
 		fn = NULL;
 	} else {
@@ -1001,6 +1016,7 @@ static void alua_check(struct scsi_device *sdev, bool force)
 		return;
 	}
 	rcu_read_unlock();
+	dev_err(&sdev->sdev_gendev, "%s calling alua_rtpg_queue\n", __func__);
 	alua_rtpg_queue(pg, sdev, NULL, force);
 	kref_put(&pg->kref, release_port_group);
 }
@@ -1011,6 +1027,7 @@ static void alua_check(struct scsi_device *sdev, bool force)
  * Fail I/O to all paths not in state
  * active/optimized or active/non-optimized.
  */
+__maybe_unused
 static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 {
 	struct alua_dh_data *h = sdev->handler_data;
@@ -1035,10 +1052,12 @@ static blk_status_t alua_prep_fn(struct scsi_device *sdev, struct request *req)
 	}
 }
 
+__maybe_unused
 static void alua_rescan(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h = sdev->handler_data;
 
+	dev_err(&sdev->sdev_gendev, "%s\n", __func__);
 	alua_initialize(sdev, h);
 }
 
@@ -1046,13 +1065,16 @@ static void alua_rescan(struct scsi_device *sdev)
  * alua_bus_attach - Attach device handler
  * @sdev: device to be attached to
  */
+__maybe_unused
 static int alua_bus_attach(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h;
 	int err;
 
-	if (sdev->scsi_mpath_dev)
+	if (sdev->scsi_mpath_dev) {
+		dev_err(&sdev->sdev_gendev, "%s scsi_mpath_dev SCSI_DH_DEV_UNSUPP\n", __func__);
 		return SCSI_DH_DEV_UNSUPP;
+	}
 	h = kzalloc_obj(*h);
 	if (!h)
 		return SCSI_DH_NOMEM;
@@ -1078,6 +1100,7 @@ failed:
  * alua_bus_detach - Detach device handler
  * @sdev: device to be detached from
  */
+__maybe_unused
 static void alua_bus_detach(struct scsi_device *sdev)
 {
 	struct alua_dh_data *h = sdev->handler_data;

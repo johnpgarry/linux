@@ -1124,6 +1124,10 @@ sdev_store_dh_state(struct device *dev, struct device_attribute *attr,
 	struct scsi_device *sdev = to_scsi_device(dev);
 	int err = -EINVAL;
 
+	dev_err(&sdev->sdev_gendev, "%s sdev->handler=%pS buf=%s sdev->sdev_state=%d CANCEL=%d DEL=%d buf=%s\n",
+		__func__, sdev->handler, buf, sdev->sdev_state,
+		SDEV_CANCEL, SDEV_DEL, buf);
+
 	if (sdev->sdev_state == SDEV_CANCEL ||
 	    sdev->sdev_state == SDEV_DEL)
 		return -ENODEV;
@@ -1133,13 +1137,18 @@ sdev_store_dh_state(struct device *dev, struct device_attribute *attr,
 		 * Attach to a device handler
 		 */
 		err = scsi_dh_attach(sdev->request_queue, buf);
+		dev_err(&sdev->sdev_gendev, "%s1 called scsi_dh_attach err=%d\n",
+			__func__, err);
 	} else if (!strncmp(buf, "activate", 8)) {
 		/*
 		 * Activate a device handler
 		 */
-		if (sdev->handler->activate)
-			err = sdev->handler->activate(sdev, NULL, NULL);
-		else
+
+		dev_err(&sdev->sdev_gendev, "%s2 calling sdev->handler->activate=%pS\n",
+			__func__, sdev->handler->activate);
+	//	if (sdev->handler->activate)
+	//		err = sdev->handler->activate(sdev, NULL, NULL);
+	//	else
 			err = 0;
 	} else if (!strncmp(buf, "detach", 6)) {
 		/*
@@ -1166,7 +1175,10 @@ sdev_show_access_state(struct device *dev,
 	unsigned char access_state;
 	const char *access_state_name;
 
-	if (!sdev->handler)
+
+	dev_err(dev, "%s sdev->handler=%pS scsi_mpath_dev_alua=%d\n",
+		__func__, sdev->handler, scsi_mpath_dev_alua(sdev));
+	if (!sdev->handler && !scsi_mpath_dev_alua(sdev))
 		return -EINVAL;
 
 	access_state = (sdev->access_state & SCSI_ACCESS_STATE_MASK);
@@ -1184,7 +1196,9 @@ sdev_show_preferred_path(struct device *dev,
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
 
-	if (!sdev->handler)
+	dev_err(dev, "%s sdev->handler=%pS scsi_mpath_dev_alua=%d\n",
+		__func__, sdev->handler, scsi_mpath_dev_alua(sdev));
+	if (!sdev->handler && !scsi_mpath_dev_alua(sdev))
 		return -EINVAL;
 
 	if (sdev->access_state & SCSI_ACCESS_STATE_PREFERRED)

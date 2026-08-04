@@ -18,9 +18,6 @@
 #define SCSI_MPATH_ALUA_RTPG_DELAY_MS		5
 #define SCSI_MPATH_ALUA_RTPG_RETRY_DELAY		2
 
-/* get rid of this fixme */
-#define ALUA_DH_NAME ""
-
 static struct workqueue_struct *alua_wq;
 
 enum {
@@ -270,15 +267,13 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 		 */
 		if ((scsi_mpath_dev->alua_valid_states & ~TPGS_SUPPORT_OPTIMIZED) == 0) {
 			sdev_printk(KERN_INFO, sdev,
-				    "%s: ignoring rtpg result %d\n",
-				    ALUA_DH_NAME, ret);
+				    "alua: ignoring rtpg result %d\n", ret);
 			kfree(buff);
 			return 0;
 		}
 		if (ret < 0 || !scsi_sense_valid(&sense_hdr)) {
 			sdev_printk(KERN_INFO, sdev,
-				    "%s: rtpg failed, result %d\n",
-				    ALUA_DH_NAME, ret);
+				    "alua: rtpg failed, result %d\n", ret);
 			kfree(buff);
 			if (ret < 0)
 				return -EBUSY;
@@ -319,15 +314,13 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 			err = -EAGAIN; //SCSI_DH_RETRY
 		if (err == -EAGAIN &&
 		    scsi_mpath_dev->alua_expiry != 0 && time_before(jiffies,  scsi_mpath_dev->alua_expiry)) {
-			sdev_printk(KERN_ERR, sdev, "%s: rtpg retry\n",
-				    ALUA_DH_NAME);
-			scsi_print_sense_hdr(sdev, ALUA_DH_NAME, &sense_hdr);
+			sdev_printk(KERN_ERR, sdev, "alua: rtpg retry\n");
+			scsi_print_sense_hdr(sdev, "alua", &sense_hdr);
 			kfree(buff);
 			return err;
 		}
-		sdev_printk(KERN_ERR, sdev, "%s: rtpg failed\n",
-			    ALUA_DH_NAME);
-		scsi_print_sense_hdr(sdev, ALUA_DH_NAME, &sense_hdr);
+		sdev_printk(KERN_ERR, sdev, "alua: rtpg failed\n");
+		scsi_print_sense_hdr(sdev, "alua", &sense_hdr);
 		kfree(buff);
 		scsi_mpath_dev->alua_expiry = 0;
 		return -EIO;
@@ -358,8 +351,8 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 
 	if (orig_transition_tmo != scsi_mpath_dev->alua_transition_tmo) {
 		sdev_printk(KERN_INFO, sdev,
-			    "%s: transition timeout set to %d seconds\n",
-			    ALUA_DH_NAME, scsi_mpath_dev->alua_transition_tmo);
+			    "alua: transition timeout set to %d seconds\n",
+			    scsi_mpath_dev->alua_transition_tmo);
 		scsi_mpath_dev->alua_expiry = jiffies + scsi_mpath_dev->alua_transition_tmo * HZ;
 	}
 
@@ -438,6 +431,9 @@ static void scsi_mpath_alua_work(struct work_struct *work)
 		container_of(work, struct scsi_mpath_device, alua_work.work);
 	struct scsi_device *sdev = scsi_mpath_dev->sdev;
 	int ret;
+
+	if (WARN_ON_ONCE(!scsi_mpath_dev->alua))
+		return;
 
 	dev_err(&sdev->sdev_gendev, "%s calling scsi_mpath_alua_rtpg\n", __func__);
 	ret = scsi_mpath_alua_rtpg(sdev);
@@ -768,10 +764,20 @@ static int scsi_mpath_ua_thread(void *data)
 void scsi_multipath_dev_rescan(struct scsi_device *sdev)
 {
 	/* Handle ALUA reconfig */
-	dev_warn_once(&sdev->sdev_gendev, "calling queue_delayed_work SCSI_MPATH_ALUA_RTPG_DELAY_MS\n");
+	dev_warn_once(&sdev->sdev_gendev, "calling queue_delayed_work SCSI_MPATH_ALUA_RTPG_DELAY_MS alua=%d\n",
 
-	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
-		msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
+		sdev->scsi_mpath_dev->alua);
+
+	if (sdev->scsi_mpath_dev->alua)
+		queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
+			msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
+}
+
+bool scsi_mpath_dev_alua(struct scsi_device *sdev)
+{
+	if (sdev->scsi_mpath_dev && sdev->scsi_mpath_dev->alua)
+		return true;
+	return false;
 }
 
 static struct scsi_mpath_head *scsi_mpath_alloc_head(char *vpd_id)
@@ -897,6 +903,8 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 		return 0;
 
 	tpgs = alua_check_tpgs(sdev);
+	dev_err(&sdev->sdev_gendev, "%s TPGS_MODE_IMPLICIT set=%d\n",
+		__func__, !!(tpgs & TPGS_MODE_IMPLICIT));
 	if (!(tpgs & TPGS_MODE_IMPLICIT) &&
 	    (scsi_multipath != SCSI_MULTIPATH_ALWAYS)) {
 		sdev_printk(KERN_DEBUG, sdev, "IMPLICIT TPGS are required for multipath support\n");
@@ -928,6 +936,7 @@ found:
 	mutex_unlock(&scsi_mpath_heads_lock);
 
 	if (tpgs & TPGS_MODE_IMPLICIT) {
+		sdev->scsi_mpath_dev->alua = 1;
 		ret = scsi_mpath_alua_init(sdev);
 		if (ret)
 			goto out_put_head;

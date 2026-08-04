@@ -91,6 +91,7 @@ static struct scsi_device_handler *__scsi_dh_lookup(const char *name)
 
 	spin_lock(&list_lock);
 	list_for_each_entry(tmp, &scsi_dh_list, list) {
+		pr_err("%s name=%s tmp->name=%s\n", __func__, name, tmp->name);
 		if (!strncmp(tmp->name, name, strlen(tmp->name))) {
 			found = tmp;
 			break;
@@ -326,8 +327,10 @@ int scsi_dh_attach(struct request_queue *q, const char *name)
 	sdev = scsi_device_from_queue(q);
 	if (!sdev)
 		return -ENODEV;
-
+	dev_err(&sdev->sdev_gendev, "%s calling scsi_dh_lookup name=%s\n", __func__, name);
 	scsi_dh = scsi_dh_lookup(name);
+	dev_err(&sdev->sdev_gendev, "%s1 called scsi_dh_lookup scsi_dh=%pS sdev->handler=%pS\n",
+		__func__, scsi_dh, sdev->handler);
 	if (!scsi_dh) {
 		err = -EINVAL;
 		goto out_put_device;

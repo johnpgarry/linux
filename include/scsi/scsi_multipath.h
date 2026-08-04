@@ -47,6 +47,8 @@ struct scsi_mpath_device {
 	unsigned long		alua_expiry;
 	unsigned long		alua_interval;
 
+	unsigned int		alua:1;
+
 	char			device_id_str[SCSI_MPATH_DEVICE_ID_LEN];
 };
 
@@ -73,6 +75,7 @@ void scsi_multipath_dev_rescan(struct scsi_device *sdev);
 enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr);
 blk_status_t scsi_multipath_prep_cmd(struct scsi_cmnd *cmnd);
+bool scsi_mpath_dev_alua(struct scsi_device *sdev);
 #else /* CONFIG_SCSI_MULTIPATH */
 
 struct scsi_mpath_head {
@@ -140,6 +143,10 @@ static inline enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_
 static inline blk_status_t scsi_multipath_prep_cmd(struct scsi_cmnd *cmnd)
 {
 	return BLK_STS_OK;
+}
+static inline bool scsi_mpath_dev_alua(struct scsi_device *sdev)
+{
+	return false;
 }
 #endif /* CONFIG_SCSI_MULTIPATH */
 #endif /* _SCSI_SCSI_MULTIPATH_H */
