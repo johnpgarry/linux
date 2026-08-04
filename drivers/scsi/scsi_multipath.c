@@ -857,6 +857,8 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 
 static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 {
+	if (sdev->scsi_mpath_dev->alua)
+		flush_delayed_work(&sdev->scsi_mpath_dev->alua_work);
 	kfree(sdev->scsi_mpath_dev);
 	sdev->scsi_mpath_dev = NULL;
 }
