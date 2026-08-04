@@ -175,7 +175,7 @@ static struct mpath_device *__mpath_find_path(struct mpath_head *mpath_head,
 		else
 			distance = LOCAL_DISTANCE;
 
-		switch(mpath_device->access_state) {
+		switch(READ_ONCE(mpath_device->access_state)) {
 		case MPATH_STATE_OPTIMIZED:
 		    if (distance < found_distance) {
 			    found_distance = distance;
@@ -240,11 +240,11 @@ static struct mpath_device *mpath_round_robin_path(
 
 		if (mpath_path_is_disabled(mpath_head, mpath_device))
 			continue;
-		if (mpath_device->access_state == MPATH_STATE_OPTIMIZED) {
+		if (READ_ONCE(mpath_device->access_state) == MPATH_STATE_OPTIMIZED) {
 			found = mpath_device;
 			goto out;
 		}
-		if (mpath_device->access_state == MPATH_STATE_NONOPTIMIZED)
+		if (READ_ONCE(mpath_device->access_state) == MPATH_STATE_NONOPTIMIZED)
 			found = mpath_device;
 	}
 
@@ -254,7 +254,7 @@ static struct mpath_device *mpath_round_robin_path(
 	 *  - no other optimized path found and current is optimized,
 	 *  - no other usable path found and current is usable.
 	 */
-	access_state_old = old->access_state;
+	access_state_old = READ_ONCE(old->access_state);
 	if (!mpath_path_is_disabled(mpath_head, old) &&
 	    (access_state_old == MPATH_STATE_OPTIMIZED ||
 	    (!found && access_state_old == MPATH_STATE_NONOPTIMIZED)))
@@ -284,7 +284,7 @@ static struct mpath_device *mpath_queue_depth_path(
 
 		depth = atomic_read(mpath_device->nr_active);
 
-		switch (mpath_device->access_state) {
+		switch (READ_ONCE(mpath_device->access_state)) {
 		case MPATH_STATE_OPTIMIZED:
 			if (depth < min_depth_opt) {
 				min_depth_opt = depth;

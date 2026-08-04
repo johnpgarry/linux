@@ -225,19 +225,23 @@ static const struct class scsi_mpath_device_class = {
 	.dev_release = scsi_mpath_head_release,
 };
 
-static void scsi_mpath_update_access_state(struct scsi_device *sdev, unsigned char access_state)
+static void scsi_mpath_update_access_state(struct scsi_device *sdev,
+				unsigned char access_state)
 {
 	WRITE_ONCE(sdev->access_state, access_state);
 
 	switch (access_state & SCSI_ACCESS_STATE_MASK) {
 	case SCSI_ACCESS_STATE_OPTIMAL:
-		sdev->scsi_mpath_dev->mpath_device.access_state = MPATH_STATE_OPTIMIZED;
+		WRITE_ONCE(sdev->scsi_mpath_dev->mpath_device.access_state,
+				MPATH_STATE_OPTIMIZED);
 		break;
 	case SCSI_ACCESS_STATE_ACTIVE:
-		sdev->scsi_mpath_dev->mpath_device.access_state = MPATH_STATE_NONOPTIMIZED;
+		WRITE_ONCE(sdev->scsi_mpath_dev->mpath_device.access_state,
+				MPATH_STATE_NONOPTIMIZED);
 		break;
 	default:
-		sdev->scsi_mpath_dev->mpath_device.access_state = MPATH_STATE_OTHER;
+		WRITE_ONCE(sdev->scsi_mpath_dev->mpath_device.access_state,
+				MPATH_STATE_OTHER);
 		break;
 	}
 }
