@@ -934,7 +934,7 @@ found:
 			goto out_put_head;
 		sdev->scsi_mpath_dev->alua = 1;
 	} else {
-		//sdev->scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
+		sdev->scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
 	}
 
 	ret = ida_alloc(&scsi_mpath_head->ida, GFP_KERNEL);
