@@ -277,8 +277,6 @@ static int scsi_mpath_alua_rtpg(struct scsi_device *sdev)
 			kfree(buff);
 			if (ret < 0)
 				return -EBUSY;
-			if (host_byte(ret) == DID_NO_CONNECT)
-				return -ETXTBSY; //SCSI_DH_RES_TEMP_UNAVAIL
 			return -EIO;
 		}
 
@@ -378,7 +376,6 @@ skip_rtpg:
 	if (transitioning_sense)
 		scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_TRANSITIONING;
 
-
 	dev_err(&sdev->sdev_gendev, "%s5 group_id_old=%d scsi_mpath_dev->alua_group_id=%d\n",
 		__func__, group_id_old, scsi_mpath_dev->alua_group_id);
 	dev_err(&sdev->sdev_gendev, "%s5.1 state_old=%d scsi_mpath_dev->alua_state=%d\n",
@@ -424,6 +421,11 @@ skip_rtpg:
 	return err;
 }
 
+static void scsi_multipath_alua_rtpg_queue(struct scsi_device *sdev)
+{
+	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
+		sdev->scsi_mpath_dev->alua_interval * HZ);
+}
 
 static void scsi_mpath_alua_work(struct work_struct *work)
 {
@@ -438,6 +440,14 @@ static void scsi_mpath_alua_work(struct work_struct *work)
 	dev_err(&sdev->sdev_gendev, "%s calling scsi_mpath_alua_rtpg\n", __func__);
 	ret = scsi_mpath_alua_rtpg(sdev);
 	dev_err(&sdev->sdev_gendev, "%s1 called scsi_mpath_alua_rtpg, ret=%d\n", __func__, ret);
+
+	if (ret == -EAGAIN) {
+		scsi_mpath_dev->alua_interval = SCSI_MPATH_ALUA_RTPG_RETRY_DELAY;
+		scsi_multipath_alua_rtpg_queue(sdev);
+	} else {
+		sdev_printk(KERN_ERR, sdev,"error issuing RTPG ret=%d\n",
+			ret);
+	}
 }
 
 static int scsi_multipath_sdev_init(struct scsi_device *sdev)
@@ -614,13 +624,6 @@ static void scsi_mpath_remove_head_work(struct mpath_head *mpath_head)
 	bus_for_each_drv(&scsi_bus_type, NULL, scsi_mpath_head,
 		scsi_mpath_remove_head_drv);
 	scsi_mpath_put_head(scsi_mpath_head);
-}
-
-
-static void scsi_multipath_alua_rtpg_queue(struct scsi_device *sdev)
-{
-	queue_delayed_work(alua_wq, &sdev->scsi_mpath_dev->alua_work,
-		sdev->scsi_mpath_dev->alua_interval * HZ);
 }
 
 static void scsi_mpath_alua_handle_state_transition(struct scsi_device *sdev)
@@ -924,10 +927,10 @@ found:
 	mutex_unlock(&scsi_mpath_heads_lock);
 
 	if (tpgs & TPGS_MODE_IMPLICIT) {
-		sdev->scsi_mpath_dev->alua = 1;
 		ret = scsi_mpath_alua_init(sdev);
 		if (ret)
 			goto out_put_head;
+		sdev->scsi_mpath_dev->alua = 1;
 	} else {
 		//sdev->scsi_mpath_dev->alua_state = SCSI_ACCESS_STATE_OPTIMAL;
 	}
