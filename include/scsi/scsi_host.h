@@ -533,9 +533,9 @@ struct scsi_host_template {
 		unsigned long irq_flags;				\
 		enum scsi_qc_status rc;					\
 									\
-		spin_lock_irqsave(shost->host_lock, irq_flags);		\
+		spin_lock_irqsave(&shost->host_lock, irq_flags);	\
 		rc = func_name##_lck(cmd);				\
-		spin_unlock_irqrestore(shost->host_lock, irq_flags);	\
+		spin_unlock_irqrestore(&shost->host_lock, irq_flags);	\
 		return rc;						\
 	}
 
@@ -569,8 +569,7 @@ struct Scsi_Host {
 	
 	struct list_head	starved_list;
 
-	spinlock_t		default_lock;
-	spinlock_t		*host_lock;
+	spinlock_t		host_lock;
 
 	struct mutex		scan_mutex;/* serialize scanning activity */
 
