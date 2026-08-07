@@ -48,4 +48,8 @@ void alua_print_info(struct scsi_device *sdev, int group_id, int state,
 blk_status_t scsi_alua_prep_cmd(struct scsi_cmnd *cmnd, unsigned char state);
 int submit_stpg(struct scsi_device *sdev, int group_id,
 		       struct scsi_sense_hdr *sshdr);
+enum scsi_disposition scsi_alua_check_sense(struct scsi_device *sdev,
+			struct scsi_sense_hdr *sense_hdr,
+			void (*state_transition)(struct scsi_device *sdev),
+			void (*rtpg_queue)(struct scsi_device *sdev));
 #endif // _SCSI_ALUA_H

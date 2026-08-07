@@ -273,82 +273,18 @@ static void alua_handle_state_transition(struct scsi_device *sdev)
 	alua_check(sdev, false);
 }
 
+static void alua_check_force(struct scsi_device *sdev)
+{
+	alua_check(sdev, true);
+}
+
 __maybe_unused
 static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 					      struct scsi_sense_hdr *sense_hdr)
 {
-	switch (sense_hdr->sense_key) {
-	case NOT_READY:
-		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
-			/*
-			 * LUN Not Accessible - ALUA state transition
-			 */
-			alua_handle_state_transition(sdev);
-			return NEEDS_RETRY;
-		}
-		break;
-	case UNIT_ATTENTION:
-		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
-			/*
-			 * LUN Not Accessible - ALUA state transition
-			 */
-			alua_handle_state_transition(sdev);
-			return NEEDS_RETRY;
-		}
-		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x00) {
-			/*
-			 * Power On, Reset, or Bus Device Reset.
-			 * Might have obscured a state transition,
-			 * so schedule a recheck.
-			 */
-			dev_err(&sdev->sdev_gendev, "%s1 calling alua_check Power On, Reset, or Bus Device Reset\n", __func__);
-			alua_check(sdev, true);
-			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x04)
-			/*
-			 * Device internal reset
-			 */
-			return ADD_TO_MLQUEUE;
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x01)
-			/*
-			 * Mode Parameters Changed
-			 */
-			return ADD_TO_MLQUEUE;
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x06) {
-			/*
-			 * ALUA state changed
-			 */
-			dev_err(&sdev->sdev_gendev, "%s2 calling alua_check ALUA state changed\n", __func__);
-			alua_check(sdev, true);
-			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07) {
-			/*
-			 * Implicit ALUA state transition failed
-			 */
-			dev_err(&sdev->sdev_gendev, "%s3 Implicit ALUA state transition failed\n", __func__);
-			alua_check(sdev, true);
-			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x03)
-			/*
-			 * Inquiry data has changed
-			 */
-			return ADD_TO_MLQUEUE;
-		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x0e)
-			/*
-			 * REPORTED_LUNS_DATA_HAS_CHANGED is reported
-			 * when switching controllers on targets like
-			 * Intel Multi-Flex. We can just retry.
-			 */
-			return ADD_TO_MLQUEUE;
-		break;
-	}
-
-	return SCSI_RETURN_NOT_HANDLED;
+	return scsi_alua_check_sense(sdev, sense_hdr,
+		alua_handle_state_transition, alua_check_force);
 }
-
 
 /*
  * alua_rtpg - Evaluate REPORT TARGET GROUP STATES
