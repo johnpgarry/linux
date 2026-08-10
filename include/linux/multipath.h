@@ -22,6 +22,13 @@ enum mpath_access_state {
 	MPATH_STATE_OTHER
 };
 
+enum mpath_stat_group {
+	MPATH_STAT_READ,
+	MPATH_STAT_WRITE,
+	MPATH_STAT_OTHER,
+	MPATH_NUM_STAT_GROUPS
+};
+
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
 
 struct mpath_device {

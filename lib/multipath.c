@@ -8,7 +8,8 @@
 #include <linux/wait_bit.h>
 #include <trace/events/block.h>
 
-static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head);
+static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head,
+					enum mpath_stat_group op_type);
 
 static struct workqueue_struct *mpath_wq;
 
@@ -315,7 +316,8 @@ static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
 	return mpath_device;
 }
 
-static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head)
+static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head,
+				enum mpath_stat_group op_type)
 {
 	enum mpath_iopolicy_e iopolicy = mpath_read_iopolicy(mpath_head);
 
@@ -354,6 +356,22 @@ static bool mpath_available_path(struct mpath_head *mpath_head)
 	return mpath_head_queue_if_no_path(mpath_head);
 }
 
+static enum mpath_stat_group __mpath_data_dir(const enum req_op op)
+{
+	if (op == REQ_OP_READ)
+		return MPATH_STAT_READ;
+	else if (op == REQ_OP_WRITE)
+		return MPATH_STAT_WRITE;
+	else
+		return MPATH_STAT_OTHER;
+}
+
+__maybe_unused
+static enum mpath_stat_group mpath_data_dir(struct request *req)
+{
+	return __mpath_data_dir(req_op(req));
+}
+
 static void mpath_bdev_submit_bio(struct bio *bio)
 {
 	struct mpath_head *mpath_head = bio->bi_bdev->bd_disk->private_data;
@@ -371,7 +389,8 @@ static void mpath_bdev_submit_bio(struct bio *bio)
 		return;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head,
+				__mpath_data_dir(bio_op(bio)));
 
 	if (likely(mpath_device)) {
 		if (mpath_head->mpdt->clone_bio) {
@@ -462,7 +481,7 @@ static int mpath_bdev_get_unique_id(struct gendisk *disk, u8 id[16],
 	struct mpath_device *mpath_device;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, MPATH_STATE_OTHER);
 	if (mpath_device) {
 		if (mpath_device->disk->fops->get_unique_id)
 			ret = mpath_device->disk->fops->get_unique_id(
@@ -493,7 +512,8 @@ static int mpath_bdev_ioctl(struct block_device *bdev, blk_mode_t mode,
 		return -ENOIOCTLCMD;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	/* Check nvme_ns_head_ioctl() for better setting than always MPATH_STATE_OTHER */
+	mpath_device = mpath_find_path(mpath_head, MPATH_STATE_OTHER);
 	if (!mpath_device) {
 		err = -EWOULDBLOCK;
 		goto out_unlock;
@@ -518,7 +538,7 @@ static int mpath_bdev_getgeo(struct gendisk *disk, struct hd_geometry *geo)
 	struct mpath_device *mpath_device;
 
 	srcu_idx = srcu_read_lock(&mpath_head->srcu);
-	mpath_device = mpath_find_path(mpath_head);
+	mpath_device = mpath_find_path(mpath_head, MPATH_STATE_OTHER);
 	if (mpath_device) {
 		if (mpath_device->disk->fops->getgeo)
 			ret = mpath_device->disk->fops->getgeo(
