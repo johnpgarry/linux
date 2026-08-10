@@ -14,6 +14,7 @@ enum mpath_iopolicy_e {
 	MPATH_IOPOLICY_NUMA,
 	MPATH_IOPOLICY_RR,
 	MPATH_IOPOLICY_QD,
+	MPATH_IOPOLICY_LATENCY,
 };
 
 enum mpath_access_state {
@@ -30,6 +31,7 @@ enum mpath_stat_group {
 };
 
 #define MPATH_DEVICE_SYSFS_ATTR_LINK      0
+#define MPATH_DEVICE_PATH_STAT            1
 
 struct mpath_device {
 	struct mpath_head	*mpath_head;
@@ -39,6 +41,7 @@ struct mpath_device {
 	int			numa_node;
 	atomic_t		*nr_active;
 	enum mpath_access_state access_state;
+	struct mpath_path_lat __percpu *path_lat;
 };
 
 struct mpath_head_template {
@@ -48,6 +51,30 @@ struct mpath_head_template {
 	bool (*is_optimized)(struct mpath_device *);
 	struct bio *(*clone_bio)(struct bio *);
 	const struct attribute_group **device_groups;
+};
+
+struct mpath_path_lat_stat {
+	u64 nr_samples;		/* total num of samples processed */
+	u64 nr_ignored;		/* num. of samples ignored */
+	u64 slat_ns;		/* smoothed (ewma) latency in nanoseconds */
+	u64 score;		/* score used for weight calculation */
+	u64 last_batch_ts;	/* timestamp when last time avg. latency is calculated */
+	u64 sel;		/* num of times this path is selcted for I/O */
+	u64 batch;		/* accumulated latency sum for current window */
+	u32 batch_count;	/* num of samples accumulated in current window */
+	u32 weight;		/* path weight */
+	u32 credit;		/* path credit for I/O forwarding */
+};
+
+struct mpath_path_lat_work {
+	struct mpath_device *mpath_device;	/* owning device */
+	struct work_struct weight_work;	/* deferred work for weight calculation */
+	int op_type;			/* op type : READ/WRITE/OTHER */
+};
+
+struct mpath_path_lat {
+	struct mpath_path_lat_stat stat;	/* path statistics */
+	struct mpath_path_lat_work work;	/* background worker context */
 };
 
 #define MPATH_HEAD_DISK_LIVE 			0
@@ -72,6 +99,10 @@ struct mpath_head {
 	struct delayed_work	remove_work;
 	unsigned int		delayed_removal_secs;
 	struct module		*drv_module;
+
+	struct mpath_device * __percpu	*latency_path;
+	u32				latency_ewma_shift;
+	u64				latency_batch_timeout;
 
 	unsigned long		flags;
 	struct gendisk		*disk;
@@ -107,6 +138,7 @@ static inline enum mpath_iopolicy_e mpath_read_iopolicy(
 void mpath_synchronize(struct mpath_head *mpath_head);
 int mpath_set_iopolicy(const char *str, enum mpath_iopolicy_e *iopolicy);
 int mpath_get_iopolicy(char *buf, int iopolicy);
+void mpath_set_head_paths(struct mpath_head *mpath_head);
 bool mpath_clear_current_path(struct mpath_device *mpath_device);
 int mpath_add_device(struct mpath_device *mpath_device, struct gendisk *disk,
 		int numa_node, atomic_t *nr_active);
@@ -134,6 +166,8 @@ ssize_t mpath_delayed_removal_secs_show(struct mpath_head *mpath_head,
 			char *buf);
 ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
 			const char *buf, size_t count);
+
+void mpath_add_sample(struct request *rq, struct mpath_device *mpath_device);
 
 static inline bool is_mpath_disk(struct gendisk *disk)
 {

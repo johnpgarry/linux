@@ -76,7 +76,7 @@ static int scsi_mpath_get_iopolicy_param(char *buf, const struct kernel_param *k
 module_param_call(multipath_iopolicy, scsi_mpath_set_iopolicy_param,
 		scsi_mpath_get_iopolicy_param, &iopolicy, 0644);
 MODULE_PARM_DESC(multipath_iopolicy,
-	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth'");
+	"Default multipath I/O policy; 'numa' (default), 'round-robin' or 'queue-depth' or 'latency'");
 
 static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 {
@@ -128,6 +128,7 @@ static ssize_t scsi_mpath_device_iopolicy_store(struct device *dev,
 		return -EINVAL;
 
 	mpath_clear_paths(mpath_head);
+	mpath_set_head_paths(mpath_head);
 	mpath_schedule_requeue_work(mpath_head);
 	/*
 	 * Ensure requeue work completes, as this work could run later when
@@ -639,6 +640,8 @@ bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = scmd->device;
 	struct block_device *bi_bdev = NULL;
+	struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
 
 	if (scmd->flags & SCMD_MPATH_IO_STATS) {
 		struct bio *clone = req->bio, *master = clone->bi_private;
@@ -654,6 +657,8 @@ bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 
 		atomic_dec_if_positive(&shost->mpath_nr_active);
 	}
+
+	mpath_add_sample(req, mpath_device);
 
 	if (!(scmd->flags & SCMD_MPATH_IO_STATS))
 		return false;

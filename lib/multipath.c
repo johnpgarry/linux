@@ -3,8 +3,11 @@
  * Copyright (c) 2017-2018 Christoph Hellwig.
  * Copyright (c) 2026 Oracle and/or its affiliates.
  */
+#include <linux/blk-mq.h>
 #include <linux/module.h>
+#include <linux/math64.h>
 #include <linux/multipath.h>
+#include <linux/rculist.h>
 #include <linux/wait_bit.h>
 #include <trace/events/block.h>
 
@@ -14,9 +17,10 @@ static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head,
 static struct workqueue_struct *mpath_wq;
 
 static const char * const mpath_iopolicy_names[] = {
-	[MPATH_IOPOLICY_NUMA]	= "numa",
-	[MPATH_IOPOLICY_RR]	= "round-robin",
-	[MPATH_IOPOLICY_QD]	= "queue-depth",
+	[MPATH_IOPOLICY_NUMA]		= "numa",
+	[MPATH_IOPOLICY_RR]		= "round-robin",
+	[MPATH_IOPOLICY_QD]		= "queue-depth",
+	[MPATH_IOPOLICY_LATENCY]	= "latency",
 };
 
 static int mpath_iopolicy_parse(const char *str)
@@ -52,13 +56,273 @@ void mpath_synchronize(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_synchronize);
 
+static enum mpath_stat_group __mpath_data_dir(const enum req_op op)
+{
+	if (op == REQ_OP_READ)
+		return MPATH_STAT_READ;
+	else if (op == REQ_OP_WRITE)
+		return MPATH_STAT_WRITE;
+	else
+		return MPATH_STAT_OTHER;
+}
+
+static enum mpath_stat_group mpath_data_dir(struct request *req)
+{
+	return __mpath_data_dir(req_op(req));
+}
+
+
+static void mpath_weight_work(struct work_struct *weight_work)
+{
+	int cpu, srcu_idx;
+	u32 weight;
+	struct mpath_device *mpath_device;
+	struct mpath_path_lat_stat *stat;
+	struct mpath_path_lat_work *work = container_of(weight_work,
+			struct mpath_path_lat_work, weight_work);
+	struct mpath_head *mpath_head = work->mpath_device->mpath_head;
+	int op_type = work->op_type;
+	u64 total_score = 0;
+
+	cpu = get_cpu();
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
+			srcu_read_lock_held(&mpath_head->srcu)) {
+
+		stat = &this_cpu_ptr(mpath_device->path_lat)[op_type].stat;
+		if (!READ_ONCE(stat->slat_ns)) {
+			stat->score = 0;
+			continue;
+		}
+		/*
+		 * Compute the path score as the inverse of smoothed
+		 * latency, scaled by NSEC_PER_SEC. Floating point
+		 * math is unavailable in the kernel, so fixed-point
+		 * scaling is used instead. NSEC_PER_SEC is chosen
+		 * because valid latencies are always < 1 second; longer
+		 * latencies are ignored.
+		 */
+		stat->score = div_u64(NSEC_PER_SEC, READ_ONCE(stat->slat_ns));
+
+		/* Compute total score. */
+		total_score += stat->score;
+	}
+
+	if (!total_score)
+		goto out;
+
+	/*
+	 * After computing the total slatency, we derive per-path weight
+	 * (normalized to the range 0–64). The weight represents the
+	 * relative share of I/O the path should receive.
+	 *
+	 *   - lower smoothed latency -> higher weight
+	 *   - higher smoothed slatency -> lower weight
+	 *
+	 * Next, while forwarding I/O, we assign "credits" to each path
+	 * based on its weight (please also refer nvme_latency_path()):
+	 *   - Initially, credits = weight.
+	 *   - Each time an I/O is dispatched on a path, its credits are
+	 *     decremented proportionally.
+	 *   - When a path runs out of credits, it becomes temporarily
+	 *     ineligible until credit is refilled.
+	 *
+	 * I/O distribution is therefore governed by available credits,
+	 * ensuring that over time the proportion of I/O sent to each
+	 * path matches its weight (and thus its performance).
+	 */
+	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
+			srcu_read_lock_held(&mpath_head->srcu)) {
+
+		stat = &this_cpu_ptr(mpath_device->path_lat)[op_type].stat;
+		weight = div_u64(stat->score * 64, total_score);
+
+		/*
+		 * Ensure the path weight never drops below 1. A weight
+		 * of 0 is used only for newly added paths. During
+		 * bootstrap, a few I/Os are sent to such paths to
+		 * establish an initial weight. Enforcing a minimum
+		 * weight of 1 guarantees that no path is forgotten and
+		 * that each path is probed at least occasionally.
+		 */
+		if (!weight)
+			weight = 1;
+
+		WRITE_ONCE(stat->weight, weight);
+	}
+out:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+	put_cpu();
+}
+
+/*
+ * Formula to calculate the EWMA (Exponentially Weighted Moving Average):
+ * ewma = (old_ewma * (EWMA_SHIFT - 1) + (EWMA_SHIFT)) / EWMA_SHIFT
+ * For instance, with EWMA_SHIFT = 3, this assigns 7/8 (~87.5 %) weight to
+ * the existing/old ewma and 1/8 (~12.5%) weight to the new sample.
+ */
+static inline u64 calc_ewma_update(u64 old, u64 new, u32 ewma_shift)
+{
+	return (old * ((1 << ewma_shift) - 1) + new) >> ewma_shift;
+}
+
+static void __mpath_add_sample(struct request *rq, struct mpath_device *mpath_device)
+{
+	int cpu;
+	unsigned int op_type;
+	struct mpath_path_lat *path_lat;
+	struct mpath_path_lat_stat *stat;
+	u64 now, latency, slat_ns, avg_lat_ns;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+
+	if (list_is_singular(&mpath_head->dev_list))
+		return;
+
+	now = ktime_get_ns();
+	latency = now >= rq->io_start_time_ns ? now - rq->io_start_time_ns : 0;
+	if (!latency)
+		return;
+
+	/*
+	 * As completion code path is serialized(i.e. no same completion queue
+	 * update code could run simultaneously on multiple cpu) we can safely
+	 * access per cpu nvme path stat here from another cpu (in case the
+	 * completion cpu is different from submission cpu).
+	 * The only field which could be accessed simultaneously here is the
+	 * path ->weight which may be accessed by this function as well as I/O
+	 * submission path during path selection logic and we protect ->weight
+	 * using READ_ONCE/WRITE_ONCE. Yes this may not be 100% accurate but
+	 * we also don't need to be so accurate here as the path credit would
+	 * be anyways refilled, based on path weight, once path consumes all
+	 * its credits. And we limit path weight/credit max up to 64. Please
+	 * also refer nvme_latency_path().
+	 */
+	cpu = blk_mq_rq_cpu(rq);
+	op_type = mpath_data_dir(rq);
+	path_lat = &per_cpu_ptr(mpath_device->path_lat, cpu)[op_type];
+	stat = &path_lat->stat;
+
+	/*
+	 * If latency > ~1s then ignore this sample to prevent EWMA from being
+	 * skewed by pathological outliers (multi-second waits, controller
+	 * timeouts etc.). This keeps path scores representative of normal
+	 * performance and avoids instability from rare spikes. If such high
+	 * latency is real, ANA state reporting or keep-alive error counters
+	 * will mark the path unhealthy and remove it from the head node list,
+	 * so we safely skip such sample here.
+	 */
+	if (unlikely(latency > NSEC_PER_SEC)) {
+		stat->nr_ignored++;
+		dev_warn_ratelimited(NULL,
+			"ignoring sample with >1s latency (possible controller stall or timeout)\n");
+		return;
+	}
+
+	/*
+	 * Accumulate latency samples and increment the batch count for each
+	 * ~15 second interval. When the interval expires, compute the simple
+	 * average latency over that window, then update the smoothed (EWMA)
+	 * latency. The path weight is recalculated based on this smoothed
+	 * latency.
+	 */
+	stat->batch += latency;
+	stat->batch_count++;
+	stat->nr_samples++;
+
+	if (now > stat->last_batch_ts) {
+		u64 timeout = READ_ONCE(mpath_head->latency_batch_timeout);
+
+		if ((now - stat->last_batch_ts) < timeout)
+			return;
+
+		/*
+		 * Find simple average latency for the last epoch (~15 sec
+		 * interval).
+		 */
+		avg_lat_ns = div_u64(stat->batch, stat->batch_count);
+		stat->last_batch_ts = now;
+
+		/*
+		 * Calculate smooth/EWMA (Exponentially Weighted Moving Average)
+		 * latency. EWMA is preferred over simple average latency
+		 * because it smooths naturally, reduces jitter from sudden
+		 * spikes, and adapts faster to changing conditions. It also
+		 * avoids storing historical samples, and works well for both
+		 * slow and fast I/O rates.
+		 * Formula:
+		 * slat_ns = (prev_slat_ns * (WEIGHT - 1) + (latency)) / WEIGHT
+		 * With WEIGHT = 8, this assigns 7/8 (~87.5 %) weight to the
+		 * existing latency and 1/8 (~12.5%) weight to the new latency.
+		 */
+		if (unlikely(!stat->slat_ns))
+			WRITE_ONCE(stat->slat_ns, avg_lat_ns);
+		else {
+			slat_ns = calc_ewma_update(stat->slat_ns, avg_lat_ns,
+					READ_ONCE(mpath_head->latency_ewma_shift));
+			WRITE_ONCE(stat->slat_ns, slat_ns);
+		}
+
+		stat->batch = stat->batch_count = 0;
+
+		/*
+		 * Defer calculation of the path weight in per-cpu workqueue.
+		 */
+		schedule_work_on(cpu, &path_lat->work.weight_work);
+	}
+}
+
+void mpath_add_sample(struct request *rq, struct mpath_device *mpath_device)
+{
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	int srcu_idx;
+
+	if (!test_bit(MPATH_DEVICE_PATH_STAT, &mpath_device->flags))
+		return;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	if (test_bit(MPATH_DEVICE_PATH_STAT, &mpath_device->flags))
+		__mpath_add_sample(rq, mpath_device);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+}
+EXPORT_SYMBOL_GPL(mpath_add_sample);
+
+static int mpath_alloc_device_stat(struct mpath_device *mpath_device)
+{
+	int i, cpu;
+	struct mpath_path_lat_work *work;
+	gfp_t gfp = GFP_KERNEL | __GFP_ZERO;
+
+	mpath_device->path_lat = __alloc_percpu_gfp(MPATH_NUM_STAT_GROUPS *
+				sizeof(struct mpath_path_lat),
+				__alignof__(struct mpath_path_lat), gfp);
+	if (!mpath_device->path_lat)
+		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		for (i = 0; i < MPATH_NUM_STAT_GROUPS; i++) {
+			work = &per_cpu_ptr(mpath_device->path_lat, cpu)[i].work;
+			work->mpath_device = mpath_device;
+			work->op_type = i;
+			INIT_WORK(&work->weight_work, mpath_weight_work);
+		}
+	}
+
+	return 0;
+}
+
 int mpath_add_device(struct mpath_device *mpath_device, struct gendisk *disk,
 		int numa_node, atomic_t *nr_active)
 {
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	int ret;
 
 	if (!disk || !nr_active)
 		return -EINVAL;
+
+	ret = mpath_alloc_device_stat(mpath_device);
+	if (ret)
+		return ret;
 
 	mpath_device->disk = disk;
 	mpath_device->numa_node = numa_node;
@@ -85,6 +349,8 @@ bool mpath_delete_device(struct mpath_device *mpath_device)
 
 	mpath_synchronize(mpath_device->mpath_head);
 
+	free_percpu(mpath_device->path_lat);
+
 	return empty;
 }
 EXPORT_SYMBOL_GPL(mpath_delete_device);
@@ -101,6 +367,92 @@ bool mpath_head_devices_empty(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_head_devices_empty);
 
+static void mpath_reset_device_latency_stat(struct mpath_device *mpath_device)
+{
+	int i, cpu;
+	struct mpath_path_lat_stat *stat;
+
+	for_each_possible_cpu(cpu) {
+		for (i = 0; i < MPATH_NUM_STAT_GROUPS; i++) {
+			stat = &per_cpu_ptr(mpath_device->path_lat, cpu)[i].stat;
+			memset(stat, 0, sizeof(struct mpath_path_lat_stat));
+		}
+	}
+}
+
+static void mpath_cancel_device_latency_weight_work(struct mpath_device *mpath_device)
+{
+	int i, cpu;
+	struct mpath_path_lat *path_lat;
+
+	for_each_possible_cpu(cpu) {
+		for (i = 0; i < MPATH_NUM_STAT_GROUPS; i++) {
+			path_lat = &per_cpu_ptr(mpath_device->path_lat, cpu)[i];
+			cancel_work_sync(&path_lat->work.weight_work);
+		}
+	}
+}
+
+static bool mpath_enable_device_latency_sampling(struct mpath_device *mpath_device)
+{
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+
+	if (!mpath_head->disk ||
+		mpath_read_iopolicy(mpath_head) != MPATH_IOPOLICY_LATENCY)
+		return false;
+
+	if (test_and_set_bit(MPATH_DEVICE_PATH_STAT, &mpath_device->flags))
+		return false;
+
+	blk_queue_flag_set(QUEUE_FLAG_SAME_FORCE, mpath_device->disk->queue);
+	blk_stat_enable_accounting(mpath_device->disk->queue);
+	return true;
+}
+
+static bool mpath_disable_device_latency_sampling(struct mpath_device *mpath_device)
+{
+	int cpu;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
+	bool changed = false;
+
+	if (!test_and_clear_bit(MPATH_DEVICE_PATH_STAT, &mpath_device->flags))
+		return false;
+
+	for_each_possible_cpu(cpu) {
+		if (mpath_device == READ_ONCE(*per_cpu_ptr(mpath_head->latency_path, cpu))) {
+			WRITE_ONCE(*per_cpu_ptr(mpath_head->latency_path, cpu), NULL);
+			changed = true;
+		}
+	}
+
+
+	blk_stat_disable_accounting(mpath_device->disk->queue);
+	blk_queue_flag_clear(QUEUE_FLAG_SAME_FORCE, mpath_device->disk->queue);
+
+	/*
+	 * Ensure that we wait until completion side samplings (if any sneaked
+	 * in after we clear NVME_NS_PATH_STAT) are all scheduled before we
+	 * start cancelling those.
+	 */
+	synchronize_srcu(&mpath_head->srcu);
+	mpath_cancel_device_latency_weight_work(mpath_device);
+	mpath_reset_device_latency_stat(mpath_device);
+	return changed;
+}
+
+void mpath_set_head_paths(struct mpath_head *mpath_head)
+{
+	struct mpath_device *mpath_device;
+	int srcu_idx;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
+				srcu_read_lock_held(&mpath_head->srcu))
+		mpath_enable_device_latency_sampling(mpath_device);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+}
+EXPORT_SYMBOL_GPL(mpath_set_head_paths);
+
 bool mpath_clear_current_path(struct mpath_device *mpath_device)
 {
 	struct mpath_head *mpath_head = mpath_device->mpath_head;
@@ -115,6 +467,9 @@ bool mpath_clear_current_path(struct mpath_device *mpath_device)
 			changed = true;
 		}
 	}
+
+	if (mpath_disable_device_latency_sampling(mpath_device))
+		changed = true;
 
 	return changed;
 }
@@ -131,6 +486,17 @@ EXPORT_SYMBOL_GPL(mpath_clear_paths);
 
 void mpath_revalidate_paths(struct mpath_head *mpath_head)
 {
+	struct mpath_device *mpath_device;
+	int srcu_idx;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	list_for_each_entry_srcu(mpath_device, &mpath_head->dev_list, siblings,
+			srcu_read_lock_held(&mpath_head->srcu)) {
+
+		mpath_reset_device_latency_stat(mpath_device);
+	}
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
 	mpath_clear_paths(mpath_head);
 	mpath_schedule_requeue_work(mpath_head);
 }
@@ -316,12 +682,95 @@ static struct mpath_device *mpath_numa_path(struct mpath_head *mpath_head)
 	return mpath_device;
 }
 
+static struct mpath_device *mpath_latency_path(struct mpath_head *mpath_head,
+		unsigned int op_type)
+{
+	struct mpath_device *mpath_device, *start, *found = NULL;
+	struct mpath_path_lat_stat *stat;
+	u32 weight;
+	int cpu;
+
+	cpu = get_cpu();
+	mpath_device = READ_ONCE(*this_cpu_ptr(mpath_head->latency_path));
+	if (unlikely(!mpath_device)) {
+		mpath_device = list_first_or_null_rcu(&mpath_head->dev_list,
+				struct mpath_device, siblings);
+		if (unlikely(!mpath_device))
+			goto out;
+	}
+found_device:
+	start = mpath_device;
+	// fixme add is live check
+	while (mpath_path_is_disabled(mpath_head, mpath_device)) {
+		mpath_device = list_next_entry_circular(mpath_device, &mpath_head->dev_list, siblings);
+
+		/*
+		 * If we iterate through all paths in the list but find each
+		 * path in list is either disabled or dead then bail out.
+		 */
+		if (mpath_device == start)
+			goto out;
+	}
+
+	stat = &this_cpu_ptr(mpath_device->path_lat)[op_type].stat;
+
+	/*
+	 * When the head path-list is singular we don't calculate the
+	 * only path weight for optimization as we don't need to forward
+	 * I/O to more than one path. The another possibility is when the
+	 * path is newly added, we don't know its weight. So we go round
+	 * -robin for each such path and forward I/O to it.Once we start
+	 * getting response for such I/Os, the path weight calculation
+	 * would kick in and then we start using path credit for
+	 * forwarding I/O.
+	 */
+	weight = READ_ONCE(stat->weight);
+	if (!weight) {
+		found = mpath_device;
+		goto out;
+	}
+
+	/*
+	 * To keep path selection logic simple, we don't distinguish
+	 * between ANA optimized and non-optimized states. The non-
+	 * optimized path is expected to have a lower weight, and
+	 * therefore fewer credits. As a result, only a small number of
+	 * I/Os will be forwarded to paths in the non-optimized state.
+	 */
+	if (stat->credit > 0) {
+		--stat->credit;
+		found = mpath_device;
+		goto out;
+	} else {
+		/*
+		 * Refill credit from path weight and move to next path. The
+		 * refilled credit of the current path will be used next when
+		 * all remainng paths exhaust its credits.
+		 */
+		weight = READ_ONCE(stat->weight);
+		stat->credit = weight;
+		mpath_device = list_next_entry_circular(mpath_device, &mpath_head->dev_list, siblings);
+		if (likely(mpath_device))
+			goto found_device;
+	}
+out:
+	if (found) {
+		stat->sel++;
+		WRITE_ONCE(*this_cpu_ptr(mpath_head->latency_path), found);
+	}
+
+	put_cpu();
+	return found;
+}
+
 static struct mpath_device *mpath_find_path(struct mpath_head *mpath_head,
 				enum mpath_stat_group op_type)
 {
 	enum mpath_iopolicy_e iopolicy = mpath_read_iopolicy(mpath_head);
 
 	switch (iopolicy) {
+	case MPATH_IOPOLICY_LATENCY:
+		return mpath_latency_path(mpath_head, op_type);
 	case MPATH_IOPOLICY_QD:
 		return mpath_queue_depth_path(mpath_head);
 	case MPATH_IOPOLICY_RR:
@@ -354,22 +803,6 @@ static bool mpath_available_path(struct mpath_head *mpath_head)
 	 * non-zero, this flag is set to true. When zero, the flag is cleared.
 	 */
 	return mpath_head_queue_if_no_path(mpath_head);
-}
-
-static enum mpath_stat_group __mpath_data_dir(const enum req_op op)
-{
-	if (op == REQ_OP_READ)
-		return MPATH_STAT_READ;
-	else if (op == REQ_OP_WRITE)
-		return MPATH_STAT_WRITE;
-	else
-		return MPATH_STAT_OTHER;
-}
-
-__maybe_unused
-static enum mpath_stat_group mpath_data_dir(struct request *req)
-{
-	return __mpath_data_dir(req_op(req));
 }
 
 static void mpath_bdev_submit_bio(struct bio *bio)
@@ -456,6 +889,7 @@ void mpath_head_uninit(struct mpath_head *mpath_head)
 	if (!refcount_dec_and_test(refcount))
 		wait_var_event(refcount, !refcount_read(refcount));
 	cleanup_srcu_struct(&mpath_head->srcu);
+	free_percpu(mpath_head->latency_path);
 }
 EXPORT_SYMBOL_GPL(mpath_head_uninit);
 
@@ -671,9 +1105,15 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head,
 	     !mpath_head->iopolicy || mpath_head->disk)
 		return -EINVAL;
 
+	mpath_head->latency_path = alloc_percpu_gfp(struct mpath_device*, GFP_KERNEL);
+	if (!mpath_head->latency_path)
+		return -ENOMEM;
+
 	disk = blk_alloc_disk(lim, numa_node);
-	if (IS_ERR(disk))
+	if (IS_ERR(disk)) {
+		free_percpu(mpath_head->latency_path);
 		return PTR_ERR(disk);
+	}
 
 	mpath_head->disk = disk;
 	mpath_head->disk->private_data = mpath_head;
