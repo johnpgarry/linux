@@ -11,6 +11,25 @@
 
 bool multipath = true;
 static bool multipath_always_on;
+static bool rq_mode;
+
+static int multipath_rq_mode_set(const char *val, const struct kernel_param *kp)
+{
+	pr_err("%s val=%s\n", __func__, val);
+	if (!val)
+		return -EINVAL;
+	if (!strncmp(val, "on", 2))
+		rq_mode = true;
+
+	return 0;
+}
+
+static const struct kernel_param_ops rq_mode_param_ops = {
+	.set = multipath_rq_mode_set,
+};
+
+module_param_cb(rq_mode, &rq_mode_param_ops, &rq_mode, 0444);
+MODULE_PARM_DESC(rq_mode, "turn on native multipath support, options: on, off, always");
 
 static int multipath_param_set(const char *val, const struct kernel_param *kp)
 {
@@ -623,7 +642,7 @@ static int nvme_ns_head_report_zones(struct gendisk *disk, sector_t sector,
 #define nvme_ns_head_report_zones	NULL
 #endif /* CONFIG_BLK_DEV_ZONED */
 
-const struct block_device_operations nvme_ns_head_ops = {
+const struct block_device_operations nvme_ns_head_ops_bio = {
 	.owner		= THIS_MODULE,
 	.submit_bio	= nvme_ns_head_submit_bio,
 	.open		= nvme_ns_head_open,
@@ -633,6 +652,18 @@ const struct block_device_operations nvme_ns_head_ops = {
 	.getgeo		= nvme_getgeo,
 	.get_unique_id	= nvme_ns_head_get_unique_id,
 	.report_zones	= nvme_ns_head_report_zones,
+	.pr_ops		= &nvme_pr_ops,
+};
+
+const struct block_device_operations nvme_ns_head_ops_rq = {
+	.owner          = THIS_MODULE,
+	.open		= nvme_ns_head_open,
+	.release	= nvme_ns_head_release,
+	.ioctl		= nvme_ns_head_ioctl,
+	.compat_ioctl	= blkdev_compat_ptr_ioctl,
+	.get_unique_id	= nvme_ns_head_get_unique_id,
+	.report_zones	= nvme_ns_head_report_zones,
+	.getgeo		= nvme_getgeo,
 	.pr_ops		= &nvme_pr_ops,
 };
 
@@ -731,6 +762,114 @@ static void nvme_remove_head_work(struct work_struct *work)
 	module_put(THIS_MODULE);
 }
 
+static enum rq_end_io_ret nvme_mpath_mq_rq_end_clone(struct request *clone,
+					    blk_status_t error,
+					    const struct io_comp_batch *iob)
+{
+	struct request *orig = clone->end_io_data;
+	//if (error)
+	//WARN_ON_ONCE(1);
+	pr_err_once("%s clone=%pS tag=%d error=%d iob=%pS end_io_data=%pS orig=%pS tag=%d\n",
+			__func__, clone, clone->tag, error, iob, clone->end_io_data, orig, orig->tag);
+	blk_mq_end_request(orig, error);
+	return RQ_END_IO_FREE;
+}
+
+static blk_status_t nvme_mpath_mq_rq(struct blk_mq_hw_ctx *hctx,
+			 const struct blk_mq_queue_data *bd)
+{
+	struct request *rq = bd->rq;
+	blk_status_t blk_sts;
+	struct request_queue *q = rq->q;
+	struct gendisk *disk = q->disk;
+	struct nvme_ns_head *head = disk->private_data;
+	struct device *dev;
+	struct nvme_ns *ns;
+	int srcu_idx;
+
+	srcu_idx = srcu_read_lock(&head->srcu);
+	ns = nvme_find_path(head);
+
+	//pr_err("%s mpath_head=%pS mpath_device=%pS rq=%pS\n", __func__, mpath_head, mpath_device, rq);
+
+	if (likely(ns)) {
+		struct request *clone;
+		struct block_device *bdev = ns->disk->part0;
+		struct request_queue *q = bdev_get_queue(bdev);
+		int ret;
+
+	//	pr_err("%s2 mpath_head=%pS rq=%pS end_io=%pS\n",
+	//		__func__, mpath_head, rq, rq->end_io);
+
+
+		clone = blk_mq_alloc_request(q, rq->cmd_flags | REQ_NOMERGE,
+			BLK_MQ_REQ_NOWAIT);
+		
+		if (IS_ERR(clone)) {
+			pr_err("%s3 clone=%pS ns=%pS bdev=%pS q=%pS rq=%pS\n",
+				__func__, clone, ns, bdev, q, rq);
+			if (clone == ERR_PTR(-EAGAIN))
+				blk_sts = BLK_STS_RESOURCE;
+			else
+				blk_sts = BLK_STS_IOERR;
+			goto out_unlock;
+		}
+
+		ret = blk_rq_prep_clone(clone, rq, NULL, GFP_KERNEL,
+				      NULL, NULL);
+	
+		if (ret) {
+			pr_err("%s4 clone=%pS ret=%d bdev=%pS q=%pS rq=%pS\n",
+				__func__, clone, ret, bdev, q, rq);
+			blk_sts = BLK_STS_IOERR;
+			goto out_unlock;
+		}
+
+		clone->end_io = nvme_mpath_mq_rq_end_clone;
+		clone->end_io_data = rq;
+
+		ret = blk_insert_cloned_request(clone);
+		pr_err_once("%s clone=%pS tag=%d rq=%pS tag=%d\n", __func__, clone, clone->tag, rq, rq->tag);
+		switch (ret) {
+		case BLK_STS_OK:
+			break;
+		case BLK_STS_RESOURCE:
+		case BLK_STS_DEV_RESOURCE:
+			pr_err_once("%s calling blk_rq_unprep_clone clone=%pS\n", __func__, clone);
+			blk_rq_unprep_clone(clone);
+			pr_err_once("%s calling blk_mq_cleanup_rq clone=%pS\n", __func__, clone);
+			blk_mq_cleanup_rq(clone);
+			pr_err_once("%s calling blk_mq_free_request clone=%pS\n", __func__, clone);
+			blk_mq_free_request(clone);
+			pr_err_once("%s called blk_mq_free_request clone=%pS\n", __func__, clone);
+			blk_sts = BLK_STS_RESOURCE;
+			goto out_unlock;
+		default:
+			pr_err("%s5 clone=%pS ret=%d bdev=%pS q=%pS from blk_insert_cloned_request rq=%pS\n",
+				__func__, clone, ret, bdev, q, rq);
+			/* must complete clone in terms of original request */
+			BUG();
+		}
+
+	} else if (nvme_available_path(head)) {
+		dev_warn_ratelimited(dev, "no usable path - requeuing I/O\n");
+
+		blk_sts = BLK_STS_TRANSPORT;
+	} else {
+		dev_warn_ratelimited(dev, "no available path - failing I/O\n");
+
+		blk_sts = BLK_STS_IOERR;
+	}
+
+out_unlock:
+	srcu_read_unlock(&head->srcu, srcu_idx);
+	return blk_sts;
+}
+
+const struct blk_mq_ops nvme_mpath_mq_ops = {
+	.queue_rq	= nvme_mpath_mq_rq,
+};
+
 int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 {
 	struct queue_limits lim;
@@ -766,10 +905,16 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	if (head->ids.csi == NVME_CSI_ZNS)
 		lim.features |= BLK_FEAT_ZONED;
 
-	head->disk = blk_alloc_disk(&lim, ctrl->numa_node);
+	if (rq_mode)
+		head->disk = blk_mq_alloc_disk(&head->tag_set, &lim, head);
+	else
+		head->disk = blk_alloc_disk(&lim, ctrl->numa_node);
 	if (IS_ERR(head->disk))
 		return PTR_ERR(head->disk);
-	head->disk->fops = &nvme_ns_head_ops;
+	if (rq_mode)
+		head->disk->fops = &nvme_ns_head_ops_rq;
+	else
+		head->disk->fops = &nvme_ns_head_ops_bio;
 	head->disk->private_data = head;
 
 	/*

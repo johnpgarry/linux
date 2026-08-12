@@ -4007,6 +4007,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 {
 	struct nvme_ns_head *head;
 	size_t size = sizeof(*head);
+	struct blk_mq_tag_set *tag_set;
 	int ret = -ENOMEM;
 
 #ifdef CONFIG_NVME_MULTIPATH
@@ -4032,6 +4033,18 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	ratelimit_state_init(&head->rs_nuse, 5 * HZ, 1);
 	ratelimit_set_flags(&head->rs_nuse, RATELIMIT_MSG_ON_RELEASE);
 	kref_init(&head->ref);
+
+	tag_set = &head->tag_set;
+	memset(tag_set, 0, sizeof(*tag_set));
+
+	tag_set->ops = &nvme_mpath_mq_ops;
+	tag_set->nr_hw_queues = 1;
+	tag_set->nr_maps = 1;
+	tag_set->queue_depth = 32;
+
+	tag_set->driver_data = head;
+
+	ret = blk_mq_alloc_tag_set(tag_set);
 
 	if (head->ids.csi) {
 		ret = nvme_get_effects_log(ctrl, head->ids.csi, &head->effects);

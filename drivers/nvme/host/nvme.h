@@ -572,6 +572,7 @@ struct nvme_ns_head {
 	u16			nr_plids;
 	u16			*plids;
 #ifdef CONFIG_NVME_MULTIPATH
+	struct blk_mq_tag_set tag_set;
 	struct bio_list		requeue_list
 		__guarded_by(&requeue_lock);
 	spinlock_t		requeue_lock;
@@ -1038,7 +1039,8 @@ int nvme_dev_uring_cmd(struct io_uring_cmd *ioucmd, unsigned int issue_flags);
 extern const struct attribute_group *nvme_ns_attr_groups[];
 extern const struct attribute_group nvme_ns_mpath_attr_group;
 extern const struct pr_ops nvme_pr_ops;
-extern const struct block_device_operations nvme_ns_head_ops;
+extern const struct block_device_operations nvme_ns_head_ops_bio;
+extern const struct block_device_operations nvme_ns_head_ops_rq;
 extern const struct attribute_group nvme_dev_attrs_group;
 extern const struct attribute_group nvme_dev_diag_attrs_group;
 extern const struct attribute_group *nvme_subsys_attrs_groups[];
@@ -1099,9 +1101,11 @@ extern struct device_attribute dev_attr_io_requeue_no_usable_path_count;
 extern struct device_attribute dev_attr_io_fail_no_available_path_count;
 extern struct device_attribute subsys_attr_iopolicy;
 
+extern const struct blk_mq_ops nvme_mpath_mq_ops;
+
 static inline bool nvme_disk_is_ns_head(struct gendisk *disk)
 {
-	return disk->fops == &nvme_ns_head_ops;
+	return disk->fops == &nvme_ns_head_ops_bio || disk->fops == &nvme_ns_head_ops_rq;
 }
 static inline bool nvme_mpath_queue_if_no_path(struct nvme_ns_head *head)
 {
