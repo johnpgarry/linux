@@ -4041,7 +4041,11 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	tag_set->nr_hw_queues = 1;
 	tag_set->nr_maps = 1;
 	tag_set->queue_depth = 32;
-
+	if (ctrl->ops->flags & NVME_F_BLOCKING) {
+		dev_err(ctrl->dev, "NVME_F_BLOCKING set\n");
+		tag_set->flags |= BLK_MQ_F_BLOCKING;
+	} else
+		dev_err(ctrl->dev, "NVME_F_BLOCKING unset\n");
 	tag_set->driver_data = head;
 
 	ret = blk_mq_alloc_tag_set(tag_set);
