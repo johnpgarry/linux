@@ -4040,7 +4040,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	tag_set->ops = &nvme_mpath_mq_ops;
 	tag_set->nr_hw_queues = 1;
 	tag_set->nr_maps = 1;
-	tag_set->queue_depth = 32;
+	tag_set->queue_depth = 1024;
 	if (ctrl->ops->flags & NVME_F_BLOCKING) {
 		dev_err(ctrl->dev, "NVME_F_BLOCKING set\n");
 		tag_set->flags |= BLK_MQ_F_BLOCKING;
