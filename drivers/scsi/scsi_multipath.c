@@ -404,9 +404,9 @@ static struct mpath_head_template smpdt = {
 extern int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 		bool open_for_write, unsigned int timeout);
 
-static void scsi_mpath_alloc_head_bsg(struct scsi_mpath_head *scsi_mpath_head)
+void scsi_mpath_alloc_head_bsg(struct scsi_mpath_head *scsi_mpath_head)
 {
-	int ret = mpath_setup_bsg(&scsi_mpath_head->mpath_head, dev_name(&scsi_mpath_head->dev));
+	int ret = mpath_setup_bsg(&scsi_mpath_head->mpath_head, &scsi_mpath_head->dev);
 	dev_err(&scsi_mpath_head->dev, "%s ret=%d\n",
 		__func__, ret);
 }
@@ -454,7 +454,6 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(char *vpd_id)
 		return NULL;
 	}
 
-	scsi_mpath_alloc_head_bsg(scsi_mpath_head);
 
 	return scsi_mpath_head;
 

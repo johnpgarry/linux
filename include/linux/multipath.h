@@ -73,9 +73,11 @@ struct mpath_head {
 	const struct attribute_group 		**disk_groups;
 	const struct mpath_head_template	*mpdt;
 
-	struct device		bsg_dev;
+	#ifdef dsddsd
 	struct request_queue *bsg_q;
 	struct blk_mq_tag_set	tag_set;
+	#endif
+	struct device		bsg_dev;
 	struct bsg_device *bsg_device;
 
 	struct mpath_device __rcu 		*current_path[MAX_NUMNODES];
@@ -118,7 +120,7 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device);
 int mpath_get_head(struct mpath_head *mpath_head);
 void mpath_put_head(struct mpath_head *mpath_head);
 int mpath_head_init(struct mpath_head *mpath_head);
-int mpath_setup_bsg(struct mpath_head *mpath_head, const char *name);
+int mpath_setup_bsg(struct mpath_head *mpath_head, struct device *parent);
 void mpath_head_uninit(struct mpath_head *mpath_head);
 
 void mpath_put_disk(struct mpath_head *mpath_head);

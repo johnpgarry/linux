@@ -1735,6 +1735,10 @@ static enum scsi_qc_status scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	}
 
 	trace_scsi_dispatch_cmd_start(cmd);
+
+	if (mpath_is_bsg_request(scsi_cmd_to_rq(cmd)))
+		pr_err("%s rq=%pS queuecommand=%pS\n",
+			__func__, scsi_cmd_to_rq(cmd), host->hostt->queuecommand);
 	rtn = host->hostt->queuecommand(host, cmd);
 	if (rtn) {
 		atomic_dec(&cmd->device->iorequest_cnt);

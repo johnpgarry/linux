@@ -4321,6 +4321,7 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 		goto out_free_disk;
 	disk = mpath_head->disk;
 
+
 	error = ida_alloc(&sd_index_ida, GFP_KERNEL);
 	if (error < 0) {
 		sdev_printk(KERN_WARNING, sdp, "sd_mpath_probe: memory exhausted.\n");
@@ -4364,6 +4365,10 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 
 	sd_mpath_disk->disk_count = 1;
 	mutex_unlock(&sd_mpath_disks_lock);
+
+	
+	
+	scsi_mpath_alloc_head_bsg(scsi_mpath_head);
 found:
 	sdkp->sd_mpath_disk = sd_mpath_disk;
 	sdkp->disk->flags |= GENHD_FL_HIDDEN;

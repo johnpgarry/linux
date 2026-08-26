@@ -663,6 +663,8 @@ int mpath_alloc_head_disk(struct mpath_head *mpath_head,
 	INIT_DELAYED_WORK(&mpath_head->remove_work, mpath_remove_head_work);
 	mpath_head->delayed_removal_secs = 0;
 
+	disk->queue->queuedata = mpath_head;
+
 	set_bit(GD_SUPPRESS_PART_SCAN, &mpath_head->disk->state);
 
 	return 0;
@@ -1096,69 +1098,70 @@ static const struct blk_mq_ops mpath_bsg_mq_ops = {
 	.complete		= mpath_bsg_complete,
 //	.timeout		= bsg_timeout,
 };
-extern int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
+extern int scsi_bsg_sg_io_fnx(struct request_queue *q, struct sg_io_v4 *hdr,
 		bool open_for_write, unsigned int timeout);
 
-int mpath_setup_bsg(struct mpath_head *mpath_head, const char *name)
+int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
+		bool open_for_write, unsigned int timeout);
+
+static int scsi_bsg_sg_io_fn1(struct request_queue *q, struct sg_io_v4 *hdr,
+		bool open_for_write, unsigned int timeout)
+{
+	struct mpath_device *mpath_device;
+	int srcu_idx;
+	int ret = -EWOULDBLOCK;
+	struct mpath_head *mpath_head = q->queuedata;
+
+	pr_err("%s q=%pS mpath_head=%pS\n", __func__, q, mpath_head);
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+
+	pr_err("%s q=%pS mpath_device=%pS\n", __func__, q, mpath_device);
+
+	if (likely(mpath_device))
+		ret = scsi_bsg_sg_io_fn(mpath_device->disk->queue, hdr, open_for_write, timeout);
+	pr_err("%s2 ret=%d\n", __func__, ret);
+
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	pr_err("%s10 mpath_head=%pS mpath_device=%pS\n", __func__, mpath_head, mpath_device);
+	return 0;
+}
+
+int mpath_setup_bsg(struct mpath_head *mpath_head, struct device *parent)
 {
 	struct device *bsg_dev = &mpath_head->bsg_dev;
 	struct queue_limits lim;
-	struct blk_mq_tag_set *set;
-	int ret = -ENOMEM;
+
+	pr_err("%s mpath_head=%pS mpath_head->parent=%pS\n", __func__, mpath_head, mpath_head->parent);
+	pr_err("%s1 disk=%pS\n", __func__, mpath_head->disk);
+	pr_err("%s2 queue=%pS\n", __func__, mpath_head->disk->queue);
 
 	blk_set_stacking_limits(&lim);
 
 	device_initialize(bsg_dev);
+	pr_err("%s2.2 queue=%pS\n", __func__, mpath_head->disk->queue);
 
-	bsg_dev->parent = get_device(mpath_head->parent);
+	dev_err(parent, "%s2.2.0\n", __func__);
 
-	dev_set_name(bsg_dev, "%s", name);
+	bsg_dev->parent = get_device(parent);
 
+	pr_err("%s2.3 queue=%pS\n", __func__, mpath_head->disk->queue);
+	dev_set_name(bsg_dev, "bsg");
+
+	pr_err("%s2.4 queue=%pS\n", __func__, mpath_head->disk->queue);
 	if (device_add(bsg_dev)) {
 		BUG();
 	}
 
-	set = &mpath_head->tag_set;
-	set->ops = &mpath_bsg_mq_ops;
-	set->nr_hw_queues = 1;
-	set->queue_depth = 128;
-	set->numa_node = NUMA_NO_NODE;
-	set->cmd_size = 1280;//sizeof(struct bsg_job);
-	set->flags = BLK_MQ_F_BLOCKING;
-	if (blk_mq_alloc_tag_set(set)) {
-		pr_err("%s2\n", __func__);
-		goto out_tag_set;
-	}
-
-	mpath_head->bsg_q = blk_mq_alloc_queue(set, &lim, mpath_head);
-	if (IS_ERR(mpath_head->bsg_q)) {
-		pr_err("%s3\n", __func__);
-		ret = PTR_ERR(mpath_head->bsg_q);
-		goto out_queue;
-	}
-
-	blk_queue_rq_timeout(mpath_head->bsg_q, BLK_DEFAULT_SG_TIMEOUT);
-
-	pr_err("%s3.1 mpath_head->bsg_q=%pS\n", __func__, mpath_head->bsg_q);
 	pr_err("%s3.2 &mpath_head->bsg_dev=%pS\n", __func__, &mpath_head->bsg_dev);
-	pr_err("%s3.3 name=%s\n", __func__, name);
-	mpath_head->bsg_device = bsg_register_queue(mpath_head->bsg_q, &mpath_head->bsg_dev, name, scsi_bsg_sg_io_fn, NULL);
+	mpath_head->bsg_device = bsg_register_queue(mpath_head->disk->queue, bsg_dev, dev_name(parent), scsi_bsg_sg_io_fn1, NULL);
+	pr_err("%s4 mpath_head->bsg_device=%pS\n", __func__, mpath_head->bsg_device);
 	if (IS_ERR(mpath_head->bsg_device)) {
-		pr_err("%s4\n", __func__);
-		ret = PTR_ERR(mpath_head->bsg_device);
-		goto out_cleanup_queue;
+		return PTR_ERR(mpath_head->bsg_device);
 	}
 
 	pr_err("%s10\n", __func__);
-	return 0;
-out_cleanup_queue:
-	blk_mq_destroy_queue(mpath_head->bsg_q);
-	blk_put_queue(mpath_head->bsg_q);
-out_queue:
-	blk_mq_free_tag_set(set);
-out_tag_set:
-//	kfree(bset);
-
 	return 0;
 }
 
