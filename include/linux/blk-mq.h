@@ -107,6 +107,8 @@ struct request {
 	struct blk_mq_ctx *mq_ctx;
 	struct blk_mq_hw_ctx *mq_hctx;
 
+	bool bsg_special;
+
 	blk_opf_t cmd_flags;		/* op and common flags */
 	req_flags_t rq_flags;
 

@@ -1077,6 +1077,9 @@ out:
 
 bool mpath_is_bsg_request(struct request *rq)
 {
+	if (rq->bsg_special)
+		return true;
+
 	return rq->end_io == mpath_bsg_end_clone;
 }
 EXPORT_SYMBOL_GPL(mpath_is_bsg_request);

@@ -1619,7 +1619,16 @@ static void scsi_complete(struct request *rq)
 			if (bi_io_vec) {
 				pr_err("%s2 bv_page=%pS bv_len=%d bv_offset=%d\n",
 					__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
-				print_hex_dump(KERN_WARNING, "bio scsi_complete ", DUMP_PREFIX_OFFSET, 16, 1,
+				print_hex_dump(KERN_WARNING, "bio scsi_complete bi_vcnt ", DUMP_PREFIX_OFFSET, 16, 1,
+	  				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
+			}
+		} else if (bio) {
+			struct bio_vec *bi_io_vec = bio->bi_io_vec;
+			pr_err("%s3 bi_io_vec=%pS\n", __func__, bi_io_vec);
+			if (bi_io_vec) {
+				pr_err("%s4 bv_page=%pS bv_len=%d bv_offset=%d\n",
+					__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
+				print_hex_dump(KERN_WARNING, "bio scsi_complete no bi_vcnt ", DUMP_PREFIX_OFFSET, 16, 1,
 	  				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
 			}
 		}

@@ -690,6 +690,7 @@ struct request *blk_mq_alloc_request(struct request_queue *q, blk_opf_t opf,
 	rq->phys_gap_bit = 0;
 	rq->__sector = (sector_t) -1;
 	rq->bio = rq->biotail = NULL;
+	rq->bsg_special = false;
 	return rq;
 out_queue_exit:
 	blk_queue_exit(q);

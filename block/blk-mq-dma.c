@@ -4,6 +4,7 @@
  */
 #include <linux/blk-integrity.h>
 #include <linux/blk-mq-dma.h>
+#include <linux/multipath.h>
 #include "blk.h"
 
 static bool __blk_map_iter_next(struct blk_map_iter *iter)
@@ -143,6 +144,8 @@ static inline void blk_rq_map_iter_init(struct request *rq,
 	struct bio *bio = rq->bio;
 
 	if (rq->rq_flags & RQF_SPECIAL_PAYLOAD) {
+		if (mpath_is_bsg_request(rq))
+			pr_err("%s rq=%pS RQF_SPECIAL_PAYLOAD\n", __func__, rq);
 		*iter = (struct blk_map_iter) {
 			.bvecs = &rq->special_vec,
 			.iter = {
@@ -150,12 +153,19 @@ static inline void blk_rq_map_iter_init(struct request *rq,
 			}
 		};
 	} else if (bio) {
+		if (mpath_is_bsg_request(rq))
+			pr_err("%s2 rq=%pS bio->bi_io_vec=%pS bio->bi_iter bi_sector=%lld, bi_size=%d, bi_idx=%d, bi_offset=%d\n",
+				__func__, rq, bio->bi_io_vec,
+			bio->bi_iter.bi_sector, bio->bi_iter.bi_size, bio->bi_iter.bi_idx, bio->bi_iter.bi_offset);
 		*iter = (struct blk_map_iter) {
 			.bio = bio,
 			.bvecs = bio->bi_io_vec,
 			.iter = bio->bi_iter,
 		};
 	} else {
+		if (mpath_is_bsg_request(rq))
+			pr_err("%s3 rq=%pS flush request\n",
+				__func__, rq);
 		/* the internal flush request may not have bio attached */
 		*iter = (struct blk_map_iter) {};
 	}
@@ -291,18 +301,26 @@ int __blk_rq_map_sg(struct request *rq, struct scatterlist *sglist,
 	struct phys_vec vec;
 	int nsegs = 0;
 
+	if (mpath_is_bsg_request(rq))
+		pr_err("%s rq=%pS\n", __func__, rq);
 	blk_rq_map_iter_init(rq, &iter);
 	while (blk_map_iter_next(rq, &iter, &vec)) {
 		*last_sg = blk_next_sg(last_sg, sglist);
 
+		if (mpath_is_bsg_request(rq))
+			pr_err("%s2 rq=%pS\n", __func__, rq);
 		WARN_ON_ONCE(overflows_type(vec.len, unsigned int));
 		sg_set_page(*last_sg, phys_to_page(vec.paddr), vec.len,
 				offset_in_page(vec.paddr));
 		nsegs++;
 	}
 
-	if (*last_sg)
+	if (*last_sg) {
+
+		if (mpath_is_bsg_request(rq))
+			pr_err("%s3 rq=%pS\n", __func__, rq);
 		sg_mark_end(*last_sg);
+	}
 
 	/*
 	 * Something must have been wrong if the figured number of
