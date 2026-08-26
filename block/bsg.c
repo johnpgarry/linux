@@ -233,6 +233,7 @@ struct bsg_device *bsg_register_queue(struct request_queue *q,
 
 	ret = ida_alloc_max(&bsg_minor_ida, BSG_MAX_DEVS - 1, GFP_KERNEL);
 	if (ret < 0) {
+		pr_err("%s1\n", __func__);
 		if (ret == -ENOSPC)
 			dev_err(parent, "bsg: too many bsg devices\n");
 		kfree(bd);
@@ -248,14 +249,20 @@ struct bsg_device *bsg_register_queue(struct request_queue *q,
 	cdev_init(&bd->cdev, &bsg_fops);
 	bd->cdev.owner = THIS_MODULE;
 	ret = cdev_device_add(&bd->cdev, &bd->device);
-	if (ret)
+	if (ret) {
+		pr_err("%s2\n", __func__);
 		goto out_put_device;
+	}
 
 	if (q->disk && q->disk->queue_kobj.sd) {
+		pr_err("%s3 &q->disk->queue_kobj=%pS &bd->device.kobj=%pS\n",
+			__func__, &q->disk->queue_kobj, &bd->device.kobj);
 		ret = sysfs_create_link(&q->disk->queue_kobj, &bd->device.kobj,
 					"bsg");
-		if (ret)
+		if (ret) {
+			pr_err("%s3.1\n", __func__);
 			goto out_device_del;
+		}
 	}
 
 	return bd;

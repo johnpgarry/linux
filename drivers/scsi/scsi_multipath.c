@@ -401,6 +401,46 @@ static struct mpath_head_template smpdt = {
 	.clone_bio = scsi_mpath_clone_bio,
 };
 
+
+#include <linux/bsg.h>
+#include <linux/bsg-lib.h>
+
+static int scsi_mpath_bsg_request(struct bsg_job *job)
+{
+	pr_err("%s job=%pS\n", __func__, job);
+
+	return 0;
+}
+static void scsi_mpath_alloc_head_bsg(struct scsi_mpath_head *scsi_mpath_head)
+{
+	struct queue_limits lim;
+	struct device *bsg_dev = &scsi_mpath_head->bsg_dev;
+
+	blk_set_stacking_limits(&lim);
+
+	device_initialize(bsg_dev);
+
+	bsg_dev->parent = get_device(&scsi_mpath_head->dev);
+
+	dev_set_name(bsg_dev, "%s_bsg", dev_name(&scsi_mpath_head->dev));
+
+	if (device_add(bsg_dev)) {
+		BUG();
+	}
+
+	scsi_mpath_head->bsg_q = bsg_setup_queue(bsg_dev, dev_name(&scsi_mpath_head->dev), &lim,
+			scsi_mpath_bsg_request, NULL, 0);
+	dev_err(&scsi_mpath_head->dev, "%s scsi_mpath_head->bsg_q=%pS\n",
+		__func__, scsi_mpath_head->bsg_q);
+	if (IS_ERR(scsi_mpath_head->bsg_q)) {
+		
+		return;
+	}
+
+
+}
+
+
 static struct scsi_mpath_head *scsi_mpath_alloc_head(char *vpd_id)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
@@ -443,6 +483,8 @@ static struct scsi_mpath_head *scsi_mpath_alloc_head(char *vpd_id)
 		put_device(&scsi_mpath_head->dev);
 		return NULL;
 	}
+
+	scsi_mpath_alloc_head_bsg(scsi_mpath_head);
 
 	return scsi_mpath_head;
 

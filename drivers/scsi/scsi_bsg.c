@@ -271,6 +271,9 @@ out_put_request:
 
 struct bsg_device *scsi_bsg_register_queue(struct scsi_device *sdev)
 {
+	dev_err(&sdev->sdev_gendev, "%s sdev->request_queue=%pS\n",
+		__func__, sdev->request_queue);
+
 	return bsg_register_queue(sdev->request_queue, &sdev->sdev_gendev,
 			dev_name(&sdev->sdev_gendev), scsi_bsg_sg_io_fn,
 			scsi_bsg_uring_cmd);

@@ -369,8 +369,10 @@ struct request_queue *bsg_setup_queue(struct device *dev, const char *name,
 	int ret = -ENOMEM;
 
 	bset = kzalloc_obj(*bset);
-	if (!bset)
+	if (!bset) {
+		pr_err("%s1\n", __func__);
 		return ERR_PTR(-ENOMEM);
+	}
 
 	bset->job_fn = job_fn;
 	bset->timeout_fn = timeout;
@@ -382,11 +384,14 @@ struct request_queue *bsg_setup_queue(struct device *dev, const char *name,
 	set->numa_node = NUMA_NO_NODE;
 	set->cmd_size = sizeof(struct bsg_job) + dd_job_size;
 	set->flags = BLK_MQ_F_BLOCKING;
-	if (blk_mq_alloc_tag_set(set))
+	if (blk_mq_alloc_tag_set(set)) {
+		pr_err("%s2\n", __func__);
 		goto out_tag_set;
+	}
 
 	q = blk_mq_alloc_queue(set, lim, dev);
 	if (IS_ERR(q)) {
+		pr_err("%s3\n", __func__);
 		ret = PTR_ERR(q);
 		goto out_queue;
 	}
@@ -395,6 +400,7 @@ struct request_queue *bsg_setup_queue(struct device *dev, const char *name,
 
 	bset->bd = bsg_register_queue(q, dev, name, bsg_transport_sg_io_fn, NULL);
 	if (IS_ERR(bset->bd)) {
+		pr_err("%s4\n", __func__);
 		ret = PTR_ERR(bset->bd);
 		goto out_cleanup_queue;
 	}
