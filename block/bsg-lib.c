@@ -25,7 +25,7 @@ struct bsg_set {
 	bsg_timeout_fn		*timeout_fn;
 };
 
-static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
+static __maybe_unused int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 		bool open_for_write, unsigned int timeout)
 {
 	struct bsg_job *job;
@@ -33,6 +33,14 @@ static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 	struct bio *bio;
 	void *reply;
 	int ret;
+
+	pr_err("%s hdr->protocol=%d hdr->subprotocol=%d\n", __func__, hdr->protocol, hdr->subprotocol);
+	if (hdr->protocol != BSG_PROTOCOL_SCSI) {
+		pr_err("%s1 hdr->protocol=%d BSG_PROTOCOL_SCSI=%d\n", __func__, hdr->protocol, BSG_PROTOCOL_SCSI);
+	}
+	if (hdr->subprotocol != BSG_SUB_PROTOCOL_SCSI_TRANSPORT) {
+		pr_err("%s2 hdr->subprotocol=%d BSG_SUB_PROTOCOL_SCSI_TRANSPORT=%d\n", __func__, hdr->protocol, BSG_SUB_PROTOCOL_SCSI_TRANSPORT);
+	}
 
 	if (hdr->protocol != BSG_PROTOCOL_SCSI  ||
 	    hdr->subprotocol != BSG_SUB_PROTOCOL_SCSI_TRANSPORT)
@@ -42,6 +50,7 @@ static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 
 	rq = blk_mq_alloc_request(q, hdr->dout_xfer_len ?
 			     REQ_OP_DRV_OUT : REQ_OP_DRV_IN, 0);
+	pr_err("%s3 rq=%pS\n", __func__, rq);
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
 	rq->timeout = timeout;
@@ -55,6 +64,7 @@ static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 
 	job->request_len = hdr->request_len;
 	job->request = memdup_user(uptr64(hdr->request), hdr->request_len);
+	pr_err("%s3 job->request=%pS\n", __func__, job->request);
 	if (IS_ERR(job->request)) {
 		ret = PTR_ERR(job->request);
 		goto out_free_rq;
@@ -62,6 +72,7 @@ static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 
 	if (hdr->dout_xfer_len && hdr->din_xfer_len) {
 		job->bidi_rq = blk_mq_alloc_request(rq->q, REQ_OP_DRV_IN, 0);
+		pr_err("%s4 job->bidi_rq=%pS\n", __func__, job->bidi_rq);
 		if (IS_ERR(job->bidi_rq)) {
 			ret = PTR_ERR(job->bidi_rq);
 			goto out_free_job_request;
@@ -70,6 +81,7 @@ static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 		ret = blk_rq_map_user(rq->q, job->bidi_rq, NULL,
 				uptr64(hdr->din_xferp), hdr->din_xfer_len,
 				GFP_KERNEL);
+		pr_err("%s4 ret=%d\n", __func__, ret);
 		if (ret)
 			goto out_free_bidi_rq;
 
@@ -88,6 +100,7 @@ static int bsg_transport_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 				hdr->din_xfer_len, GFP_KERNEL);
 	}
 
+	pr_err("%s5 ret=%d\n", __func__, ret);
 	if (ret)
 		goto out_unmap_bidi_rq;
 
@@ -146,6 +159,7 @@ out_free_job_request:
 	kfree(job->request);
 out_free_rq:
 	blk_mq_free_request(rq);
+	pr_err("%s10 ret=%d\n", __func__, ret);
 	return ret;
 }
 
@@ -350,6 +364,9 @@ static const struct blk_mq_ops bsg_mq_ops = {
 	.timeout		= bsg_timeout,
 };
 
+extern int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
+		bool open_for_write, unsigned int timeout);
+
 /**
  * bsg_setup_queue - Create and add the bsg hooks so we can receive requests
  * @dev: device to attach bsg device to
@@ -398,7 +415,7 @@ struct request_queue *bsg_setup_queue(struct device *dev, const char *name,
 
 	blk_queue_rq_timeout(q, BLK_DEFAULT_SG_TIMEOUT);
 
-	bset->bd = bsg_register_queue(q, dev, name, bsg_transport_sg_io_fn, NULL);
+	bset->bd = bsg_register_queue(q, dev, name, scsi_bsg_sg_io_fn, NULL);
 	if (IS_ERR(bset->bd)) {
 		pr_err("%s4\n", __func__);
 		ret = PTR_ERR(bset->bd);

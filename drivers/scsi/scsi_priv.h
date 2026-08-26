@@ -5,7 +5,7 @@
 #include <linux/device.h>
 #include <scsi/scsi_device.h>
 #include <linux/sbitmap.h>
-
+#include <linux/bsg.h>
 struct bsg_device;
 struct request_queue;
 struct request;
@@ -196,7 +196,8 @@ static inline void scsi_dh_release_device(struct scsi_device *sdev) { }
 #endif
 
 struct bsg_device *scsi_bsg_register_queue(struct scsi_device *sdev);
-
+int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
+		bool open_for_write, unsigned int timeout);
 extern int scsi_device_max_queue_depth(struct scsi_device *sdev);
 
 /* 

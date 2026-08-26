@@ -182,13 +182,20 @@ out_free_req:
 	return ret;
 }
 
-static int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
+int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 		bool open_for_write, unsigned int timeout)
 {
 	struct scsi_cmnd *scmd;
 	struct request *rq;
 	struct bio *bio;
 	int ret;
+	pr_err("%s hdr->protocol=%d hdr->subprotocol=%d\n", __func__, hdr->protocol, hdr->subprotocol);
+	if (hdr->protocol != BSG_PROTOCOL_SCSI) {
+		pr_err("%s1 hdr->protocol=%d BSG_PROTOCOL_SCSI=%d\n", __func__, hdr->protocol, BSG_PROTOCOL_SCSI);
+	}
+	if (hdr->subprotocol != BSG_SUB_PROTOCOL_SCSI_CMD) {
+		pr_err("%s2 hdr->subprotocol=%d BSG_SUB_PROTOCOL_SCSI_CMD=%d\n", __func__, hdr->protocol, BSG_SUB_PROTOCOL_SCSI_CMD);
+	}
 
 	if (hdr->protocol != BSG_PROTOCOL_SCSI  ||
 	    hdr->subprotocol != BSG_SUB_PROTOCOL_SCSI_CMD)
