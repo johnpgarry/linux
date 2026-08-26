@@ -3,6 +3,7 @@
  * Copyright (c) 2017-2018 Christoph Hellwig.
  * Copyright (c) 2026 Oracle and/or its affiliates.
  */
+#include <linux/bsg.h>
 #include <linux/module.h>
 #include <linux/multipath.h>
 #include <linux/wait_bit.h>
@@ -910,6 +911,114 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 	clear_bit(MPATH_DEVICE_SYSFS_ATTR_LINK, &mpath_device->flags);
 }
 EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
+
+static blk_status_t mpath_bsg_queue_rq(struct blk_mq_hw_ctx *hctx,
+				 const struct blk_mq_queue_data *bd)
+{
+	struct request_queue *q = hctx->queue;
+	struct mpath_head *mpath_head = q->queuedata;
+
+	pr_err("%s q=%pS hctx=%pS bd=%pS mpath_head=%pS\n", __func__, q, hctx, bd, mpath_head);
+
+	return BLK_STS_OK;
+
+	#ifdef dsdsdd
+	struct request *req = bd->rq;
+	struct bsg_set *bset =
+		container_of(q->tag_set, struct bsg_set, tag_set);
+	blk_status_t sts = BLK_STS_IOERR;
+	int ret;
+
+	blk_mq_start_request(req);
+
+	if (!get_device(dev))
+		return BLK_STS_IOERR;
+
+	if (!bsg_prepare_job(dev, req))
+		goto out;
+
+	ret = bset->job_fn(blk_mq_rq_to_pdu(req));
+	if (!ret)
+		sts = BLK_STS_OK;
+
+out:
+	put_device(dev);
+	return sts;
+	#endif
+}
+
+static const struct blk_mq_ops mpath_bsg_mq_ops = {
+	.queue_rq		= mpath_bsg_queue_rq,
+//	.init_request		= bsg_init_rq,
+//	.exit_request		= bsg_exit_rq,
+//	.complete		= bsg_complete,
+//	.timeout		= bsg_timeout,
+};
+extern int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
+		bool open_for_write, unsigned int timeout);
+
+int mpath_setup_bsg(struct mpath_head *mpath_head, const char *name)
+{
+	struct device *bsg_dev = &mpath_head->bsg_dev;
+	struct queue_limits lim;
+	struct blk_mq_tag_set *set;
+	int ret = -ENOMEM;
+
+	blk_set_stacking_limits(&lim);
+
+	device_initialize(bsg_dev);
+
+	bsg_dev->parent = get_device(mpath_head->parent);
+
+	dev_set_name(bsg_dev, "%s", name);
+
+	if (device_add(bsg_dev)) {
+		BUG();
+	}
+
+	set = &mpath_head->tag_set;
+	set->ops = &mpath_bsg_mq_ops;
+	set->nr_hw_queues = 1;
+	set->queue_depth = 128;
+	set->numa_node = NUMA_NO_NODE;
+	set->cmd_size = 128;//sizeof(struct bsg_job);
+	set->flags = BLK_MQ_F_BLOCKING;
+	if (blk_mq_alloc_tag_set(set)) {
+		pr_err("%s2\n", __func__);
+		goto out_tag_set;
+	}
+
+	mpath_head->bsg_q = blk_mq_alloc_queue(set, &lim, mpath_head);
+	if (IS_ERR(mpath_head->bsg_q)) {
+		pr_err("%s3\n", __func__);
+		ret = PTR_ERR(mpath_head->bsg_q);
+		goto out_queue;
+	}
+
+	blk_queue_rq_timeout(mpath_head->bsg_q, BLK_DEFAULT_SG_TIMEOUT);
+
+	pr_err("%s3.1 mpath_head->bsg_q=%pS\n", __func__, mpath_head->bsg_q);
+	pr_err("%s3.2 &mpath_head->bsg_dev=%pS\n", __func__, mpath_head->bsg_dev);
+	pr_err("%s3.3 name=%s\n", __func__, name);
+	mpath_head->bsg_device = bsg_register_queue(mpath_head->bsg_q, &mpath_head->bsg_dev, name, scsi_bsg_sg_io_fn, NULL);
+	if (IS_ERR(mpath_head->bsg_device)) {
+		pr_err("%s4\n", __func__);
+		ret = PTR_ERR(mpath_head->bsg_device);
+		goto out_cleanup_queue;
+	}
+
+	pr_err("%s10\n", __func__);
+	return 0;
+out_cleanup_queue:
+	blk_mq_destroy_queue(mpath_head->bsg_q);
+	blk_put_queue(mpath_head->bsg_q);
+out_queue:
+	blk_mq_free_tag_set(set);
+out_tag_set:
+//	kfree(bset);
+
+	return 0;
+}
 
 int mpath_head_init(struct mpath_head *mpath_head)
 {

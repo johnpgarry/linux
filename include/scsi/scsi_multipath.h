@@ -29,9 +29,6 @@ struct scsi_mpath_head {
 	struct bio_set		bio_pool;
 	struct device		dev;
 	int			index;
-	struct device		bsg_dev;
-	struct request_queue *bsg_q;
-	struct blk_mq_tag_set	tag_set;
 };
 
 struct scsi_mpath_device {

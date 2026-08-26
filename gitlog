@@ -1,0 +1,52 @@
+a7aac4c3ac4c scsi: sd: add mpath_queue_depth dev attribute
+5f3a32fdf992 scsi: sd: add mpath_numa_nodes dev attribute
+0f12cc0465c7 scsi: sd: add mpath_dev file
+9c894cfe8333 scsi: sd: add multipath disk attr groups
+16156ec0abbd scsi: sd: support multipath disk
+fa65d1f3426d scsi: sd: add multipath disk class
+77f4c6e27633 scsi-multipath: add delayed disk removal support
+53625d33e5e1 scsi-multipath: block PR commands
+12f407ab44bd scsi-multipath: add scsi_mpath_{start,end}_request()
+97e2e7bf4912 scsi-multipath: add scsi_mpath_get_nr_active()
+38e02de3c55b scsi-multipath: provide callbacks for path state
+436a21a5938a scsi-multipath: failover handling
+ba8b582572b1 scsi-multipath: clear path when device is blocked
+7e8844893fa9 scsi-multipath: clone each bio
+cccbff4f0302 scsi-multipath: support iopolicy
+523467d8f7d8 scsi-multipath: provide sysfs link from to scsi_device
+2613022cc296 scsi-multipath: introduce scsi_device head structure
+657a51e75628 scsi-multipath: introduce basic SCSI device support
+5253d02efa2f CONFIG_SCSI_MULTIPATH=y
+af1160cc61dc nvme-multipath: switch to use libmultipath
+a9340f469681 nvme-multipath: add nvme_mpath_get_nr_active()
+148ae22bafe9 nvme-multipath: add nvme_mpath_head_queue_if_no_path()
+ef33b78aac5d nvme-multipath: add nvme_{add,delete}_ns()
+f62385a7d96f nvme-multipath: add nvme_mpath_synchronize()
+346900a0a86f nvme-multipath: add nvme_mpath_get_iopolicy()
+3a7693c408f2 nvme-multipath: add uring_cmd support
+0c5ee8207426 nvme-multipath: add nvme_mpath_cdev_ioctl()
+8519482a7e4b nvme-multipath: add nvme_mpath_is_{disabled, optimised}
+e5acc1dbcd53 nvme-multipath: add nvme_mpath_{add, remove}_cdev()
+aa9471f618da nvme-multipath: add nvme_mpath_available_path()
+c57cc982506c nvme-multipath: add initial support for using libmultipath
+2a7cb1171fd0 libmultipath: Add mpath_bdev_get_unique_id()
+f61197eb486e libmultipath: Add mpath_bdev_getgeo()
+64abd15c0fab libmultipath: Add support for block device IOCTL
+6cb1f09346cd libmultipath: Add mpath_bdev_report_zones()
+285a964e3cbb libmultipath: Add PR support
+a2f75336eb53 libmultipath: Add sysfs helpers
+10ec918109e5 libmultipath: Add cdev support
+0a9f4adc1b2d libmultipath: Add delayed removal support
+27597f333552 libmultipath: Add support for mpath_device management
+7b6c25179e33 libmultipath: Add bio handling
+761584b5f67f libmultipath: Add path selection support
+c7c7df55ddce libmultipath: Add basic gendisk support
+a31d26e7d0cb libmultipath: Add initial framework
+b80d13d6710f iscsi tmo
+fc11cd3e3304 CONFIG_DEBUG_KMEMLEAK
+90e9d1c7db7e CONFIG_LIBMULTIPATH=y
+c34e457a4b49 sync defconfig from 6.19 dev branch
+dc59e4fea9d8 Linux 7.2-rc1
+0716f9b9338a Merge tag 'ntb-7.2' of https://github.com/jonmason/ntb
+8b69c0475871 Merge tag 'input-for-v7.2-rc0-2' of git://git.kernel.org/pub/scm/linux/kernel/git/dtor/input
+780d569e6c4b Merge tag 'pwm/for-7.2-rc1-2' of git://git.kernel.org/pub/scm/linux/kernel/git/ukleinek/linux
