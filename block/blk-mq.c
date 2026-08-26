@@ -3345,6 +3345,9 @@ int blk_rq_prep_clone(struct request *rq, struct request *rq_src,
 	if (!bs)
 		bs = &fs_bio_set;
 
+	pr_err("%s rq=%pS q=%pS disk=%pS part0=%pS\n",
+		__func__, rq, rq->q, rq->q->disk, rq->q->disk->part0);
+
 	__rq_for_each_bio(bio_src, rq_src) {
 		struct bio *bio	 = bio_alloc_clone(rq->q->disk->part0, bio_src,
 					gfp_mask, bs);

@@ -189,7 +189,11 @@ int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 	struct request *rq;
 	struct bio *bio;
 	int ret;
-	pr_err("%s hdr->protocol=%d hdr->subprotocol=%d\n", __func__, hdr->protocol, hdr->subprotocol);
+
+	
+
+	pr_err("%s hdr->protocol=%d ->subprotocol=%d ->request_len=%d hdr=%pS\n",
+		__func__, hdr->protocol, hdr->subprotocol, hdr->request_len, hdr);
 	if (hdr->protocol != BSG_PROTOCOL_SCSI) {
 		pr_err("%s1 hdr->protocol=%d BSG_PROTOCOL_SCSI=%d\n", __func__, hdr->protocol, BSG_PROTOCOL_SCSI);
 	}
@@ -221,6 +225,13 @@ int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 	ret = -EFAULT;
 	if (copy_from_user(scmd->cmnd, uptr64(hdr->request), scmd->cmd_len))
 		goto out_put_request;
+	pr_err("%s2 rq=%pS scmd->cmnd 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
+		__func__, rq, scmd->cmnd[0], scmd->cmnd[1], scmd->cmnd[2], scmd->cmnd[3],
+				      scmd->cmnd[4], scmd->cmnd[5], scmd->cmnd[6], scmd->cmnd[7]);
+	pr_err("%s2.2 rq=%pS hdr->request_len=0x%x hdr->request=0x%llx (masked=0x%llx)\n",
+		__func__, rq, hdr->request_len,
+				      hdr->request,
+				      hdr->request & 0xffffff);
 	ret = -EPERM;
 	if (!scsi_cmd_allowed(scmd->cmnd, open_for_write))
 		goto out_put_request;
@@ -238,8 +249,11 @@ int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 		goto out_put_request;
 
 	bio = rq->bio;
+	pr_err("%s3 rq=%pS __data_len=%d calling blk_execute_rq\n", __func__, rq, rq->__data_len);
 	blk_execute_rq(rq, !(hdr->flags & BSG_FLAG_Q_AT_TAIL));
 
+	pr_err("%s3.1 rq=%pS called blk_execute_rq\n",
+		__func__, rq);
 	/*
 	 * fill in all the output members
 	 */
@@ -249,25 +263,53 @@ int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 	if (scsi_status_is_check_condition(scmd->result))
 		hdr->driver_status = DRIVER_SENSE;
 	hdr->info = 0;
-	if (hdr->device_status || hdr->transport_status || hdr->driver_status)
+	if (hdr->device_status || hdr->transport_status || hdr->driver_status) {
+		pr_err("%s3.6 SG_INFO_CHECK\n", __func__);
 		hdr->info |= SG_INFO_CHECK;
+	}
 	hdr->response_len = 0;
 
 	if (scmd->sense_len && hdr->response) {
 		int len = min_t(unsigned int, hdr->max_response_len,
 				scmd->sense_len);
 
+		pr_err("%s4 calling copy_to_user len=%d\n", __func__, len);
 		if (copy_to_user(uptr64(hdr->response), scmd->sense_buffer,
 				 len))
 			ret = -EFAULT;
-		else
+		else {
 			hdr->response_len = len;
+			print_hex_dump(KERN_WARNING, "sg_io_v4 resp ", DUMP_PREFIX_OFFSET, 16, 1,
+	  				scmd->sense_buffer, len, true);
+		}
+		pr_err("%s4.1 hdr->response_len=%d\n", __func__, hdr->response_len);
 	}
 
 	if (rq_data_dir(rq) == READ)
 		hdr->din_resid = scmd->resid_len;
 	else
 		hdr->dout_resid = scmd->resid_len;
+
+	pr_err("%s8 rq=%pS din_resid=%d dout_resid=%d\n",
+		__func__, rq, hdr->din_resid, hdr->dout_resid);
+
+	pr_err("%s9 rq=%pS device_status=0x%x transport_status=0x%x driver_status=0x%x\n",
+		__func__, rq, hdr->device_status, hdr->transport_status, hdr->driver_status);
+
+
+	pr_err("%s9.1 rq=%pS bio=%pS ->bi_bi_vcnt=%d ->bi_io_vec=%pS\n",
+		__func__, rq, bio, bio->bi_vcnt, bio->bi_io_vec);
+
+	if (bio->bi_vcnt) {
+		struct bio_vec *bi_io_vec = bio->bi_io_vec;
+		pr_err("%s9.2 bi_io_vec=%pS\n", __func__, bi_io_vec);
+		if (bi_io_vec) {
+			pr_err("%s9.3 bv_page=%pS bv_len=%d bv_offset=%d\n",
+				__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
+			print_hex_dump(KERN_WARNING, "bio scsi_bsg_sg_io_fn ", DUMP_PREFIX_OFFSET, 16, 1,
+  				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
+		}
+	}
 
 	blk_rq_unmap_user(bio);
 

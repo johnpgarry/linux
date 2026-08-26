@@ -135,6 +135,8 @@ ssize_t mpath_delayed_removal_secs_show(struct mpath_head *mpath_head,
 ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
 			const char *buf, size_t count);
 
+bool mpath_is_bsg_request(struct request *rq);
+
 static inline bool is_mpath_disk(struct gendisk *disk)
 {
 	#if IS_ENABLED(CONFIG_LIBMULTIPATH)

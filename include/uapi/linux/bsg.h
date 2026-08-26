@@ -23,13 +23,13 @@
 #define BSG_FLAG_Q_AT_HEAD 0x20
 
 struct sg_io_v4 {
-	__s32 guard;		/* [i] 'Q' to differentiate from v3 */
-	__u32 protocol;		/* [i] 0 -> SCSI , .... */
-	__u32 subprotocol;	/* [i] 0 -> SCSI command, 1 -> SCSI task
+	__s32 guard;		/* [i] 'Q' to differentiate from v3 */		//0
+	__u32 protocol;		/* [i] 0 -> SCSI , .... */					//4
+	__u32 subprotocol;	/* [i] 0 -> SCSI command, 1 -> SCSI task	//8
 				   management function, .... */
 
-	__u32 request_len;	/* [i] in bytes */
-	__u64 request;		/* [i], [*i] {SCSI: cdb} */
+	__u32 request_len;	/* [i] in bytes */							//12
+	__u64 request;		/* [i], [*i] {SCSI: cdb} */					//16
 	__u64 request_tag;	/* [i] {SCSI: task tag (only if flagged)} */
 	__u32 request_attr;	/* [i] {SCSI: task attribute} */
 	__u32 request_priority;	/* [i] {SCSI: task priority} */

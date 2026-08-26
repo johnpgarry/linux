@@ -1572,6 +1572,24 @@ static void scsi_complete(struct request *rq)
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
 	enum scsi_disposition disposition;
+	struct scsi_device *sdev = cmd->device;
+
+	if (mpath_is_bsg_request(rq)) {
+		struct bio *bio = rq->bio;
+		dev_err(&sdev->sdev_gendev, "%s rq=%pS ->end_io=%pS bio=%pS len=%d\n",
+			__func__, rq, rq->end_io, rq->bio, blk_rq_bytes(rq));
+
+		if (bio && bio->bi_vcnt) {
+			struct bio_vec *bi_io_vec = bio->bi_io_vec;
+			pr_err("%s1 bi_io_vec=%pS\n", __func__, bi_io_vec);
+			if (bi_io_vec) {
+				pr_err("%s2 bv_page=%pS bv_len=%d bv_offset=%d\n",
+					__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
+				print_hex_dump(KERN_WARNING, "bio scsi_complete ", DUMP_PREFIX_OFFSET, 16, 1,
+	  				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
+			}
+		}
+	}
 
 	if (blk_mq_is_reserved_rq(rq)) {
 		/* Only pass-through requests are supported in this code path. */
@@ -1866,6 +1884,9 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
 	enum scsi_qc_status reason;
+
+//	if (blk_rq_is_passthrough(req))
+//		dev_err(&sdev->sdev_gendev, "%s req=%pS q=%pS\n", __func__, req, q);
 
 	WARN_ON_ONCE(cmd->budget_token < 0);
 

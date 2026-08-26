@@ -912,15 +912,123 @@ void mpath_remove_sysfs_link(struct mpath_device *mpath_device)
 }
 EXPORT_SYMBOL_GPL(mpath_remove_sysfs_link);
 
+static enum rq_end_io_ret mpath_bsg_end_clone(struct request *clone,
+					    blk_status_t error,
+					    const struct io_comp_batch *iob)
+{
+	struct request *orig = clone->end_io_data;
+	//if (error)
+	//WARN_ON_ONCE(1);
+	pr_err("%s clone=%pS bio=%pS len=%d tag=%d error=%d iob=%pS end_io_data=%pS orig=%pS tag=%d\n",
+			__func__, clone, clone->bio, blk_rq_bytes(clone), clone->tag, error, iob, clone->end_io_data, orig, orig->tag);
+	blk_mq_end_request(orig, error);
+	pr_err("%s1 clone=%pS bio=%pS\n",
+			__func__, clone, clone->bio);
+	return RQ_END_IO_FREE;
+}
+
 static blk_status_t mpath_bsg_queue_rq(struct blk_mq_hw_ctx *hctx,
 				 const struct blk_mq_queue_data *bd)
 {
 	struct request_queue *q = hctx->queue;
 	struct mpath_head *mpath_head = q->queuedata;
+	struct mpath_device *mpath_device;
+	struct device *dev = mpath_head->parent;
+	struct request *rq = bd->rq;
+	blk_status_t blk_sts;
+	int srcu_idx;
 
-	pr_err("%s q=%pS hctx=%pS bd=%pS mpath_head=%pS\n", __func__, q, hctx, bd, mpath_head);
+	pr_err("%s q=%pS hctx=%pS bd=%pS mpath_head=%pS rq=%pS\n",
+		__func__, q, hctx, bd, mpath_head, rq);
+	pr_err("%s0 rq=%pS end_io=%pS\n",
+		__func__, rq, rq->end_io);
 
-	return BLK_STS_OK;
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+
+	pr_err("%s1 q=%pS hctx=%pS bd=%pS mpath_head=%pS mpath_device=%pS\n",
+		__func__, q, hctx, bd, mpath_head, mpath_device);
+
+
+
+	if (likely(mpath_device)) {
+		struct request *clone;
+		struct block_device *bdev = mpath_device->disk->part0;
+		struct request_queue *q = bdev_get_queue(bdev);
+		int ret;
+
+	//	pr_err("%s2 mpath_head=%pS rq=%pS end_io=%pS\n",
+	//		__func__, mpath_head, rq, rq->end_io);
+
+
+		clone = blk_mq_alloc_request(q, rq->cmd_flags | REQ_NOMERGE,
+			BLK_MQ_REQ_NOWAIT);
+		
+		if (IS_ERR(clone)) {
+			pr_err("%s3 clone=%pS mpath_device=%pS bdev=%pS q=%pS rq=%pS\n",
+				__func__, clone, mpath_device, bdev, q, rq);
+			if (clone == ERR_PTR(-EAGAIN))
+				blk_sts = BLK_STS_RESOURCE;
+			else
+				blk_sts = BLK_STS_IOERR;
+			goto out_unlock;
+		}
+
+		ret = blk_rq_prep_clone(clone, rq, NULL, GFP_KERNEL,
+				      NULL, NULL);
+	
+		if (ret) {
+			pr_err("%s4 clone=%pS ret=%d bdev=%pS q=%pS rq=%pS\n",
+				__func__, clone, ret, bdev, q, rq);
+			blk_sts = BLK_STS_IOERR;
+			goto out_unlock;
+		}
+
+		clone->end_io = mpath_bsg_end_clone;
+		clone->end_io_data = rq;
+
+		pr_err("%s5 clone=%pS len=%d tag=%d bio=%pS rq=%pS tag=%d bdev q=%pS bio=%pS\n",
+			__func__, clone, blk_rq_bytes(clone), clone->tag, clone->bio, rq, rq->tag, q, rq->bio);
+		ret = blk_insert_cloned_request(clone);
+		pr_err("%s5.1 clone=%pS tag=%d rq=%pS tag=%d bdev q=%pS\n",
+			__func__, clone, clone->tag, rq, rq->tag, q);
+		switch (ret) {
+		case BLK_STS_OK:
+			break;
+		case BLK_STS_RESOURCE:
+		case BLK_STS_DEV_RESOURCE:
+			pr_err_once("%s6.1 calling blk_rq_unprep_clone clone=%pS\n", __func__, clone);
+			blk_rq_unprep_clone(clone);
+			pr_err_once("%s6.2 calling blk_mq_cleanup_rq clone=%pS\n", __func__, clone);
+			blk_mq_cleanup_rq(clone);
+			pr_err_once("%s6.3 calling blk_mq_free_request clone=%pS\n", __func__, clone);
+			blk_mq_free_request(clone);
+			pr_err_once("%s6.4 called blk_mq_free_request clone=%pS\n", __func__, clone);
+			blk_sts = BLK_STS_RESOURCE;
+			goto out_unlock;
+		default:
+			pr_err("%s7 clone=%pS ret=%d bdev=%pS q=%pS from blk_insert_cloned_request rq=%pS\n",
+				__func__, clone, ret, bdev, q, rq);
+			/* must complete clone in terms of original request */
+			BUG();
+		}
+
+	} else if (mpath_available_path(mpath_head)) {
+		dev_warn_ratelimited(dev, "no usable path - requeuing I/O\n");
+
+		blk_sts = BLK_STS_TRANSPORT;
+	} else {
+		dev_warn_ratelimited(dev, "no available path - failing I/O\n");
+
+		blk_sts = BLK_STS_IOERR;
+	}
+
+out_unlock:
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	pr_err("%s10 q=%pS hctx=%pS bd=%pS mpath_head=%pS mpath_device=%pS blk_sts=%d\n",
+		__func__, q, hctx, bd, mpath_head, mpath_device, blk_sts);
+	return blk_sts;
 
 	#ifdef dsdsdd
 	struct request *req = bd->rq;
@@ -947,11 +1055,22 @@ out:
 	#endif
 }
 
+bool mpath_is_bsg_request(struct request *rq)
+{
+	return rq->end_io == mpath_bsg_end_clone;
+}
+EXPORT_SYMBOL_GPL(mpath_is_bsg_request);
+
+static void mpath_bsg_complete(struct request *rq)
+{
+	pr_err("%s rq=%pS\n", __func__, rq);
+}
+
 static const struct blk_mq_ops mpath_bsg_mq_ops = {
 	.queue_rq		= mpath_bsg_queue_rq,
 //	.init_request		= bsg_init_rq,
 //	.exit_request		= bsg_exit_rq,
-//	.complete		= bsg_complete,
+	.complete		= mpath_bsg_complete,
 //	.timeout		= bsg_timeout,
 };
 extern int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
@@ -981,7 +1100,7 @@ int mpath_setup_bsg(struct mpath_head *mpath_head, const char *name)
 	set->nr_hw_queues = 1;
 	set->queue_depth = 128;
 	set->numa_node = NUMA_NO_NODE;
-	set->cmd_size = 128;//sizeof(struct bsg_job);
+	set->cmd_size = 1280;//sizeof(struct bsg_job);
 	set->flags = BLK_MQ_F_BLOCKING;
 	if (blk_mq_alloc_tag_set(set)) {
 		pr_err("%s2\n", __func__);
@@ -998,7 +1117,7 @@ int mpath_setup_bsg(struct mpath_head *mpath_head, const char *name)
 	blk_queue_rq_timeout(mpath_head->bsg_q, BLK_DEFAULT_SG_TIMEOUT);
 
 	pr_err("%s3.1 mpath_head->bsg_q=%pS\n", __func__, mpath_head->bsg_q);
-	pr_err("%s3.2 &mpath_head->bsg_dev=%pS\n", __func__, mpath_head->bsg_dev);
+	pr_err("%s3.2 &mpath_head->bsg_dev=%pS\n", __func__, &mpath_head->bsg_dev);
 	pr_err("%s3.3 name=%s\n", __func__, name);
 	mpath_head->bsg_device = bsg_register_queue(mpath_head->bsg_q, &mpath_head->bsg_dev, name, scsi_bsg_sg_io_fn, NULL);
 	if (IS_ERR(mpath_head->bsg_device)) {

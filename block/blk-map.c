@@ -517,6 +517,9 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 	else if (queue_virt_boundary(q))
 		copy = queue_virt_boundary(q) & iov_iter_gap_alignment(iter);
 
+	pr_err("%s rq=%pS copy=%d map_bvec=%d\n",
+		__func__, rq, copy, map_bvec);
+
 	if (map_bvec) {
 		ret = blk_rq_map_user_bvec(rq, iter);
 		if (!ret)
@@ -527,6 +530,8 @@ int blk_rq_map_user_iov(struct request_queue *q, struct request *rq,
 		copy = true;
 	}
 
+	pr_err("%s2 rq=%pS copy=%d map_bvec=%d\n",
+		__func__, rq, copy, map_bvec);
 	i = *iter;
 	do {
 		if (copy)

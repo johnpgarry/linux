@@ -64,12 +64,18 @@ static int bsg_sg_io(struct bsg_device *bd, bool open_for_write,
 
 	if (copy_from_user(&hdr, uarg, sizeof(hdr)))
 		return -EFAULT;
+	print_hex_dump(KERN_WARNING, "bsg_sg_io0 ", DUMP_PREFIX_OFFSET, 16, 1,
+  				&hdr, (sizeof(struct sg_io_v4) / 64) * 64, true);
 	if (hdr.guard != 'Q')
 		return -EINVAL;
 	ret = bd->sg_io_fn(bd->queue, &hdr, open_for_write,
 			   bsg_timeout(bd, &hdr));
-	if (!ret && copy_to_user(uarg, &hdr, sizeof(hdr)))
-		return -EFAULT;
+	if (!ret) {
+		print_hex_dump(KERN_WARNING, "bsg_sg_io1 ", DUMP_PREFIX_OFFSET, 16, 1,
+  					&hdr, (sizeof(struct sg_io_v4) / 64) * 64, true);
+		if (copy_to_user(uarg, &hdr, sizeof(hdr)))
+			return -EFAULT;
+	}
 	return ret;
 }
 
