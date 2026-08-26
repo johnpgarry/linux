@@ -250,6 +250,20 @@ int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 
 	bio = rq->bio;
 	pr_err("%s3 rq=%pS __data_len=%d calling blk_execute_rq\n", __func__, rq, rq->__data_len);
+
+
+	if (bio->bi_vcnt) {
+		struct bio_vec *bi_io_vec = bio->bi_io_vec;
+		pr_err("%s3.2 bi_io_vec=%pS\n", __func__, bi_io_vec);
+		if (bi_io_vec) {
+			pr_err("%s3.3 bv_page=%pS bv_len=%d bv_offset=%d\n",
+				__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
+			print_hex_dump(KERN_WARNING, "bio scsi_bsg_sg_io_fn before ", DUMP_PREFIX_OFFSET, 16, 1,
+  				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
+		}
+	}
+
+
 	blk_execute_rq(rq, !(hdr->flags & BSG_FLAG_Q_AT_TAIL));
 
 	pr_err("%s3.1 rq=%pS called blk_execute_rq\n",
@@ -306,7 +320,7 @@ int scsi_bsg_sg_io_fn(struct request_queue *q, struct sg_io_v4 *hdr,
 		if (bi_io_vec) {
 			pr_err("%s9.3 bv_page=%pS bv_len=%d bv_offset=%d\n",
 				__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
-			print_hex_dump(KERN_WARNING, "bio scsi_bsg_sg_io_fn ", DUMP_PREFIX_OFFSET, 16, 1,
+			print_hex_dump(KERN_WARNING, "bio scsi_bsg_sg_io_fn after ", DUMP_PREFIX_OFFSET, 16, 1,
   				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
 		}
 	}

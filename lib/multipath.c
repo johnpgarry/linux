@@ -955,6 +955,7 @@ static blk_status_t mpath_bsg_queue_rq(struct blk_mq_hw_ctx *hctx,
 		struct request *clone;
 		struct block_device *bdev = mpath_device->disk->part0;
 		struct request_queue *q = bdev_get_queue(bdev);
+		struct bio *clone_bio;
 		int ret;
 
 	//	pr_err("%s2 mpath_head=%pS rq=%pS end_io=%pS\n",
@@ -984,13 +985,32 @@ static blk_status_t mpath_bsg_queue_rq(struct blk_mq_hw_ctx *hctx,
 			goto out_unlock;
 		}
 
+		clone_bio = clone->bio;
+
+		if (clone_bio) {
+			pr_err("%s5.0 clone=%pS bio=%pS bi_vcnt=%d\n", __func__, clone, clone_bio, clone_bio->bi_vcnt);
+
+
+			if (clone_bio->bi_vcnt) {
+				struct bio_vec *bi_io_vec = clone_bio->bi_io_vec;
+				pr_err("%s5.1 bi_io_vec=%pS\n", __func__, bi_io_vec);
+				if (bi_io_vec) {
+					pr_err("%s5.2 bv_page=%pS bv_len=%d bv_offset=%d\n",
+						__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
+					print_hex_dump(KERN_WARNING, "bio mpath_bsg_queue_rq ", DUMP_PREFIX_OFFSET, 16, 1,
+		  				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
+				}
+			}
+
+		}
+
 		clone->end_io = mpath_bsg_end_clone;
 		clone->end_io_data = rq;
 
-		pr_err("%s5 clone=%pS len=%d tag=%d bio=%pS rq=%pS tag=%d bdev q=%pS bio=%pS\n",
+		pr_err("%s5.3 clone=%pS len=%d tag=%d bio=%pS rq=%pS tag=%d bdev q=%pS bio=%pS\n",
 			__func__, clone, blk_rq_bytes(clone), clone->tag, clone->bio, rq, rq->tag, q, rq->bio);
 		ret = blk_insert_cloned_request(clone);
-		pr_err("%s5.1 clone=%pS tag=%d rq=%pS tag=%d bdev q=%pS\n",
+		pr_err("%s5.4 clone=%pS tag=%d rq=%pS tag=%d bdev q=%pS\n",
 			__func__, clone, clone->tag, rq, rq->tag, q);
 		switch (ret) {
 		case BLK_STS_OK:

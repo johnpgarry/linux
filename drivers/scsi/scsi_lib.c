@@ -669,6 +669,30 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
 	struct scsi_device *sdev = cmd->device;
 	struct request_queue *q = sdev->request_queue;
 
+	if (mpath_is_bsg_request(req)) {
+		struct bio *bio = req->bio;
+		pr_err("%s req=%pS is_mpath_request=%d bio=%pS len=%d\n",
+			__func__, req, is_mpath_request(req), req->bio, blk_rq_bytes(req));
+
+
+		if (bio) {
+
+			pr_err("%s0 bio->bi_vcnt=%d\n",
+				__func__, bio->bi_vcnt);
+
+			if (bio) {
+				struct bio_vec *bi_io_vec = bio->bi_io_vec;
+				pr_err("%s1 bi_io_vec=%pS\n", __func__, bi_io_vec);
+				if (bi_io_vec) {
+					pr_err("%s2 bv_page=%pS bv_len=%d bv_offset=%d\n",
+						__func__, bi_io_vec->bv_page, bi_io_vec->bv_len, bi_io_vec->bv_offset);
+					print_hex_dump(KERN_WARNING, "bio scsi_end_request ", DUMP_PREFIX_OFFSET, 16, 1,
+		  				page_to_virt(bi_io_vec->bv_page), bi_io_vec->bv_len, true);
+				}
+			}
+		}
+	}
+
 	if (sdev->scsi_mpath_dev && is_mpath_request(req)) {
 		if (scsi_mpath_end_request(req, error, bytes))
 			return true;
@@ -1165,6 +1189,10 @@ blk_status_t scsi_alloc_sgtables(struct scsi_cmnd *cmd)
 	bool need_drain = scsi_cmd_needs_dma_drain(sdev, rq);
 	int count;
 
+	if (mpath_is_bsg_request(rq)) {
+		pr_err("%s rq=%pS cmd=%pS nr_segs=%d\n", __func__, rq, cmd, nr_segs);
+	}
+
 	if (WARN_ON_ONCE(!nr_segs))
 		return BLK_STS_IOERR;
 
@@ -1188,6 +1216,9 @@ blk_status_t scsi_alloc_sgtables(struct scsi_cmnd *cmd)
 	 */
 	count = __blk_rq_map_sg(rq, cmd->sdb.table.sgl, &last_sg);
 
+	if (mpath_is_bsg_request(rq)) {
+		pr_err("%s2 rq=%pS cmd=%pS nr_segs=%d count=%d\n", __func__, rq, cmd, nr_segs, count);
+	}
 	if (blk_rq_bytes(rq) & rq->q->limits.dma_pad_mask) {
 		unsigned int pad_len =
 			(rq->q->limits.dma_pad_mask & ~blk_rq_bytes(rq)) + 1;
@@ -1579,6 +1610,9 @@ static void scsi_complete(struct request *rq)
 		dev_err(&sdev->sdev_gendev, "%s rq=%pS ->end_io=%pS bio=%pS len=%d\n",
 			__func__, rq, rq->end_io, rq->bio, blk_rq_bytes(rq));
 
+		dev_err(&sdev->sdev_gendev, "%s0 bio->bi_vcnt=%d\n",
+			__func__, bio->bi_vcnt);
+
 		if (bio && bio->bi_vcnt) {
 			struct bio_vec *bi_io_vec = bio->bi_io_vec;
 			pr_err("%s1 bi_io_vec=%pS\n", __func__, bi_io_vec);
@@ -1885,8 +1919,19 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	blk_status_t ret;
 	enum scsi_qc_status reason;
 
-//	if (blk_rq_is_passthrough(req))
-//		dev_err(&sdev->sdev_gendev, "%s req=%pS q=%pS\n", __func__, req, q);
+	if (mpath_is_bsg_request(req)) {
+
+		struct bio *bio = req->bio;
+
+		pr_err("%s req=%pS bio=%pS len=%d\n",
+			__func__, req, bio, blk_rq_bytes(req));
+
+		if (bio) {
+
+			pr_err("%s0 req=%pS bio->bi_vcnt=%d\n",
+				__func__, req, bio->bi_vcnt);
+		}
+	}
 
 	WARN_ON_ONCE(cmd->budget_token < 0);
 
