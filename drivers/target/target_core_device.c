@@ -166,7 +166,7 @@ out_unlock:
 	rcu_read_unlock();
 
 	if (!se_lun) {
-		pr_debug("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
+		pr_err("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
 			" Access for 0x%08llx for %s\n",
 			se_cmd->se_tfo->fabric_name,
 			se_cmd->orig_fe_lun,
@@ -536,7 +536,7 @@ int core_dev_add_lun(
 	if (rc < 0)
 		return rc;
 
-	pr_debug("%s_TPG[%u]_LUN[%llu] - Activated %s Logical Unit from"
+	pr_err("%s_TPG[%u]_LUN[%llu] - Activated %s Logical Unit from"
 		" CORE HBA: %u\n", tpg->se_tpg_tfo->fabric_name,
 		tpg->se_tpg_tfo->tpg_get_tag(tpg), lun->unpacked_lun,
 		tpg->se_tpg_tfo->fabric_name, dev->se_hba->hba_id);
@@ -569,7 +569,7 @@ void core_dev_del_lun(
 	struct se_portal_group *tpg,
 	struct se_lun *lun)
 {
-	pr_debug("%s_TPG[%u]_LUN[%llu] - Deactivating %s Logical Unit from"
+	pr_err("%s_TPG[%u]_LUN[%llu] - Deactivating %s Logical Unit from"
 		" device object\n", tpg->se_tpg_tfo->fabric_name,
 		tpg->se_tpg_tfo->tpg_get_tag(tpg), lun->unpacked_lun,
 		tpg->se_tpg_tfo->fabric_name);
@@ -629,7 +629,7 @@ int core_dev_add_initiator_node_lun_acl(
 			lun_access_ro, nacl, tpg) < 0)
 		return -EINVAL;
 
-	pr_debug("%s_TPG[%hu]_LUN[%llu->%llu] - Added %s ACL for "
+	pr_err("%s_TPG[%hu]_LUN[%llu->%llu] - Added %s ACL for "
 		" InitiatorNode: %s\n", tpg->se_tpg_tfo->fabric_name,
 		tpg->se_tpg_tfo->tpg_get_tag(tpg), lun->unpacked_lun, lacl->mapped_lun,
 		lun_access_ro ? "RO" : "RW",
@@ -661,7 +661,7 @@ int core_dev_del_initiator_node_lun_acl(
 		core_disable_device_list_for_node(lun, deve, nacl, tpg);
 	mutex_unlock(&nacl->lun_entry_mutex);
 
-	pr_debug("%s_TPG[%hu]_LUN[%llu] - Removed ACL for"
+	pr_err("%s_TPG[%hu]_LUN[%llu] - Removed ACL for"
 		" InitiatorNode: %s Mapped LUN: %llu\n",
 		tpg->se_tpg_tfo->fabric_name,
 		tpg->se_tpg_tfo->tpg_get_tag(tpg), lun->unpacked_lun,
@@ -674,7 +674,7 @@ void core_dev_free_initiator_node_lun_acl(
 	struct se_portal_group *tpg,
 	struct se_lun_acl *lacl)
 {
-	pr_debug("%s_TPG[%hu] - Freeing ACL for %s InitiatorNode: %s"
+	pr_err("%s_TPG[%hu] - Freeing ACL for %s InitiatorNode: %s"
 		" Mapped LUN: %llu\n", tpg->se_tpg_tfo->fabric_name,
 		tpg->se_tpg_tfo->tpg_get_tag(tpg),
 		tpg->se_tpg_tfo->fabric_name,
@@ -691,13 +691,13 @@ static void scsi_dump_inquiry(struct se_device *dev)
 	/*
 	 * Print Linux/SCSI style INQUIRY formatting to the kernel ring buffer
 	 */
-	pr_debug("  Vendor: %-" __stringify(INQUIRY_VENDOR_LEN) "s\n",
+	pr_err("  Vendor: %-" __stringify(INQUIRY_VENDOR_LEN) "s\n",
 		wwn->vendor);
-	pr_debug("  Model: %-" __stringify(INQUIRY_MODEL_LEN) "s\n",
+	pr_err("  Model: %-" __stringify(INQUIRY_MODEL_LEN) "s\n",
 		wwn->model);
-	pr_debug("  Revision: %-" __stringify(INQUIRY_REVISION_LEN) "s\n",
+	pr_err("  Revision: %-" __stringify(INQUIRY_REVISION_LEN) "s\n",
 		wwn->revision);
-	pr_debug("  Type:   %s ", scsi_device_type(device_type));
+	pr_err("  Type:   %s ", scsi_device_type(device_type));
 }
 
 static void target_non_ordered_release(struct percpu_ref *ref)
@@ -991,7 +991,7 @@ int target_configure_device(struct se_device *dev)
 
 	if (dev->transport->configure_unmap &&
 	    dev->transport->configure_unmap(dev)) {
-		pr_debug("Discard support available, but disabled by default.\n");
+		pr_err("Discard support available, but disabled by default.\n");
 	}
 
 	/*

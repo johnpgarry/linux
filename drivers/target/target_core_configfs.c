@@ -1192,7 +1192,7 @@ static ssize_t alua_support_store(struct config_item *item,
 	bool flag, oldflag;
 	int ret;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s %s\n", __func__, page);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -1233,7 +1233,7 @@ static ssize_t pgr_support_store(struct config_item *item,
 	bool flag, oldflag;
 	int ret;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s %s\n", __func__, page);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -1281,7 +1281,7 @@ static ssize_t submit_type_store(struct config_item *item, const char *page,
 	int ret;
 	u8 val;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s %s\n", __func__, page);
 	ret = kstrtou8(page, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -1300,7 +1300,7 @@ static ssize_t complete_type_store(struct config_item *item, const char *page,
 	int ret;
 	u8 val;
 
-	pr_err("%s\n", __func__);
+	pr_err("%s %s\n", __func__, page);
 	ret = kstrtou8(page, 0, &val);
 	if (ret < 0)
 		return ret;
