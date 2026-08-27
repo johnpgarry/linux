@@ -489,6 +489,39 @@ struct scsi_mpath_head *scsi_mpath_find_head_by_id(int id)
 }
 EXPORT_SYMBOL_GPL(scsi_mpath_find_head_by_id);
 
+struct scsi_mpath_wrapper_data {
+	void *data;
+	int (*cb)(struct scsi_device *sdev, void *data);
+};
+
+static int scsi_mpath_call_for_sdev_wrapper(struct mpath_device *mpath_device, void *data)
+{
+	struct scsi_mpath_wrapper_data *scsi_mpath_wrapper_data = data;
+	struct scsi_mpath_device *scsi_mpath_dev = to_scsi_mpath_device(mpath_device);
+	struct scsi_device *sdev = scsi_mpath_dev->sdev;
+
+	pr_err("%s scsi_mpath_wrapper_data=%pS\n", __func__, scsi_mpath_wrapper_data);
+	pr_err("%s1 data=%pS\n", __func__, scsi_mpath_wrapper_data->data);
+	pr_err("%s2 cb=%pS\n", __func__, scsi_mpath_wrapper_data->cb);
+	return (*scsi_mpath_wrapper_data->cb)(sdev, scsi_mpath_wrapper_data->data);
+}
+
+int scsi_mpath_call_for_sdev(struct scsi_mpath_head *scsi_mpath_head,
+		int (*cb)(struct scsi_device *sdev, void *data),
+		void *data)
+{
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	struct scsi_mpath_wrapper_data scsi_mpath_wrapper_data = {
+		.data = data,
+		.cb = cb,
+	};
+
+	pr_err("%s calling mpath_call_for_device &scsi_mpath_wrapper_data=%pS cb=%pS data=%pS\n",
+		__func__,
+		&scsi_mpath_wrapper_data, cb, data);
+	return mpath_call_for_device(mpath_head, scsi_mpath_call_for_sdev_wrapper, &scsi_mpath_wrapper_data);
+}
+
 static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 {
 	kfree(sdev->scsi_mpath_dev);

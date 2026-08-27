@@ -239,6 +239,57 @@ out_free:
 	return -EPERM;
 }
 
+static int pscsi_mpath_get_inquiry_vpd_serial_sdev(struct scsi_device *sdev, void *data)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
+	struct t10_wwn *wwn = data;
+	int ret;
+
+	dev_err(&sdev->sdev_gendev, "%s data=%pS\n", __func__, data);
+
+	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = INQUIRY;
+	cdb[1] = 0x01; /* Query VPD */
+	cdb[2] = 0x80; /* Unit Serial Number */
+	put_unaligned_be16(INQUIRY_VPD_SERIAL_LEN, &cdb[3]);
+
+	ret = scsi_execute_cmd(sdev, cdb, REQ_OP_DRV_IN, buf,
+			       INQUIRY_VPD_SERIAL_LEN, HZ, 1, NULL);
+	if (ret)
+		goto out_free;
+
+	snprintf(&wwn->unit_serial[0], INQUIRY_VPD_SERIAL_LEN, "%s", &buf[4]);
+
+	wwn->t10_dev->dev_flags |= DF_FIRMWARE_VPD_UNIT_SERIAL;
+
+	kfree(buf);
+
+	return 0;
+
+out_free:
+	kfree(buf);
+	return ret;
+}
+
+static int
+pscsi_mpath_get_inquiry_vpd_serial(struct scsi_mpath_head *scsi_mpath_head, struct t10_wwn *wwn)
+{
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	int ret;
+
+	dev_err(mpath_head->parent, "%s scsi_mpath_head=%pS wwn=%pS\n", __func__, scsi_mpath_head, wwn);
+
+	ret = scsi_mpath_call_for_sdev(scsi_mpath_head, pscsi_mpath_get_inquiry_vpd_serial_sdev, wwn);
+
+	dev_err(mpath_head->parent, "%s2 scsi_mpath_head=%pS ret=%d\n", __func__, scsi_mpath_head, ret);
+	return 0;
+}
+
+
 static void
 pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
 		struct t10_wwn *wwn)
@@ -386,15 +437,15 @@ static int pscsi_add_mpath_device_to_list(struct se_device *dev,
 	 * Locate VPD WWN Information used for various purposes within
 	 * the Storage Engine.
 	 */
-	#ifdef dsddsd
-	if (!pscsi_get_inquiry_vpd_serial(sd, &dev->t10_wwn)) {
+	if (!pscsi_mpath_get_inquiry_vpd_serial(scsi_mpath_head, &dev->t10_wwn)) {
 		/*
 		 * If VPD Unit Serial returned GOOD status, try
 		 * VPD Device Identification page (0x83).
 		 */
-		pscsi_get_inquiry_vpd_device_ident(sd, &dev->t10_wwn);
+		//BUG();
+		//pscsi_get_inquiry_vpd_device_ident(sd, &dev->t10_wwn);
+
 	}
-	#endif
 
 
 	return 0;

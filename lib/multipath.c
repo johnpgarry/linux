@@ -928,6 +928,23 @@ int mpath_head_init(struct mpath_head *mpath_head)
 }
 EXPORT_SYMBOL_GPL(mpath_head_init);
 
+int mpath_call_for_device(struct mpath_head *mpath_head,
+		int (*cb)(struct mpath_device *mpath_device, void *data),
+		void *data)
+{
+	struct mpath_device *mpath_device;
+	int ret = -EWOULDBLOCK, srcu_idx;
+
+	srcu_idx = srcu_read_lock(&mpath_head->srcu);
+	mpath_device = mpath_find_path(mpath_head);
+	if (mpath_device)
+		ret = cb(mpath_device, data);
+	srcu_read_unlock(&mpath_head->srcu, srcu_idx);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mpath_call_for_device);
+
 static int __init mpath_init(void)
 {
 	mpath_wq = alloc_workqueue("mpath-wq",

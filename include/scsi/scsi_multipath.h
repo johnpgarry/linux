@@ -30,7 +30,7 @@ struct scsi_mpath_head {
 	struct device		dev;
 	int			index;
 	unsigned char type;
-	
+
 	char vendor[INQUIRY_VENDOR_LEN + 1];
 	char model[INQUIRY_MODEL_LEN + 1];
 	char rev[INQUIRY_REVISION_LEN + 1];
@@ -66,6 +66,9 @@ void scsi_mpath_start_request(struct request *req);
 bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 			       unsigned int nr_bytes);
 struct scsi_mpath_head *scsi_mpath_find_head_by_id(int id);
+int scsi_mpath_call_for_sdev(struct scsi_mpath_head *scsi_mpath_head,
+		int (*cb)(struct scsi_device *sdev, void *data),
+		void *data);
 #else /* CONFIG_SCSI_MULTIPATH */
 
 struct scsi_mpath_head {

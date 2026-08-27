@@ -127,7 +127,8 @@ ssize_t mpath_delayed_removal_secs_show(struct mpath_head *mpath_head,
 			char *buf);
 ssize_t mpath_delayed_removal_secs_store(struct mpath_head *mpath_head,
 			const char *buf, size_t count);
-
+int mpath_call_for_device(struct mpath_head *mpath_head,
+		int (*cb)(struct mpath_device *mpath_device, void *), void *data);
 static inline bool is_mpath_disk(struct gendisk *disk)
 {
 	#if IS_ENABLED(CONFIG_LIBMULTIPATH)
