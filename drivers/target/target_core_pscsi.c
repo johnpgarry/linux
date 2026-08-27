@@ -25,6 +25,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
+#include <scsi/scsi_multipath.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_backend.h>
@@ -51,6 +52,8 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	struct pscsi_hba_virt *phv;
 
+	pr_err("%s hba=%pS host_id=%d\n", __func__, hba, host_id);
+
 	phv = kzalloc_obj(struct pscsi_hba_virt);
 	if (!phv) {
 		pr_err("Unable to allocate struct pscsi_hba_virt\n");
@@ -61,10 +64,10 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 
 	hba->hba_ptr = phv;
 
-	pr_debug("CORE_HBA[%d] - TCM SCSI HBA Driver %s on"
+	pr_err("CORE_HBA[%d] - TCM SCSI HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
 		PSCSI_VERSION, TARGET_CORE_VERSION);
-	pr_debug("CORE_HBA[%d] - Attached SCSI HBA to Generic\n",
+	pr_err("CORE_HBA[%d] - Attached SCSI HBA to Generic\n",
 	       hba->hba_id);
 
 	return 0;
@@ -75,15 +78,16 @@ static void pscsi_detach_hba(struct se_hba *hba)
 	struct pscsi_hba_virt *phv = hba->hba_ptr;
 	struct Scsi_Host *scsi_host = phv->phv_lld_host;
 
+	pr_err("%s hba=%pS\n", __func__, hba);
 	if (scsi_host) {
 		scsi_host_put(scsi_host);
 
-		pr_debug("CORE_HBA[%d] - Detached SCSI HBA: %s from"
+		pr_err("CORE_HBA[%d] - Detached SCSI HBA: %s from"
 			" Generic Target Core\n", hba->hba_id,
 			(scsi_host->hostt->name) ? (scsi_host->hostt->name) :
 			"Unknown");
 	} else
-		pr_debug("CORE_HBA[%d] - Detached Virtual SCSI HBA"
+		pr_err("CORE_HBA[%d] - Detached Virtual SCSI HBA"
 			" from Generic Target Core\n", hba->hba_id);
 
 	kfree(phv);
@@ -94,6 +98,7 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 {
 	struct pscsi_hba_virt *phv = hba->hba_ptr;
 	struct Scsi_Host *sh = phv->phv_lld_host;
+	pr_err("%s hba=%pS\n", __func__, hba);
 	/*
 	 * Release the struct Scsi_Host
 	 */
@@ -104,7 +109,7 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 		phv->phv_lld_host = NULL;
 		phv->phv_mode = PHV_VIRTUAL_HOST_ID;
 
-		pr_debug("CORE_HBA[%d] - Disabled pSCSI HBA Passthrough"
+		pr_err("CORE_HBA[%d] - Disabled pSCSI HBA Passthrough"
 			" %s\n", hba->hba_id, (sh->hostt->name) ?
 			(sh->hostt->name) : "Unknown");
 
@@ -125,7 +130,7 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 	phv->phv_lld_host = sh;
 	phv->phv_mode = PHV_LLD_SCSI_HOST_NO;
 
-	pr_debug("CORE_HBA[%d] - Enabled pSCSI HBA Passthrough %s\n",
+	pr_err("CORE_HBA[%d] - Enabled pSCSI HBA Passthrough %s\n",
 		hba->hba_id, (sh->hostt->name) ? (sh->hostt->name) : "Unknown");
 
 	return 1;
@@ -136,7 +141,7 @@ static void pscsi_tape_read_blocksize(struct se_device *dev,
 {
 	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
 	int ret;
-
+	pr_err("%s sdev=%pS\n", __func__, sdev);
 	buf = kzalloc(12, GFP_KERNEL);
 	if (!buf)
 		goto out_free;
@@ -163,6 +168,7 @@ out_free:
 static void
 pscsi_set_inquiry_info(struct scsi_device *sdev, struct t10_wwn *wwn)
 {
+	dev_err(&sdev->sdev_gendev, "%s sdev=%pS\n", __func__, sdev);
 	if (sdev->inquiry_len < INQUIRY_LEN)
 		return;
 	/*
@@ -185,6 +191,7 @@ pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
 	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
 	int ret;
 
+	dev_err(&sdev->sdev_gendev, "%s sdev=%pS\n", __func__, sdev);
 	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
@@ -220,6 +227,7 @@ pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
 	int ident_len, page_len, off = 4, ret;
 	struct t10_vpd *vpd;
 
+	dev_err(&sdev->sdev_gendev, "%s sdev=%pS\n", __func__, sdev);
 	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
 	if (!buf)
 		return;
@@ -245,7 +253,7 @@ pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
 					" length zero!\n");
 			break;
 		}
-		pr_debug("T10 VPD Identifier Length: %d\n", ident_len);
+		pr_err("T10 VPD Identifier Length: %d\n", ident_len);
 
 		vpd = kzalloc_obj(struct t10_vpd);
 		if (!vpd) {
@@ -285,6 +293,8 @@ static int pscsi_add_device_to_list(struct se_device *dev,
 {
 	struct pscsi_dev_virt *pdv = PSCSI_DEV(dev);
 	struct request_queue *q = sd->request_queue;
+
+	dev_err(&sd->sdev_gendev, "%s sd=%pS q=%pS\n", __func__, sd, q);
 
 	pdv->pdv_sd = sd;
 
@@ -334,13 +344,14 @@ static struct se_device *pscsi_alloc_device(struct se_hba *hba,
 {
 	struct pscsi_dev_virt *pdv;
 
+	pr_err("%s hba=%pS name=%s\n", __func__, hba, name);
 	pdv = kzalloc_obj(struct pscsi_dev_virt);
 	if (!pdv) {
 		pr_err("Unable to allocate memory for struct pscsi_dev_virt\n");
 		return NULL;
 	}
 
-	pr_debug("PSCSI: Allocated pdv: %p for %s\n", pdv, name);
+	pr_err("PSCSI: Allocated pdv: %p for %s\n", pdv, name);
 	return &pdv->dev;
 }
 
@@ -356,6 +367,7 @@ static int pscsi_create_type_disk(struct se_device *dev, struct scsi_device *sd)
 	struct file *bdev_file;
 	int ret;
 
+	dev_err(&sd->sdev_gendev, "%s sd=%pS\n", __func__, sd);
 	if (scsi_device_get(sd)) {
 		pr_err("scsi_device_get() failed for %d:%d:%d:%llu\n",
 			sh->host_no, sd->channel, sd->id, sd->lun);
@@ -383,7 +395,7 @@ static int pscsi_create_type_disk(struct se_device *dev, struct scsi_device *sd)
 		return ret;
 	}
 
-	pr_debug("CORE_PSCSI[%d] - Added TYPE_%s for %d:%d:%d:%llu\n",
+	pr_err("CORE_PSCSI[%d] - Added TYPE_%s for %d:%d:%d:%llu\n",
 		phv->phv_host_id, sd->type == TYPE_DISK ? "DISK" : "ZBC",
 		sh->host_no, sd->channel, sd->id, sd->lun);
 	return 0;
@@ -398,7 +410,7 @@ static int pscsi_create_type_nondisk(struct se_device *dev, struct scsi_device *
 	struct pscsi_hba_virt *phv = dev->se_hba->hba_ptr;
 	struct Scsi_Host *sh = sd->host;
 	int ret;
-
+	pr_err("%s sd=%pS\n", __func__, sd);
 	if (scsi_device_get(sd)) {
 		pr_err("scsi_device_get() failed for %d:%d:%d:%llu\n",
 			sh->host_no, sd->channel, sd->id, sd->lun);
@@ -412,7 +424,7 @@ static int pscsi_create_type_nondisk(struct se_device *dev, struct scsi_device *
 		scsi_device_put(sd);
 		return ret;
 	}
-	pr_debug("CORE_PSCSI[%d] - Added Type: %s for %d:%d:%d:%llu\n",
+	pr_err("CORE_PSCSI[%d] - Added Type: %s for %d:%d:%d:%llu\n",
 		phv->phv_host_id, scsi_device_type(sd->type), sh->host_no,
 		sd->channel, sd->id, sd->lun);
 
@@ -429,12 +441,19 @@ static int pscsi_configure_device(struct se_device *dev)
 	int legacy_mode_enable = 0;
 	int ret;
 
+	pr_err("%s dev=%pS sh=%pS\n", __func__, dev, sh);
 	if (!(pdv->pdv_flags & PDF_HAS_CHANNEL_ID) ||
 	    !(pdv->pdv_flags & PDF_HAS_TARGET_ID) ||
 	    !(pdv->pdv_flags & PDF_HAS_LUN_ID)) {
 		pr_err("Missing scsi_channel_id=, scsi_target_id= and"
 			" scsi_lun_id= parameters\n");
-		return -EINVAL;
+
+		if ((pdv->pdv_flags & PDF_HAS_MULTIPATH_ID)){
+
+			pr_err("0 got multipath id=%d\n", pdv->pdv_mpath_id);
+		} else {
+			return -EINVAL;
+		}
 	}
 
 	/*
@@ -442,6 +461,7 @@ static int pscsi_configure_device(struct se_device *dev)
 	 * struct Scsi_Host we will need to bring the TCM/pSCSI object online
 	 */
 	if (!sh) {
+		pr_err("0.1 sh=%pS\n", sh);
 		if (phv->phv_mode == PHV_LLD_SCSI_HOST_NO) {
 			pr_err("pSCSI: Unable to locate struct"
 				" Scsi_Host for PHV_LLD_SCSI_HOST_NO\n");
@@ -474,6 +494,7 @@ static int pscsi_configure_device(struct se_device *dev)
 			legacy_mode_enable = 1;
 			hba->hba_flags |= HBA_FLAGS_PSCSI_MODE;
 			sh = phv->phv_lld_host;
+			pr_err("0.5 sh=%pS !PDF_HAS_VIRT_HOST_ID\n", sh);
 		} else {
 			sh = scsi_host_lookup(pdv->pdv_host_id);
 			if (!sh) {
@@ -482,6 +503,7 @@ static int pscsi_configure_device(struct se_device *dev)
 				return -EINVAL;
 			}
 			pdv->pdv_lld_host = sh;
+			pr_err("0.6 sh=%pS PDF_HAS_VIRT_HOST_ID\n", sh);
 		}
 	} else {
 		if (phv->phv_mode == PHV_VIRTUAL_HOST_ID) {
@@ -491,12 +513,22 @@ static int pscsi_configure_device(struct se_device *dev)
 		}
 	}
 
+	if ((pdv->pdv_flags & PDF_HAS_MULTIPATH_ID)) {
+		struct scsi_mpath_head *scsi_mpath_head = scsi_mpath_find_head_by_id(pdv->pdv_mpath_id);
+
+
+		pr_err("%s1.1 scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
+	}
+
+	pr_err("%s2 dev=%pS sh=%pS going to loop list_for_each_entry for sh\n", __func__, dev, sh);
 	spin_lock_irq(sh->host_lock);
 	list_for_each_entry(sd, &sh->__devices, siblings) {
+		dev_err(&sd->sdev_gendev, "%s2.1 dev=%pS\n", __func__, dev);
 		if ((pdv->pdv_channel_id != sd->channel) ||
 		    (pdv->pdv_target_id != sd->id) ||
 		    (pdv->pdv_lun_id != sd->lun))
 			continue;
+		dev_err(&sd->sdev_gendev, "%s2.2 dev=%pS sd->type=%d\n", __func__, dev, sd->type);
 		/*
 		 * Functions will release the held struct scsi_host->host_lock
 		 * before calling pscsi_add_device_to_list() to register
@@ -557,8 +589,9 @@ static void pscsi_destroy_device(struct se_device *dev)
 	struct pscsi_dev_virt *pdv = PSCSI_DEV(dev);
 	struct pscsi_hba_virt *phv = dev->se_hba->hba_ptr;
 	struct scsi_device *sd = pdv->pdv_sd;
-
+	pr_err("%s sd=%pS\n", __func__, sd);
 	if (sd) {
+		dev_err(&sd->sdev_gendev, "%s1 sd=%pS\n", __func__, sd);
 		/*
 		 * Release exclusive pSCSI internal struct block_device claim for
 		 * struct scsi_device with TYPE_DISK or TYPE_ZBC
@@ -591,7 +624,7 @@ static void pscsi_complete_cmd(struct se_cmd *cmd, u8 scsi_status,
 	struct pscsi_dev_virt *pdv = PSCSI_DEV(cmd->se_dev);
 	struct scsi_device *sd = pdv->pdv_sd;
 	unsigned char *cdb = cmd->priv;
-
+	pr_err("%s sd=%pS\n", __func__, sd);
 	/*
 	 * Special case for REPORT_LUNs which is emulated and not passed on.
 	 */
@@ -688,7 +721,7 @@ after_mode_select:
 			if (req_sense[0] == 0xf0 &&	/* valid, fixed format */
 			    req_sense[2] & 0xe0 &&	/* FM, EOM, or ILI */
 			    (req_sense[2] & 0xf) == 0) { /* key==NO_SENSE */
-				pr_debug("Tape FM/EOM/ILI status detected. Treat as normal read.\n");
+				pr_err("Tape FM/EOM/ILI status detected. Treat as normal read.\n");
 				cmd->se_cmd_flags |= SCF_TREAT_READ_AS_NORMAL;
 			}
 		}
@@ -697,7 +730,7 @@ after_mode_select:
 
 enum {
 	Opt_scsi_host_id, Opt_scsi_channel_id, Opt_scsi_target_id,
-	Opt_scsi_lun_id, Opt_err
+	Opt_scsi_lun_id, Opt_scsi_mpath_id, Opt_err
 };
 
 static match_table_t tokens = {
@@ -705,6 +738,7 @@ static match_table_t tokens = {
 	{Opt_scsi_channel_id, "scsi_channel_id=%d"},
 	{Opt_scsi_target_id, "scsi_target_id=%d"},
 	{Opt_scsi_lun_id, "scsi_lun_id=%d"},
+	{Opt_scsi_mpath_id, "scsi_mpath_id=%d"},
 	{Opt_err, NULL}
 };
 
@@ -717,6 +751,8 @@ static ssize_t pscsi_set_configfs_dev_params(struct se_device *dev,
 	substring_t args[MAX_OPT_ARGS];
 	int ret = 0, arg, token;
 
+	pr_err("%s dev=%pS\n", __func__, dev);
+
 	opts = kstrdup(page, GFP_KERNEL);
 	if (!opts)
 		return -ENOMEM;
@@ -727,6 +763,8 @@ static ssize_t pscsi_set_configfs_dev_params(struct se_device *dev,
 		if (!*ptr)
 			continue;
 
+		pr_err("%s1 dev=%pS ptr=%s phv->phv_mode=%d PHV_LLD_SCSI_HOST_NO=%d\n",
+			__func__, dev, ptr, phv->phv_mode, PHV_LLD_SCSI_HOST_NO);
 		token = match_token(ptr, tokens, args);
 		switch (token) {
 		case Opt_scsi_host_id:
@@ -742,7 +780,7 @@ static ssize_t pscsi_set_configfs_dev_params(struct se_device *dev,
 			if (ret)
 				goto out;
 			pdv->pdv_host_id = arg;
-			pr_debug("PSCSI[%d]: Referencing SCSI Host ID:"
+			pr_err("PSCSI[%d]: Referencing SCSI Host ID:"
 				" %d\n", phv->phv_host_id, pdv->pdv_host_id);
 			pdv->pdv_flags |= PDF_HAS_VIRT_HOST_ID;
 			break;
@@ -751,7 +789,7 @@ static ssize_t pscsi_set_configfs_dev_params(struct se_device *dev,
 			if (ret)
 				goto out;
 			pdv->pdv_channel_id = arg;
-			pr_debug("PSCSI[%d]: Referencing SCSI Channel"
+			pr_err("PSCSI[%d]: Referencing SCSI Channel"
 				" ID: %d\n",  phv->phv_host_id,
 				pdv->pdv_channel_id);
 			pdv->pdv_flags |= PDF_HAS_CHANNEL_ID;
@@ -761,17 +799,27 @@ static ssize_t pscsi_set_configfs_dev_params(struct se_device *dev,
 			if (ret)
 				goto out;
 			pdv->pdv_target_id = arg;
-			pr_debug("PSCSI[%d]: Referencing SCSI Target"
+			pr_err("PSCSI[%d]: Referencing SCSI Target"
 				" ID: %d\n", phv->phv_host_id,
 				pdv->pdv_target_id);
 			pdv->pdv_flags |= PDF_HAS_TARGET_ID;
+			break;
+		case Opt_scsi_mpath_id:
+			ret = match_int(args, &arg);
+			if (ret)
+				goto out;
+			pdv->pdv_mpath_id = arg;
+			pr_err("PSCSI[%d]: Referencing SCSI mpath"
+				" ID: %d\n", phv->phv_host_id,
+				pdv->pdv_mpath_id);
+			pdv->pdv_flags |= PDF_HAS_MULTIPATH_ID;
 			break;
 		case Opt_scsi_lun_id:
 			ret = match_int(args, &arg);
 			if (ret)
 				goto out;
 			pdv->pdv_lun_id = arg;
-			pr_debug("PSCSI[%d]: Referencing SCSI LUN ID:"
+			pr_err("PSCSI[%d]: Referencing SCSI LUN ID:"
 				" %d\n", phv->phv_host_id, pdv->pdv_lun_id);
 			pdv->pdv_flags |= PDF_HAS_LUN_ID;
 			break;
@@ -835,14 +883,14 @@ pscsi_map_sg(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 
 	BUG_ON(!cmd->data_length);
 
-	pr_debug("PSCSI: nr_pages: %d\n", nr_pages);
+	pr_err("PSCSI: nr_pages: %d\n", nr_pages);
 
 	for_each_sg(sgl, sg, sgl_nents, i) {
 		page = sg_page(sg);
 		off = sg->offset;
 		len = sg->length;
 
-		pr_debug("PSCSI: i: %d page: %p len: %d off: %d\n", i,
+		pr_err("PSCSI: i: %d page: %p len: %d off: %d\n", i,
 			page, len, off);
 
 		/*
@@ -866,20 +914,20 @@ new_bio:
 					 rw ? REQ_OP_WRITE : REQ_OP_READ);
 				bio->bi_end_io = pscsi_bi_endio;
 
-				pr_debug("PSCSI: Allocated bio: %p,"
+				pr_err("PSCSI: Allocated bio: %p,"
 					" dir: %s nr_vecs: %d\n", bio,
 					(rw) ? "rw" : "r", nr_vecs);
 			}
 
-			pr_debug("PSCSI: Calling bio_add_page() i: %d"
+			pr_err("PSCSI: Calling bio_add_page() i: %d"
 				" bio: %p page: %p len: %d off: %d\n", i, bio,
 				page, len, off);
 
 			rc = bio_add_page(bio, page, bytes, off);
-			pr_debug("PSCSI: bio->bi_vcnt: %d nr_vecs: %d\n",
+			pr_err("PSCSI: bio->bi_vcnt: %d nr_vecs: %d\n",
 				bio_segments(bio), nr_vecs);
 			if (rc != bytes) {
-				pr_debug("PSCSI: Reached bio->bi_vcnt max:"
+				pr_err("PSCSI: Reached bio->bi_vcnt max:"
 					" %d i: %d bio: %p, allocating another"
 					" bio\n", bio->bi_vcnt, i, bio);
 
@@ -988,7 +1036,10 @@ static u32 pscsi_get_device_type(struct se_device *dev)
 {
 	struct pscsi_dev_virt *pdv = PSCSI_DEV(dev);
 	struct scsi_device *sd = pdv->pdv_sd;
-
+	if (!sd)
+		pr_err("%s sd=%pS\n", __func__, sd);
+	else
+		dev_err(&sd->sdev_gendev, "%s sd->type=%d\n", __func__, sd->type);
 	return (sd) ? sd->type : TYPE_NO_LUN;
 }
 
@@ -1012,7 +1063,7 @@ static enum rq_end_io_ret pscsi_req_done(struct request *req,
 	u8 *cdb = cmd->priv;
 
 	if (scsi_status != SAM_STAT_GOOD) {
-		pr_debug("PSCSI Status Byte exception at cmd: %p CDB:"
+		pr_err("PSCSI Status Byte exception at cmd: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", cmd, cdb[0], scmd->result);
 	}
 
@@ -1023,7 +1074,7 @@ static enum rq_end_io_ret pscsi_req_done(struct request *req,
 		target_complete_cmd_with_length(cmd, scsi_status, valid_data);
 		break;
 	default:
-		pr_debug("PSCSI Host Byte exception at cmd: %p CDB:"
+		pr_err("PSCSI Host Byte exception at cmd: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", cmd, cdb[0], scmd->result);
 		target_complete_cmd(cmd, SAM_STAT_CHECK_CONDITION);
 		break;

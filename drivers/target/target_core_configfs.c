@@ -49,7 +49,7 @@ static void target_core_setup_##_name##_cit(struct target_backend *tb)	\
 	cit->ct_group_ops = _group_ops;					\
 	cit->ct_attrs = _attrs;						\
 	cit->ct_owner = tb->ops->owner;					\
-	pr_debug("Setup generic %s\n", __stringify(_name));		\
+	pr_err("Setup generic %s\n", __stringify(_name));		\
 }
 
 #define TB_CIT_SETUP_DRV(_name, _item_ops, _group_ops)			\
@@ -61,7 +61,7 @@ static void target_core_setup_##_name##_cit(struct target_backend *tb)	\
 	cit->ct_group_ops = _group_ops;					\
 	cit->ct_attrs = tb->ops->tb_##_name##_attrs;			\
 	cit->ct_owner = tb->ops->owner;					\
-	pr_debug("Setup generic %s\n", __stringify(_name));		\
+	pr_err("Setup generic %s\n", __stringify(_name));		\
 }
 
 extern struct t10_alua_lu_gp *default_lu_gp;
@@ -101,6 +101,7 @@ static char db_root_stage[DB_ROOT_LEN];
 static ssize_t target_core_item_dbroot_show(struct config_item *item,
 					    char *page)
 {
+	//pr_err("%s\n", __func__);
 	return sprintf(page, "%s\n", db_root);
 }
 
@@ -111,6 +112,7 @@ static ssize_t target_core_item_dbroot_store(struct config_item *item,
 	ssize_t r = -EINVAL;
 	struct path path = {};
 
+	pr_err("%s\n", __func__);
 	mutex_lock(&target_devices_lock);
 	if (target_devices) {
 		pr_err("db_root: cannot be changed because it's in use\n");
@@ -141,12 +143,14 @@ static ssize_t target_core_item_dbroot_store(struct config_item *item,
 	path_put(&path);
 
 	strscpy(db_root, db_root_stage);
-	pr_debug("Target_Core_ConfigFS: db_root set to %s\n", db_root);
+	pr_err("Target_Core_ConfigFS: db_root set to %s\n", db_root);
 
 	r = read_bytes;
 
 unlock:
 	mutex_unlock(&target_devices_lock);
+	if (r < 0)
+		pr_err("%s10 r=%zd\n", __func__, r);
 	return r;
 }
 
@@ -186,12 +190,12 @@ static struct config_group *target_core_register_fabric(
 	struct target_fabric_configfs *tf;
 	int ret;
 
-	pr_debug("Target_Core_ConfigFS: REGISTER -> group: %p name:"
+	pr_err("Target_Core_ConfigFS: REGISTER -> group: %p name:"
 			" %s\n", group, name);
 
 	tf = target_core_get_fabric(name);
 	if (!tf) {
-		pr_debug("target_core_register_fabric() trying autoload for %s\n",
+		pr_err("target_core_register_fabric() trying autoload for %s\n",
 			 name);
 
 		/*
@@ -214,7 +218,7 @@ static struct config_group *target_core_register_fabric(
 			 */
 			ret = request_module("iscsi_target_mod");
 			if (ret < 0) {
-				pr_debug("request_module() failed for"
+				pr_err("request_module() failed for"
 				         " iscsi_target_mod.ko: %d\n", ret);
 				return ERR_PTR(-EINVAL);
 			}
@@ -227,7 +231,7 @@ static struct config_group *target_core_register_fabric(
 			 */
 			ret = request_module("tcm_loop");
 			if (ret < 0) {
-				pr_debug("request_module() failed for"
+				pr_err("request_module() failed for"
 				         " tcm_loop.ko: %d\n", ret);
 				return ERR_PTR(-EINVAL);
 			}
@@ -237,17 +241,17 @@ static struct config_group *target_core_register_fabric(
 	}
 
 	if (!tf) {
-		pr_debug("target_core_get_fabric() failed for %s\n",
+		pr_err("target_core_get_fabric() failed for %s\n",
 		         name);
 		return ERR_PTR(-EINVAL);
 	}
-	pr_debug("Target_Core_ConfigFS: REGISTER -> Located fabric:"
+	pr_err("Target_Core_ConfigFS: REGISTER -> Located fabric:"
 			" %s\n", tf->tf_ops->fabric_name);
 	/*
 	 * On a successful target_core_get_fabric() look, the returned
 	 * struct target_fabric_configfs *tf will contain a usage reference.
 	 */
-	pr_debug("Target_Core_ConfigFS: REGISTER tfc_wwn_cit -> %p\n",
+	pr_err("Target_Core_ConfigFS: REGISTER tfc_wwn_cit -> %p\n",
 			&tf->tf_wwn_cit);
 
 	config_group_init_type_name(&tf->tf_group, name, &tf->tf_wwn_cit);
@@ -256,7 +260,7 @@ static struct config_group *target_core_register_fabric(
 			&tf->tf_discovery_cit);
 	configfs_add_default_group(&tf->tf_disc_group, &tf->tf_group);
 
-	pr_debug("Target_Core_ConfigFS: REGISTER -> Allocated Fabric: %s\n",
+	pr_err("Target_Core_ConfigFS: REGISTER -> Allocated Fabric: %s\n",
 		 config_item_name(&tf->tf_group.cg_item));
 	return &tf->tf_group;
 }
@@ -271,14 +275,14 @@ static void target_core_deregister_fabric(
 	struct target_fabric_configfs *tf = container_of(
 		to_config_group(item), struct target_fabric_configfs, tf_group);
 
-	pr_debug("Target_Core_ConfigFS: DEREGISTER -> Looking up %s in"
+	pr_err("Target_Core_ConfigFS: DEREGISTER -> Looking up %s in"
 		" tf list\n", config_item_name(item));
 
-	pr_debug("Target_Core_ConfigFS: DEREGISTER -> located fabric:"
+	pr_err("Target_Core_ConfigFS: DEREGISTER -> located fabric:"
 			" %s\n", tf->tf_ops->fabric_name);
 	atomic_dec(&tf->tf_access_cnt);
 
-	pr_debug("Target_Core_ConfigFS: DEREGISTER -> Releasing ci"
+	pr_err("Target_Core_ConfigFS: DEREGISTER -> Releasing ci"
 			" %s\n", config_item_name(item));
 
 	configfs_remove_default_groups(&tf->tf_group);
@@ -664,6 +668,7 @@ static ssize_t emulate_model_alias_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	if (dev->export_count) {
 		pr_err("dev[%p]: Unable to change model alias"
 			" while export_count is %d\n",
@@ -691,6 +696,7 @@ static ssize_t emulate_write_cache_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -701,7 +707,7 @@ static ssize_t emulate_write_cache_store(struct config_item *item,
 	}
 
 	da->emulate_write_cache = flag;
-	pr_debug("dev[%p]: SE Device WRITE_CACHE_EMULATION flag: %d\n",
+	pr_err("dev[%p]: SE Device WRITE_CACHE_EMULATION flag: %d\n",
 			da->da_dev, flag);
 	return count;
 }
@@ -713,6 +719,7 @@ static ssize_t emulate_ua_intlck_ctrl_store(struct config_item *item,
 	u32 val;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtou32(page, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -731,7 +738,7 @@ static ssize_t emulate_ua_intlck_ctrl_store(struct config_item *item,
 		return -EINVAL;
 	}
 	da->emulate_ua_intlck_ctrl = val;
-	pr_debug("dev[%p]: SE Device UA_INTRLCK_CTRL flag: %d\n",
+	pr_err("dev[%p]: SE Device UA_INTRLCK_CTRL flag: %d\n",
 		da->da_dev, val);
 	return count;
 }
@@ -743,6 +750,7 @@ static ssize_t emulate_tas_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -754,7 +762,7 @@ static ssize_t emulate_tas_store(struct config_item *item,
 		return -EINVAL;
 	}
 	da->emulate_tas = flag;
-	pr_debug("dev[%p]: SE Device TASK_ABORTED status bit: %s\n",
+	pr_err("dev[%p]: SE Device TASK_ABORTED status bit: %s\n",
 		da->da_dev, flag ? "Enabled" : "Disabled");
 
 	return count;
@@ -791,6 +799,7 @@ static ssize_t emulate_tpu_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -806,7 +815,7 @@ static ssize_t emulate_tpu_store(struct config_item *item,
 	}
 
 	da->emulate_tpu = flag;
-	pr_debug("dev[%p]: SE Device Thin Provisioning UNMAP bit: %d\n",
+	pr_err("dev[%p]: SE Device Thin Provisioning UNMAP bit: %d\n",
 		da->da_dev, flag);
 	return count;
 }
@@ -819,6 +828,7 @@ static ssize_t emulate_tpws_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -834,7 +844,7 @@ static ssize_t emulate_tpws_store(struct config_item *item,
 	}
 
 	da->emulate_tpws = flag;
-	pr_debug("dev[%p]: SE Device Thin Provisioning WRITE_SAME: %d\n",
+	pr_err("dev[%p]: SE Device Thin Provisioning WRITE_SAME: %d\n",
 				da->da_dev, flag);
 	return count;
 }
@@ -847,6 +857,7 @@ static ssize_t pi_prot_type_store(struct config_item *item,
 	struct se_device *dev = da->da_dev;
 	u32 flag;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtou32(page, 0, &flag);
 	if (ret < 0)
 		return ret;
@@ -898,13 +909,14 @@ static ssize_t pi_prot_type_store(struct config_item *item,
 	}
 
 	da->pi_prot_verify = (bool) da->pi_prot_type;
-	pr_debug("dev[%p]: SE Device Protection Type: %d\n", dev, flag);
+	pr_err("dev[%p]: SE Device Protection Type: %d\n", dev, flag);
 	return count;
 }
 
 /* always zero, but attr needs to remain RW to avoid userspace breakage */
 static ssize_t pi_prot_format_show(struct config_item *item, char *page)
 {
+	pr_err("%s\n", __func__);
 	return snprintf(page, PAGE_SIZE, "0\n");
 }
 
@@ -916,6 +928,7 @@ static ssize_t pi_prot_format_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -942,7 +955,7 @@ static ssize_t pi_prot_format_store(struct config_item *item,
 	if (ret)
 		return ret;
 
-	pr_debug("dev[%p]: SE Device Protection Format complete\n", dev);
+	pr_err("dev[%p]: SE Device Protection Format complete\n", dev);
 	return count;
 }
 
@@ -953,6 +966,7 @@ static ssize_t pi_prot_verify_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -982,6 +996,7 @@ static ssize_t force_pr_aptpl_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -993,7 +1008,7 @@ static ssize_t force_pr_aptpl_store(struct config_item *item,
 	}
 
 	da->force_pr_aptpl = flag;
-	pr_debug("dev[%p]: SE Device force_pr_aptpl: %d\n", da->da_dev, flag);
+	pr_err("dev[%p]: SE Device force_pr_aptpl: %d\n", da->da_dev, flag);
 	return count;
 }
 
@@ -1004,6 +1019,7 @@ static ssize_t emulate_rest_reord_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -1014,7 +1030,7 @@ static ssize_t emulate_rest_reord_store(struct config_item *item,
 		return -ENOSYS;
 	}
 	da->emulate_rest_reord = flag;
-	pr_debug("dev[%p]: SE Device emulate_rest_reord: %d\n",
+	pr_err("dev[%p]: SE Device emulate_rest_reord: %d\n",
 		da->da_dev, flag);
 	return count;
 }
@@ -1027,6 +1043,7 @@ static ssize_t unmap_zeroes_data_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -1047,7 +1064,7 @@ static ssize_t unmap_zeroes_data_store(struct config_item *item,
 			return ret;
 	}
 	da->unmap_zeroes_data = flag;
-	pr_debug("dev[%p]: SE Device Thin Provisioning LBPRZ bit: %d\n",
+	pr_err("dev[%p]: SE Device Thin Provisioning LBPRZ bit: %d\n",
 		 da->da_dev, flag);
 	return count;
 }
@@ -1063,6 +1080,7 @@ static ssize_t queue_depth_store(struct config_item *item,
 	u32 val;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtou32(page, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -1088,7 +1106,7 @@ static ssize_t queue_depth_store(struct config_item *item,
 		}
 	}
 	da->queue_depth = dev->queue_depth = val;
-	pr_debug("dev[%p]: SE Device TCQ Depth changed to: %u\n", dev, val);
+	pr_err("dev[%p]: SE Device TCQ Depth changed to: %u\n", dev, val);
 	return count;
 }
 
@@ -1099,6 +1117,7 @@ static ssize_t optimal_sectors_store(struct config_item *item,
 	u32 val;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtou32(page, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -1117,7 +1136,7 @@ static ssize_t optimal_sectors_store(struct config_item *item,
 	}
 
 	da->optimal_sectors = val;
-	pr_debug("dev[%p]: SE Device optimal_sectors changed to %u\n",
+	pr_err("dev[%p]: SE Device optimal_sectors changed to %u\n",
 			da->da_dev, val);
 	return count;
 }
@@ -1129,6 +1148,7 @@ static ssize_t block_size_store(struct config_item *item,
 	u32 val;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtou32(page, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -1149,7 +1169,7 @@ static ssize_t block_size_store(struct config_item *item,
 
 	da->block_size = val;
 
-	pr_debug("dev[%p]: SE Device block_size changed to %u\n",
+	pr_err("dev[%p]: SE Device block_size changed to %u\n",
 			da->da_dev, val);
 	return count;
 }
@@ -1159,6 +1179,7 @@ static ssize_t alua_support_show(struct config_item *item, char *page)
 	struct se_dev_attrib *da = to_attrib(item);
 	u8 flags = da->da_dev->transport_flags;
 
+	pr_err("%s\n", __func__);
 	return snprintf(page, PAGE_SIZE, "%d\n",
 			flags & TRANSPORT_FLAG_PASSTHROUGH_ALUA ? 0 : 1);
 }
@@ -1171,6 +1192,7 @@ static ssize_t alua_support_store(struct config_item *item,
 	bool flag, oldflag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -1198,6 +1220,7 @@ static ssize_t pgr_support_show(struct config_item *item, char *page)
 	struct se_dev_attrib *da = to_attrib(item);
 	u8 flags = da->da_dev->transport_flags;
 
+	pr_err("%s\n", __func__);
 	return snprintf(page, PAGE_SIZE, "%d\n",
 			flags & TRANSPORT_FLAG_PASSTHROUGH_PGR ? 0 : 1);
 }
@@ -1210,6 +1233,7 @@ static ssize_t pgr_support_store(struct config_item *item,
 	bool flag, oldflag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
@@ -1239,12 +1263,13 @@ static ssize_t emulate_rsoc_store(struct config_item *item,
 	bool flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtobool(page, &flag);
 	if (ret < 0)
 		return ret;
 
 	da->emulate_rsoc = flag;
-	pr_debug("dev[%p]: SE Device REPORT_SUPPORTED_OPERATION_CODES_EMULATION flag: %d\n",
+	pr_err("dev[%p]: SE Device REPORT_SUPPORTED_OPERATION_CODES_EMULATION flag: %d\n",
 			da->da_dev, flag);
 	return count;
 }
@@ -1256,6 +1281,7 @@ static ssize_t submit_type_store(struct config_item *item, const char *page,
 	int ret;
 	u8 val;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtou8(page, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -1274,6 +1300,7 @@ static ssize_t complete_type_store(struct config_item *item, const char *page,
 	int ret;
 	u8 val;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtou8(page, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -1451,6 +1478,7 @@ static ssize_t target_check_inquiry_data(char *buf)
 static ssize_t target_wwn_vendor_id_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return sprintf(page, "%s\n", &to_t10_wwn(item)->vendor[0]);
 }
 
@@ -1465,6 +1493,7 @@ static ssize_t target_wwn_vendor_id_store(struct config_item *item,
 	ssize_t len;
 	ssize_t ret;
 
+	pr_err("%s\n", __func__);
 	len = strscpy(buf, page);
 	if (len > 0) {
 		/* Strip any newline added from userspace. */
@@ -1498,7 +1527,7 @@ static ssize_t target_wwn_vendor_id_store(struct config_item *item,
 	BUILD_BUG_ON(sizeof(dev->t10_wwn.vendor) != INQUIRY_VENDOR_LEN + 1);
 	strscpy(dev->t10_wwn.vendor, stripped);
 
-	pr_debug("Target_Core_ConfigFS: Set emulated T10 Vendor Identification:"
+	pr_err("Target_Core_ConfigFS: Set emulated T10 Vendor Identification:"
 		 " %s\n", dev->t10_wwn.vendor);
 
 	return count;
@@ -1507,6 +1536,7 @@ static ssize_t target_wwn_vendor_id_store(struct config_item *item,
 static ssize_t target_wwn_product_id_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return sprintf(page, "%s\n", &to_t10_wwn(item)->model[0]);
 }
 
@@ -1521,6 +1551,7 @@ static ssize_t target_wwn_product_id_store(struct config_item *item,
 	ssize_t len;
 	ssize_t ret;
 
+	pr_err("%s\n", __func__);
 	len = strscpy(buf, page);
 	if (len > 0) {
 		/* Strip any newline added from userspace. */
@@ -1554,7 +1585,7 @@ static ssize_t target_wwn_product_id_store(struct config_item *item,
 	BUILD_BUG_ON(sizeof(dev->t10_wwn.model) != INQUIRY_MODEL_LEN + 1);
 	strscpy(dev->t10_wwn.model, stripped);
 
-	pr_debug("Target_Core_ConfigFS: Set emulated T10 Model Identification: %s\n",
+	pr_err("Target_Core_ConfigFS: Set emulated T10 Model Identification: %s\n",
 		 dev->t10_wwn.model);
 
 	return count;
@@ -1563,6 +1594,7 @@ static ssize_t target_wwn_product_id_store(struct config_item *item,
 static ssize_t target_wwn_revision_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return sprintf(page, "%s\n", &to_t10_wwn(item)->revision[0]);
 }
 
@@ -1577,6 +1609,7 @@ static ssize_t target_wwn_revision_store(struct config_item *item,
 	ssize_t len;
 	ssize_t ret;
 
+	pr_err("%s\n", __func__);
 	len = strscpy(buf, page);
 	if (len > 0) {
 		/* Strip any newline added from userspace. */
@@ -1610,7 +1643,7 @@ static ssize_t target_wwn_revision_store(struct config_item *item,
 	BUILD_BUG_ON(sizeof(dev->t10_wwn.revision) != INQUIRY_REVISION_LEN + 1);
 	strscpy(dev->t10_wwn.revision, stripped);
 
-	pr_debug("Target_Core_ConfigFS: Set emulated T10 Revision: %s\n",
+	pr_err("Target_Core_ConfigFS: Set emulated T10 Revision: %s\n",
 		 dev->t10_wwn.revision);
 
 	return count;
@@ -1620,6 +1653,7 @@ static ssize_t
 target_wwn_company_id_show(struct config_item *item,
 				char *page)
 {
+	pr_err("%s\n", __func__);
 	return snprintf(page, PAGE_SIZE, "%#08x\n",
 			to_t10_wwn(item)->company_id);
 }
@@ -1633,6 +1667,7 @@ target_wwn_company_id_store(struct config_item *item,
 	u32 val;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	/*
 	 * The IEEE COMPANY_ID field should contain a 24-bit canonical
 	 * form OUI assigned by the IEEE.
@@ -1658,7 +1693,7 @@ target_wwn_company_id_store(struct config_item *item,
 
 	t10_wwn->company_id = val;
 
-	pr_debug("Target_Core_ConfigFS: Set IEEE Company ID: %#08x\n",
+	pr_err("Target_Core_ConfigFS: Set IEEE Company ID: %#08x\n",
 		 t10_wwn->company_id);
 
 	return count;
@@ -1670,8 +1705,13 @@ target_wwn_company_id_store(struct config_item *item,
 static ssize_t target_wwn_vpd_unit_serial_show(struct config_item *item,
 		char *page)
 {
-	return sprintf(page, "T10 VPD Unit Serial Number: %s\n",
+	int ret;
+	ret = sprintf(page, "T10 VPD Unit Serial Number: %s\n",
 		&to_t10_wwn(item)->unit_serial[0]);
+
+	pr_err("%s %s", __func__, page);
+
+	return ret;
 }
 
 static ssize_t target_wwn_vpd_unit_serial_store(struct config_item *item,
@@ -1681,6 +1721,7 @@ static ssize_t target_wwn_vpd_unit_serial_store(struct config_item *item,
 	struct se_device *dev = t10_wwn->t10_dev;
 	unsigned char buf[INQUIRY_VPD_SERIAL_LEN] = { };
 
+	pr_err("%s\n", __func__);
 	/*
 	 * If Linux/SCSI subsystem_api_t plugin got a VPD Unit Serial
 	 * from the struct scsi_device level firmware, do not allow
@@ -1726,7 +1767,7 @@ static ssize_t target_wwn_vpd_unit_serial_store(struct config_item *item,
 			"%s", strstrip(buf));
 	dev->dev_flags |= DF_EMULATED_VPD_UNIT_SERIAL;
 
-	pr_debug("Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
+	pr_err("Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
 			" %s\n", dev->t10_wwn.unit_serial);
 
 	return count;
@@ -1763,6 +1804,7 @@ static ssize_t target_wwn_vpd_protocol_identifier_show(struct config_item *item,
 static ssize_t target_wwn_pd_text_id_info_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return sysfs_emit(page, "%s\n", &to_t10_wwn(item)->pd_text_id_info[0]);
 }
 
@@ -1776,6 +1818,7 @@ static ssize_t target_wwn_pd_text_id_info_store(struct config_item *item,
 	unsigned char buf[PD_TEXT_ID_INFO_LEN + 2];
 	char *stripped;
 
+	pr_err("%s\n", __func__);
 	/*
 	 * Check to see if any active exports exist.  If they do exist, fail
 	 * here as changing this information on the fly (underneath the
@@ -1802,7 +1845,7 @@ static ssize_t target_wwn_pd_text_id_info_store(struct config_item *item,
 	strscpy(dev->t10_wwn.pd_text_id_info, stripped,
 	       sizeof(dev->t10_wwn.pd_text_id_info));
 
-	pr_debug("Target_Core_ConfigFS: Set emulated peripheral dev text id info:"
+	pr_err("Target_Core_ConfigFS: Set emulated peripheral dev text id info:"
 		  " %s\n", dev->t10_wwn.pd_text_id_info);
 
 	return count;
@@ -1820,6 +1863,7 @@ static ssize_t target_wwn_##_name##_show(struct config_item *item,	\
 	unsigned char buf[VPD_TMP_BUF_SIZE];				\
 	ssize_t len = 0;						\
 									\
+	pr_err("%s\n", __func__);\
 	spin_lock(&t10_wwn->t10_vpd_lock);				\
 	list_for_each_entry(vpd, &t10_wwn->t10_vpd_list, vpd_list) {	\
 		if (vpd->association != _assoc)				\
@@ -1935,6 +1979,7 @@ static ssize_t target_pr_res_holder_show(struct config_item *item, char *page)
 	struct se_device *dev = pr_to_dev(item);
 	int ret;
 
+	pr_err("%s\n", __func__);
 	if (!dev->dev_attrib.emulate_pr)
 		return sprintf(page, "SPC_RESERVATIONS_DISABLED\n");
 
@@ -1956,6 +2001,7 @@ static ssize_t target_pr_res_pr_all_tgt_pts_show(struct config_item *item,
 	struct se_device *dev = pr_to_dev(item);
 	ssize_t len = 0;
 
+	pr_err("%s\n", __func__);
 	spin_lock(&dev->dev_reservation_lock);
 	if (!dev->dev_pr_res_holder) {
 		len = sprintf(page, "No SPC-3 Reservation holder\n");
@@ -1974,6 +2020,7 @@ static ssize_t target_pr_res_pr_all_tgt_pts_show(struct config_item *item,
 static ssize_t target_pr_res_pr_generation_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return sprintf(page, "0x%08x\n", pr_to_dev(item)->t10_pr.pr_generation);
 }
 
@@ -1988,6 +2035,7 @@ static ssize_t target_pr_res_pr_holder_tg_port_show(struct config_item *item,
 	const struct target_core_fabric_ops *tfo;
 	ssize_t len = 0;
 
+	pr_err("%s\n", __func__);
 	spin_lock(&dev->dev_reservation_lock);
 	pr_reg = dev->dev_pr_res_holder;
 	if (!pr_reg) {
@@ -2025,6 +2073,7 @@ static ssize_t target_pr_res_pr_registered_i_pts_show(struct config_item *item,
 	ssize_t len = 0;
 	int reg_count = 0;
 
+	pr_err("%s\n", __func__);
 	len += sprintf(page+len, "SPC-3 PR Registrations:\n");
 
 	spin_lock(&dev->t10_pr.registration_lock);
@@ -2061,6 +2110,7 @@ static ssize_t target_pr_res_pr_type_show(struct config_item *item, char *page)
 	struct t10_pr_registration *pr_reg;
 	ssize_t len = 0;
 
+	pr_err("%s\n", __func__);
 	spin_lock(&dev->dev_reservation_lock);
 	pr_reg = dev->dev_pr_res_holder;
 	if (pr_reg) {
@@ -2078,6 +2128,7 @@ static ssize_t target_pr_res_type_show(struct config_item *item, char *page)
 {
 	struct se_device *dev = pr_to_dev(item);
 
+	pr_err("%s\n", __func__);
 	if (!dev->dev_attrib.emulate_pr)
 		return sprintf(page, "SPC_RESERVATIONS_DISABLED\n");
 	if (dev->transport_flags & TRANSPORT_FLAG_PASSTHROUGH_PGR)
@@ -2093,6 +2144,7 @@ static ssize_t target_pr_res_aptpl_active_show(struct config_item *item,
 {
 	struct se_device *dev = pr_to_dev(item);
 
+	pr_err("%s\n", __func__);
 	if (!dev->dev_attrib.emulate_pr ||
 	    (dev->transport_flags & TRANSPORT_FLAG_PASSTHROUGH_PGR))
 		return 0;
@@ -2106,6 +2158,7 @@ static ssize_t target_pr_res_aptpl_metadata_show(struct config_item *item,
 {
 	struct se_device *dev = pr_to_dev(item);
 
+	pr_err("%s\n", __func__);
 	if (!dev->dev_attrib.emulate_pr ||
 	    (dev->transport_flags & TRANSPORT_FLAG_PASSTHROUGH_PGR))
 		return 0;
@@ -2153,6 +2206,7 @@ static ssize_t target_pr_res_aptpl_metadata_store(struct config_item *item,
 	u16 tpgt = 0;
 	u8 type = 0;
 
+	pr_err("%s\n", __func__);
 	if (!dev->dev_attrib.emulate_pr ||
 	    (dev->transport_flags & TRANSPORT_FLAG_PASSTHROUGH_PGR))
 		return count;
@@ -2160,7 +2214,7 @@ static ssize_t target_pr_res_aptpl_metadata_store(struct config_item *item,
 		return count;
 
 	if (dev->export_count) {
-		pr_debug("Unable to process APTPL metadata while"
+		pr_err("Unable to process APTPL metadata while"
 			" active fabric exports exist\n");
 		return -EINVAL;
 	}
@@ -2364,6 +2418,7 @@ static ssize_t target_dev_info_show(struct config_item *item, char *page)
 	int bl = 0;
 	ssize_t read_bytes = 0;
 
+	pr_err("%s\n", __func__);
 	transport_dump_dev_state(dev, page, &bl);
 	read_bytes += bl;
 	read_bytes += dev->transport->show_configfs_dev_params(dev,
@@ -2376,6 +2431,8 @@ static ssize_t target_dev_control_store(struct config_item *item,
 {
 	struct se_device *dev = to_device(item);
 
+	pr_err("%s page=%s", __func__, page);
+
 	return dev->transport->set_configfs_dev_params(dev, page, count);
 }
 
@@ -2383,6 +2440,7 @@ static ssize_t target_dev_alias_show(struct config_item *item, char *page)
 {
 	struct se_device *dev = to_device(item);
 
+	pr_err("%s\n", __func__);
 	if (!(dev->dev_flags & DF_USING_ALIAS))
 		return 0;
 
@@ -2396,6 +2454,7 @@ static ssize_t target_dev_alias_store(struct config_item *item,
 	struct se_hba *hba = dev->se_hba;
 	ssize_t read_bytes;
 
+	pr_err("%s\n", __func__);
 	if (count > (SE_DEV_ALIAS_LEN-1)) {
 		pr_err("alias count: %d exceeds"
 			" SE_DEV_ALIAS_LEN-1: %u\n", (int)count,
@@ -2411,7 +2470,7 @@ static ssize_t target_dev_alias_store(struct config_item *item,
 
 	dev->dev_flags |= DF_USING_ALIAS;
 
-	pr_debug("Target_Core_ConfigFS: %s/%s set alias: %s\n",
+	pr_err("Target_Core_ConfigFS: %s/%s set alias: %s\n",
 		config_item_name(&hba->hba_group.cg_item),
 		config_item_name(&dev->dev_group.cg_item),
 		dev->dev_alias);
@@ -2423,6 +2482,7 @@ static ssize_t target_dev_udev_path_show(struct config_item *item, char *page)
 {
 	struct se_device *dev = to_device(item);
 
+	pr_err("%s\n", __func__);
 	if (!(dev->dev_flags & DF_USING_UDEV_PATH))
 		return 0;
 
@@ -2436,6 +2496,9 @@ static ssize_t target_dev_udev_path_store(struct config_item *item,
 	struct se_hba *hba = dev->se_hba;
 	ssize_t read_bytes;
 
+
+	pr_err("%s count=%zd\n", __func__, count);
+
 	if (count > (SE_UDEV_PATH_LEN-1)) {
 		pr_err("udev_path count: %d exceeds"
 			" SE_UDEV_PATH_LEN-1: %u\n", (int)count,
@@ -2445,14 +2508,17 @@ static ssize_t target_dev_udev_path_store(struct config_item *item,
 
 	read_bytes = snprintf(&dev->udev_path[0], SE_UDEV_PATH_LEN,
 			"%s", page);
-	if (!read_bytes)
+	pr_err("%s1 &dev->udev_path[0]=%s\n", __func__, &dev->udev_path[0]);
+	if (!read_bytes) {
+		pr_err("%s read_bytes\n", __func__);
 		return -EINVAL;
+	}
 	if (dev->udev_path[read_bytes - 1] == '\n')
 		dev->udev_path[read_bytes - 1] = '\0';
 
 	dev->dev_flags |= DF_USING_UDEV_PATH;
 
-	pr_debug("Target_Core_ConfigFS: %s/%s set udev_path: %s\n",
+	pr_err("Target_Core_ConfigFS: %s/%s set udev_path: %s\n",
 		config_item_name(&hba->hba_group.cg_item),
 		config_item_name(&dev->dev_group.cg_item),
 		dev->udev_path);
@@ -2464,6 +2530,7 @@ static ssize_t target_dev_enable_show(struct config_item *item, char *page)
 {
 	struct se_device *dev = to_device(item);
 
+	pr_err("%s %d\n", __func__, target_dev_configured(dev));
 	return snprintf(page, PAGE_SIZE, "%d\n", target_dev_configured(dev));
 }
 
@@ -2473,6 +2540,8 @@ static ssize_t target_dev_enable_store(struct config_item *item,
 	struct se_device *dev = to_device(item);
 	char *ptr;
 	int ret;
+
+	pr_err("%s\n", __func__);
 
 	ptr = strstr(page, "1");
 	if (!ptr) {
@@ -2495,6 +2564,7 @@ static ssize_t target_dev_alua_lu_gp_show(struct config_item *item, char *page)
 	struct t10_alua_lu_gp_member *lu_gp_mem;
 	ssize_t len = 0;
 
+	pr_err("%s\n", __func__);
 	lu_gp_mem = dev->dev_alua_lu_gp_mem;
 	if (!lu_gp_mem)
 		return 0;
@@ -2521,6 +2591,7 @@ static ssize_t target_dev_alua_lu_gp_store(struct config_item *item,
 	unsigned char buf[LU_GROUP_NAME_BUF] = { };
 	int move = 0;
 
+	pr_err("%s\n", __func__);
 	lu_gp_mem = dev->dev_alua_lu_gp_mem;
 	if (!lu_gp_mem)
 		return count;
@@ -2553,7 +2624,7 @@ static ssize_t target_dev_alua_lu_gp_store(struct config_item *item,
 		 * with NULL
 		 */
 		if (!lu_gp_new) {
-			pr_debug("Target_Core_ConfigFS: Releasing %s/%s"
+			pr_err("Target_Core_ConfigFS: Releasing %s/%s"
 				" from ALUA LU Group: core/alua/lu_gps/%s, ID:"
 				" %hu\n",
 				config_item_name(&hba->hba_group.cg_item),
@@ -2578,7 +2649,7 @@ static ssize_t target_dev_alua_lu_gp_store(struct config_item *item,
 	__core_alua_attach_lu_gp_mem(lu_gp_mem, lu_gp_new);
 	spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 
-	pr_debug("Target_Core_ConfigFS: %s %s/%s to ALUA LU Group:"
+	pr_err("Target_Core_ConfigFS: %s %s/%s to ALUA LU Group:"
 		" core/alua/lu_gps/%s, ID: %hu\n",
 		(move) ? "Moving" : "Adding",
 		config_item_name(&hba->hba_group.cg_item),
@@ -2599,6 +2670,7 @@ static ssize_t target_dev_lba_map_show(struct config_item *item, char *page)
 	int bl = 0;
 	char state;
 
+	pr_err("%s\n", __func__);
 	spin_lock(&dev->t10_alua.lba_map_lock);
 	if (!list_empty(&dev->t10_alua.lba_map_list))
 	    bl += sprintf(b + bl, "%u %u\n",
@@ -2648,6 +2720,7 @@ static ssize_t target_dev_lba_map_store(struct config_item *item,
 	unsigned long start_lba = -1, end_lba = -1;
 	unsigned long segment_size = -1, segment_mult = -1;
 
+	pr_err("%s\n", __func__);
 	orig = map_entries = kstrdup(page, GFP_KERNEL);
 	if (!map_entries)
 		return -ENOMEM;
@@ -2802,6 +2875,7 @@ static ssize_t target_lu_gp_lu_gp_id_show(struct config_item *item, char *page)
 {
 	struct t10_alua_lu_gp *lu_gp = to_lu_gp(item);
 
+	pr_err("%s\n", __func__);
 	if (!lu_gp->lu_gp_valid_id)
 		return 0;
 	return sprintf(page, "%hu\n", lu_gp->lu_gp_id);
@@ -2815,6 +2889,7 @@ static ssize_t target_lu_gp_lu_gp_id_store(struct config_item *item,
 	unsigned long lu_gp_id;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtoul(page, 0, &lu_gp_id);
 	if (ret < 0) {
 		pr_err("kstrtoul() returned %d for"
@@ -2831,7 +2906,7 @@ static ssize_t target_lu_gp_lu_gp_id_store(struct config_item *item,
 	if (ret < 0)
 		return -EINVAL;
 
-	pr_debug("Target_Core_ConfigFS: Set ALUA Logical Unit"
+	pr_err("Target_Core_ConfigFS: Set ALUA Logical Unit"
 		" Group: core/alua/lu_gps/%s to ID: %hu\n",
 		config_item_name(&alua_lu_gp_cg->cg_item),
 		lu_gp->lu_gp_id);
@@ -2846,6 +2921,7 @@ static ssize_t target_lu_gp_members_show(struct config_item *item, char *page)
 	const char *const end = page + PAGE_SIZE;
 	char *cur = page;
 
+	pr_err("%s\n", __func__);
 	spin_lock(&lu_gp->lu_gp_lock);
 	list_for_each_entry(lu_gp_mem, &lu_gp->lu_gp_mem_list, lu_gp_mem_list) {
 		struct se_device *dev = lu_gp_mem->lu_gp_mem_dev;
@@ -2901,6 +2977,7 @@ static struct config_group *target_core_alua_create_lu_gp(
 	struct config_group *alua_lu_gp_cg = NULL;
 	struct config_item *alua_lu_gp_ci = NULL;
 
+	pr_err("%s\n", __func__);
 	lu_gp = core_alua_allocate_lu_gp(name, 0);
 	if (IS_ERR(lu_gp))
 		return NULL;
@@ -2911,7 +2988,7 @@ static struct config_group *target_core_alua_create_lu_gp(
 	config_group_init_type_name(alua_lu_gp_cg, name,
 			&target_core_alua_lu_gp_cit);
 
-	pr_debug("Target_Core_ConfigFS: Allocated ALUA Logical Unit"
+	pr_err("Target_Core_ConfigFS: Allocated ALUA Logical Unit"
 		" Group: core/alua/lu_gps/%s\n",
 		config_item_name(alua_lu_gp_ci));
 
@@ -2926,7 +3003,7 @@ static void target_core_alua_drop_lu_gp(
 	struct t10_alua_lu_gp *lu_gp = container_of(to_config_group(item),
 			struct t10_alua_lu_gp, lu_gp_group);
 
-	pr_debug("Target_Core_ConfigFS: Releasing ALUA Logical Unit"
+	pr_err("Target_Core_ConfigFS: Releasing ALUA Logical Unit"
 		" Group: core/alua/lu_gps/%s, ID: %hu\n",
 		config_item_name(item), lu_gp->lu_gp_id);
 	/*
@@ -2960,6 +3037,7 @@ static inline struct t10_alua_tg_pt_gp *to_tg_pt_gp(struct config_item *item)
 static ssize_t target_tg_pt_gp_alua_access_state_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return sprintf(page, "%d\n",
 		       to_tg_pt_gp(item)->tg_pt_gp_alua_access_state);
 }
@@ -2972,6 +3050,7 @@ static ssize_t target_tg_pt_gp_alua_access_state_store(struct config_item *item,
 	unsigned long tmp;
 	int new_state, ret;
 
+	pr_err("%s\n", __func__);
 	if (!tg_pt_gp->tg_pt_gp_valid_id) {
 		pr_err("Unable to do implicit ALUA on invalid tg_pt_gp ID\n");
 		return -EINVAL;
@@ -3012,6 +3091,7 @@ static ssize_t target_tg_pt_gp_alua_access_status_show(struct config_item *item,
 		char *page)
 {
 	struct t10_alua_tg_pt_gp *tg_pt_gp = to_tg_pt_gp(item);
+	pr_err("%s\n", __func__);
 	return sprintf(page, "%s\n",
 		core_alua_dump_status(tg_pt_gp->tg_pt_gp_alua_access_status));
 }
@@ -3023,6 +3103,7 @@ static ssize_t target_tg_pt_gp_alua_access_status_store(
 	unsigned long tmp;
 	int new_status, ret;
 
+	pr_err("%s\n", __func__);
 	if (!tg_pt_gp->tg_pt_gp_valid_id) {
 		pr_err("Unable to set ALUA access status on invalid tg_pt_gp ID\n");
 		return -EINVAL;
@@ -3051,12 +3132,14 @@ static ssize_t target_tg_pt_gp_alua_access_status_store(
 static ssize_t target_tg_pt_gp_alua_access_type_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_show_access_type(to_tg_pt_gp(item), page);
 }
 
 static ssize_t target_tg_pt_gp_alua_access_type_store(struct config_item *item,
 		const char *page, size_t count)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_store_access_type(to_tg_pt_gp(item), page, count);
 }
 
@@ -3065,6 +3148,7 @@ static ssize_t target_tg_pt_gp_alua_support_##_name##_show(		\
 		struct config_item *item, char *p)			\
 {									\
 	struct t10_alua_tg_pt_gp *t = to_tg_pt_gp(item);		\
+	pr_err("%s\n", __func__);\
 	return sprintf(p, "%d\n",					\
 		!!(t->tg_pt_gp_alua_supported_states & _bit));		\
 }									\
@@ -3109,6 +3193,7 @@ ALUA_SUPPORTED_STATE_ATTR(active_nonoptimized, ALUA_AN_SUP);
 static ssize_t target_tg_pt_gp_alua_write_metadata_show(
 		struct config_item *item, char *page)
 {
+	pr_err("%s\n", __func__);
 	return sprintf(page, "%d\n",
 		to_tg_pt_gp(item)->tg_pt_gp_write_metadata);
 }
@@ -3120,6 +3205,7 @@ static ssize_t target_tg_pt_gp_alua_write_metadata_store(
 	unsigned long tmp;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract alua_write_metadata\n");
@@ -3139,12 +3225,14 @@ static ssize_t target_tg_pt_gp_alua_write_metadata_store(
 static ssize_t target_tg_pt_gp_nonop_delay_msecs_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_show_nonop_delay_msecs(to_tg_pt_gp(item), page);
 }
 
 static ssize_t target_tg_pt_gp_nonop_delay_msecs_store(struct config_item *item,
 		const char *page, size_t count)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_store_nonop_delay_msecs(to_tg_pt_gp(item), page,
 			count);
 }
@@ -3152,12 +3240,14 @@ static ssize_t target_tg_pt_gp_nonop_delay_msecs_store(struct config_item *item,
 static ssize_t target_tg_pt_gp_trans_delay_msecs_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_show_trans_delay_msecs(to_tg_pt_gp(item), page);
 }
 
 static ssize_t target_tg_pt_gp_trans_delay_msecs_store(struct config_item *item,
 		const char *page, size_t count)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_store_trans_delay_msecs(to_tg_pt_gp(item), page,
 			count);
 }
@@ -3165,12 +3255,14 @@ static ssize_t target_tg_pt_gp_trans_delay_msecs_store(struct config_item *item,
 static ssize_t target_tg_pt_gp_implicit_trans_secs_show(
 		struct config_item *item, char *page)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_show_implicit_trans_secs(to_tg_pt_gp(item), page);
 }
 
 static ssize_t target_tg_pt_gp_implicit_trans_secs_store(
 		struct config_item *item, const char *page, size_t count)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_store_implicit_trans_secs(to_tg_pt_gp(item), page,
 			count);
 }
@@ -3178,12 +3270,14 @@ static ssize_t target_tg_pt_gp_implicit_trans_secs_store(
 static ssize_t target_tg_pt_gp_preferred_show(struct config_item *item,
 		char *page)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_show_preferred_bit(to_tg_pt_gp(item), page);
 }
 
 static ssize_t target_tg_pt_gp_preferred_store(struct config_item *item,
 		const char *page, size_t count)
 {
+	pr_err("%s\n", __func__);
 	return core_alua_store_preferred_bit(to_tg_pt_gp(item), page, count);
 }
 
@@ -3192,6 +3286,7 @@ static ssize_t target_tg_pt_gp_tg_pt_gp_id_show(struct config_item *item,
 {
 	struct t10_alua_tg_pt_gp *tg_pt_gp = to_tg_pt_gp(item);
 
+	pr_err("%s\n", __func__);
 	if (!tg_pt_gp->tg_pt_gp_valid_id)
 		return 0;
 	return sprintf(page, "%hu\n", tg_pt_gp->tg_pt_gp_id);
@@ -3205,6 +3300,7 @@ static ssize_t target_tg_pt_gp_tg_pt_gp_id_store(struct config_item *item,
 	unsigned long tg_pt_gp_id;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	ret = kstrtoul(page, 0, &tg_pt_gp_id);
 	if (ret < 0) {
 		pr_err("ALUA tg_pt_gp_id: invalid value '%s' for tg_pt_gp_id\n",
@@ -3221,7 +3317,7 @@ static ssize_t target_tg_pt_gp_tg_pt_gp_id_store(struct config_item *item,
 	if (ret < 0)
 		return -EINVAL;
 
-	pr_debug("Target_Core_ConfigFS: Set ALUA Target Port Group: "
+	pr_err("Target_Core_ConfigFS: Set ALUA Target Port Group: "
 		"core/alua/tg_pt_gps/%s to ID: %hu\n",
 		config_item_name(&alua_tg_pt_gp_cg->cg_item),
 		tg_pt_gp->tg_pt_gp_id);
@@ -3237,6 +3333,7 @@ static ssize_t target_tg_pt_gp_members_show(struct config_item *item,
 	ssize_t len = 0, cur_len;
 	unsigned char buf[TG_PT_GROUP_NAME_BUF] = { };
 
+	pr_err("%s\n", __func__);
 	spin_lock(&tg_pt_gp->tg_pt_gp_lock);
 	list_for_each_entry(lun, &tg_pt_gp->tg_pt_gp_lun_list,
 			lun_tg_pt_gp_link) {
@@ -3333,6 +3430,7 @@ static struct config_group *target_core_alua_create_tg_pt_gp(
 	struct config_group *alua_tg_pt_gp_cg = NULL;
 	struct config_item *alua_tg_pt_gp_ci = NULL;
 
+	pr_err("%s\n", __func__);
 	tg_pt_gp = core_alua_allocate_tg_pt_gp(alua->t10_dev, name, 0);
 	if (!tg_pt_gp)
 		return NULL;
@@ -3343,7 +3441,7 @@ static struct config_group *target_core_alua_create_tg_pt_gp(
 	config_group_init_type_name(alua_tg_pt_gp_cg, name,
 			&target_core_alua_tg_pt_gp_cit);
 
-	pr_debug("Target_Core_ConfigFS: Allocated ALUA Target Port"
+	pr_err("Target_Core_ConfigFS: Allocated ALUA Target Port"
 		" Group: alua/tg_pt_gps/%s\n",
 		config_item_name(alua_tg_pt_gp_ci));
 
@@ -3357,7 +3455,7 @@ static void target_core_alua_drop_tg_pt_gp(
 	struct t10_alua_tg_pt_gp *tg_pt_gp = container_of(to_config_group(item),
 			struct t10_alua_tg_pt_gp, tg_pt_gp_group);
 
-	pr_debug("Target_Core_ConfigFS: Releasing ALUA Target Port"
+	pr_err("Target_Core_ConfigFS: Releasing ALUA Target Port"
 		" Group: alua/tg_pt_gps/%s, ID: %hu\n",
 		config_item_name(item), tg_pt_gp->tg_pt_gp_id);
 	/*
@@ -3550,6 +3648,7 @@ static ssize_t target_hba_info_show(struct config_item *item, char *page)
 {
 	struct se_hba *hba = to_hba(item);
 
+	pr_err("%s\n", __func__);
 	return sprintf(page, "HBA Index: %d plugin: %s version: %s\n",
 			hba->hba_id, hba->backend->ops->name,
 			TARGET_CORE_VERSION);
@@ -3560,6 +3659,7 @@ static ssize_t target_hba_mode_show(struct config_item *item, char *page)
 	struct se_hba *hba = to_hba(item);
 	int hba_mode = 0;
 
+	pr_err("%s\n", __func__);
 	if (hba->hba_flags & HBA_FLAGS_PSCSI_MODE)
 		hba_mode = 1;
 
@@ -3573,6 +3673,7 @@ static ssize_t target_hba_mode_store(struct config_item *item,
 	unsigned long mode_flag;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	if (hba->backend->ops->pmode_enable_hba == NULL)
 		return -EINVAL;
 
@@ -3635,6 +3736,7 @@ static struct config_group *target_core_call_addhbatotarget(
 	unsigned long plugin_dep_id = 0;
 	int ret;
 
+	pr_err("%s\n", __func__);
 	if (strlen(name) >= TARGET_CORE_NAME_MAX_LEN) {
 		pr_err("Passed *name strlen(): %d exceeds"
 			" TARGET_CORE_NAME_MAX_LEN: %d\n", (int)strlen(name),
@@ -3738,7 +3840,7 @@ static void target_init_dbroot(void)
 	filp_close(fp, NULL);
 
 	strscpy(db_root, db_root_stage);
-	pr_debug("Target_Core_ConfigFS: db_root set to %s\n", db_root);
+	pr_err("Target_Core_ConfigFS: db_root set to %s\n", db_root);
 }
 
 static int __init target_core_init_configfs(void)
@@ -3747,7 +3849,7 @@ static int __init target_core_init_configfs(void)
 	struct t10_alua_lu_gp *lu_gp;
 	int ret;
 
-	pr_debug("TARGET_CORE[0]: Loading Generic Kernel Storage"
+	pr_err("TARGET_CORE[0]: Loading Generic Kernel Storage"
 		" Engine: %s on %s/%s on "UTS_RELEASE"\n",
 		TARGET_CORE_VERSION, utsname()->sysname, utsname()->machine);
 
@@ -3803,7 +3905,7 @@ static int __init target_core_init_configfs(void)
 			ret, subsys->su_group.cg_item.ci_namebuf);
 		goto out_global;
 	}
-	pr_debug("TARGET_CORE[0]: Initialized ConfigFS Fabric"
+	pr_err("TARGET_CORE[0]: Initialized ConfigFS Fabric"
 		" Infrastructure: "TARGET_CORE_VERSION" on %s/%s"
 		" on "UTS_RELEASE"\n", utsname()->sysname, utsname()->machine);
 	/*
@@ -3855,7 +3957,7 @@ static void __exit target_core_exit_configfs(void)
 	core_alua_free_lu_gp(default_lu_gp);
 	default_lu_gp = NULL;
 
-	pr_debug("TARGET_CORE[0]: Released ConfigFS Fabric"
+	pr_err("TARGET_CORE[0]: Released ConfigFS Fabric"
 			" Infrastructure\n");
 
 	core_dev_release_virtual_lun0();

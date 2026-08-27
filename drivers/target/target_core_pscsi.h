@@ -29,6 +29,7 @@ struct Scsi_Host;
 #define PDF_HAS_VPD_UNIT_SERIAL 0x08
 #define PDF_HAS_VPD_DEV_IDENT	0x10
 #define PDF_HAS_VIRT_HOST_ID	0x20
+#define PDF_HAS_MULTIPATH_ID	0x40
 
 struct pscsi_dev_virt {
 	struct se_device dev;
@@ -37,6 +38,7 @@ struct pscsi_dev_virt {
 	int	pdv_channel_id;
 	int	pdv_target_id;
 	int	pdv_lun_id;
+	int pdv_mpath_id;
 	struct file *pdv_bdev_file;
 	struct scsi_device *pdv_sd;
 	struct Scsi_Host *pdv_lld_host;

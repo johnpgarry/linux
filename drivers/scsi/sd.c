@@ -4112,7 +4112,27 @@ static int sd_mpath_add_disk(struct scsi_disk *sdkp)
 	struct scsi_device *sdp = sdkp->device;
 	struct scsi_mpath_device *scsi_mpath_dev = sdp->scsi_mpath_dev;
 	struct mpath_device *mpath_device = &scsi_mpath_dev->mpath_device;
+	struct mpath_head *mpath_head = mpath_device->mpath_head;
 	int ret;
+	struct kobject *sdev_kobj;
+	struct device *target;
+
+	sdev_kobj = &sdp->sdev_gendev.kobj;
+
+	target = disk_to_dev(mpath_head->disk);
+
+	dev_err(disk_to_dev(sdkp->disk), "%s sdev_kobj=%pS target=%pS class=%pS\n",
+		__func__, sdev_kobj, target, target->class);
+	dev_err(target, "%s sdev_kobj=%pS target=%pS class=%pS\n",
+		__func__, sdev_kobj, target, target->class);
+
+//	ret = sysfs_add_link_to_group(sdev_kobj, "block",
+//				&target->kobj, dev_name(target));
+
+	ret = 0;//sysfs_create_link(sdev_kobj, &target->kobj,
+		    //  dev_name(target));
+
+	dev_err(disk_to_dev(sdkp->disk), "%s2 ret=%d\n", __func__, ret);
 
 	ret = mpath_add_device(mpath_device, sdkp->disk,
 		dev_to_node(sdp->host->dma_dev), &sdp->host->mpath_nr_active);
@@ -4275,6 +4295,8 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	struct gendisk *disk;
 	int error;
 
+	__maybe_unused struct device *sdev_dev = &sdp->sdev_gendev;
+
 	/*
 	 * sd_mpath_disks_list is kept locked if no disk found.
 	 * Otherwise an extra reference is taken.
@@ -4312,7 +4334,12 @@ static int sd_mpath_probe(struct scsi_disk *sdkp)
 	lim.features |= BLK_FEAT_IO_STAT | BLK_FEAT_NOWAIT |
 		BLK_FEAT_POLL | BLK_FEAT_ATOMIC_WRITES;
 
+	#undef dsdsdd
+	#ifdef dsdsdd
+	mpath_head->parent = sdev_dev;
+	#else
 	mpath_head->parent = &sd_mpath_disk->dev;
+	#endif
 	mpath_head->drv_module = THIS_MODULE;
 	mpath_head->disk_groups = sd_mpath_disk_attr_groups;
 	error = mpath_alloc_head_disk(mpath_head, &lim,
@@ -4660,6 +4687,8 @@ static int sd_probe(struct scsi_device *sdp)
 			sdp->host->rpm_autosuspend_delay);
 	}
 
+
+	dev_err(dev, "%s calling device_add_disk\n", __func__);
 	error = device_add_disk(dev, gd, sd_mpath_dev_groups);
 	if (error) {
 		sd_mpath_fail_probe(sdkp);
@@ -4670,7 +4699,7 @@ static int sd_probe(struct scsi_device *sdp)
 		goto out;
 	}
 
-	if (sdp->scsi_mpath_dev) {
+	if (sdp->scsi_mpath_dev) {	
 		error = sd_mpath_add_disk(sdkp);
 		if (error) {
 			sd_mpath_fail_probe(sdkp);

@@ -473,6 +473,22 @@ static struct scsi_mpath_head *scsi_mpath_find_head(
 	return NULL;
 }
 
+struct scsi_mpath_head *scsi_mpath_find_head_by_id(int id)
+{
+	struct scsi_mpath_head *scsi_mpath_head;
+
+	list_for_each_entry(scsi_mpath_head, &scsi_mpath_heads_list, entry) {
+		if (scsi_mpath_head->index == id) {
+			if (scsi_mpath_try_get_head(scsi_mpath_head))
+				continue;
+			return scsi_mpath_head;
+		}
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(scsi_mpath_find_head_by_id);
+
 static void scsi_multipath_sdev_uninit(struct scsi_device *sdev)
 {
 	kfree(sdev->scsi_mpath_dev);
