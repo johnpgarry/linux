@@ -523,6 +523,10 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 		goto found;
 	scsi_mpath_head =
 		scsi_mpath_alloc_head(sdev->scsi_mpath_dev->device_id_str);
+	scsi_mpath_head->type = sdev->type;
+	memcpy(scsi_mpath_head->vendor, sdev->vendor, INQUIRY_VENDOR_LEN + 1);
+	memcpy(scsi_mpath_head->model, sdev->model, INQUIRY_VENDOR_LEN + 1);
+	memcpy(scsi_mpath_head->rev, sdev->rev, INQUIRY_VENDOR_LEN + 1);
 	if (!scsi_mpath_head) {
 		sdev_printk(KERN_NOTICE, sdev, "could not allocate multipath head, device multipathing disabled\n");
 		mutex_unlock(&scsi_mpath_heads_lock);

@@ -29,6 +29,11 @@ struct scsi_mpath_head {
 	struct bio_set		bio_pool;
 	struct device		dev;
 	int			index;
+	unsigned char type;
+	
+	char vendor[INQUIRY_VENDOR_LEN + 1];
+	char model[INQUIRY_MODEL_LEN + 1];
+	char rev[INQUIRY_REVISION_LEN + 1];
 };
 
 struct scsi_mpath_device {

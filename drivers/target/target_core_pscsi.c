@@ -185,6 +185,26 @@ pscsi_set_inquiry_info(struct scsi_device *sdev, struct t10_wwn *wwn)
 		 "%." __stringify(INQUIRY_REVISION_LEN) "s", sdev->rev);
 }
 
+static void
+pscsi_mpath_set_inquiry_info(struct scsi_mpath_head *scsi_mpath_head, struct t10_wwn *wwn)
+{
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	dev_err(mpath_head->parent, "%s scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
+
+	/*
+	 * Use sdev->inquiry data from drivers/scsi/scsi_scan.c:scsi_add_lun()
+	 */
+	BUILD_BUG_ON(sizeof(wwn->vendor) != INQUIRY_VENDOR_LEN + 1);
+	snprintf(wwn->vendor, sizeof(wwn->vendor),
+		 "%." __stringify(INQUIRY_VENDOR_LEN) "s", scsi_mpath_head->vendor);
+	BUILD_BUG_ON(sizeof(wwn->model) != INQUIRY_MODEL_LEN + 1);
+	snprintf(wwn->model, sizeof(wwn->model),
+		 "%." __stringify(INQUIRY_MODEL_LEN) "s", scsi_mpath_head->model);
+	BUILD_BUG_ON(sizeof(wwn->revision) != INQUIRY_REVISION_LEN + 1);
+	snprintf(wwn->revision, sizeof(wwn->revision),
+		 "%." __stringify(INQUIRY_REVISION_LEN) "s", scsi_mpath_head->rev);
+}
+
 static int
 pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
 {
@@ -339,6 +359,47 @@ static int pscsi_add_device_to_list(struct se_device *dev,
 	return 0;
 }
 
+static int pscsi_add_mpath_device_to_list(struct se_device *dev,
+		struct scsi_mpath_head *scsi_mpath_head)
+{
+	struct pscsi_dev_virt *pdv = PSCSI_DEV(dev);
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	struct gendisk *disk = mpath_head->disk;
+	struct request_queue *q = disk->queue;
+
+	dev_err(mpath_head->parent, "%s scsi_mpath_head=%pS q=%pS\n", __func__, scsi_mpath_head, q);
+
+	pdv->pdv_scsi_mpath_head = scsi_mpath_head;
+
+	dev->dev_attrib.hw_block_size =
+		min_not_zero(4096, 512);
+	dev->dev_attrib.hw_max_sectors =
+		min_not_zero(SZ_1M, queue_max_hw_sectors(q));
+	dev->dev_attrib.hw_queue_depth = 1024;
+
+	/*
+	 * Setup our standard INQUIRY info into se_dev->t10_wwn
+	 */
+	pscsi_mpath_set_inquiry_info(scsi_mpath_head, &dev->t10_wwn);
+
+	/*
+	 * Locate VPD WWN Information used for various purposes within
+	 * the Storage Engine.
+	 */
+	#ifdef dsddsd
+	if (!pscsi_get_inquiry_vpd_serial(sd, &dev->t10_wwn)) {
+		/*
+		 * If VPD Unit Serial returned GOOD status, try
+		 * VPD Device Identification page (0x83).
+		 */
+		pscsi_get_inquiry_vpd_device_ident(sd, &dev->t10_wwn);
+	}
+	#endif
+
+
+	return 0;
+}
+
 static struct se_device *pscsi_alloc_device(struct se_hba *hba,
 		const char *name)
 {
@@ -398,6 +459,42 @@ static int pscsi_create_type_disk(struct se_device *dev, struct scsi_device *sd)
 	pr_err("CORE_PSCSI[%d] - Added TYPE_%s for %d:%d:%d:%llu\n",
 		phv->phv_host_id, sd->type == TYPE_DISK ? "DISK" : "ZBC",
 		sh->host_no, sd->channel, sd->id, sd->lun);
+	return 0;
+}
+
+static int pscsi_mpath_create_type_disk(struct se_device *dev, struct scsi_mpath_head *scsi_mpath_head)
+{
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	struct pscsi_hba_virt *phv = dev->se_hba->hba_ptr;
+	struct pscsi_dev_virt *pdv = PSCSI_DEV(dev);
+	//struct Scsi_Host *sh = sd->host;
+	struct file *bdev_file;
+	int ret;
+
+	dev_err(mpath_head->parent, "%s scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
+
+	/*
+	 * Claim exclusive struct block_device access to struct scsi_device
+	 * for TYPE_DISK and TYPE_ZBC using supplied udev_path
+	 */
+	bdev_file = bdev_file_open_by_path(dev->udev_path,
+				BLK_OPEN_WRITE | BLK_OPEN_READ, pdv, NULL);
+	dev_err(mpath_head->parent, "%s0 bdev_file=%pS\n", __func__, bdev_file);
+	if (IS_ERR(bdev_file)) {
+		pr_err("pSCSI: bdev_file_open_by_path() failed\n");
+		return PTR_ERR(bdev_file);
+	}
+	pdv->pdv_bdev_file = bdev_file;
+
+	ret = pscsi_add_mpath_device_to_list(dev, scsi_mpath_head);
+	if (ret) {
+		fput(bdev_file);
+		return ret;
+	}
+
+	pr_err("CORE_PSCSI[%d] - Added TYPE_%s for scsi_mpath_device%d\n",
+		phv->phv_host_id, scsi_mpath_head->type == TYPE_DISK ? "DISK" : "ZBC",
+		scsi_mpath_head->index);
 	return 0;
 }
 
@@ -515,9 +612,26 @@ static int pscsi_configure_device(struct se_device *dev)
 
 	if ((pdv->pdv_flags & PDF_HAS_MULTIPATH_ID)) {
 		struct scsi_mpath_head *scsi_mpath_head = scsi_mpath_find_head_by_id(pdv->pdv_mpath_id);
+		int ret;
+
+		pr_err("%s1.1 scsi_mpath_head=%pS dev=%pS\n", __func__, scsi_mpath_head, dev);
+
+		if (!scsi_mpath_head)
+			goto out;
 
 
-		pr_err("%s1.1 scsi_mpath_head=%pS\n", __func__, scsi_mpath_head);
+		switch (scsi_mpath_head->type) {
+		case TYPE_DISK:
+		case TYPE_ZBC:
+			ret = pscsi_mpath_create_type_disk(dev, scsi_mpath_head);
+			break;
+		default:
+			ret = -EOPNOTSUPP;
+			break;
+		}
+
+		pr_err("%s1.2 scsi_mpath_head=%pS ret=%d\n", __func__, scsi_mpath_head, ret);
+		return 0;
 	}
 
 	pr_err("%s2 dev=%pS sh=%pS going to loop list_for_each_entry for sh\n", __func__, dev, sh);
@@ -558,6 +672,7 @@ static int pscsi_configure_device(struct se_device *dev)
 	}
 	spin_unlock_irq(sh->host_lock);
 
+out:
 	pr_err("pSCSI: Unable to locate %d:%d:%d:%d\n", sh->host_no,
 		pdv->pdv_channel_id,  pdv->pdv_target_id, pdv->pdv_lun_id);
 
@@ -1036,10 +1151,13 @@ static u32 pscsi_get_device_type(struct se_device *dev)
 {
 	struct pscsi_dev_virt *pdv = PSCSI_DEV(dev);
 	struct scsi_device *sd = pdv->pdv_sd;
-	if (!sd)
-		pr_err("%s sd=%pS\n", __func__, sd);
-	else
-		dev_err(&sd->sdev_gendev, "%s sd->type=%d\n", __func__, sd->type);
+	struct scsi_mpath_head *scsi_mpath_head = pdv->pdv_scsi_mpath_head;
+
+	pr_err("%s dev=%pS sd=%pS scsi_mpath_head=%pS\n", __func__, dev, sd, scsi_mpath_head);
+
+	if (scsi_mpath_head)
+		return scsi_mpath_head->type;
+	dev_err(&sd->sdev_gendev, "%s sd->type=%d\n", __func__, sd->type);
 	return (sd) ? sd->type : TYPE_NO_LUN;
 }
 

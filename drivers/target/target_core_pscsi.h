@@ -41,6 +41,7 @@ struct pscsi_dev_virt {
 	int pdv_mpath_id;
 	struct file *pdv_bdev_file;
 	struct scsi_device *pdv_sd;
+	struct scsi_mpath_head *pdv_scsi_mpath_head;
 	struct Scsi_Host *pdv_lld_host;
 } ____cacheline_aligned;
 
