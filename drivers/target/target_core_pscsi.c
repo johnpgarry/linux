@@ -286,7 +286,7 @@ pscsi_mpath_get_inquiry_vpd_serial(struct scsi_mpath_head *scsi_mpath_head, stru
 	ret = scsi_mpath_call_for_sdev(scsi_mpath_head, pscsi_mpath_get_inquiry_vpd_serial_sdev, wwn);
 
 	dev_err(mpath_head->parent, "%s2 scsi_mpath_head=%pS ret=%d\n", __func__, scsi_mpath_head, ret);
-	return 0;
+	return ret;
 }
 
 
@@ -358,6 +358,85 @@ pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
 out:
 	kfree(buf);
 }
+
+static int pscsi_mpath_get_inquiry_vpd_device_ident_sdev(struct scsi_device *sdev, void *data)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf = data;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = INQUIRY;
+	cdb[1] = 0x01; /* Query VPD */
+	cdb[2] = 0x83; /* Device Identifier */
+	put_unaligned_be16(INQUIRY_VPD_DEVICE_IDENTIFIER_LEN, &cdb[3]);
+
+	return scsi_execute_cmd(sdev, cdb, REQ_OP_DRV_IN, buf,
+			       INQUIRY_VPD_DEVICE_IDENTIFIER_LEN, HZ, 1, NULL);
+}
+
+static void
+pscsi_mpath_get_inquiry_vpd_device_ident(struct scsi_mpath_head *scsi_mpath_head,
+		struct t10_wwn *wwn)
+{
+	unsigned char *buf, *page_83;
+	struct mpath_head *mpath_head = &scsi_mpath_head->mpath_head;
+	int ident_len, page_len, off = 4, ret;
+	struct t10_vpd *vpd;
+	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	dev_err(mpath_head->parent, "%s sdev=%pS\n", __func__, scsi_mpath_head);
+
+	ret = scsi_mpath_call_for_sdev(scsi_mpath_head, pscsi_mpath_get_inquiry_vpd_device_ident_sdev, buf);
+	dev_err(mpath_head->parent, "%s1 sdev=%pS ret=%d\n", __func__, scsi_mpath_head, ret);
+	if (ret)
+		goto out;
+
+	page_len = get_unaligned_be16(&buf[2]);
+	while (page_len > 0) {
+		/* Grab a pointer to the Identification descriptor */
+		page_83 = &buf[off];
+		ident_len = page_83[3];
+		if (!ident_len) {
+			pr_err("page_83[3]: identifier"
+					" length zero!\n");
+			break;
+		}
+		pr_err("T10 VPD Identifier Length: %d\n", ident_len);
+
+		vpd = kzalloc_obj(struct t10_vpd);
+		if (!vpd) {
+			pr_err("Unable to allocate memory for"
+					" struct t10_vpd\n");
+			goto out;
+		}
+		INIT_LIST_HEAD(&vpd->vpd_list);
+
+		transport_set_vpd_proto_id(vpd, page_83);
+		transport_set_vpd_assoc(vpd, page_83);
+
+		if (transport_set_vpd_ident_type(vpd, page_83) < 0) {
+			off += (ident_len + 4);
+			page_len -= (ident_len + 4);
+			kfree(vpd);
+			continue;
+		}
+		if (transport_set_vpd_ident(vpd, page_83) < 0) {
+			off += (ident_len + 4);
+			page_len -= (ident_len + 4);
+			kfree(vpd);
+			continue;
+		}
+
+		list_add_tail(&vpd->vpd_list, &wwn->t10_vpd_list);
+		off += (ident_len + 4);
+		page_len -= (ident_len + 4);
+	}
+
+out:
+	kfree(buf);
+}
+
 
 static int pscsi_add_device_to_list(struct se_device *dev,
 		struct scsi_device *sd)
@@ -443,7 +522,7 @@ static int pscsi_add_mpath_device_to_list(struct se_device *dev,
 		 * VPD Device Identification page (0x83).
 		 */
 		//BUG();
-		//pscsi_get_inquiry_vpd_device_ident(sd, &dev->t10_wwn);
+		pscsi_mpath_get_inquiry_vpd_device_ident(scsi_mpath_head, &dev->t10_wwn);
 
 	}
 
