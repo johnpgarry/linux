@@ -4536,6 +4536,9 @@ static int sd_probe(struct scsi_device *sdp)
 	int index = -1;
 	int error;
 
+	dev_err(dev, "%s dev=%pS\n", __func__, dev);
+
+
 	scsi_autopm_get_device(sdp);
 	error = -ENODEV;
 	if (sdp->type != TYPE_DISK &&

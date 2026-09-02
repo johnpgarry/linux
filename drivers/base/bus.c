@@ -547,6 +547,8 @@ int bus_add_device(struct device *dev)
 	struct subsys_private *sp;
 	int error;
 
+	pr_err("%s dev=%pS dev->bus=%pS\n", __func__, dev, dev->bus);
+
 	if (!dev->bus) {
 		/*
 		 * This is a normal operation for many devices that do not
@@ -621,8 +623,10 @@ void bus_probe_device(struct device *dev)
 
 	mutex_lock(&sp->mutex);
 	list_for_each_entry(sif, &sp->interfaces, node)
-		if (sif->add_dev)
+		if (sif->add_dev) {
+			pr_err("%s dev=%pS calling sif->add_dev=%pS\n", __func__, dev, sif->add_dev);
 			sif->add_dev(dev, sif);
+		}
 	mutex_unlock(&sp->mutex);
 	subsys_put(sp);
 }

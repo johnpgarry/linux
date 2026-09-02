@@ -562,6 +562,8 @@ static int scsi_bus_probe(struct device *dev)
 	struct scsi_device *sdp = to_scsi_device(dev);
 	struct scsi_driver *drv = to_scsi_driver(dev->driver);
 
+	dev_err(dev, "%s drv->probe=%pS sdp=%pS\n", __func__, drv->probe, sdp);
+
 	if (drv->probe)
 		return drv->probe(sdp);
 	else
@@ -1439,7 +1441,9 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 
 	scsi_dh_add_device(sdev);
 
+	pr_err("%s1 sdev=%pS calling device_add sdev_gendev\n", __func__, sdev);
 	error = device_add(&sdev->sdev_gendev);
+	pr_err("%s1.1 sdev=%pS called device_add sdev_gendev error=%d\n", __func__, sdev, error);
 	if (error) {
 		sdev_printk(KERN_INFO, sdev,
 				"failed to add device: %d\n", error);
@@ -1447,7 +1451,9 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	}
 
 	device_enable_async_suspend(&sdev->sdev_dev);
+	pr_err("%s2 sdev=%pS calling device_add sdev_dev\n", __func__, sdev);
 	error = device_add(&sdev->sdev_dev);
+	pr_err("%s2.1 sdev=%pS called device_add sdev_gendev error=%d\n", __func__, sdev, error);
 	if (error) {
 		sdev_printk(KERN_INFO, sdev,
 				"failed to add class device: %d\n", error);
@@ -1706,6 +1712,7 @@ void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 	const struct scsi_host_template *hostt = shost->hostt;
 	struct scsi_target  *starget = sdev->sdev_target;
 
+	pr_err("%s sdev=%pS sdev->sdev_dev=%pS sdev->sdev_gendev=%pS\n", __func__, sdev, &sdev->sdev_dev, &sdev->sdev_gendev);
 	device_initialize(&sdev->sdev_gendev);
 	sdev->sdev_gendev.bus = &scsi_bus_type;
 	sdev->sdev_gendev.type = &scsi_dev_type;
@@ -1713,6 +1720,7 @@ void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 	dev_set_name(&sdev->sdev_gendev, "%d:%d:%d:%llu",
 		     sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
 	sdev->sdev_gendev.groups = hostt->sdev_groups;
+
 
 	device_initialize(&sdev->sdev_dev);
 	sdev->sdev_dev.parent = get_device(&sdev->sdev_gendev);

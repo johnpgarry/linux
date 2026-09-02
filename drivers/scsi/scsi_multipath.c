@@ -688,8 +688,8 @@ static struct mpath_head_template smpdt = {
 void scsi_multipath_dev_rescan(struct scsi_device *sdev)
 {
 	/* Handle ALUA reconfig */
-	dev_warn_once(&sdev->sdev_gendev, "calling queue_delayed_work SCSI_MPATH_ALUA_RTPG_DELAY_MS alua=%d\n",
-		sdev->scsi_mpath_dev->alua);
+	dev_warn(&sdev->sdev_gendev, "calling queue_delayed_work SCSI_MPATH_ALUA_RTPG_DELAY_MS alua=%d alua_check_tpgs(sdev)=%d\n",
+		sdev->scsi_mpath_dev->alua, alua_check_tpgs(sdev));
 
 	if (sdev->scsi_mpath_dev->alua)
 		queue_delayed_work(scsi_mpath_alua_wq, &sdev->scsi_mpath_dev->alua_work,
@@ -809,6 +809,42 @@ static int scsi_mpath_alua_init(struct scsi_device *sdev)
 	return 0;
 }
 
+struct iter_data {
+	struct scsi_device *sdev;
+	bool implicit_alua;
+};
+
+static int scsi_mpath_dev_alloc_iter(struct device *dev, void *data)
+{
+	struct iter_data *iter_data = data; 
+	struct scsi_device *sdev = iter_data->sdev;
+	struct scsi_device *sdev_iter;
+
+	if (!scsi_is_sdev_device(dev))
+		return 0;
+
+	sdev_iter = to_scsi_device(dev);
+	if (sdev_iter == sdev)
+		return 0;
+
+	dev_err(&sdev->sdev_gendev, "%s iter_data=%pS sdev=%pS\n", __func__, iter_data, sdev);
+
+	WARN_ON_ONCE(1);
+
+	if (!sdev_iter->scsi_mpath_dev)
+		return 0;
+
+	dev_err(&sdev->sdev_gendev, "%s1 data=%pS class=%pS type=%pS scsi_is_sdev_device=%d\n",
+		__func__, data, dev->class, dev->type, scsi_is_sdev_device(dev));
+	dev_err(&sdev->sdev_gendev, "%s2 same=%d sdev=%pS sdev_iter=%pS implicit_alua=%d\n", __func__,
+		!!(dev == &sdev_iter->sdev_gendev), sdev, sdev_iter, iter_data->implicit_alua);
+
+	if (iter_data->implicit_alua != !!(sdev_iter->scsi_mpath_dev))
+		return -ENODEV;
+
+	return 0;
+}
+
 int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 {
 	struct scsi_mpath_head *scsi_mpath_head;
@@ -817,13 +853,6 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 	if (scsi_multipath == SCSI_MULTIPATH_OFF)
 		return 0;
 
-	tpgs = alua_check_tpgs(sdev);
-	if (!(tpgs & TPGS_MODE_IMPLICIT) &&
-	    (scsi_multipath != SCSI_MULTIPATH_ALWAYS)) {
-		sdev_printk(KERN_DEBUG, sdev, "IMPLICIT TPGS are required for multipath support\n");
-		return 0;
-	}
-
 	ret = scsi_multipath_sdev_init(sdev);
 	if (ret)
 		return ret;
@@ -831,6 +860,39 @@ int scsi_mpath_dev_alloc(struct scsi_device *sdev)
 	ret = scsi_mpath_unique_lun_id(sdev);
 	if (ret < 0)
 		goto out_uninit;
+
+	tpgs = alua_check_tpgs(sdev);
+	if (!(tpgs & TPGS_MODE_IMPLICIT) &&
+	    (scsi_multipath != SCSI_MULTIPATH_ALWAYS)) {
+		struct iter_data data = {
+			.implicit_alua = false,
+			.sdev = sdev,
+		};
+
+		sdev_printk(KERN_DEBUG, sdev, "IMPLICIT TPGS are required for multipath support\n");
+
+		mutex_lock(&scsi_mpath_heads_lock);
+		//sdev_printk(KERN_ERR, sdev, "calling scsi_mpath_dev_alloc_iter sdev=%pS\n", sdev);
+		ret = bus_for_each_dev(&scsi_bus_type, NULL, &data, scsi_mpath_dev_alloc_iter);
+		mutex_unlock(&scsi_mpath_heads_lock);
+		sdev_printk(KERN_ERR, sdev, "ret=%d from scsi_mpath_dev_alloc_iter for !ALUA\n", ret);
+		if (ret < 0)
+			goto out_uninit;
+	} else {
+		struct iter_data data = {
+			.implicit_alua = true,
+			.sdev = sdev,
+		};
+
+		mutex_lock(&scsi_mpath_heads_lock);
+		//sdev_printk(KERN_ERR, sdev, "calling scsi_mpath_dev_alloc_iter sdev=%pS\n", sdev);
+		ret = bus_for_each_dev(&scsi_bus_type, NULL, &data, scsi_mpath_dev_alloc_iter);
+		mutex_unlock(&scsi_mpath_heads_lock);
+		sdev_printk(KERN_ERR, sdev, "ret=%d from scsi_mpath_dev_alloc_iter for ALUA\n", ret);
+		if (ret < 0)
+			goto out_uninit;
+	}
+
 
 	mutex_lock(&scsi_mpath_heads_lock);
 	scsi_mpath_head = scsi_mpath_find_head(sdev->scsi_mpath_dev);
