@@ -40,6 +40,7 @@
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi_dh.h>
 #include <scsi/scsi_devinfo.h>
+#include <scsi/scsi_multipath.h>
 #include <scsi/sg.h>
 
 #include "scsi_priv.h"
@@ -598,6 +599,12 @@ enum scsi_disposition scsi_check_sense(struct scsi_cmnd *scmd)
 		if (rc != SCSI_RETURN_NOT_HANDLED)
 			return rc;
 		/* handler does not care. Drop down to default handling */
+	} else if (scsi_mpath_dev_alua(sdev)) {
+		enum scsi_disposition rc;
+
+		rc = scsi_multipath_alua_check_sense(sdev, &sshdr);
+		if (rc != SCSI_RETURN_NOT_HANDLED)
+			return rc;
 	}
 
 	if (scmd->cmnd[0] == TEST_UNIT_READY &&
