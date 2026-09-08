@@ -89,6 +89,8 @@ static int scsi_mpath_unique_lun_id(struct scsi_device *sdev)
 		return ret;
 	else if (ret == 0)
 		return -EINVAL;
+	else if (ret > SCSI_MPATH_DEVICE_ID_LEN)
+		return -EINVAL;
 
 	return 0;
 }
