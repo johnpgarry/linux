@@ -60,7 +60,7 @@ void scsi_mpath_revalidate_paths(struct scsi_mpath_device *scsi_mpath_dev);
 void scsi_mpath_start_request(struct request *req);
 bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 			       unsigned int nr_bytes);
-void scsi_mpath_end_request_no_update(struct request *req);
+void scsi_mpath_end_request_no_update(struct request *req, blk_status_t error);
 #else /* CONFIG_SCSI_MULTIPATH */
 
 struct scsi_mpath_head {
@@ -121,7 +121,8 @@ static inline bool scsi_mpath_end_request(struct request *req, blk_status_t erro
 {
 	return false;
 }
-static inline void scsi_mpath_end_request_no_update(struct request *req)
+static inline void scsi_mpath_end_request_no_update(struct request *req,
+				blk_status_t error)
 {
 }
 #endif /* CONFIG_SCSI_MULTIPATH */
