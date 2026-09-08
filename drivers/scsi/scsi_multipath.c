@@ -651,13 +651,17 @@ bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 	return false;
 }
 
-void scsi_mpath_end_request_no_update(struct request *req)
+void scsi_mpath_end_request_no_update(struct request *req, blk_status_t error)
 {
 	struct scsi_cmnd *scmd = blk_mq_rq_to_pdu(req);
 	struct scsi_device *sdev = scmd->device;
 	struct bio *clone = req->bio, *master = clone->bi_private;
 	struct block_device *bi_bdev = master->bi_bdev;
 	unsigned int nr_bytes;
+
+	/* Don't generate error logs if we are going to try another path */
+	if (blk_path_error(error))
+		req->rq_flags |= RQF_QUIET;
 
 	if (scmd->flags & SCMD_MPATH_CNT_ACTIVE) {
 		struct Scsi_Host *shost = sdev->host;
