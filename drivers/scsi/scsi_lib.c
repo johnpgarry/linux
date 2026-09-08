@@ -1974,6 +1974,8 @@ out_put_budget:
 		 */
 		if (req->rq_flags & RQF_DONTPREP)
 			scsi_mq_uninit_cmd(cmd);
+		cmd->flags = 0;
+
 		scsi_run_queue_async(sdev);
 		break;
 	}
