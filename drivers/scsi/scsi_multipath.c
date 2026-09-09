@@ -258,16 +258,6 @@ void scsi_mpath_dev_clear_path(struct scsi_mpath_device *scsi_mpath_dev)
                mpath_synchronize(mpath_head);
 }
 
-static inline void bio_list_add_master(struct bio_list *bl,
-				struct bio *master_bio)
-{
-	if (bl->tail)
-		bl->tail->bi_next = master_bio;
-	else
-		bl->head = master_bio;
-	bl->tail = master_bio;
-}
-
 static void scsi_mpath_clone_end_io(struct bio *clone)
 {
 	struct bio *master_bio = clone->bi_private;
@@ -278,7 +268,7 @@ static void scsi_mpath_clone_end_io(struct bio *clone)
 		unsigned long flags;
 
 		spin_lock_irqsave(&mpath_head->requeue_lock, flags);
-		bio_list_add_master(&mpath_head->requeue_list, master_bio);
+		bio_list_add(&mpath_head->requeue_list, master_bio);
 		spin_unlock_irqrestore(&mpath_head->requeue_lock, flags);
 		bio_put(clone);
 
