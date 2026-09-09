@@ -24542,6 +24542,15 @@ F:	drivers/scsi/libsas/
 F:	include/scsi/libsas.h
 F:	include/scsi/sas_ata.h
 
+SCSI NATIVE MULTIPATH SUPPORT
+R:	John Garry <john.garry@linux.dev>
+L:	linux-scsi@vger.kernel.org
+S:	Supported
+F:	drivers/scsi/scsi_multipath.c
+F:	include/linux/multipath.h
+F:	include/scsi/scsi_multipath.h
+F:	lib/multipath.c
+
 SCSI RDMA PROTOCOL (SRP) INITIATOR
 M:	Bart Van Assche <bvanassche@acm.org>
 L:	linux-rdma@vger.kernel.org
