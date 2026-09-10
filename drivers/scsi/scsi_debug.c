@@ -84,7 +84,7 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_DEV_SIZE_MB   8
 #define DEF_ZBC_DEV_SIZE_MB   128
 #define DEF_DIF 0
-#define DEF_DIX 0
+#define DEF_DIX 1
 #define DEF_PER_HOST_STORE false
 #define DEF_D_SENSE   0
 #define DEF_EVERY_NTH   0
@@ -115,8 +115,8 @@ static const char *sdebug_version_date = "20210520";
 #define DEF_VIRTUAL_GB   0
 #define DEF_VPD_USE_HOSTNO 1
 #define DEF_WRITESAME_LENGTH 0xFFFF
-#define DEF_ATOMIC_WR 0
-#define DEF_ATOMIC_WR_MAX_LENGTH 128
+#define DEF_ATOMIC_WR 1
+#define DEF_ATOMIC_WR_MAX_LENGTH 1024
 #define DEF_ATOMIC_WR_ALIGN 2
 #define DEF_ATOMIC_WR_GRAN 2
 #define DEF_ATOMIC_WR_MAX_LENGTH_BNDRY (DEF_ATOMIC_WR_MAX_LENGTH)

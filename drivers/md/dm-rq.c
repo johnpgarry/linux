@@ -396,6 +396,7 @@ static int map_request(struct dm_rq_target_io *tio)
 			break;
 		case BLK_STS_RESOURCE:
 		case BLK_STS_DEV_RESOURCE:
+		//	pr_err("%s clone=%pS rq=%pS\n", __func__, clone, rq);
 			blk_rq_unprep_clone(clone);
 			blk_mq_cleanup_rq(clone);
 			tio->ti->type->release_clone_rq(clone, &tio->info);
