@@ -36,10 +36,17 @@ void sd_dif_config_host(struct scsi_disk *sdkp, struct queue_limits *lim)
 	dif = scsi_host_dif_capable(sdp->host, type);
 	dix = scsi_host_dix_capable(sdp->host, type);
 
+	dev_err(&sdp->sdev_gendev, "%s dif=%d dix=%d scsi_host_dix_capable=%d\n",
+		__func__, dif, dix,
+		scsi_host_dix_capable(sdp->host, 0));
+
 	if (!dix && scsi_host_dix_capable(sdp->host, 0)) {
 		dif = 0; dix = 1;
 	}
 
+	dev_err(&sdp->sdev_gendev, "%s1 dif=%d dix=%d scsi_host_dix_capable=%d\n",
+		__func__, dif, dix,
+		scsi_host_dix_capable(sdp->host, 0));
 	if (!dix)
 		return;
 

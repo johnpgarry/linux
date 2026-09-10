@@ -1806,7 +1806,7 @@ static inline int bio_split_rw_at(struct bio *bio,
 /*
  * Maximum contiguous integrity buffer allocation.
  */
-#define BLK_INTEGRITY_MAX_SIZE		SZ_2M
+#define BLK_INTEGRITY_MAX_SIZE		SZ_4K
 
 /*
  * Maximum size of I/O that needs a block layer integrity buffer.  Limited

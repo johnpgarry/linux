@@ -1953,10 +1953,13 @@ static void __iscsi_block_session(struct work_struct *work)
 	spin_unlock_irqrestore(&session->lock, flags);
 	scsi_block_targets(shost, &session->dev);
 	ISCSI_DBG_TRANS_SESSION(session, "Completed SCSI target blocking\n");
-	if (session->recovery_tmo >= 0)
+	if (session->recovery_tmo >= 0) {
+		pr_err("%s2 session->recovery_tmo=%d\n", __func__, session->recovery_tmo);
+		 session->recovery_tmo = 5;
 		queue_delayed_work(session->workq,
 				   &session->recovery_work,
 				   session->recovery_tmo * HZ);
+	}
 }
 
 void iscsi_block_session(struct iscsi_cls_session *session)

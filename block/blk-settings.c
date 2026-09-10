@@ -127,6 +127,10 @@ static int blk_validate_integrity_limits(struct queue_limits *lim)
 {
 	struct blk_integrity *bi = &lim->integrity;
 
+	pr_err("%s bi->metadata_size=%d bi->csum_type=%d bi->tag_size=%d BLK_INTEGRITY_REF_TAG=%d atomic_write_hw_max=%d\n",
+		__func__, bi->metadata_size, bi->csum_type, bi->tag_size,
+		!!(bi->flags & BLK_INTEGRITY_REF_TAG), lim->atomic_write_hw_max);
+
 	if (!bi->metadata_size) {
 		if (bi->csum_type != BLK_INTEGRITY_CSUM_NONE ||
 		    bi->tag_size || ((bi->flags & BLK_INTEGRITY_REF_TAG))) {
@@ -203,8 +207,14 @@ static int blk_validate_integrity_limits(struct queue_limits *lim)
 	 * already have it.  Limit the I/O size so that a single maximum size
 	 * metadata segment can cover the integrity data for the entire I/O.
 	 */
+	pr_err("%s1 lim->max_sectors=%d max_integrity_io_size()=%d (%d sectors)\n",
+		__func__, lim->max_sectors,
+		max_integrity_io_size(lim),
+		max_integrity_io_size(lim) >> SECTOR_SHIFT);
 	lim->max_sectors = min(lim->max_sectors,
 		max_integrity_io_size(lim) >> SECTOR_SHIFT);
+	pr_err("%s2 lim->max_sectors=%d\n",
+		__func__, lim->max_sectors);
 
 	return 0;
 }
