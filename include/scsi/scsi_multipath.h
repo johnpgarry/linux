@@ -36,6 +36,15 @@ struct scsi_mpath_device {
 	struct scsi_device 	*sdev;
 	int			index;
 	struct scsi_mpath_head	*scsi_mpath_head;
+	struct delayed_work	alua_work;
+	int			alua_group_id;
+	int			alua_valid_states;
+	int			rtpg_ext_hdr_unsupp;
+	unsigned char		alua_transition_tmo;
+	unsigned long		alua_expiry;
+	unsigned long		alua_interval;
+
+	unsigned int		alua:1;
 
 	char			device_id_str[SCSI_MPATH_DEVICE_ID_LEN];
 };
@@ -60,6 +69,7 @@ void scsi_mpath_revalidate_paths(struct scsi_mpath_device *scsi_mpath_dev);
 void scsi_mpath_start_request(struct request *req);
 bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 			       unsigned int nr_bytes);
+bool scsi_mpath_dev_has_alua(struct scsi_device *sdev);
 void scsi_mpath_end_request_no_update(struct request *req, blk_status_t error);
 #else /* CONFIG_SCSI_MULTIPATH */
 
@@ -121,9 +131,16 @@ static inline bool scsi_mpath_end_request(struct request *req, blk_status_t erro
 {
 	return false;
 }
+static inline void scsi_multipath_dev_rescan(struct scsi_device *sdev)
+{
+}
 static inline void scsi_mpath_end_request_no_update(struct request *req,
 				blk_status_t error)
 {
+}
+static inline bool scsi_mpath_dev_has_alua(struct scsi_device *sdev)
+{
+	return false;
 }
 #endif /* CONFIG_SCSI_MULTIPATH */
 #endif /* _SCSI_SCSI_MULTIPATH_H */

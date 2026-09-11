@@ -1167,7 +1167,7 @@ sdev_show_access_state(struct device *dev,
 	unsigned char access_state;
 	const char *access_state_name;
 
-	if (!sdev->handler)
+	if (!sdev->handler && !scsi_mpath_dev_alua(sdev))
 		return -EINVAL;
 
 	access_state = (sdev->access_state & SCSI_ACCESS_STATE_MASK);
@@ -1185,7 +1185,7 @@ sdev_show_preferred_path(struct device *dev,
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
 
-	if (!sdev->handler)
+	if (!sdev->handler && !scsi_mpath_dev_alua(sdev))
 		return -EINVAL;
 
 	if (sdev->access_state & SCSI_ACCESS_STATE_PREFERRED)
