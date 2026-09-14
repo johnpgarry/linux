@@ -633,6 +633,87 @@ static void scsi_mpath_remove_head_work(struct mpath_head *mpath_head)
 	scsi_mpath_put_head(scsi_mpath_head);
 }
 
+static void scsi_mpath_alua_handle_state_transition(struct scsi_device *sdev)
+{
+	__maybe_unused struct scsi_mpath_device *scsi_mpath_dev = sdev->scsi_mpath_dev;
+	dev_err(&sdev->sdev_gendev, "%s\n", __func__);
+	scsi_mpath_update_access_state(sdev, SCSI_ACCESS_STATE_TRANSITIONING);
+	queue_delayed_work(scsi_mpath_alua_wq, &sdev->scsi_mpath_dev->alua_work,
+		msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
+}
+
+enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr)
+{
+	switch (sense_hdr->sense_key) {
+	case NOT_READY:
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
+			/*
+			 * LUN Not Accessible - ALUA state transition
+			 */
+			scsi_mpath_alua_handle_state_transition(sdev);
+			return NEEDS_RETRY;
+		}
+		break;
+	case UNIT_ATTENTION:
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
+			/*
+			 * LUN Not Accessible - ALUA state transition
+			 */
+			scsi_mpath_alua_handle_state_transition(sdev);
+			return NEEDS_RETRY;
+		}
+		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x00) {
+			/*
+			 * Power On, Reset, or Bus Device Reset.
+			 * Might have obscured a state transition,
+			 * so schedule a recheck.
+			 */
+			scsi_multipath_alua_rtpg_queue(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x04)
+			/*
+			 * Device internal reset
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x01)
+			/*
+			 * Mode Parameters Changed
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x06) {
+			/*
+			 * ALUA state changed
+			 */
+			scsi_multipath_alua_rtpg_queue(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07) {
+			/*
+			 * Implicit ALUA state transition failed
+			 */
+			scsi_multipath_alua_rtpg_queue(sdev);
+			return ADD_TO_MLQUEUE;
+		}
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x03)
+			/*
+			 * Inquiry data has changed
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x0e)
+			/*
+			 * REPORTED_LUNS_DATA_HAS_CHANGED is reported
+			 * when switching controllers on targets like
+			 * Intel Multi-Flex. We can just retry.
+			 */
+			return ADD_TO_MLQUEUE;
+		break;
+	}
+
+	return SCSI_RETURN_NOT_HANDLED;
+}
+
 static struct mpath_head_template smpdt = {
 	.remove_head = scsi_mpath_remove_head_work,
 	.is_disabled = scsi_mpath_is_disabled,

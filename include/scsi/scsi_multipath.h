@@ -72,6 +72,8 @@ bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 bool scsi_mpath_dev_has_alua(struct scsi_device *sdev);
 void scsi_mpath_end_request_no_update(struct request *req, blk_status_t error);
 void scsi_multipath_dev_rescan(struct scsi_device *sdev);
+enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr);
 #else /* CONFIG_SCSI_MULTIPATH */
 
 struct scsi_mpath_head {
@@ -138,6 +140,11 @@ static inline void scsi_multipath_dev_rescan(struct scsi_device *sdev)
 static inline void scsi_mpath_end_request_no_update(struct request *req,
 				blk_status_t error)
 {
+}
+static inline enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
+					      struct scsi_sense_hdr *sense_hdr)
+{
+	return SCSI_RETURN_NOT_HANDLED;
 }
 static inline bool scsi_mpath_dev_has_alua(struct scsi_device *sdev)
 {
