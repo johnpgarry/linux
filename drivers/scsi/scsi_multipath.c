@@ -641,6 +641,14 @@ static struct mpath_head_template smpdt = {
 	.clone_bio = scsi_mpath_clone_bio,
 };
 
+void scsi_multipath_dev_rescan(struct scsi_device *sdev)
+{
+	if (sdev->scsi_mpath_dev->alua)
+		queue_delayed_work(scsi_mpath_alua_wq,
+			&sdev->scsi_mpath_dev->alua_work,
+			msecs_to_jiffies(SCSI_MPATH_ALUA_RTPG_DELAY_MS));
+}
+
 bool scsi_mpath_dev_has_alua(struct scsi_device *sdev)
 {
 	if (sdev->scsi_mpath_dev && sdev->scsi_mpath_dev->alua)

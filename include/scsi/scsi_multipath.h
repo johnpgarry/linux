@@ -71,6 +71,7 @@ bool scsi_mpath_end_request(struct request *req, blk_status_t error,
 			       unsigned int nr_bytes);
 bool scsi_mpath_dev_has_alua(struct scsi_device *sdev);
 void scsi_mpath_end_request_no_update(struct request *req, blk_status_t error);
+void scsi_multipath_dev_rescan(struct scsi_device *sdev);
 #else /* CONFIG_SCSI_MULTIPATH */
 
 struct scsi_mpath_head {
@@ -130,6 +131,9 @@ static inline bool scsi_mpath_end_request(struct request *req, blk_status_t erro
 			       unsigned int nr_bytes)
 {
 	return false;
+}
+static inline void scsi_multipath_dev_rescan(struct scsi_device *sdev)
+{
 }
 static inline void scsi_mpath_end_request_no_update(struct request *req,
 				blk_status_t error)
