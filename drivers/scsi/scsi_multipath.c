@@ -714,6 +714,12 @@ enum scsi_disposition scsi_multipath_alua_check_sense(struct scsi_device *sdev,
 	return SCSI_RETURN_NOT_HANDLED;
 }
 
+blk_status_t scsi_multipath_prep_cmd(struct scsi_cmnd *cmnd)
+{
+	return scsi_alua_prep_cmd(cmnd,
+		READ_ONCE(cmnd->device->access_state) & SCSI_ACCESS_STATE_MASK);
+}
+
 static struct mpath_head_template smpdt = {
 	.remove_head = scsi_mpath_remove_head_work,
 	.is_disabled = scsi_mpath_is_disabled,
