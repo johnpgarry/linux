@@ -819,10 +819,12 @@ xfs_file_dio_write_atomic(
 	 * HW offload should be faster, so try that first if it is already
 	 * known that the write length is not too large.
 	 */
-	if (ocount > xfs_inode_buftarg(ip)->bt_awu_max)
+	if (ocount > xfs_inode_buftarg(ip)->bt_awu_max) {
 		dops = &xfs_atomic_write_cow_iomap_ops;
-	else
+		dio_flags |= IOMAP_DIO_FORCE_WAIT;
+	} else {
 		dops = &xfs_direct_write_iomap_ops;
+	}
 
 retry:
 	ret = xfs_ilock_iocb_for_write(iocb, &iolock);
@@ -840,6 +842,8 @@ retry:
 	}
 
 	trace_xfs_file_direct_write(iocb, from);
+	if (dio_flags & IOMAP_DIO_FORCE_WAIT)
+		inode_dio_wait(VFS_I(ip));
 	if (mapping_stable_writes(iocb->ki_filp->f_mapping))
 		dio_flags |= IOMAP_DIO_BOUNCE;
 	ret = iomap_dio_rw(iocb, from, dops, &xfs_dio_write_ops, dio_flags,
@@ -853,6 +857,7 @@ retry:
 	 */
 	if (ret == -ENOPROTOOPT && dops == &xfs_direct_write_iomap_ops) {
 		xfs_iunlock(ip, iolock);
+		dio_flags |= IOMAP_DIO_FORCE_WAIT;
 		dops = &xfs_atomic_write_cow_iomap_ops;
 		goto retry;
 	}
