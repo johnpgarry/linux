@@ -664,16 +664,17 @@ arm_smmu_make_cmd_tlbi(enum arm_smmu_cmdq_opcode op, u16 asid, u16 vmid)
 struct arm_smmu_ll_queue {
 	union {
 		u64			val;
+		atomic64_t		atomic;
 		struct {
+			struct {
+				u16	sync;
+				u16	count;
+			};
 			u32		prod;
-			u32		cons;
 		};
-		struct {
-			atomic_t	prod;
-			atomic_t	cons;
-		} atomic;
 		u8			__pad[SMP_CACHE_BYTES];
 	} ____cacheline_aligned_in_smp;
+	u32				cons;
 	u32				max_n_shift;
 	u32				max_cmd_per_batch;
 };
